@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
-import { AI_MODELS, MODEL_ACCESS } from "@/lib/constants";
+import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { GenerateRequest, ModelId } from "@/types";
 
@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Resolve audio track URL if selected
+    const audioTrack = body.audioTrackId
+      ? BUILT_IN_AUDIO_TRACKS.find((t) => t.id === body.audioTrackId)
+      : undefined;
+
     // Create job record
     const job = await createJob({
       userId: user.id,
@@ -84,6 +89,9 @@ export async function POST(req: NextRequest) {
       numInferenceSteps: body.numInferenceSteps,
       isDraft: body.isDraft || false,
       creditsCost: creditCost,
+      aspectRatio: body.aspectRatio,
+      audioTrackId: body.audioTrackId,
+      audioUrl: audioTrack?.url,
     });
 
     // Build RunPod input (model-specific schema)
@@ -101,6 +109,7 @@ export async function POST(req: NextRequest) {
       guidanceScale: body.guidanceScale,
       numInferenceSteps: body.numInferenceSteps,
       isDraft: body.isDraft,
+      aspectRatio: body.aspectRatio,
     });
 
     // Submit to RunPod — use server-side URL for webhook (not NEXT_PUBLIC_ which may be localhost)

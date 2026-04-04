@@ -17,6 +17,10 @@ import {
   Grid3x3,
   List,
   Clock,
+  Smartphone,
+  Music,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
@@ -25,6 +29,7 @@ export default function GalleryPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [audioMuted, setAudioMuted] = useState(false);
 
   const filteredVideos = videos.filter(
     (v) =>
@@ -128,7 +133,7 @@ export default function GalleryPage() {
               className="group relative rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden hover:border-violet-500/30 transition-all cursor-pointer"
               onClick={() => setSelectedVideo(selectedVideo === video.id ? null : video.id)}
             >
-              <div className="aspect-video bg-zinc-800 relative">
+              <div className={`${video.aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} bg-zinc-800 relative`}>
                 {video.thumbnailUrl ? (
                   <img
                     src={video.thumbnailUrl}
@@ -143,7 +148,15 @@ export default function GalleryPage() {
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Play className="w-10 h-10 text-white" />
                 </div>
-                <div className="absolute bottom-2 right-2">
+                <div className="absolute bottom-2 right-2 flex gap-1">
+                  {video.aspectRatio === "portrait" && (
+                    <Badge variant="cyan" className="text-[10px]">Reel</Badge>
+                  )}
+                  {video.audioUrl && (
+                    <Badge variant="violet" className="text-[10px]">
+                      <Music className="w-2.5 h-2.5" />
+                    </Badge>
+                  )}
                   <Badge className="text-[10px]">{video.resolution}</Badge>
                 </div>
               </div>
@@ -213,34 +226,66 @@ export default function GalleryPage() {
       )}
 
       {/* Video Player Modal */}
-      {selectedVideo && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setSelectedVideo(null)}
-        >
+      {selectedVideo && (() => {
+        const currentVideo = videos.find((v) => v.id === selectedVideo);
+        const isReelVideo = currentVideo?.aspectRatio === "portrait";
+        return (
           <div
-            className="max-w-4xl w-full rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            onClick={() => setSelectedVideo(null)}
           >
-            <div className="aspect-video bg-black">
-              <video
-                src={videos.find((v) => v.id === selectedVideo)?.url}
-                controls
-                autoPlay
-                className="w-full h-full"
-              />
-            </div>
-            <div className="p-4">
-              <p className="text-sm font-medium text-zinc-200">
-                {videos.find((v) => v.id === selectedVideo)?.title}
-              </p>
-              <p className="text-xs text-zinc-500 mt-1">
-                {videos.find((v) => v.id === selectedVideo)?.prompt}
-              </p>
+            <div
+              className={`rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden ${
+                isReelVideo ? "max-w-sm w-full" : "max-w-4xl w-full"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={isReelVideo ? "aspect-[9/16]" : "aspect-video"} style={{ background: "black", position: "relative" }}>
+                <video
+                  src={currentVideo?.url}
+                  controls
+                  autoPlay
+                  className="w-full h-full"
+                />
+                {/* Audio track played alongside video */}
+                {currentVideo?.audioUrl && (
+                  <audio
+                    src={currentVideo.audioUrl}
+                    autoPlay
+                    loop
+                    muted={audioMuted}
+                  />
+                )}
+              </div>
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-zinc-200">
+                    {currentVideo?.title}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {isReelVideo && (
+                      <Badge variant="cyan" className="text-[10px]">
+                        <Smartphone className="w-3 h-3 mr-1" /> Reel
+                      </Badge>
+                    )}
+                    {currentVideo?.audioUrl && (
+                      <button
+                        onClick={() => setAudioMuted(!audioMuted)}
+                        className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      >
+                        {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">
+                  {currentVideo?.prompt}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

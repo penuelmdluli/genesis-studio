@@ -40,6 +40,9 @@ export default function DashboardLayout({
               fps: v.fps,
               fileSize: v.file_size || 0,
               isPublic: v.is_public || false,
+              aspectRatio: v.aspect_ratio || "landscape",
+              audioUrl: v.audio_url || undefined,
+              audioTrackId: v.audio_track_id || undefined,
               createdAt: v.created_at,
             }))
           );

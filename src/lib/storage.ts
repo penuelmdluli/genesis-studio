@@ -113,3 +113,27 @@ export function thumbnailStorageKey(userId: string, jobId: string): string {
 export function inputImageStorageKey(userId: string, filename: string): string {
   return `inputs/${userId}/${Date.now()}-${filename}`;
 }
+
+export function audioStorageKey(userId: string, jobId: string): string {
+  return `audio/${userId}/${jobId}.mp3`;
+}
+
+export async function uploadAudio(
+  key: string,
+  body: Buffer,
+  contentType = "audio/mpeg"
+): Promise<string> {
+  await R2.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+
+  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
+    return `${PUBLIC_URL}/${key}`;
+  }
+  return key;
+}

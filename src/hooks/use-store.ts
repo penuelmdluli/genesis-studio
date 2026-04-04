@@ -3,7 +3,7 @@
 // ============================================
 
 import { create } from "zustand";
-import { GenerationJob, Video, PlanId, ModelId, GenerationType } from "@/types";
+import { GenerationJob, Video, PlanId, ModelId, GenerationType, AspectRatio, VideoFormat } from "@/types";
 
 interface UserState {
   id: string;
@@ -31,6 +31,10 @@ interface GenerateFormState {
   isDraft: boolean;
   inputImage?: File;
   inputVideo?: File;
+  videoFormat: VideoFormat;
+  aspectRatio: AspectRatio;
+  audioTrackId?: string;
+  customAudio?: File;
 }
 
 interface StoreState {
@@ -75,6 +79,8 @@ const defaultForm: GenerateFormState = {
   guidanceScale: 7.5,
   numInferenceSteps: 30,
   isDraft: false,
+  videoFormat: "standard",
+  aspectRatio: "landscape",
 };
 
 export const useStore = create<StoreState>((set) => ({

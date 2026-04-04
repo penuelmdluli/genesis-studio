@@ -9,6 +9,7 @@ import {
   ModelId,
   PlanId,
   GenerationType,
+  AspectRatio,
   Video,
   ApiKey,
 } from "@/types";
@@ -101,6 +102,9 @@ export async function createJob(params: {
   numInferenceSteps?: number;
   isDraft: boolean;
   creditsCost: number;
+  aspectRatio?: AspectRatio;
+  audioTrackId?: string;
+  audioUrl?: string;
 }) {
   const { data, error } = await getSupabase()
     .from("generation_jobs")
@@ -122,6 +126,9 @@ export async function createJob(params: {
       is_draft: params.isDraft,
       credits_cost: params.creditsCost,
       progress: 0,
+      aspect_ratio: params.aspectRatio,
+      audio_track_id: params.audioTrackId,
+      audio_url: params.audioUrl,
     })
     .select()
     .single();
@@ -211,6 +218,9 @@ export async function createVideo(params: {
   duration: number;
   fps: number;
   fileSize: number;
+  aspectRatio?: AspectRatio;
+  audioUrl?: string;
+  audioTrackId?: string;
 }) {
   const { data, error } = await getSupabase()
     .from("videos")
@@ -227,6 +237,9 @@ export async function createVideo(params: {
       fps: params.fps,
       file_size: params.fileSize,
       is_public: false,
+      aspect_ratio: params.aspectRatio,
+      audio_url: params.audioUrl,
+      audio_track_id: params.audioTrackId,
     })
     .select()
     .single();

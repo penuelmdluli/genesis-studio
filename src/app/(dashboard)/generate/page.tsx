@@ -9,9 +9,19 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/hooks/use-store";
-import { AI_MODELS, RESOLUTIONS, DURATIONS, FPS_OPTIONS, MODEL_ACCESS } from "@/lib/constants";
+import {
+  AI_MODELS,
+  RESOLUTIONS,
+  REEL_RESOLUTIONS,
+  DURATIONS,
+  REEL_DURATIONS,
+  FPS_OPTIONS,
+  MODEL_ACCESS,
+  BUILT_IN_AUDIO_TRACKS,
+  AUDIO_GENRES,
+} from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
-import { ModelId, GenerationType } from "@/types";
+import { ModelId, GenerationType, VideoFormat } from "@/types";
 import {
   Sparkles,
   Zap,
@@ -25,6 +35,11 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Smartphone,
+  Monitor,
+  Music,
+  Volume2,
+  X,
 } from "lucide-react";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
@@ -39,7 +54,9 @@ export default function GeneratePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string | null>(null);
+  const [audioGenreFilter, setAudioGenreFilter] = useState<string>("All");
   const isLoading = !user;
+  const isReel = form.videoFormat === "reel";
 
   const userPlan = user?.plan || "free";
   const availableModels = MODEL_ACCESS[userPlan] || MODEL_ACCESS.free;
@@ -50,11 +67,18 @@ export default function GeneratePage() {
   const creditCost = estimateCreditCost(modelId, form.resolution, form.duration, form.isDraft);
   const hasEnoughCredits = (user?.creditBalance ?? 0) >= creditCost;
 
-  const availableResolutions = RESOLUTIONS.filter((r) => {
+  const resolutionSource = isReel ? REEL_RESOLUTIONS : RESOLUTIONS;
+  const durationSource = isReel ? REEL_DURATIONS : DURATIONS;
+  const availableResolutions = resolutionSource.filter((r) => {
     const modelMaxRes = currentModel?.maxResolution;
     const resOrder = ["480p", "720p", "1080p", "4k"];
     return resOrder.indexOf(r.value) <= resOrder.indexOf(modelMaxRes || "720p");
   });
+
+  const filteredAudioTracks = BUILT_IN_AUDIO_TRACKS.filter(
+    (t) => audioGenreFilter === "All" || t.genre === audioGenreFilter
+  );
+  const selectedAudioTrack = BUILT_IN_AUDIO_TRACKS.find((t) => t.id === form.audioTrackId);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,6 +123,8 @@ export default function GeneratePage() {
           guidanceScale: form.guidanceScale,
           numInferenceSteps: form.numInferenceSteps,
           isDraft: form.isDraft,
+          aspectRatio: form.aspectRatio,
+          audioTrackId: form.audioTrackId || undefined,
         }),
       });
 
@@ -115,6 +141,8 @@ export default function GeneratePage() {
           duration: form.duration,
           fps: form.fps,
           isDraft: form.isDraft,
+          aspectRatio: form.aspectRatio,
+          audioTrackId: form.audioTrackId,
           creditsCost: creditCost,
           progress: 0,
           createdAt: new Date().toISOString(),
@@ -135,9 +163,9 @@ export default function GeneratePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Generate Video</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">Generate {isReel ? "Reel" : "Video"}</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Create AI-generated videos from text, images, or other videos.
+          Create AI-generated {isReel ? "reels" : "videos"} from text, images, or other videos{isReel ? " — optimized for social media" : ""}.
         </p>
       </div>
 
@@ -165,6 +193,47 @@ export default function GeneratePage() {
                         {opt.label}
                       </div>
                       <div className="text-xs text-zinc-500">{opt.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Video Format: Standard vs Reel */}
+          <Card>
+            <CardContent className="p-4">
+              <label className="text-sm font-medium text-zinc-300 block mb-2">Format</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "standard" as VideoFormat, label: "Standard", icon: Monitor, desc: "Landscape 16:9" },
+                  { value: "reel" as VideoFormat, label: "Reel", icon: Smartphone, desc: "Vertical 9:16" },
+                ] as const).map((fmt) => {
+                  const isActive = form.videoFormat === fmt.value;
+                  return (
+                    <button
+                      key={fmt.value}
+                      onClick={() => {
+                        setFormField("videoFormat", fmt.value);
+                        setFormField("aspectRatio", fmt.value === "reel" ? "portrait" : "landscape");
+                        // Reset duration to a valid option for the new format
+                        if (fmt.value === "reel" && !REEL_DURATIONS.includes(form.duration)) {
+                          setFormField("duration", 15);
+                        } else if (fmt.value === "standard" && !DURATIONS.includes(form.duration)) {
+                          setFormField("duration", 5);
+                        }
+                      }}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        isActive
+                          ? "border-violet-500/50 bg-violet-500/10"
+                          : "border-zinc-800 bg-zinc-900/30 hover:border-zinc-700"
+                      }`}
+                    >
+                      <fmt.icon className={`w-5 h-5 mb-2 ${isActive ? "text-violet-400" : "text-zinc-500"}`} />
+                      <div className={`text-sm font-medium ${isActive ? "text-violet-300" : "text-zinc-300"}`}>
+                        {fmt.label}
+                      </div>
+                      <div className="text-xs text-zinc-500">{fmt.desc}</div>
                     </button>
                   );
                 })}
@@ -300,7 +369,7 @@ export default function GeneratePage() {
                     value={form.duration.toString()}
                     onChange={(e) => setFormField("duration", parseInt(e.target.value))}
                   >
-                    {DURATIONS.map((d) => (
+                    {durationSource.map((d) => (
                       <option key={d} value={d}>{d}s</option>
                     ))}
                   </Select>
@@ -388,6 +457,97 @@ export default function GeneratePage() {
             </CardContent>
           </Card>
 
+          {/* Audio / Sound */}
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <Music className="w-4 h-4 text-violet-400" />
+                  Background Audio
+                  <span className="text-zinc-600">(optional)</span>
+                </label>
+                {form.audioTrackId && (
+                  <button
+                    onClick={() => setFormField("audioTrackId", undefined as unknown as string)}
+                    className="text-xs text-zinc-500 hover:text-red-400 flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" /> Remove
+                  </button>
+                )}
+              </div>
+
+              {/* Genre Filter */}
+              <div className="flex gap-1.5 flex-wrap">
+                {["All", ...AUDIO_GENRES].map((genre) => (
+                  <button
+                    key={genre}
+                    onClick={() => setAudioGenreFilter(genre)}
+                    className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                      audioGenreFilter === genre
+                        ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                        : "bg-zinc-800/50 text-zinc-500 border border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+
+              {/* Track List */}
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {filteredAudioTracks.map((track) => {
+                  const isSelected = form.audioTrackId === track.id;
+                  return (
+                    <button
+                      key={track.id}
+                      onClick={() =>
+                        setFormField("audioTrackId", isSelected ? (undefined as unknown as string) : track.id)
+                      }
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
+                        isSelected
+                          ? "border-violet-500/50 bg-violet-500/10"
+                          : "border-zinc-800/50 bg-zinc-900/20 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isSelected ? "bg-violet-500/20" : "bg-zinc-800"
+                        }`}
+                      >
+                        <Volume2
+                          className={`w-4 h-4 ${isSelected ? "text-violet-400" : "text-zinc-600"}`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-300"}`}>
+                          {track.name}
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          {track.genre} · {track.duration}s · {track.bpm} BPM
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <Badge variant="violet" className="shrink-0 text-[10px]">
+                          Selected
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Track Summary */}
+              {selectedAudioTrack && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-violet-500/5 border border-violet-500/15">
+                  <Music className="w-4 h-4 text-violet-400" />
+                  <span className="text-xs text-violet-300">
+                    {selectedAudioTrack.name} — {selectedAudioTrack.genre} · {selectedAudioTrack.duration}s
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Negative Prompt */}
           <Card>
             <CardContent className="p-4 space-y-2">
@@ -419,6 +579,12 @@ export default function GeneratePage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-zinc-500">Format</span>
+                  <Badge variant={isReel ? "cyan" : "default"}>
+                    {isReel ? "Reel (9:16)" : "Standard (16:9)"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-zinc-500">Model</span>
                   <span className="text-zinc-200">{currentModel?.name}</span>
                 </div>
@@ -436,6 +602,15 @@ export default function GeneratePage() {
                     {form.isDraft ? "Draft" : "Full Quality"}
                   </Badge>
                 </div>
+                {selectedAudioTrack && (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Audio</span>
+                    <span className="text-zinc-200 flex items-center gap-1">
+                      <Music className="w-3 h-3 text-violet-400" />
+                      {selectedAudioTrack.name}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Est. Time</span>
                   <span className="text-zinc-200">
@@ -476,7 +651,7 @@ export default function GeneratePage() {
                   "Not enough credits"
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" /> Generate Video
+                    <Sparkles className="w-4 h-4" /> Generate {isReel ? "Reel" : "Video"}
                   </>
                 )}
               </Button>

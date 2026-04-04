@@ -20,6 +20,8 @@ export type ModelTier =
   | "budget";
 
 export type GenerationType = "t2v" | "i2v" | "v2v";
+export type AspectRatio = "landscape" | "portrait" | "square";
+export type VideoFormat = "standard" | "reel";
 
 export interface AIModel {
   id: ModelId;
@@ -99,6 +101,9 @@ export interface GenerationJob {
   guidanceScale?: number;
   numInferenceSteps?: number;
   isDraft: boolean;
+  aspectRatio?: AspectRatio;
+  audioTrackId?: string;
+  audioUrl?: string;
   creditsCost: number;
   outputVideoUrl?: string;
   thumbnailUrl?: string;
@@ -109,6 +114,17 @@ export interface GenerationJob {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+}
+
+// --- Audio Tracks ---
+export interface AudioTrack {
+  id: string;
+  name: string;
+  genre: string;
+  duration: number; // seconds
+  url: string; // R2 storage URL or built-in path
+  bpm?: number;
+  isBuiltIn: boolean;
 }
 
 // --- Videos ---
@@ -126,6 +142,9 @@ export interface Video {
   fps: number;
   fileSize: number;
   isPublic: boolean;
+  aspectRatio?: AspectRatio;
+  audioUrl?: string;
+  audioTrackId?: string;
   createdAt: string;
 }
 
@@ -175,6 +194,8 @@ export interface GenerateRequest {
   guidanceScale?: number;
   numInferenceSteps?: number;
   isDraft?: boolean;
+  aspectRatio?: AspectRatio;
+  audioTrackId?: string;
 }
 
 export interface GenerateResponse {

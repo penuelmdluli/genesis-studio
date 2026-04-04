@@ -8,7 +8,7 @@ import { validateApiKey } from "@/lib/db";
 import { createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
-import { AI_MODELS, MODEL_ACCESS } from "@/lib/constants";
+import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
 import { createHash } from "crypto";
@@ -86,6 +86,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Resolve audio track
+    const audioTrackId = body.audio_track_id;
+    const audioTrack = audioTrackId
+      ? BUILT_IN_AUDIO_TRACKS.find((t) => t.id === audioTrackId)
+      : undefined;
+    const aspectRatio = body.aspect_ratio || "landscape";
+
     // Create job
     const job = await createJob({
       userId: user.id,
@@ -102,6 +109,9 @@ export async function POST(req: NextRequest) {
       numInferenceSteps: body.num_inference_steps,
       isDraft,
       creditsCost: creditCost,
+      aspectRatio,
+      audioTrackId,
+      audioUrl: audioTrack?.url,
     });
 
     // Submit to RunPod
@@ -118,6 +128,7 @@ export async function POST(req: NextRequest) {
       guidanceScale: body.guidance_scale,
       numInferenceSteps: body.num_inference_steps,
       isDraft,
+      aspectRatio,
     });
 
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

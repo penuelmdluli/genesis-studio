@@ -2,7 +2,7 @@
 // GENESIS STUDIO — Constants & Configuration
 // ============================================
 
-import { AIModel, Plan, CreditPack, ModelId } from "@/types";
+import { AIModel, Plan, CreditPack, ModelId, AudioTrack } from "@/types";
 
 // --- AI Models Registry ---
 export const AI_MODELS: Record<ModelId, AIModel> = {
@@ -171,11 +171,137 @@ export const RESOLUTIONS = [
   { value: "4k", label: "4K (Ultra HD)", width: 3840, height: 2160 },
 ];
 
+// --- Vertical (Reel) Resolution Options ---
+export const REEL_RESOLUTIONS = [
+  { value: "480p", label: "480p Vertical", width: 480, height: 854 },
+  { value: "720p", label: "720p Vertical", width: 720, height: 1280 },
+  { value: "1080p", label: "1080p Vertical", width: 1080, height: 1920 },
+];
+
 // --- Duration Options ---
 export const DURATIONS = [3, 5, 6, 8, 10];
 
+// --- Reel Duration Options ---
+export const REEL_DURATIONS = [5, 10, 15, 30, 60];
+
 // --- FPS Options ---
 export const FPS_OPTIONS = [24, 30];
+
+// --- Built-in Audio Tracks Library ---
+export const AUDIO_GENRES = [
+  "Cinematic",
+  "Electronic",
+  "Lo-Fi",
+  "Hip Hop",
+  "Ambient",
+  "Pop",
+  "Rock",
+  "Classical",
+] as const;
+
+export type AudioGenre = (typeof AUDIO_GENRES)[number];
+
+export const BUILT_IN_AUDIO_TRACKS: AudioTrack[] = [
+  {
+    id: "track-cinematic-epic",
+    name: "Epic Rising",
+    genre: "Cinematic",
+    duration: 60,
+    url: "/audio/cinematic-epic.mp3",
+    bpm: 120,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-cinematic-emotional",
+    name: "Emotional Journey",
+    genre: "Cinematic",
+    duration: 45,
+    url: "/audio/cinematic-emotional.mp3",
+    bpm: 80,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-electronic-pulse",
+    name: "Digital Pulse",
+    genre: "Electronic",
+    duration: 60,
+    url: "/audio/electronic-pulse.mp3",
+    bpm: 128,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-electronic-future",
+    name: "Future Bass",
+    genre: "Electronic",
+    duration: 30,
+    url: "/audio/electronic-future.mp3",
+    bpm: 140,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-lofi-chill",
+    name: "Chill Vibes",
+    genre: "Lo-Fi",
+    duration: 60,
+    url: "/audio/lofi-chill.mp3",
+    bpm: 85,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-lofi-study",
+    name: "Study Beats",
+    genre: "Lo-Fi",
+    duration: 45,
+    url: "/audio/lofi-study.mp3",
+    bpm: 75,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-hiphop-trap",
+    name: "Trap Energy",
+    genre: "Hip Hop",
+    duration: 30,
+    url: "/audio/hiphop-trap.mp3",
+    bpm: 140,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-ambient-space",
+    name: "Deep Space",
+    genre: "Ambient",
+    duration: 60,
+    url: "/audio/ambient-space.mp3",
+    bpm: 60,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-pop-upbeat",
+    name: "Upbeat Pop",
+    genre: "Pop",
+    duration: 30,
+    url: "/audio/pop-upbeat.mp3",
+    bpm: 120,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-rock-drive",
+    name: "Driving Rock",
+    genre: "Rock",
+    duration: 45,
+    url: "/audio/rock-drive.mp3",
+    bpm: 130,
+    isBuiltIn: true,
+  },
+  {
+    id: "track-classical-piano",
+    name: "Piano Serenade",
+    genre: "Classical",
+    duration: 60,
+    url: "/audio/classical-piano.mp3",
+    bpm: 72,
+    isBuiltIn: true,
+  },
+];
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {

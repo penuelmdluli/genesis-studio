@@ -78,6 +78,9 @@ export async function GET(
             duration: job.duration,
             fps: job.fps,
             fileSize: 0,
+            aspectRatio: job.aspect_ratio,
+            audioUrl: job.audio_url,
+            audioTrackId: job.audio_track_id,
           });
 
           return NextResponse.json({

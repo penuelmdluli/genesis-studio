@@ -18,6 +18,8 @@ describe("useStore", () => {
         guidanceScale: 7.5,
         numInferenceSteps: 30,
         isDraft: false,
+        videoFormat: "standard",
+        aspectRatio: "landscape",
       },
       activeJobs: [],
       videos: [],
@@ -76,6 +78,9 @@ describe("useStore", () => {
       expect(form.duration).toBe(5);
       expect(form.fps).toBe(24);
       expect(form.isDraft).toBe(false);
+      expect(form.videoFormat).toBe("standard");
+      expect(form.aspectRatio).toBe("landscape");
+      expect(form.audioTrackId).toBeUndefined();
     });
 
     it("updates individual form fields", () => {
@@ -92,6 +97,21 @@ describe("useStore", () => {
       useStore.getState().resetForm();
       expect(useStore.getState().form.prompt).toBe("");
       expect(useStore.getState().form.modelId).toBe("wan-2.2");
+    });
+
+    it("updates video format and aspect ratio for reels", () => {
+      useStore.getState().setFormField("videoFormat", "reel");
+      useStore.getState().setFormField("aspectRatio", "portrait");
+      expect(useStore.getState().form.videoFormat).toBe("reel");
+      expect(useStore.getState().form.aspectRatio).toBe("portrait");
+    });
+
+    it("sets and clears audio track", () => {
+      useStore.getState().setFormField("audioTrackId", "track-cinematic-epic");
+      expect(useStore.getState().form.audioTrackId).toBe("track-cinematic-epic");
+
+      useStore.getState().setFormField("audioTrackId", undefined as unknown as string);
+      expect(useStore.getState().form.audioTrackId).toBeUndefined();
     });
   });
 

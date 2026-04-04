@@ -2,7 +2,7 @@
 // GENESIS STUDIO — RunPod Serverless Integration
 // ============================================
 
-import { ModelId, GenerationType } from "@/types";
+import { ModelId, GenerationType, AspectRatio } from "@/types";
 
 const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 
@@ -97,11 +97,29 @@ export async function cancelRunPodJob(
   });
 }
 
-// Convert resolution string to width/height
-export function resolutionToSize(resolution: string): {
-  width: number;
-  height: number;
-} {
+// Convert resolution string to width/height, respecting aspect ratio
+export function resolutionToSize(
+  resolution: string,
+  aspectRatio?: AspectRatio
+): { width: number; height: number } {
+  if (aspectRatio === "portrait") {
+    // Vertical (9:16) for reels
+    const sizes: Record<string, { width: number; height: number }> = {
+      "480p": { width: 480, height: 854 },
+      "720p": { width: 720, height: 1280 },
+      "1080p": { width: 1080, height: 1920 },
+    };
+    return sizes[resolution] || sizes["720p"];
+  }
+  if (aspectRatio === "square") {
+    const sizes: Record<string, { width: number; height: number }> = {
+      "480p": { width: 480, height: 480 },
+      "720p": { width: 720, height: 720 },
+      "1080p": { width: 1080, height: 1080 },
+    };
+    return sizes[resolution] || sizes["720p"];
+  }
+  // Default: landscape (16:9)
   const sizes: Record<string, { width: number; height: number }> = {
     "480p": { width: 854, height: 480 },
     "720p": { width: 1280, height: 720 },
@@ -130,12 +148,13 @@ export interface BuildRunPodInputParams {
   guidanceScale?: number;
   numInferenceSteps?: number;
   isDraft?: boolean;
+  aspectRatio?: AspectRatio;
 }
 
 // Build model-specific RunPod job input
 // Each RunPod Hub template expects different field names/formats
 export function buildRunPodInput(params: BuildRunPodInputParams): Record<string, unknown> {
-  const { width, height } = resolutionToSize(params.resolution);
+  const { width, height } = resolutionToSize(params.resolution, params.aspectRatio);
   const numFrames = durationToFrames(params.duration, params.fps);
   const steps = params.numInferenceSteps ?? (params.isDraft ? 15 : 30);
   const guidance = params.guidanceScale ?? 7.5;

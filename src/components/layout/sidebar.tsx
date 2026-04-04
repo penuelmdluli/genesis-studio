@@ -41,10 +41,10 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   // --- CREATE ---
-  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
+  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "HOT" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "NEW" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create" },
-  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "NEW" },
+  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "HOT" },
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
   // --- AUDIO ---
@@ -190,8 +190,13 @@ export function Sidebar() {
                     <span className="truncate flex-1">{item.label}</span>
                   )}
                   {(sidebarOpen || mobileMenuOpen) && item.badge && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 text-white leading-none">
-                      {item.badge}
+                    <span className={cn(
+                      "px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none",
+                      item.badge === "HOT"
+                        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white"
+                        : "bg-gradient-to-r from-violet-500 to-cyan-500 text-white"
+                    )}>
+                      {item.badge === "HOT" ? "🔥" : item.badge}
                     </span>
                   )}
                 </Link>

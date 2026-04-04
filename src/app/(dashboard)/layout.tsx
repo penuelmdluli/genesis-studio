@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,22 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen } = useStore();
+  const { sidebarOpen, setUser } = useStore();
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const res = await fetch("/api/user");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+        }
+      } catch (err) {
+        console.error("Failed to load user:", err);
+      }
+    }
+    loadUser();
+  }, [setUser]);
 
   return (
     <div className="min-h-screen bg-black">

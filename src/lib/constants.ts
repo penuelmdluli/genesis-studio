@@ -179,7 +179,7 @@ export const FPS_OPTIONS = [24, 30];
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {
-  free: ["cogvideo-x"],
+  free: ["cogvideo-x", "wan-2.2", "mochi-1"],
   creator: [
     "cogvideo-x",
     "ltx-video",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJob, updateJobStatus, createVideo } from "@/lib/db";
+import { updateJobStatus, createVideo } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey } from "@/lib/storage";
 
@@ -18,7 +18,6 @@ export async function POST(req: NextRequest) {
     const { id: runpodJobId, status, output, error: jobError, executionTime } = body;
 
     // Find our job by RunPod job ID
-    // In production, use an index lookup
     const { createSupabaseAdmin } = await import("@/lib/supabase");
     const supabase = createSupabaseAdmin();
     const { data: job } = await supabase
@@ -33,27 +32,34 @@ export async function POST(req: NextRequest) {
     }
 
     if (status === "COMPLETED" && output) {
-      // Download video from RunPod temporary URL and upload to R2
-      let finalVideoUrl = output.video_url;
-      let finalThumbnailUrl = output.thumbnail_url;
+      let finalVideoUrl = "";
+      let finalThumbnailUrl = "";
 
       try {
-        if (output.video_url) {
-          const videoRes = await fetch(output.video_url);
+        const vKey = videoStorageKey(job.user_id, job.id);
+
+        // Handle base64 video data (common in RunPod Hub templates)
+        if (output.video && !output.video.startsWith("http")) {
+          const videoBuffer = Buffer.from(output.video, "base64");
+          finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+        }
+        // Handle URL-based video output
+        else if (output.video_url || (output.video && output.video.startsWith("http"))) {
+          const videoUrl = output.video_url || output.video;
+          const videoRes = await fetch(videoUrl);
           const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-          const vKey = videoStorageKey(job.user_id, job.id);
           finalVideoUrl = await uploadVideo(vKey, videoBuffer);
         }
 
+        // Handle thumbnail if provided
         if (output.thumbnail_url) {
+          const tKey = thumbnailStorageKey(job.user_id, job.id);
           const thumbRes = await fetch(output.thumbnail_url);
           const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer());
-          const tKey = thumbnailStorageKey(job.user_id, job.id);
           finalThumbnailUrl = await uploadThumbnail(tKey, thumbBuffer);
         }
       } catch (storageErr) {
         console.error("Storage upload error:", storageErr);
-        // Fall back to RunPod URLs
       }
 
       await updateJobStatus(job.id, {
@@ -71,7 +77,7 @@ export async function POST(req: NextRequest) {
         jobId: job.id,
         title: job.prompt.slice(0, 100),
         url: finalVideoUrl,
-        thumbnailUrl: finalThumbnailUrl || "",
+        thumbnailUrl: finalThumbnailUrl,
         modelId: job.model_id,
         prompt: job.prompt,
         resolution: job.resolution,

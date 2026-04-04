@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserByClerkId, getJob } from "@/lib/db";
+import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
+import { getRunPodJobStatus } from "@/lib/runpod";
+import { refundCredits } from "@/lib/credits";
+import { uploadVideo, videoStorageKey } from "@/lib/storage";
+import { ModelId } from "@/types";
 
 export async function GET(
   req: NextRequest,
@@ -21,6 +25,102 @@ export async function GET(
     const job = await getJob(jobId);
     if (!job || job.user_id !== user.id) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    // If job is still queued/processing and has a RunPod job ID, poll RunPod for updates
+    if ((job.status === "queued" || job.status === "processing") && job.runpod_job_id) {
+      try {
+        const runpodStatus = await getRunPodJobStatus(
+          job.model_id as ModelId,
+          job.runpod_job_id
+        );
+
+        if (runpodStatus.status === "COMPLETED" && runpodStatus.output) {
+          const output = runpodStatus.output as Record<string, string>;
+          let finalVideoUrl = "";
+
+          try {
+            const vKey = videoStorageKey(job.user_id, job.id);
+
+            // Handle base64 video data
+            if (output.video && !output.video.startsWith("http")) {
+              const videoBuffer = Buffer.from(output.video, "base64");
+              finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+            }
+            // Handle URL-based video
+            else if (output.video_url || (output.video && output.video.startsWith("http"))) {
+              const videoUrl = output.video_url || output.video;
+              const videoRes = await fetch(videoUrl);
+              const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+              finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+            }
+          } catch (storageErr) {
+            console.error("Storage upload error:", storageErr);
+          }
+
+          await updateJobStatus(job.id, {
+            status: "completed",
+            progress: 100,
+            outputVideoUrl: finalVideoUrl,
+            gpuTime: runpodStatus.executionTime,
+            completedAt: new Date().toISOString(),
+          });
+
+          await createVideo({
+            userId: job.user_id,
+            jobId: job.id,
+            title: job.prompt.slice(0, 100),
+            url: finalVideoUrl,
+            thumbnailUrl: "",
+            modelId: job.model_id,
+            prompt: job.prompt,
+            resolution: job.resolution,
+            duration: job.duration,
+            fps: job.fps,
+            fileSize: 0,
+          });
+
+          return NextResponse.json({
+            id: job.id,
+            status: "completed",
+            progress: 100,
+            outputVideoUrl: finalVideoUrl,
+            modelId: job.model_id,
+            prompt: job.prompt,
+            resolution: job.resolution,
+            duration: job.duration,
+            creditsCost: job.credits_cost,
+            createdAt: job.created_at,
+            completedAt: new Date().toISOString(),
+          });
+        } else if (runpodStatus.status === "FAILED") {
+          await updateJobStatus(job.id, {
+            status: "failed",
+            errorMessage: runpodStatus.error || "Generation failed on GPU",
+            completedAt: new Date().toISOString(),
+          });
+
+          await refundCredits(
+            job.user_id,
+            job.credits_cost,
+            job.id,
+            "Generation failed — automatic refund"
+          );
+
+          return NextResponse.json({
+            id: job.id,
+            status: "failed",
+            errorMessage: runpodStatus.error || "Generation failed on GPU",
+            creditsCost: job.credits_cost,
+            createdAt: job.created_at,
+          });
+        } else if (runpodStatus.status === "IN_PROGRESS") {
+          await updateJobStatus(job.id, { status: "processing" });
+          job.status = "processing";
+        }
+      } catch (pollErr) {
+        console.error("RunPod poll error:", pollErr);
+      }
     }
 
     return NextResponse.json({

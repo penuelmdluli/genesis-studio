@@ -142,8 +142,8 @@ describe("FPS_OPTIONS", () => {
 });
 
 describe("MODEL_ACCESS", () => {
-  it("free plan only has cogvideo-x", () => {
-    expect(MODEL_ACCESS.free).toEqual(["cogvideo-x"]);
+  it("free plan has cogvideo-x, wan-2.2, and mochi-1", () => {
+    expect(MODEL_ACCESS.free).toEqual(["cogvideo-x", "wan-2.2", "mochi-1"]);
   });
 
   it("creator, pro, studio have all 6 models", () => {

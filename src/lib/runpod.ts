@@ -161,18 +161,78 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
 
   switch (params.modelId) {
     case "wan-2.2":
+      // ComfyUI workflow format — the RunPod endpoint runs a ComfyUI worker
       return {
-        prompt: params.prompt,
-        negative_prompt: params.negativePrompt || "",
-        width,
-        height,
-        num_frames: numFrames,
-        num_inference_steps: steps,
-        guidance_scale: guidance,
-        fps: params.fps,
-        seed: params.seed ?? Math.floor(Math.random() * 2147483647),
-        ...(params.inputImageUrl && { image_url: params.inputImageUrl }),
-        ...(params.inputVideoUrl && { video_url: params.inputVideoUrl }),
+        workflow: {
+          "1": {
+            class_type: "UNETLoader",
+            inputs: { unet_name: "wan2.2_t2v_5B_fp16.safetensors", weight_dtype: "fp16" },
+          },
+          "2": {
+            class_type: "CLIPLoader",
+            inputs: { clip_name: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", type: "wan" },
+          },
+          "3": {
+            class_type: "VAELoader",
+            inputs: { vae_name: "wan2.2_vae.safetensors" },
+          },
+          "4": {
+            class_type: "CLIPTextEncode",
+            inputs: { text: params.prompt, clip: ["2", 0] },
+          },
+          "5": {
+            class_type: "CLIPTextEncode",
+            inputs: { text: params.negativePrompt || "blurry, low quality, distorted", clip: ["2", 0] },
+          },
+          "6": {
+            class_type: "EmptyWanLatentVideo",
+            inputs: { width, height, length: numFrames, batch_size: 1 },
+          },
+          "7": {
+            class_type: "KSampler",
+            inputs: {
+              seed: params.seed ?? Math.floor(Math.random() * 2147483647),
+              steps,
+              cfg: guidance,
+              sampler_name: "euler",
+              scheduler: "normal",
+              denoise: 1.0,
+              model: ["1", 0],
+              positive: ["4", 0],
+              negative: ["5", 0],
+              latent_image: ["6", 0],
+            },
+          },
+          "8": {
+            class_type: "VAEDecode",
+            inputs: { samples: ["7", 0], vae: ["3", 0] },
+          },
+          "9": {
+            class_type: "VHS_VideoCombine",
+            inputs: {
+              images: ["8", 0],
+              frame_rate: params.fps,
+              loop_count: 0,
+              filename_prefix: "genesis",
+              format: "video/h264-mp4",
+              pingpong: false,
+              save_output: true,
+            },
+          },
+          // Include image/video inputs for i2v and motion control
+          ...(params.inputImageUrl && {
+            "10": {
+              class_type: "LoadImage",
+              inputs: { image: params.inputImageUrl },
+            },
+          }),
+          ...(params.inputVideoUrl && {
+            "11": {
+              class_type: "VHS_LoadVideo",
+              inputs: { video: params.inputVideoUrl, force_rate: params.fps, force_size: "Disabled" },
+            },
+          }),
+        },
       };
 
     case "mochi-1":

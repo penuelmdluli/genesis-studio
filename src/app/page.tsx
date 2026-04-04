@@ -172,23 +172,130 @@ export default function LandingPage() {
       {/* ===== VIDEO SHOWCASE ===== */}
       <MotionSection className="py-4 px-4 relative">
         <div className="max-w-5xl mx-auto">
-          <div className="relative rounded-2xl border border-white/[0.06] bg-[#111118]/60 backdrop-blur-sm overflow-hidden shadow-2xl shadow-violet-600/5">
-            <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#111118] to-cyan-900/10 relative">
-              <div className="absolute inset-0 bg-grid opacity-20" />
-              <div className="relative text-center p-8">
-                <motion.div
-                  className="w-20 h-20 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mx-auto mb-4"
-                  animate={{ boxShadow: ["0 0 20px rgba(139, 92, 246, 0.1)", "0 0 60px rgba(139, 92, 246, 0.3)", "0 0 20px rgba(139, 92, 246, 0.1)"] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  whileHover={{ scale: 1.1 }}
-                >
-                  <Play className="w-8 h-8 text-violet-400 ml-1" />
-                </motion.div>
-                <p className="text-zinc-400 text-sm">AI-generated video showcase</p>
-                <p className="text-zinc-600 text-xs mt-1">Generate your first video to see it here</p>
+          <motion.div
+            className="relative rounded-2xl border border-white/[0.08] bg-[#111118]/60 backdrop-blur-sm overflow-hidden"
+            animate={{
+              boxShadow: [
+                "0 0 30px rgba(139, 92, 246, 0.05), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                "0 0 60px rgba(139, 92, 246, 0.12), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                "0 0 30px rgba(139, 92, 246, 0.05), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+              ],
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            {/* Glowing top border */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
+
+            <div className="aspect-video relative bg-[#0D0D14] overflow-hidden">
+              {/* Animated background grid */}
+              <div className="absolute inset-0 bg-grid opacity-30" />
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-transparent to-cyan-900/10" />
+
+              {/* Floating demo video thumbnails */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative w-full max-w-3xl px-8">
+                  {/* Center main "screen" */}
+                  <motion.div
+                    className="relative mx-auto rounded-xl overflow-hidden border border-white/[0.1] shadow-2xl shadow-violet-600/10"
+                    style={{ maxWidth: "70%" }}
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-violet-600/20 via-[#18181F] to-cyan-600/10 relative flex items-center justify-center">
+                      {/* Fake video generation UI */}
+                      <div className="absolute top-3 left-3 flex gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-red-500/50" />
+                        <div className="w-2 h-2 rounded-full bg-amber-500/50" />
+                        <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+                      </div>
+                      <div className="absolute top-3 right-3">
+                        <div className="px-2 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 font-mono">GENERATING</div>
+                      </div>
+
+                      {/* Animated progress bar */}
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/[0.05]">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-violet-600 to-cyan-500"
+                          animate={{ width: ["0%", "100%"] }}
+                          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                      </div>
+
+                      {/* Center play area */}
+                      <div className="text-center">
+                        <motion.div
+                          className="w-16 h-16 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mx-auto mb-3 backdrop-blur-sm"
+                          animate={{
+                            scale: [1, 1.08, 1],
+                            boxShadow: [
+                              "0 0 20px rgba(139, 92, 246, 0.15)",
+                              "0 0 50px rgba(139, 92, 246, 0.35)",
+                              "0 0 20px rgba(139, 92, 246, 0.15)",
+                            ],
+                          }}
+                          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                          <Play className="w-6 h-6 text-violet-400 ml-0.5" />
+                        </motion.div>
+                        <motion.p
+                          className="text-zinc-300 text-sm font-medium"
+                          animate={{ opacity: [0.6, 1, 0.6] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          &ldquo;A majestic eagle soaring over mountains at golden hour&rdquo;
+                        </motion.p>
+                        <p className="text-zinc-600 text-xs mt-1">Wan 2.2 &middot; 1080p &middot; 5s</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Floating side cards */}
+                  <motion.div
+                    className="absolute -left-2 top-1/2 -translate-y-1/2 w-24 sm:w-32 rounded-lg border border-white/[0.06] bg-[#111118]/80 overflow-hidden shadow-lg"
+                    animate={{ y: [-60, -52, -60], opacity: [0.6, 0.85, 0.6] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                  >
+                    <div className="aspect-[9/16] bg-gradient-to-b from-cyan-900/20 to-pink-900/10 flex items-center justify-center">
+                      <div className="text-center">
+                        <Smartphone className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+                        <p className="text-[8px] text-zinc-500">Reel</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    className="absolute -right-2 top-1/2 -translate-y-1/2 w-24 sm:w-32 rounded-lg border border-white/[0.06] bg-[#111118]/80 overflow-hidden shadow-lg"
+                    animate={{ y: [-40, -48, -40], opacity: [0.6, 0.85, 0.6] }}
+                    transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-amber-900/15 to-emerald-900/10 flex items-center justify-center">
+                      <div className="text-center">
+                        <Film className="w-4 h-4 text-amber-400 mx-auto mb-1" />
+                        <p className="text-[8px] text-zinc-500">LTX ~30s</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
               </div>
+
+              {/* Floating particles */}
+              <motion.div
+                className="absolute top-[20%] left-[15%] w-1.5 h-1.5 rounded-full bg-violet-400/30"
+                animate={{ y: [0, -20, 0], opacity: [0.3, 0.7, 0.3] }}
+                transition={{ duration: 3, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="absolute top-[30%] right-[20%] w-1 h-1 rounded-full bg-cyan-400/30"
+                animate={{ y: [0, -15, 0], opacity: [0.2, 0.6, 0.2] }}
+                transition={{ duration: 4, repeat: Infinity, delay: 1.5 }}
+              />
+              <motion.div
+                className="absolute bottom-[25%] left-[25%] w-1 h-1 rounded-full bg-pink-400/20"
+                animate={{ y: [0, -18, 0], opacity: [0.2, 0.5, 0.2] }}
+                transition={{ duration: 3.5, repeat: Infinity, delay: 0.8 }}
+              />
             </div>
-          </div>
+          </motion.div>
         </div>
       </MotionSection>
 

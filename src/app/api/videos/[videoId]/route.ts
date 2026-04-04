@@ -3,10 +3,11 @@ import {
   S3Client,
   GetObjectCommand,
   HeadObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
-import { getUserByClerkId } from "@/lib/db";
+import { getUserByClerkId, deleteVideo } from "@/lib/db";
 
 const R2 = new S3Client({
   region: "auto",
@@ -172,6 +173,81 @@ export async function GET(
     console.error("Video stream error:", error);
     return NextResponse.json(
       { error: "Failed to stream video" },
+      { status: 500 }
+    );
+  }
+}
+
+// ============================================
+// DELETE — Remove video from DB + R2 storage
+// ============================================
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ videoId: string }> }
+) {
+  try {
+    const { videoId } = await params;
+
+    // Auth: must be signed in
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const user = await getUserByClerkId(clerkId);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Look up the video (need job_id for R2 key)
+    const supabase = createSupabaseAdmin();
+    const { data: video } = await supabase
+      .from("videos")
+      .select("id, user_id, job_id")
+      .eq("id", videoId)
+      .single();
+
+    if (!video) {
+      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+    }
+
+    // Only the owner can delete
+    if (video.user_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // 1. Delete from R2 storage (try all key formats, ignore errors)
+    const keyCandidates = [
+      `videos/${video.user_id}/${video.job_id}.mp4`,
+      `videos/${video.user_id}/${video.job_id}`,
+      `videos/${video.user_id}/${video.job_id}.webm`,
+      `videos/${video.user_id}/${video.job_id}.mov`,
+      `thumbnails/${video.user_id}/${video.job_id}.jpg`,
+    ];
+
+    for (const key of keyCandidates) {
+      try {
+        await R2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+      } catch {
+        // Key might not exist, that's fine
+      }
+    }
+
+    // 2. Delete from database
+    await deleteVideo(videoId, user.id);
+
+    // 3. Also clean up the generation job record
+    await supabase
+      .from("generation_jobs")
+      .update({ status: "deleted" })
+      .eq("id", video.job_id)
+      .eq("user_id", user.id);
+
+    return NextResponse.json({ success: true, deleted: videoId });
+  } catch (error) {
+    console.error("Video delete error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete video" },
       { status: 500 }
     );
   }

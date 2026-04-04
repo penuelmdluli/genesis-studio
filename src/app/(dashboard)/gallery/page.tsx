@@ -40,6 +40,8 @@ export default function GalleryPage() {
   const [audioMuted, setAudioMuted] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [filterFormat, setFilterFormat] = useState<"all" | "standard" | "reel">("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const isLoading = !videos;
 
   const filteredVideos = videos
@@ -65,16 +67,49 @@ export default function GalleryPage() {
 
   const currentVideo = videos.find((v) => v.id === selectedVideo);
 
-  const handleDownload = (e: React.MouseEvent, url: string, title: string) => {
+  const handleDownload = async (e: React.MouseEvent, url: string, title: string) => {
     e.stopPropagation();
-    window.open(url, "_blank");
-    toast("Download started", "success");
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${title.replace(/[^a-zA-Z0-9]/g, "_")}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast("Download started", "success");
+    } catch {
+      toast("Download failed", "error");
+    }
   };
 
-  const handleDelete = (e: React.MouseEvent, videoId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, videoId: string) => {
     e.stopPropagation();
-    removeVideo(videoId);
-    toast("Video removed", "info");
+    setConfirmDeleteId(videoId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
+    setConfirmDeleteId(null);
+    try {
+      const res = await fetch(`/api/videos/${confirmDeleteId}`, { method: "DELETE" });
+      if (res.ok) {
+        removeVideo(confirmDeleteId);
+        if (selectedVideo === confirmDeleteId) setSelectedVideo(null);
+        toast("Video deleted permanently", "success");
+      } else {
+        const data = await res.json();
+        toast(data.error || "Failed to delete video", "error");
+      }
+    } catch {
+      toast("Failed to delete video", "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -213,7 +248,7 @@ export default function GalleryPage() {
           {filteredVideos.map((video) => (
             <StaggerItem key={video.id}>
               <motion.div
-                className="group relative rounded-xl border border-white/[0.06] bg-[#111118]/60 overflow-hidden cursor-pointer"
+                className={`group relative rounded-xl border border-white/[0.06] bg-[#111118]/60 overflow-hidden cursor-pointer ${deletingId === video.id ? "opacity-50 pointer-events-none" : ""}`}
                 onClick={() => setSelectedVideo(video.id)}
                 whileHover={{ y: -3, boxShadow: "0 0 40px rgba(139, 92, 246, 0.12)" }}
                 transition={{ duration: 0.2 }}
@@ -263,7 +298,7 @@ export default function GalleryPage() {
                         </button>
                         <button
                           className="p-1.5 rounded-lg bg-black/60 text-zinc-300 hover:text-red-400 hover:bg-black/80 transition-colors"
-                          onClick={(e) => handleDelete(e, video.id)}
+                          onClick={(e) => handleDeleteClick(e, video.id)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -373,11 +408,61 @@ export default function GalleryPage() {
               <p className="text-xs text-zinc-500 truncate mt-0.5">{currentVideo.prompt}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => handleDownload(e as unknown as React.MouseEvent, currentVideo.url, currentVideo.title)}
+                className="text-zinc-400 hover:text-zinc-200"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDeleteId(currentVideo.id)}
+                className="text-zinc-400 hover:text-red-400"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
               {currentVideo.aspectRatio === "portrait" && (
                 <Badge variant="cyan"><Smartphone className="w-3 h-3 mr-1" /> Reel</Badge>
               )}
               <Badge>{currentVideo.resolution}</Badge>
               <span className="text-xs text-zinc-500">{formatDuration(currentVideo.duration)}</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <Modal
+          open={!!confirmDeleteId}
+          onClose={() => setConfirmDeleteId(null)}
+          size="sm"
+        >
+          <div className="text-center py-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-500/15 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6 text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-100 mb-2">Delete Video?</h3>
+            <p className="text-sm text-zinc-400 mb-6 max-w-xs mx-auto">
+              This will permanently delete the video from your gallery and storage. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20"
+                onClick={handleDeleteConfirm}
+              >
+                <Trash2 className="w-4 h-4" /> Delete Forever
+              </Button>
             </div>
           </div>
         </Modal>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { updateJobStatus, createVideo } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey } from "@/lib/storage";
@@ -72,12 +73,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // Upload succeeded — create video record with placeholder URL
-      const video = await createVideo({
+      // Upload succeeded — create video record with correct URL in one shot
+      const videoId = randomUUID();
+      const videoApiUrl = `/api/videos/${videoId}`;
+
+      await createVideo({
+        id: videoId,
         userId: job.user_id,
         jobId: job.id,
         title: job.prompt.slice(0, 100),
-        url: "pending", // temporary, updated immediately below
+        url: videoApiUrl,
         thumbnailUrl: "",
         modelId: job.model_id,
         prompt: job.prompt,
@@ -89,17 +94,6 @@ export async function POST(req: NextRequest) {
         audioUrl: job.audio_url,
         audioTrackId: job.audio_track_id,
       });
-
-      // Set URL to our streaming endpoint
-      const videoApiUrl = `/api/videos/${video.id}`;
-      const { error: urlUpdateError } = await supabase
-        .from("videos")
-        .update({ url: videoApiUrl })
-        .eq("id", video.id);
-
-      if (urlUpdateError) {
-        console.error("Failed to update video URL:", urlUpdateError);
-      }
 
       await updateJobStatus(job.id, {
         status: "completed",

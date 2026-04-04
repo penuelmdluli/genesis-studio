@@ -207,6 +207,7 @@ export async function getUserJobs(
 // --- Video Operations ---
 
 export async function createVideo(params: {
+  id?: string;
   userId: string;
   jobId: string;
   title: string;
@@ -222,25 +223,28 @@ export async function createVideo(params: {
   audioUrl?: string;
   audioTrackId?: string;
 }) {
+  const insertData: Record<string, unknown> = {
+    user_id: params.userId,
+    job_id: params.jobId,
+    title: params.title,
+    url: params.url,
+    thumbnail_url: params.thumbnailUrl,
+    model_id: params.modelId,
+    prompt: params.prompt,
+    resolution: params.resolution,
+    duration: params.duration,
+    fps: params.fps,
+    file_size: params.fileSize,
+    is_public: false,
+    aspect_ratio: params.aspectRatio,
+    audio_url: params.audioUrl,
+    audio_track_id: params.audioTrackId,
+  };
+  if (params.id) insertData.id = params.id;
+
   const { data, error } = await getSupabase()
     .from("videos")
-    .insert({
-      user_id: params.userId,
-      job_id: params.jobId,
-      title: params.title,
-      url: params.url,
-      thumbnail_url: params.thumbnailUrl,
-      model_id: params.modelId,
-      prompt: params.prompt,
-      resolution: params.resolution,
-      duration: params.duration,
-      fps: params.fps,
-      file_size: params.fileSize,
-      is_public: false,
-      aspect_ratio: params.aspectRatio,
-      audio_url: params.audioUrl,
-      audio_track_id: params.audioTrackId,
-    })
+    .insert(insertData)
     .select()
     .single();
 

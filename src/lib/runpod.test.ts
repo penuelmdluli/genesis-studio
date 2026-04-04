@@ -50,8 +50,8 @@ describe("buildRunPodInput", () => {
     });
 
     // Must return a workflow object, not flat params
-    expect(input.workflow).toBeDefined();
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(input.prompt).toBeDefined();
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
     // Prompt is in CLIPTextEncode node
     expect(wf["4"].class_type).toBe("CLIPTextEncode");
@@ -85,7 +85,7 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
     expect(wf["5"].class_type).toBe("CLIPTextEncode");
     expect(wf["5"].inputs.text).toBe("blurry, low quality");
   });
@@ -101,7 +101,7 @@ describe("buildRunPodInput", () => {
       isDraft: true,
     });
 
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
     expect(wf["7"].inputs.steps).toBe(15);
   });
 
@@ -148,8 +148,8 @@ describe("buildRunPodInput", () => {
       guidanceScale: 6.0,
     });
 
-    expect(input.workflow).toBeDefined();
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(input.prompt).toBeDefined();
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
     // HunyuanVideoSampler node
     expect(wf["1"].class_type).toBe("HunyuanVideoSampler");
@@ -174,8 +174,8 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    expect(input.workflow).toBeDefined();
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(input.prompt).toBeDefined();
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
     // Prompt in CLIPTextEncode
     expect(wf["2"].class_type).toBe("CLIPTextEncode");
@@ -200,8 +200,8 @@ describe("buildRunPodInput", () => {
       numInferenceSteps: 30,
     });
 
-    expect(input.workflow).toBeDefined();
-    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(input.prompt).toBeDefined();
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
     // Steps capped at 12 for turbo
     expect(wf["7"].inputs.steps).toBe(12);

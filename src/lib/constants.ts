@@ -83,6 +83,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     creditCost: { "480p": 3 },
     gpuRequirement: "16GB+",
     license: "Apache 2.0",
+    comingSoon: true,
   },
 };
 

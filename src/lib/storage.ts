@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -99,6 +100,36 @@ export async function deleteFile(key: string): Promise<void> {
       Key: key,
     })
   );
+}
+
+/**
+ * Verify an uploaded file exists in R2 and meets minimum requirements.
+ * Returns file size if healthy, throws if broken.
+ */
+export async function verifyR2Upload(
+  key: string,
+  minBytes = 5000
+): Promise<{ size: number; contentType: string }> {
+  const head = await R2.send(
+    new HeadObjectCommand({ Bucket: BUCKET, Key: key })
+  );
+
+  const size = head.ContentLength ?? 0;
+  const contentType = head.ContentType ?? "";
+
+  if (size < minBytes) {
+    throw new Error(
+      `R2 file too small: ${size} bytes (minimum ${minBytes}). File may be corrupt.`
+    );
+  }
+
+  if (!contentType.includes("video") && !contentType.includes("octet-stream")) {
+    throw new Error(
+      `R2 file has wrong content type: ${contentType}. Expected video/*.`
+    );
+  }
+
+  return { size, contentType };
 }
 
 // Generate storage keys

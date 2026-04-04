@@ -4,8 +4,8 @@
     {
       "name": "genesis-dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "--turbopack"],
-      "port": 3000
+      "runtimeArgs": ["next", "dev", "--turbopack", "--port", "3001"],
+      "port": 3001
     }
   ]
 }

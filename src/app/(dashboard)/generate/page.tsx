@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,7 @@ export default function GeneratePage() {
   const { toast } = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const generateLockRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string | null>(null);
   const [audioGenreFilter, setAudioGenreFilter] = useState<string>("All");
@@ -107,33 +108,43 @@ export default function GeneratePage() {
   };
 
   const handleGenerate = async () => {
+    // Double-click protection: ref is synchronous, prevents race window
+    if (generateLockRef.current) return;
+    generateLockRef.current = true;
+
     setError(null);
 
     const trimmedPrompt = form.prompt.trim();
     if (!trimmedPrompt) {
       setError("Please enter a prompt.");
+      generateLockRef.current = false;
       return;
     }
     if (trimmedPrompt.length < 5) {
       setError("Prompt is too short. Please describe the video you want (min 5 characters).");
+      generateLockRef.current = false;
       return;
     }
     if (trimmedPrompt.length > 2000) {
       setError("Prompt is too long (max 2000 characters). Please shorten it.");
+      generateLockRef.current = false;
       return;
     }
     // Block obvious non-prompts (markdown, code, etc.)
     const markdownPatterns = /^(#{1,6}\s|```|\*\*|>\s|\|\s|---)/m;
     if (markdownPatterns.test(trimmedPrompt) && trimmedPrompt.length > 200) {
       setError("This looks like a document, not a video prompt. Please describe the video you want to generate.");
+      generateLockRef.current = false;
       return;
     }
     if (isLoading) {
       setError("Loading account data... please wait.");
+      generateLockRef.current = false;
       return;
     }
     if (!hasEnoughCredits) {
       setError(`Not enough credits. You need ${creditCost} but have ${user?.creditBalance ?? 0}.`);
+      generateLockRef.current = false;
       return;
     }
 
@@ -220,6 +231,7 @@ export default function GeneratePage() {
       toast("Network error. Please try again.", "error");
     } finally {
       setIsGenerating(false);
+      generateLockRef.current = false;
     }
   };
 

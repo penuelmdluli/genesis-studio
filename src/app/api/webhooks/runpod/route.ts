@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { updateJobStatus, createVideo } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
-import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey } from "@/lib/storage";
+import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey, verifyR2Upload } from "@/lib/storage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,9 +44,8 @@ export async function POST(req: NextRequest) {
       }
 
       // Upload video to R2 — if this fails, mark job as failed and refund
+      const vKey = videoStorageKey(job.user_id, job.id);
       try {
-        const vKey = videoStorageKey(job.user_id, job.id);
-
         // Handle base64 video data (common in RunPod Hub templates)
         if (output.video && !output.video.startsWith("http")) {
           const videoBuffer = Buffer.from(output.video, "base64");
@@ -85,7 +84,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // Upload succeeded — create video record with correct URL in one shot
+      // Verify the uploaded file is actually valid before creating video record
+      try {
+        await verifyR2Upload(vKey);
+      } catch (verifyErr) {
+        console.error("Video verification failed:", verifyErr);
+        await updateJobStatus(job.id, {
+          status: "failed",
+          errorMessage: `Video verification failed: ${verifyErr instanceof Error ? verifyErr.message : "Unknown error"}`,
+          completedAt: new Date().toISOString(),
+        });
+        await refundCredits(
+          job.user_id,
+          job.credits_cost,
+          job.id,
+          "Video verification failed — automatic refund"
+        );
+        return NextResponse.json({ received: true });
+      }
+
+      // Upload succeeded + verified — create video record with correct URL in one shot
       const videoId = randomUUID();
       const videoApiUrl = `/api/videos/${videoId}`;
 

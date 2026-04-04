@@ -35,6 +35,7 @@ export interface AIModel {
   gpuRequirement: string;
   license: string;
   runpodEndpointId?: string;
+  comingSoon?: boolean;
 }
 
 // --- Users & Auth ---

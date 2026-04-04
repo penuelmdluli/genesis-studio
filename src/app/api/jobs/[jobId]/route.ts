@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { refundCredits } from "@/lib/credits";
-import { uploadVideo, videoStorageKey } from "@/lib/storage";
+import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId } from "@/types";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
@@ -69,10 +69,10 @@ export async function GET(
           }
 
           const output = runpodStatus.output as Record<string, string>;
+          const vKey = videoStorageKey(job.user_id, job.id);
 
           // Upload video to R2
           try {
-            const vKey = videoStorageKey(job.user_id, job.id);
 
             // Handle base64 video data
             if (output.video && !output.video.startsWith("http")) {
@@ -109,6 +109,31 @@ export async function GET(
               id: job.id,
               status: "failed",
               errorMessage: "Video upload failed. Credits have been refunded.",
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+            });
+          }
+
+          // Verify the uploaded file is actually valid before creating video record
+          try {
+            await verifyR2Upload(vKey);
+          } catch (verifyErr) {
+            console.error("Video verification failed:", verifyErr);
+            await updateJobStatus(job.id, {
+              status: "failed",
+              errorMessage: `Video verification failed: ${verifyErr instanceof Error ? verifyErr.message : "Unknown error"}`,
+              completedAt: new Date().toISOString(),
+            });
+            await refundCredits(
+              job.user_id,
+              job.credits_cost,
+              job.id,
+              "Video verification failed — automatic refund"
+            );
+            return NextResponse.json({
+              id: job.id,
+              status: "failed",
+              errorMessage: "Video verification failed. Credits have been refunded.",
               creditsCost: job.credits_cost,
               createdAt: job.created_at,
             });

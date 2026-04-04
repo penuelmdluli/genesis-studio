@@ -66,7 +66,7 @@ interface StoreState {
 
 const defaultForm: GenerateFormState = {
   type: "t2v",
-  modelId: "ltx-video",
+  modelId: "wan-2.2",
   prompt: "",
   negativePrompt: "",
   resolution: "720p",

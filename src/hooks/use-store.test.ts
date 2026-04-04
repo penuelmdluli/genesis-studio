@@ -9,7 +9,7 @@ describe("useStore", () => {
       user: null,
       form: {
         type: "t2v",
-        modelId: "ltx-video",
+        modelId: "wan-2.2",
         prompt: "",
         negativePrompt: "",
         resolution: "720p",
@@ -70,7 +70,7 @@ describe("useStore", () => {
     it("has correct defaults", () => {
       const form = useStore.getState().form;
       expect(form.type).toBe("t2v");
-      expect(form.modelId).toBe("ltx-video");
+      expect(form.modelId).toBe("wan-2.2");
       expect(form.prompt).toBe("");
       expect(form.resolution).toBe("720p");
       expect(form.duration).toBe(5);
@@ -91,7 +91,7 @@ describe("useStore", () => {
       useStore.getState().setFormField("modelId", "wan-2.2");
       useStore.getState().resetForm();
       expect(useStore.getState().form.prompt).toBe("");
-      expect(useStore.getState().form.modelId).toBe("ltx-video");
+      expect(useStore.getState().form.modelId).toBe("wan-2.2");
     });
   });
 
@@ -101,7 +101,7 @@ describe("useStore", () => {
       userId: "user-1",
       status: "queued",
       type: "t2v",
-      modelId: "ltx-video",
+      modelId: "wan-2.2",
       prompt: "Test",
       resolution: "720p",
       duration: 5,
@@ -152,7 +152,7 @@ describe("useStore", () => {
       title: "Test",
       url: "https://example.com/video.mp4",
       thumbnailUrl: "https://example.com/thumb.jpg",
-      modelId: "ltx-video",
+      modelId: "wan-2.2",
       prompt: "Test",
       resolution: "720p",
       duration: 5,

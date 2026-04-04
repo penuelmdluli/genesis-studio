@@ -37,12 +37,17 @@ export default function GeneratePage() {
   const { form, setFormField, user, addJob, updateCreditBalance } = useStore();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string | null>(null);
+  const isLoading = !user;
 
   const userPlan = user?.plan || "free";
   const availableModels = MODEL_ACCESS[userPlan] || MODEL_ACCESS.free;
-  const currentModel = AI_MODELS[form.modelId];
-  const creditCost = estimateCreditCost(form.modelId, form.resolution, form.duration, form.isDraft);
+
+  // If current model isn't available on user's plan, switch to first available
+  const modelId = availableModels.includes(form.modelId) ? form.modelId : availableModels[0];
+  const currentModel = AI_MODELS[modelId];
+  const creditCost = estimateCreditCost(modelId, form.resolution, form.duration, form.isDraft);
   const hasEnoughCredits = (user?.creditBalance ?? 0) >= creditCost;
 
   const availableResolutions = RESOLUTIONS.filter((r) => {
@@ -62,7 +67,20 @@ export default function GeneratePage() {
   };
 
   const handleGenerate = async () => {
-    if (!form.prompt.trim() || !hasEnoughCredits) return;
+    setError(null);
+
+    if (!form.prompt.trim()) {
+      setError("Please enter a prompt.");
+      return;
+    }
+    if (isLoading) {
+      setError("Loading account data... please wait.");
+      return;
+    }
+    if (!hasEnoughCredits) {
+      setError(`Not enough credits. You need ${creditCost} but have ${user?.creditBalance ?? 0}.`);
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -71,7 +89,7 @@ export default function GeneratePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: form.type,
-          modelId: form.modelId,
+          modelId: modelId,
           prompt: form.prompt,
           negativePrompt: form.negativePrompt || undefined,
           resolution: form.resolution,
@@ -91,7 +109,7 @@ export default function GeneratePage() {
           userId: user?.id || "",
           status: "queued",
           type: form.type,
-          modelId: form.modelId,
+          modelId: modelId,
           prompt: form.prompt,
           resolution: form.resolution,
           duration: form.duration,
@@ -102,9 +120,13 @@ export default function GeneratePage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
+        setError(null);
+      } else {
+        setError(data.error || "Generation failed. Please try again.");
       }
     } catch (err) {
       console.error("Generation failed:", err);
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -216,10 +238,10 @@ export default function GeneratePage() {
             <CardContent className="p-4 space-y-3">
               <label className="text-sm font-medium text-zinc-300">AI Model</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {availableModels.map((modelId) => {
-                  const model = AI_MODELS[modelId];
+                {availableModels.map((mid) => {
+                  const model = AI_MODELS[mid];
                   if (!model) return null;
-                  const isSelected = form.modelId === modelId;
+                  const isSelected = modelId === mid;
                   const supportsType = model.types.includes(form.type);
                   const tierColors: Record<string, string> = {
                     flagship: "text-violet-400",
@@ -232,8 +254,8 @@ export default function GeneratePage() {
 
                   return (
                     <button
-                      key={modelId}
-                      onClick={() => supportsType && setFormField("modelId", modelId)}
+                      key={mid}
+                      onClick={() => supportsType && setFormField("modelId", mid)}
                       disabled={!supportsType}
                       className={`p-3 rounded-lg border text-left transition-all ${
                         !supportsType
@@ -442,12 +464,14 @@ export default function GeneratePage() {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={!form.prompt.trim() || !hasEnoughCredits || isGenerating}
+                disabled={!form.prompt.trim() || isGenerating || isLoading}
                 loading={isGenerating}
                 onClick={handleGenerate}
               >
                 {isGenerating ? (
                   "Generating..."
+                ) : isLoading ? (
+                  "Loading..."
                 ) : !hasEnoughCredits ? (
                   "Not enough credits"
                 ) : (
@@ -457,7 +481,13 @@ export default function GeneratePage() {
                 )}
               </Button>
 
-              {!hasEnoughCredits && (
+              {error && (
+                <p className="text-xs text-center text-red-400 mt-2">
+                  {error}
+                </p>
+              )}
+
+              {!isLoading && !hasEnoughCredits && !error && (
                 <p className="text-xs text-center text-red-400">
                   You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
                   <a href="/pricing" className="underline">Buy credits</a>

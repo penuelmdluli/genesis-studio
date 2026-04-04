@@ -72,12 +72,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // Upload succeeded — create video record
+      // Upload succeeded — create video record with placeholder URL
       const video = await createVideo({
         userId: job.user_id,
         jobId: job.id,
         title: job.prompt.slice(0, 100),
-        url: "", // will update after we have the video ID
+        url: "pending", // temporary, updated immediately below
         thumbnailUrl: "",
         modelId: job.model_id,
         prompt: job.prompt,
@@ -92,10 +92,14 @@ export async function POST(req: NextRequest) {
 
       // Set URL to our streaming endpoint
       const videoApiUrl = `/api/videos/${video.id}`;
-      await supabase
+      const { error: urlUpdateError } = await supabase
         .from("videos")
         .update({ url: videoApiUrl })
         .eq("id", video.id);
+
+      if (urlUpdateError) {
+        console.error("Failed to update video URL:", urlUpdateError);
+      }
 
       await updateJobStatus(job.id, {
         status: "completed",

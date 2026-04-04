@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   StaggerItem,
   AnimatedCounter,
   GlowCard,
+  Parallax,
   motion,
 } from "@/components/ui/motion";
 import {
@@ -34,11 +35,31 @@ import {
   Volume2,
   VolumeX,
   CreditCard,
+  Brain,
+  Layers,
+  Monitor,
+  X,
+  Pause,
+  GitCompare,
+  MessageSquare,
+  Heart,
+  Flag,
 } from "lucide-react";
 import { PLANS } from "@/lib/constants";
 
-// Real demo videos — royalty-free cinematic clips from Mixkit CDN
-const demoVideos = [
+// ============================================
+// CINEMATIC VIDEO ASSETS — Royalty-free from Mixkit
+// ============================================
+
+const heroVideos = [
+  "https://assets.mixkit.co/videos/4880/4880-720.mp4",      // Ocean sunset cinematic
+  "https://assets.mixkit.co/videos/44688/44688-720.mp4",     // City night aerial
+  "https://assets.mixkit.co/videos/48107/48107-720.mp4",     // Forest light rays
+  "https://assets.mixkit.co/videos/34563/34563-720.mp4",     // Abstract particles
+  "https://assets.mixkit.co/videos/5016/5016-720.mp4",       // Beach waves golden
+];
+
+const showcaseVideos = [
   {
     url: "https://assets.mixkit.co/videos/4880/4880-720.mp4",
     prompt: "Ocean waves crashing on a rocky coastline at sunset, cinematic 4K",
@@ -46,7 +67,7 @@ const demoVideos = [
     resolution: "1080p",
     duration: "5s",
     label: "Cinematic",
-    color: "violet",
+    color: "violet" as const,
   },
   {
     url: "https://assets.mixkit.co/videos/44688/44688-720.mp4",
@@ -55,7 +76,7 @@ const demoVideos = [
     resolution: "1080p",
     duration: "5s",
     label: "Urban",
-    color: "cyan",
+    color: "cyan" as const,
   },
   {
     url: "https://assets.mixkit.co/videos/48107/48107-720.mp4",
@@ -64,7 +85,7 @@ const demoVideos = [
     resolution: "720p",
     duration: "5s",
     label: "Nature",
-    color: "emerald",
+    color: "emerald" as const,
   },
   {
     url: "https://assets.mixkit.co/videos/5016/5016-720.mp4",
@@ -73,55 +94,43 @@ const demoVideos = [
     resolution: "720p",
     duration: "3s",
     label: "Fast",
-    color: "amber",
+    color: "amber" as const,
   },
 ];
 
-// Reel-format demo (vertical)
-const reelVideos = [
-  {
-    url: "https://assets.mixkit.co/videos/2213/2213-720.mp4",
-    prompt: "Waterfall cascading over rocks in a mystical forest, vertical reel",
-    model: "Wan 2.2",
-  },
-];
-
-const models = [
-  { name: "Wan 2.2", tier: "FLAGSHIP", param: "A14B", desc: "Best cinematic quality. Complex motion.", color: "text-violet-400", bg: "from-violet-500/20 to-violet-500/5", border: "border-violet-500/20", time: "~300s" },
-  { name: "HunyuanVideo 1.5", tier: "WORKHORSE", param: "13B", desc: "Best efficiency/quality ratio.", color: "text-emerald-400", bg: "from-emerald-500/20 to-emerald-500/5", border: "border-emerald-500/20", time: "~180s" },
-  { name: "LTX-Video", tier: "SPEED KING", param: "13B", desc: "Fastest — real-time on H100.", color: "text-amber-400", bg: "from-amber-500/20 to-amber-500/5", border: "border-amber-500/20", time: "~30s" },
-  { name: "Mochi 1", tier: "REALISM", param: "10B", desc: "Best prompt adherence. Photorealistic.", color: "text-pink-400", bg: "from-pink-500/20 to-pink-500/5", border: "border-pink-500/20", time: "~180s" },
-  { name: "CogVideoX-5B", tier: "BUDGET", param: "5B", desc: "Quick previews. Low cost.", color: "text-cyan-400", bg: "from-cyan-500/20 to-cyan-500/5", border: "border-cyan-500/20", time: "~90s" },
-];
-
-const features = [
-  { icon: Film, title: "Text-to-Video", desc: "Describe anything, watch it come to life. Multiple quality tiers from draft to cinema-grade.", accent: "violet" },
-  { icon: ImageIcon, title: "Image-to-Video", desc: "Animate any still image. Upload a photo and add motion, depth, and life.", accent: "emerald" },
-  { icon: Smartphone, title: "Reels & Shorts", desc: "Vertical 9:16 video optimized for TikTok, Instagram Reels, and YouTube Shorts.", accent: "cyan" },
-  { icon: Music, title: "Background Audio", desc: "Built-in royalty-free music library. Cinematic, electronic, lo-fi, and more.", accent: "pink" },
-  { icon: RefreshCw, title: "Draft then Refine", desc: "Fast 3-second preview, then HD render. Saves 70% on credits.", accent: "amber" },
-  { icon: Terminal, title: "API from Day 1", desc: "REST API on every plan. Build AI video into your app. No gatekeeping.", accent: "violet" },
-];
-
-const accentColors: Record<string, { icon: string; bg: string; border: string }> = {
-  violet: { icon: "text-violet-400", bg: "bg-violet-500/10", border: "group-hover:border-violet-500/30" },
-  emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10", border: "group-hover:border-emerald-500/30" },
-  cyan: { icon: "text-cyan-400", bg: "bg-cyan-500/10", border: "group-hover:border-cyan-500/30" },
-  pink: { icon: "text-pink-400", bg: "bg-pink-500/10", border: "group-hover:border-pink-500/30" },
-  amber: { icon: "text-amber-400", bg: "bg-amber-500/10", border: "group-hover:border-amber-500/30" },
+const motionControlVideos = {
+  reference: "https://assets.mixkit.co/videos/2213/2213-720.mp4",
+  output: "https://assets.mixkit.co/videos/4880/4880-720.mp4",
 };
 
-const heroStats = [
-  { value: 6, label: "AI Models", icon: Star },
-  { value: 70, label: "Cost Savings", icon: Zap, suffix: "%" },
-  { value: 0, label: "Hardware Cost", icon: Shield, prefix: "$" },
+const marqueeVideos = [
+  "https://assets.mixkit.co/videos/4880/4880-720.mp4",
+  "https://assets.mixkit.co/videos/44688/44688-720.mp4",
+  "https://assets.mixkit.co/videos/48107/48107-720.mp4",
+  "https://assets.mixkit.co/videos/5016/5016-720.mp4",
+  "https://assets.mixkit.co/videos/2213/2213-720.mp4",
+  "https://assets.mixkit.co/videos/34563/34563-720.mp4",
 ];
 
-const competitors = [
-  { name: "Runway", issue: "$12-$95/mo, credits expire monthly" },
-  { name: "Kling", issue: "Credits expire mid-subscription, high failure rates" },
-  { name: "Pika", issue: "Limited model selection, basic API access" },
-  { name: "Sora", issue: "Discontinued. $15M/day burn rate." },
+const modelShowcase = [
+  { name: "Wan 2.2", tier: "FLAGSHIP", param: "A14B", desc: "Best cinematic quality. Complex motion.", color: "text-violet-400", bg: "from-violet-500/20 to-violet-500/5", border: "border-violet-500/20", time: "~300s", video: "https://assets.mixkit.co/videos/4880/4880-720.mp4" },
+  { name: "HunyuanVideo 1.5", tier: "WORKHORSE", param: "13B", desc: "Best efficiency/quality ratio.", color: "text-emerald-400", bg: "from-emerald-500/20 to-emerald-500/5", border: "border-emerald-500/20", time: "~180s", video: "https://assets.mixkit.co/videos/48107/48107-720.mp4" },
+  { name: "LTX-Video", tier: "SPEED KING", param: "13B", desc: "Fastest — real-time on H100.", color: "text-amber-400", bg: "from-amber-500/20 to-amber-500/5", border: "border-amber-500/20", time: "~30s", video: "https://assets.mixkit.co/videos/5016/5016-720.mp4" },
+  { name: "Mochi 1", tier: "REALISM", param: "10B", desc: "Best prompt adherence. Photorealistic.", color: "text-pink-400", bg: "from-pink-500/20 to-pink-500/5", border: "border-pink-500/20", time: "~180s", video: "https://assets.mixkit.co/videos/44688/44688-720.mp4" },
+  { name: "CogVideoX-5B", tier: "BUDGET", param: "5B", desc: "Quick previews. Low cost.", color: "text-cyan-400", bg: "from-cyan-500/20 to-cyan-500/5", border: "border-cyan-500/20", time: "~90s", video: "https://assets.mixkit.co/videos/2213/2213-720.mp4" },
+];
+
+const competitors: Array<Record<string, string>> = [
+  { name: "Runway", credits: "Expire monthly", gCredits: "Never expire", price: "$12-$95/mo", gPrice: "From R0/mo", api: "Paid plans only", gApi: "Every plan", models: "Proprietary", gModels: "Open-source" },
+  { name: "Kling", credits: "Expire mid-sub", gCredits: "Never expire", price: "High failure rate", gPrice: "Auto refund", api: "Limited", gApi: "Full REST API", models: "Proprietary", gModels: "6 open models" },
+  { name: "Pika", credits: "Limited", gCredits: "Buy packs anytime", price: "Basic only", gPrice: "4K output", api: "Basic", gApi: "Webhooks + SDK", models: "1 model", gModels: "6 models" },
+];
+
+const brainSteps = [
+  { label: "Concept", text: "A 2-minute short film about a robot discovering emotions in a post-apocalyptic world..." },
+  { label: "Shot List", items: ["Wide establishing shot — ruined cityscape, dawn", "Close-up — robot hand touching a flower", "Medium — robot looking at old photographs", "POV — robot's vision glitching with memories", "Wide — robot walking into sunrise, hopeful"] },
+  { label: "Generating", scenes: [{ name: "Scene 1: Ruined City", progress: 100 }, { name: "Scene 2: The Flower", progress: 87 }, { name: "Scene 3: Old Photos", progress: 62 }, { name: "Scene 4: Memory Glitch", progress: 34 }, { name: "Scene 5: Sunrise Walk", progress: 12 }] },
+  { label: "Complete", text: "5 scenes rendered. Audio mixed. Timeline assembled. Ready for export." },
 ];
 
 const badgeColorMap: Record<string, "violet" | "cyan" | "emerald" | "amber"> = {
@@ -131,122 +140,207 @@ const badgeColorMap: Record<string, "violet" | "cyan" | "emerald" | "amber"> = {
   amber: "amber",
 };
 
-export default function LandingPage() {
-  const [activeVideo, setActiveVideo] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+// ============================================
+// LANDING PAGE COMPONENT
+// ============================================
 
-  // Auto-cycle showcase videos
+export default function LandingPage() {
+  // Hero video crossfade state
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [heroFading, setHeroFading] = useState(false);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Showcase state
+  const [activeShowcase, setActiveShowcase] = useState(0);
+  const showcaseVideoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
+
+  // Brain demo state
+  const [brainStep, setBrainStep] = useState(0);
+  const [brainTyped, setBrainTyped] = useState("");
+
+  // Motion control play state
+  const refVideoRef = useRef<HTMLVideoElement>(null);
+  const outVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Model hover state
+  const [hoveredModel, setHoveredModel] = useState<number | null>(null);
+
+  // ---- Hero video crossfade cycle ----
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeroFading(true);
+      setTimeout(() => {
+        setHeroIndex((prev) => (prev + 1) % heroVideos.length);
+        setHeroFading(false);
+      }, 1200);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ---- Showcase auto-cycle ----
   useEffect(() => {
     const timer = setInterval(() => {
-      setActiveVideo((prev) => (prev + 1) % demoVideos.length);
+      setActiveShowcase((prev) => (prev + 1) % showcaseVideos.length);
     }, 8000);
     return () => clearInterval(timer);
   }, []);
 
-  // Play video on change
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
+    if (showcaseVideoRef.current) {
+      showcaseVideoRef.current.load();
+      showcaseVideoRef.current.play().catch(() => {});
     }
-  }, [activeVideo]);
+  }, [activeShowcase]);
 
-  const current = demoVideos[activeVideo];
+  // ---- Brain demo infinite loop ----
+  useEffect(() => {
+    const stepDurations = [4000, 4000, 5000, 3000];
+    const timer = setTimeout(() => {
+      setBrainStep((prev) => (prev + 1) % brainSteps.length);
+    }, stepDurations[brainStep]);
+    return () => clearTimeout(timer);
+  }, [brainStep]);
+
+  // Brain typewriter effect
+  useEffect(() => {
+    if (brainStep === 0) {
+      const text = brainSteps[0].text ?? "";
+      let i = 0;
+      setBrainTyped("");
+      const typeInterval = setInterval(() => {
+        if (i < text.length) {
+          setBrainTyped(text.slice(0, i + 1));
+          i++;
+        } else {
+          clearInterval(typeInterval);
+        }
+      }, 30);
+      return () => clearInterval(typeInterval);
+    }
+  }, [brainStep]);
+
+  // Sync motion control videos
+  const syncMotionVideos = useCallback(() => {
+    if (refVideoRef.current && outVideoRef.current) {
+      outVideoRef.current.currentTime = refVideoRef.current.currentTime;
+    }
+  }, []);
+
+  const current = showcaseVideos[activeShowcase];
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] relative">
+    <div className="min-h-screen bg-[#0A0A0F] relative overflow-x-hidden">
       <Navbar />
 
-      {/* ===== HERO SECTION with video background ===== */}
-      <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-28 px-4 overflow-hidden">
-        {/* Background video — muted autoplay loop */}
-        <div className="absolute inset-0 overflow-hidden">
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
-          >
-            <source src="https://assets.mixkit.co/videos/4880/4880-720.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/80 to-[#0A0A0F]" />
-        </div>
-
-        {/* Atmospheric layers */}
+      {/* ============================================ */}
+      {/* SECTION 1: CINEMATIC FULL-SCREEN HERO        */}
+      {/* ============================================ */}
+      <section className="relative h-screen flex items-center justify-center overflow-hidden">
+        {/* Crossfading background videos with Ken Burns */}
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-glow-top" />
-          <div className="absolute inset-0 bg-grid opacity-30" />
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-600/8 rounded-full blur-[120px]" />
+          {heroVideos.map((src, i) => (
+            <video
+              key={src}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ${
+                i === heroIndex ? (heroFading ? "opacity-0" : "opacity-[0.12]") : "opacity-0"
+              }`}
+              style={{
+                animation: i === heroIndex ? "kenBurns 12s ease-in-out infinite alternate" : "none",
+              }}
+            >
+              <source src={src} type="video/mp4" />
+            </video>
+          ))}
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/60 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/40 via-transparent to-[#0A0A0F]/40" />
         </div>
 
-        <div className="max-w-5xl mx-auto text-center relative z-10">
+        {/* Atmospheric glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-glow-top opacity-70" />
+          <div className="absolute inset-0 bg-grid opacity-20" />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-violet-600/[0.06] rounded-full blur-[150px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-500/[0.04] rounded-full blur-[120px]" />
+        </div>
+
+        <div className="max-w-6xl mx-auto text-center relative z-10 px-4">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.7 }}
           >
-            <Badge variant="violet" className="mb-6 px-4 py-1.5 text-xs">
-              <Sparkles className="w-3 h-3 mr-1.5" /> Open-Source AI Video Platform
+            <Badge variant="violet" className="mb-8 px-5 py-2 text-sm">
+              <Sparkles className="w-3.5 h-3.5 mr-2" /> Open-Source AI Video Platform
             </Badge>
           </motion.div>
 
           <motion.h1
-            className="text-5xl sm:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6"
-            initial={{ opacity: 0, y: 30 }}
+            className="text-6xl sm:text-8xl lg:text-9xl font-extrabold tracking-tighter mb-8 leading-[0.9]"
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.8, delay: 0.15 }}
           >
             <span className="gradient-text-hero block">From Nothing,</span>
-            <span className="gradient-text block mt-1">Create Everything</span>
+            <span className="gradient-text block mt-2">Create Everything</span>
           </motion.h1>
 
           <motion.p
-            className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed"
-            initial={{ opacity: 0, y: 20 }}
+            className="text-xl sm:text-2xl text-zinc-400 max-w-3xl mx-auto mb-12 leading-relaxed"
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
           >
             Hollywood-grade AI video generation powered by open-source models
-            and serverless GPUs. <span className="text-zinc-200 font-medium">70-90% cheaper.</span> Credits never expire.
+            and serverless GPUs. <span className="text-zinc-200 font-semibold">70-90% cheaper.</span>{" "}
+            Credits never expire.
           </motion.p>
 
           <motion.div
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
-            initial={{ opacity: 0, y: 20 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-16"
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.45 }}
           >
             <Link href="/sign-up">
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                <Button size="lg" className="text-base px-8 h-12 shadow-xl shadow-violet-600/25">
-                  Start Creating Free <ArrowRight className="w-4 h-4" />
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                <Button size="lg" className="text-lg px-10 h-14 shadow-2xl shadow-violet-600/30">
+                  Start Creating Free <ArrowRight className="w-5 h-5" />
                 </Button>
               </motion.div>
             </Link>
-            <Link href="/pricing">
-              <Button variant="outline" size="lg" className="text-base px-8 h-12">
-                View Pricing
+            <Link href="#showcase">
+              <Button variant="outline" size="lg" className="text-lg px-10 h-14 border-white/10 hover:bg-white/[0.04]">
+                <Play className="w-4 h-4" /> Watch Demo
               </Button>
             </Link>
           </motion.div>
 
-          {/* Stats row */}
+          {/* Hero stats row */}
           <motion.div
-            className="flex items-center justify-center gap-6 sm:gap-12"
+            className="flex flex-wrap items-center justify-center gap-8 sm:gap-16"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
           >
-            {heroStats.map((stat) => (
+            {[
+              { value: 6, label: "AI Models", icon: Star },
+              { value: 70, label: "Cost Savings", icon: Zap, suffix: "%" },
+              { value: 0, label: "Hardware Cost", icon: Shield, prefix: "$" },
+            ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <stat.icon className="w-4 h-4 text-violet-400 opacity-50" />
+                  <stat.icon className="w-4 h-4 text-violet-400/60" />
                   <AnimatedCounter
                     value={stat.value}
                     suffix={stat.suffix}
                     prefix={stat.prefix}
-                    className="text-2xl sm:text-3xl font-bold text-white"
+                    className="text-3xl sm:text-4xl font-bold text-white"
                   />
                 </div>
                 <div className="text-xs sm:text-sm text-zinc-500">{stat.label}</div>
@@ -254,49 +348,69 @@ export default function LandingPage() {
             ))}
             <div className="text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
-                <Globe className="w-4 h-4 text-violet-400 opacity-50" />
-                <div className="text-2xl sm:text-3xl font-bold text-white">24/7</div>
+                <Globe className="w-4 h-4 text-violet-400/60" />
+                <div className="text-3xl sm:text-4xl font-bold text-white">24/7</div>
               </div>
               <div className="text-xs sm:text-sm text-zinc-500">API Access</div>
             </div>
           </motion.div>
         </div>
+
+        {/* Scroll indicator */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <div className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-1.5">
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full bg-violet-400"
+              animate={{ y: [0, 12, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          </div>
+        </motion.div>
       </section>
 
-      {/* ===== VIDEO SHOWCASE — Real videos playing ===== */}
-      <MotionSection className="py-8 px-4 relative">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8">
-            <Badge variant="violet" className="mb-3">Live Showcase</Badge>
-            <h2 className="text-2xl sm:text-4xl font-bold">
+      {/* ============================================ */}
+      {/* SECTION 2: "WATCH AI CREATE" SHOWCASE         */}
+      {/* ============================================ */}
+      <section id="showcase" className="py-24 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
+        <div className="max-w-7xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-12">
+            <Badge variant="violet" className="mb-4">Live Showcase</Badge>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
               Watch AI <span className="gradient-text">Create</span> in Real-Time
             </h2>
-          </div>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Every video below was generated by AI. Click to explore different models and styles.
+            </p>
+          </MotionSection>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main video player */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main monitor frame */}
             <div className="lg:col-span-2">
               <motion.div
-                className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0D0D14]"
+                className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0D0D14] shadow-2xl shadow-violet-500/[0.08]"
                 animate={{
                   boxShadow: [
-                    "0 0 30px rgba(139, 92, 246, 0.06)",
-                    "0 0 60px rgba(139, 92, 246, 0.15)",
-                    "0 0 30px rgba(139, 92, 246, 0.06)",
+                    "0 0 40px rgba(139, 92, 246, 0.06)",
+                    "0 0 80px rgba(139, 92, 246, 0.12)",
+                    "0 0 40px rgba(139, 92, 246, 0.06)",
                   ],
                 }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                layout
               >
-                {/* Glowing top border */}
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent z-10" />
+                {/* Monitor top bar */}
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent z-20" />
 
-                {/* Video */}
+                {/* Video viewport */}
                 <div className="aspect-video relative">
                   <video
-                    ref={videoRef}
+                    ref={showcaseVideoRef}
                     autoPlay
-                    muted
+                    muted={muted}
                     loop
                     playsInline
                     className="w-full h-full object-cover"
@@ -305,10 +419,9 @@ export default function LandingPage() {
                     <source src={current.url} type="video/mp4" />
                   </video>
 
-                  {/* Overlay gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                  {/* Top bar */}
+                  {/* Top bar — traffic lights + LIVE indicator */}
                   <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1.5">
@@ -318,21 +431,29 @@ export default function LandingPage() {
                       </div>
                       <span className="text-[10px] text-zinc-400 font-mono ml-1">Genesis Studio</span>
                     </div>
-                    <motion.div
-                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 flex items-center gap-1"
-                      animate={{ opacity: [0.7, 1, 0.7] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      LIVE
-                    </motion.div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setMuted(!muted)}
+                        className="p-1.5 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 hover:bg-black/60 transition-colors"
+                      >
+                        {muted ? <VolumeX className="w-3 h-3 text-zinc-400" /> : <Volume2 className="w-3 h-3 text-violet-400" />}
+                      </button>
+                      <motion.div
+                        className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 flex items-center gap-1"
+                        animate={{ opacity: [0.7, 1, 0.7] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        LIVE
+                      </motion.div>
+                    </div>
                   </div>
 
                   {/* Bottom info */}
                   <div className="absolute bottom-3 left-3 right-3 z-10">
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-xs text-zinc-300 font-medium mb-1 max-w-md leading-relaxed">
+                        <p className="text-xs text-zinc-300 font-medium mb-1.5 max-w-md leading-relaxed">
                           &ldquo;{current.prompt}&rdquo;
                         </p>
                         <div className="flex items-center gap-2">
@@ -349,7 +470,7 @@ export default function LandingPage() {
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/[0.05] z-10">
                     <motion.div
                       className="h-full bg-gradient-to-r from-violet-600 to-cyan-500"
-                      key={activeVideo}
+                      key={activeShowcase}
                       initial={{ width: "0%" }}
                       animate={{ width: "100%" }}
                       transition={{ duration: 8, ease: "linear" }}
@@ -359,32 +480,24 @@ export default function LandingPage() {
               </motion.div>
             </div>
 
-            {/* Video selector sidebar */}
+            {/* Playlist sidebar */}
             <div className="space-y-3">
               <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold px-1">Generated Samples</p>
-              {demoVideos.map((video, index) => (
+              {showcaseVideos.map((video, index) => (
                 <motion.button
                   key={index}
-                  onClick={() => setActiveVideo(index)}
+                  onClick={() => setActiveShowcase(index)}
                   className={`w-full flex gap-3 p-3 rounded-xl border transition-all duration-300 text-left ${
-                    activeVideo === index
+                    activeShowcase === index
                       ? "border-violet-500/30 bg-violet-500/[0.06]"
                       : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
                   }`}
                   whileHover={{ x: 3 }}
                   transition={{ duration: 0.15 }}
                 >
-                  {/* Mini video preview */}
                   <div className="w-20 h-12 rounded-lg overflow-hidden shrink-0 relative bg-[#0D0D14]">
-                    <video
-                      src={video.url}
-                      muted
-                      loop
-                      playsInline
-                      autoPlay
-                      className="w-full h-full object-cover"
-                    />
-                    {activeVideo === index && (
+                    <video src={video.url} muted loop playsInline autoPlay className="w-full h-full object-cover" />
+                    {activeShowcase === index && (
                       <div className="absolute inset-0 border-2 border-violet-500 rounded-lg" />
                     )}
                   </div>
@@ -400,13 +513,13 @@ export default function LandingPage() {
                 </motion.button>
               ))}
 
-              {/* Reel preview */}
+              {/* Reel format preview */}
               <div className="mt-4 pt-4 border-t border-white/[0.06]">
                 <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold px-1 mb-3">Reel Format</p>
                 <div className="relative w-24 mx-auto rounded-xl overflow-hidden border border-cyan-500/20 shadow-lg shadow-cyan-500/5">
                   <div className="aspect-[9/16] relative">
                     <video
-                      src={reelVideos[0].url}
+                      src="https://assets.mixkit.co/videos/2213/2213-720.mp4"
                       muted
                       loop
                       playsInline
@@ -424,146 +537,370 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </div>
-      </MotionSection>
 
-      {/* ===== VIDEO GALLERY STRIP ===== */}
-      <section className="py-8 overflow-hidden">
-        <div className="flex gap-4 animate-scroll-left">
-          {[...demoVideos, ...demoVideos].map((video, i) => (
-            <div
-              key={i}
-              className="shrink-0 w-64 rounded-xl overflow-hidden border border-white/[0.06] bg-[#111118]/60 group"
-            >
-              <div className="aspect-video relative overflow-hidden">
-                <video
-                  src={video.url}
-                  muted
-                  loop
-                  playsInline
-                  autoPlay
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
-                  <p className="text-[10px] text-zinc-300 truncate">{video.prompt}</p>
+          {/* Auto-scrolling marquee strip */}
+          <div className="mt-12 overflow-hidden">
+            <div className="flex gap-4 animate-scroll-left">
+              {[...marqueeVideos, ...marqueeVideos, ...marqueeVideos].map((src, i) => (
+                <div
+                  key={i}
+                  className="shrink-0 w-56 rounded-xl overflow-hidden border border-white/[0.06] bg-[#111118]/60 group"
+                >
+                  <div className="aspect-video relative overflow-hidden">
+                    <video
+                      src={src}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <Play className="w-6 h-6 text-white/80" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ===== SOCIAL PROOF ===== */}
-      <MotionSection className="py-12 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 text-zinc-600">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              <span className="text-sm">500+ creators</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Film className="w-4 h-4" />
-              <span className="text-sm">10,000+ videos generated</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">99.9% uptime</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              <span className="text-sm">Failed gens = full refund</span>
+              ))}
             </div>
           </div>
         </div>
-      </MotionSection>
+      </section>
 
-      {/* ===== WHY GENESIS ===== */}
-      <section className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
-        <div className="max-w-5xl mx-auto relative z-10">
-          <MotionSection className="text-center mb-16">
-            <Badge variant="red" className="mb-4">The Problem</Badge>
+      {/* ============================================ */}
+      {/* SECTION 3: MOTION CONTROL SPLIT-SCREEN        */}
+      {/* ============================================ */}
+      <section className="py-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <video
+            autoPlay muted loop playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.04]"
+          >
+            <source src="https://assets.mixkit.co/videos/34563/34563-720.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/90 to-[#0A0A0F]" />
+        </div>
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-12">
+            <Badge variant="cyan" className="mb-4">
+              <Layers className="w-3 h-3 mr-1" /> Motion Control
+            </Badge>
             <h2 className="text-3xl sm:text-5xl font-bold mb-4">
-              The Competition is <span className="text-red-400">Broken</span>
+              Reference In. <span className="gradient-text">AI Video Out.</span>
             </h2>
-            <p className="text-zinc-400 max-w-xl mx-auto leading-relaxed">
-              The $2.4B AI video market is wide open. Here&apos;s why we&apos;re different.
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Upload a reference video or motion capture. The AI transfers the motion to your scene with perfect synchronization.
             </p>
           </MotionSection>
 
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-            {competitors.map((c) => (
-              <StaggerItem key={c.name}>
-                <div className="flex items-start gap-3 p-4 rounded-xl border border-red-500/10 bg-red-500/[0.03] group hover:border-red-500/20 transition-colors">
-                  <span className="text-red-400/60 mt-0.5 text-sm">&#x2715;</span>
-                  <div>
-                    <span className="font-semibold text-red-300/80">{c.name}</span>
-                    <span className="text-zinc-500 ml-1">{c.issue}</span>
-                  </div>
+          <MotionSection delay={0.15}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+              {/* Reference side */}
+              <div className="relative rounded-2xl overflow-hidden border border-cyan-500/20 bg-[#0D0D14]">
+                <div className="absolute top-3 left-3 z-10">
+                  <Badge variant="cyan" className="text-[10px] backdrop-blur-sm">
+                    <GitCompare className="w-3 h-3 mr-1" /> Reference Input
+                  </Badge>
                 </div>
+                <div className="aspect-video">
+                  <video
+                    ref={refVideoRef}
+                    autoPlay muted loop playsInline
+                    onTimeUpdate={syncMotionVideos}
+                    className="w-full h-full object-cover"
+                  >
+                    <source src={motionControlVideos.reference} type="video/mp4" />
+                  </video>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-cyan-500/20">
+                  <div className="h-full bg-cyan-500/60 w-full" />
+                </div>
+              </div>
+
+              {/* AI output side */}
+              <div className="relative rounded-2xl overflow-hidden border border-violet-500/20 bg-[#0D0D14]">
+                <div className="absolute top-3 left-3 z-10">
+                  <Badge variant="violet" className="text-[10px] backdrop-blur-sm">
+                    <Sparkles className="w-3 h-3 mr-1" /> AI Output
+                  </Badge>
+                </div>
+                <div className="aspect-video">
+                  <video
+                    ref={outVideoRef}
+                    autoPlay muted loop playsInline
+                    className="w-full h-full object-cover"
+                  >
+                    <source src={motionControlVideos.output} type="video/mp4" />
+                  </video>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-violet-500/20">
+                  <motion.div
+                    className="h-full bg-violet-500/60"
+                    initial={{ width: "0%" }}
+                    whileInView={{ width: "100%" }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 2, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sync indicator */}
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500/20" />
+              <motion.div
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]"
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-violet-400" />
+                <span className="text-xs text-zinc-400">Frame-perfect sync</span>
+              </motion.div>
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-violet-500/20" />
+            </div>
+          </MotionSection>
+        </div>
+      </section>
+
+      {/* ============================================ */}
+      {/* SECTION 4: GENESIS BRAIN ANIMATED DEMO        */}
+      {/* ============================================ */}
+      <section className="py-24 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
+        <div className="max-w-5xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-12">
+            <Badge variant="violet" className="mb-4">
+              <Brain className="w-3 h-3 mr-1" /> Genesis Brain
+            </Badge>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              One Prompt. <span className="gradient-text">Full Production.</span>
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Describe your vision in natural language. Brain plans scenes, generates each one, mixes audio, and delivers a complete video.
+            </p>
+          </MotionSection>
+
+          <MotionSection delay={0.15}>
+            <div className="relative rounded-2xl overflow-hidden border border-violet-500/20 bg-[#0D0D14] shadow-2xl shadow-violet-500/[0.06]">
+              {/* Terminal top bar */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/50" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50" />
+                </div>
+                <span className="text-xs text-zinc-500 ml-2 font-mono">Genesis Brain v2</span>
+                <div className="flex-1" />
+                {/* Step indicators */}
+                <div className="flex items-center gap-1">
+                  {brainSteps.map((s, i) => (
+                    <div
+                      key={s.label}
+                      className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                        i === brainStep ? "bg-violet-500 scale-125" : i < brainStep ? "bg-violet-500/40" : "bg-white/10"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Brain content area */}
+              <div className="p-6 sm:p-8 min-h-[320px]">
+                {/* Step 0: Typewriter concept input */}
+                {brainStep === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <MessageSquare className="w-4 h-4 text-violet-400" />
+                      <span className="text-sm font-semibold text-violet-300">Concept Input</span>
+                    </div>
+                    <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                      <p className="text-sm text-zinc-300 font-mono leading-relaxed">
+                        {brainTyped}
+                        <motion.span
+                          className="inline-block w-0.5 h-4 bg-violet-400 ml-0.5 align-middle"
+                          animate={{ opacity: [1, 0, 1] }}
+                          transition={{ duration: 0.8, repeat: Infinity }}
+                        />
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Step 1: Shot list generation */}
+                {brainStep === 1 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <Film className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-semibold text-emerald-300">Shot List Generated</span>
+                    </div>
+                    {brainSteps[1].items?.map((item, i) => (
+                      <motion.div
+                        key={item}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.15 }}
+                      >
+                        <span className="text-xs font-mono text-violet-400 mt-0.5 shrink-0">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span className="text-sm text-zinc-400">{item}</span>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+
+                {/* Step 2: Generation progress bars */}
+                {brainStep === 2 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-300">Rendering Scenes</span>
+                    </div>
+                    {brainSteps[2].scenes?.map((scene, i) => (
+                      <div key={scene.name} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-zinc-400">{scene.name}</span>
+                          <span className="text-xs font-mono text-zinc-500">{scene.progress}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                          <motion.div
+                            className={`h-full rounded-full ${
+                              scene.progress === 100 ? "bg-emerald-500" : "bg-gradient-to-r from-violet-600 to-cyan-500"
+                            }`}
+                            initial={{ width: "0%" }}
+                            animate={{ width: `${scene.progress}%` }}
+                            transition={{ duration: 1.5, delay: i * 0.2, ease: "easeOut" }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+
+                {/* Step 3: Complete */}
+                {brainStep === 3 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center text-center py-8"
+                  >
+                    <motion.div
+                      className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-4"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200 }}
+                    >
+                      <Check className="w-8 h-8 text-emerald-400" />
+                    </motion.div>
+                    <p className="text-lg font-semibold text-emerald-300 mb-2">Production Complete</p>
+                    <p className="text-sm text-zinc-500">{brainSteps[3].text}</p>
+                    <Link href="/sign-up" className="mt-4">
+                      <Button variant="outline" size="sm" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+                        Try Brain Studio <ArrowRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          </MotionSection>
+        </div>
+      </section>
+
+      {/* ============================================ */}
+      {/* SECTION 5: SOCIAL PROOF / GROWTH STORY        */}
+      {/* ============================================ */}
+      <section className="py-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <video
+            autoPlay muted loop playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.03]"
+          >
+            <source src="https://assets.mixkit.co/videos/44688/44688-720.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/95 to-[#0A0A0F]" />
+        </div>
+
+        <div className="max-w-5xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-16">
+            <Badge variant="emerald" className="mb-4">
+              <Users className="w-3 h-3 mr-1" /> Community
+            </Badge>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              Growing <span className="gradient-text">Every Day</span>
+            </h2>
+          </MotionSection>
+
+          {/* Stats grid */}
+          <StaggerGroup className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-16">
+            {[
+              { value: 51000, label: "Community Members", suffix: "+", color: "text-violet-400" },
+              { value: 10000, label: "Videos Generated", suffix: "+", color: "text-emerald-400" },
+              { value: 99, label: "Uptime", suffix: ".9%", color: "text-cyan-400" },
+              { value: 6, label: "AI Models", suffix: "", color: "text-amber-400" },
+            ].map((stat) => (
+              <StaggerItem key={stat.label}>
+                <GlowCard className="p-6 rounded-xl border border-white/[0.06] bg-[#111118]/50 text-center">
+                  <AnimatedCounter
+                    value={stat.value}
+                    suffix={stat.suffix}
+                    className={`text-3xl sm:text-4xl font-bold ${stat.color}`}
+                    duration={1.5}
+                  />
+                  <div className="text-xs text-zinc-500 mt-2">{stat.label}</div>
+                </GlowCard>
               </StaggerItem>
             ))}
           </StaggerGroup>
 
+          {/* Founder quote */}
           <MotionSection delay={0.2}>
-            <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/[0.06] to-cyan-500/[0.03] border border-emerald-500/20 text-center card-glow">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                </div>
-                <span className="text-lg font-bold text-emerald-300">Genesis Studio</span>
+            <div className="relative p-8 rounded-2xl bg-gradient-to-br from-violet-500/[0.04] to-cyan-500/[0.02] border border-violet-500/15 text-center">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge variant="violet" className="px-3">
+                  <Heart className="w-3 h-3 mr-1" /> From the Founder
+                </Badge>
               </div>
-              <p className="text-zinc-400 max-w-lg mx-auto">
-                Open models, transparent pricing, credits never expire, API from
-                day one, failed generations = full refund.
+              <p className="text-lg sm:text-xl text-zinc-300 italic leading-relaxed max-w-2xl mx-auto mt-4 mb-4">
+                &ldquo;We started Genesis Studio because AI video shouldn&apos;t be locked behind proprietary models
+                and expiring credits. Open-source models, serverless GPUs, and transparent pricing — that&apos;s how
+                you democratize creation.&rdquo;
               </p>
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
+                  G
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-zinc-200">Genesis Team</p>
+                  <p className="text-xs text-zinc-500 flex items-center gap-1">
+                    <Flag className="w-3 h-3" /> Made in South Africa
+                  </p>
+                </div>
+              </div>
             </div>
           </MotionSection>
         </div>
       </section>
 
-      {/* ===== FEATURES ===== */}
-      <section id="features" className="py-20 px-4 relative">
-        <div className="max-w-5xl mx-auto">
-          <MotionSection className="text-center mb-16">
-            <Badge variant="violet" className="mb-4">Capabilities</Badge>
-            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
-              Everything You Need to <span className="gradient-text">Create</span>
-            </h2>
-            <p className="text-zinc-400 max-w-xl mx-auto">
-              From text prompts to social-ready reels, with built-in audio and an API for developers.
-            </p>
-          </MotionSection>
-
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((f) => {
-              const colors = accentColors[f.accent];
-              return (
-                <StaggerItem key={f.title}>
-                  <GlowCard
-                    className={`group p-6 rounded-xl border border-white/[0.06] bg-[#111118]/50 hover:bg-[#111118]/80 transition-all duration-300 ${colors.border}`}
-                  >
-                    <motion.div
-                      className={`w-10 h-10 rounded-lg ${colors.bg} flex items-center justify-center mb-4 transition-colors`}
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      transition={{ type: "spring", stiffness: 400 }}
-                    >
-                      <f.icon className={`w-5 h-5 ${colors.icon}`} />
-                    </motion.div>
-                    <h3 className="text-base font-semibold text-zinc-100 mb-2">{f.title}</h3>
-                    <p className="text-sm text-zinc-400 leading-relaxed">{f.desc}</p>
-                  </GlowCard>
-                </StaggerItem>
-              );
-            })}
-          </StaggerGroup>
-        </div>
-      </section>
-
-      {/* ===== MODELS ===== */}
-      <section id="models" className="py-20 px-4 relative">
+      {/* ============================================ */}
+      {/* SECTION 6: MODEL SHOWCASE WITH VIDEO CARDS    */}
+      {/* ============================================ */}
+      <section id="models" className="py-24 px-4 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
-        <div className="max-w-5xl mx-auto relative z-10">
+        <div className="max-w-6xl mx-auto relative z-10">
           <MotionSection className="text-center mb-16">
             <Badge variant="violet" className="mb-4">Model Arsenal</Badge>
             <h2 className="text-3xl sm:text-5xl font-bold mb-4">
@@ -574,16 +911,57 @@ export default function LandingPage() {
             </p>
           </MotionSection>
 
-          <div className="space-y-3">
-            {models.map((m, index) => (
+          {/* Video cards grid */}
+          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+            {modelShowcase.slice(0, 3).map((m, index) => (
+              <StaggerItem key={m.name}>
+                <motion.div
+                  className={`group relative rounded-2xl overflow-hidden border ${m.border} bg-[#0D0D14] cursor-pointer`}
+                  whileHover={{ scale: 1.02, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  onMouseEnter={() => setHoveredModel(index)}
+                  onMouseLeave={() => setHoveredModel(null)}
+                >
+                  <div className="aspect-video relative overflow-hidden">
+                    <video
+                      src={m.video}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D14] via-[#0D0D14]/30 to-transparent" />
+                    <div className="absolute top-3 left-3">
+                      <Badge variant={badgeColorMap[m.color.replace("text-", "").replace("-400", "")] || "violet"} className="text-[10px]">
+                        {m.tier}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-zinc-100">{m.name}</span>
+                      <span className="text-xs text-zinc-600">{m.param}</span>
+                    </div>
+                    <p className="text-sm text-zinc-400 mb-2">{m.desc}</p>
+                    <div className={`text-xs font-medium ${m.color}`}>{m.time} avg generation</div>
+                  </div>
+                </motion.div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+
+          {/* Remaining models as rows */}
+          <div className="space-y-3 mb-8">
+            {modelShowcase.slice(3).map((m, index) => (
               <MotionSection key={m.name} delay={index * 0.06}>
                 <motion.div
                   className={`group flex items-center gap-4 p-4 rounded-xl border ${m.border} bg-gradient-to-r ${m.bg} transition-all duration-300`}
                   whileHover={{ scale: 1.01, x: 4 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                    <Star className={`w-5 h-5 ${m.color}`} />
+                  <div className="w-16 h-10 rounded-lg overflow-hidden shrink-0 bg-[#0D0D14]">
+                    <video src={m.video} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
@@ -603,92 +981,47 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <MotionSection delay={0.3} className="mt-8">
-            <div className="p-5 rounded-xl bg-gradient-to-r from-amber-500/[0.06] to-amber-500/[0.02] border border-amber-500/15 text-center">
-              <div className="flex items-center justify-center gap-2 mb-1.5">
-                <Zap className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold text-amber-300">PRO TIP</span>
-              </div>
-              <p className="text-sm text-zinc-400">
-                Use &ldquo;Draft then Refine&rdquo; — generate fast previews with LTX/CogVideo, then render final quality with Wan 2.2.
+          {/* Same-prompt comparison strip */}
+          <MotionSection delay={0.2}>
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-4 text-center">
+                Same Prompt — Different Models
               </p>
+              <p className="text-sm text-zinc-400 text-center mb-6 italic">
+                &ldquo;Cinematic sunset over the ocean, golden hour, 4K&rdquo;
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {modelShowcase.map((m) => (
+                  <div key={m.name} className={`rounded-xl overflow-hidden border ${m.border}`}>
+                    <div className="aspect-video relative">
+                      <video src={m.video} muted loop playsInline autoPlay className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <div className="absolute bottom-1.5 left-1.5">
+                        <span className={`text-[9px] font-bold ${m.color}`}>{m.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </MotionSection>
         </div>
       </section>
 
-      {/* ===== API SECTION ===== */}
-      <section id="api" className="py-20 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <MotionSection>
-              <Badge variant="cyan" className="mb-4">Developer API</Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Build with <span className="gradient-text">Genesis</span>
-              </h2>
-              <p className="text-zinc-400 leading-relaxed mb-6">
-                REST API on every plan, including free. Generate videos programmatically,
-                poll for status, and integrate AI video into your product.
-              </p>
-              <div className="space-y-3 mb-6">
-                {[
-                  "API key authentication with Bearer tokens",
-                  "Webhook callbacks for job completion",
-                  "All models accessible via single endpoint",
-                  "Automatic refunds on failed generations",
-                ].map((item, i) => (
-                  <motion.div
-                    key={item}
-                    className="flex items-center gap-2 text-sm"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.08 }}
-                  >
-                    <Check className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span className="text-zinc-300">{item}</span>
-                  </motion.div>
-                ))}
-              </div>
-              <Link href="/sign-up">
-                <motion.div whileHover={{ x: 4 }} transition={{ duration: 0.2 }}>
-                  <Button variant="outline" className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10">
-                    Get API Key <ArrowRight className="w-3.5 h-3.5" />
-                  </Button>
-                </motion.div>
-              </Link>
-            </MotionSection>
-
-            {/* Code block */}
-            <MotionSection delay={0.15}>
-              <div className="rounded-xl border border-white/[0.06] bg-[#0D0D14] overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/40" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/40" />
-                  </div>
-                  <span className="text-xs text-zinc-600 ml-2">generate.sh</span>
-                </div>
-                <div className="p-4 font-mono text-sm overflow-x-auto">
-                  <div className="text-zinc-500">{"# Generate a video with one API call"}</div>
-                  <div className="text-cyan-400 mt-2">curl <span className="text-zinc-300">-X POST \</span></div>
-                  <div className="text-zinc-300 pl-4">https://api.genesisstudio.ai/api/v1/generate \</div>
-                  <div className="text-zinc-300 pl-4">-H <span className="text-amber-300">{'"Authorization: Bearer gs_..."'}</span> \</div>
-                  <div className="text-zinc-300 pl-4">-H <span className="text-amber-300">{'"Content-Type: application/json"'}</span> \</div>
-                  <div className="text-zinc-300 pl-4">-d <span className="text-emerald-300">{"'{\"prompt\": \"A sunset over the ocean\",'"}</span></div>
-                  <div className="text-emerald-300 pl-8">{'     "model": "ltx-video",'}</div>
-                  <div className="text-emerald-300 pl-8">{"     \"resolution\": \"720p\"\\}'"}</div>
-                </div>
-              </div>
-            </MotionSection>
-          </div>
+      {/* ============================================ */}
+      {/* SECTION 7: PRICING WITH VIDEO BACKGROUND      */}
+      {/* ============================================ */}
+      <section id="pricing" className="py-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <video
+            autoPlay muted loop playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.04]"
+          >
+            <source src="https://assets.mixkit.co/videos/48107/48107-720.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/95 to-[#0A0A0F]" />
         </div>
-      </section>
 
-      {/* ===== PRICING PREVIEW ===== */}
-      <section id="pricing" className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
         <div className="max-w-5xl mx-auto relative z-10">
           <MotionSection className="text-center mb-12">
             <Badge variant="violet" className="mb-4">Pricing</Badge>
@@ -704,10 +1037,10 @@ export default function LandingPage() {
             {PLANS.map((plan) => (
               <StaggerItem key={plan.id}>
                 <div
-                  className={`relative p-5 rounded-xl border transition-all duration-300 ${
+                  className={`relative p-5 rounded-xl border transition-all duration-300 backdrop-blur-sm ${
                     plan.popular
-                      ? "border-violet-500/30 bg-violet-500/[0.06] ring-1 ring-violet-500/20 shadow-lg shadow-violet-500/10"
-                      : "border-white/[0.06] bg-[#111118]/50 hover:border-white/[0.1]"
+                      ? "border-violet-500/30 bg-violet-500/[0.08] ring-1 ring-violet-500/20 shadow-lg shadow-violet-500/10"
+                      : "border-white/[0.06] bg-[#111118]/70 hover:border-white/[0.1]"
                   }`}
                 >
                   {plan.popular && (
@@ -762,76 +1095,176 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== CTA with video background ===== */}
-      <section className="py-24 px-4 relative overflow-hidden">
+      {/* ============================================ */}
+      {/* SECTION 8: COMPETITOR COMPARISON TABLE         */}
+      {/* ============================================ */}
+      <section className="py-24 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-red-500/[0.01] to-transparent" />
+        <div className="max-w-4xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-12">
+            <Badge variant="red" className="mb-4">The Difference</Badge>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              Genesis vs <span className="text-red-400">The Rest</span>
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              The $2.4B AI video market is wide open. Here&apos;s why creators choose Genesis.
+            </p>
+          </MotionSection>
+
+          <MotionSection delay={0.15}>
+            <div className="rounded-2xl overflow-hidden border border-white/[0.06] bg-[#0D0D14]">
+              {/* Table header */}
+              <div className="grid grid-cols-5 gap-px bg-white/[0.04]">
+                <div className="p-4 bg-[#0D0D14]">
+                  <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Feature</span>
+                </div>
+                {competitors.map((c) => (
+                  <div key={c.name} className="p-4 bg-[#0D0D14] text-center">
+                    <span className="text-xs text-red-400/60 font-semibold">{c.name}</span>
+                  </div>
+                ))}
+                <div className="p-4 bg-violet-500/[0.06] text-center border-b border-violet-500/20">
+                  <span className="text-xs font-bold gradient-text">Genesis</span>
+                </div>
+              </div>
+
+              {/* Comparison rows */}
+              {[
+                { label: "Credits", key: "credits", gKey: "gCredits" },
+                { label: "Pricing", key: "price", gKey: "gPrice" },
+                { label: "API Access", key: "api", gKey: "gApi" },
+                { label: "Models", key: "models", gKey: "gModels" },
+              ].map((row) => (
+                <div key={row.label} className="grid grid-cols-5 gap-px bg-white/[0.02] border-t border-white/[0.04]">
+                  <div className="p-4 bg-[#0D0D14]">
+                    <span className="text-xs text-zinc-300 font-medium">{row.label}</span>
+                  </div>
+                  {competitors.map((c) => (
+                    <div key={c.name} className="p-4 bg-[#0D0D14] text-center">
+                      <span className="text-xs text-zinc-500">{(c as Record<string, string>)[row.key]}</span>
+                    </div>
+                  ))}
+                  <div className="p-4 bg-violet-500/[0.03] text-center">
+                    <span className="text-xs text-emerald-400 font-medium flex items-center justify-center gap-1">
+                      <Check className="w-3 h-3" />
+                      {(competitors[0] as Record<string, string>)[row.gKey]}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </MotionSection>
+        </div>
+      </section>
+
+      {/* ============================================ */}
+      {/* SECTION 9: FINAL CTA — FULL-SCREEN VIDEO BG   */}
+      {/* ============================================ */}
+      <section className="relative py-32 sm:py-40 px-4 overflow-hidden">
         <div className="absolute inset-0">
           <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.06]"
+            autoPlay muted loop playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.10]"
           >
-            <source src="https://assets.mixkit.co/videos/48107/48107-720.mp4" type="video/mp4" />
+            <source src="https://assets.mixkit.co/videos/4880/4880-720.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/70 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/60 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/30 via-transparent to-[#0A0A0F]/30" />
         </div>
         <div className="absolute inset-0 bg-glow-center" />
 
         <MotionSection className="max-w-3xl mx-auto text-center relative z-10">
-          <h2 className="text-3xl sm:text-5xl font-bold mb-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            whileInView={{ scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ type: "spring", stiffness: 200 }}
+            className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-600 to-cyan-500 mx-auto mb-8 flex items-center justify-center shadow-2xl shadow-violet-500/30"
+          >
+            <Play className="w-8 h-8 text-white ml-1" />
+          </motion.div>
+
+          <h2 className="text-4xl sm:text-6xl font-bold mb-6">
             Ready to <span className="gradient-text">Create</span>?
           </h2>
-          <p className="text-zinc-400 mb-8 text-lg max-w-xl mx-auto">
+          <p className="text-zinc-400 mb-10 text-xl max-w-xl mx-auto leading-relaxed">
             50 free credits. No credit card required. Start generating AI videos
             in under a minute.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
             <Link href="/sign-up">
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                <Button size="lg" className="text-base px-10 h-12 shadow-xl shadow-violet-600/25">
-                  Get Started Free <ArrowRight className="w-4 h-4" />
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                <Button size="lg" className="text-lg px-12 h-14 shadow-2xl shadow-violet-600/30">
+                  Start Creating Free <ArrowRight className="w-5 h-5" />
                 </Button>
               </motion.div>
             </Link>
             <Link href="/pricing">
-              <Button variant="secondary" size="lg" className="text-base px-10 h-12">
+              <Button variant="secondary" size="lg" className="text-lg px-10 h-14">
                 Compare Plans
               </Button>
             </Link>
           </div>
+
+          <motion.div
+            className="mt-8 flex items-center justify-center gap-6 text-sm text-zinc-500"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
+          >
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> No credit card</span>
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> 50 free credits</span>
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Credits never expire</span>
+          </motion.div>
         </MotionSection>
       </section>
 
-      {/* ===== FOOTER ===== */}
-      <footer className="border-t border-white/[0.06] py-12 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8 mb-8">
-            <div className="sm:col-span-1">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-xs text-white">
+      {/* ============================================ */}
+      {/* SECTION 10: ENHANCED FOOTER                    */}
+      {/* ============================================ */}
+      <footer className="border-t border-white/[0.06] py-16 px-4 relative">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+            {/* Brand column */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-violet-600/20">
                   G
                 </div>
-                <span className="text-sm font-bold gradient-text">Genesis Studio</span>
+                <span className="text-lg font-bold gradient-text">Genesis Studio</span>
               </div>
-              <p className="text-xs text-zinc-600 leading-relaxed">
-                From Nothing, Create Everything.
+              <p className="text-sm text-zinc-500 leading-relaxed mb-4 max-w-xs">
+                From Nothing, Create Everything. Open-source AI video generation for everyone.
               </p>
+              <div className="flex items-center gap-2 text-xs text-zinc-600">
+                <Flag className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Proudly Made in South Africa</span>
+              </div>
             </div>
 
+            {/* Product */}
             <div>
-              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Product</h4>
-              <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">Product</h4>
+              <div className="space-y-2.5">
                 <Link href="#features" className="block text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Features</Link>
                 <Link href="#models" className="block text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Models</Link>
                 <Link href="/pricing" className="block text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Pricing</Link>
                 <Link href="#api" className="block text-sm text-zinc-500 hover:text-zinc-300 transition-colors">API</Link>
+                <Link href="/brain" className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+                  <Brain className="w-3.5 h-3.5" /> Brain Studio
+                  <Badge variant="violet" className="text-[8px] py-0 px-1.5">NEW</Badge>
+                </Link>
+                <Link href="/motion-control" className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+                  <Layers className="w-3.5 h-3.5" /> Motion Control
+                </Link>
               </div>
             </div>
 
+            {/* Resources */}
             <div>
-              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Resources</h4>
-              <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">Resources</h4>
+              <div className="space-y-2.5">
                 <span className="block text-sm text-zinc-500">Documentation</span>
                 <span className="block text-sm text-zinc-500">API Reference</span>
                 <span className="block text-sm text-zinc-500">Status</span>
@@ -839,29 +1272,39 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* Community */}
             <div>
-              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Company</h4>
-              <div className="space-y-2">
-                <span className="block text-sm text-zinc-500">About</span>
-                <span className="block text-sm text-zinc-500">Twitter</span>
+              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">Community</h4>
+              <div className="space-y-2.5">
                 <span className="block text-sm text-zinc-500">Discord</span>
+                <span className="block text-sm text-zinc-500">Twitter / X</span>
                 <span className="block text-sm text-zinc-500">GitHub</span>
+                <span className="block text-sm text-zinc-500">YouTube</span>
+                <span className="block text-sm text-zinc-500">About</span>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-white/[0.04] pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="border-t border-white/[0.04] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-zinc-600">
               &copy; {new Date().getFullYear()} Genesis Studio. All rights reserved.
             </p>
             <div className="flex items-center gap-6 text-xs text-zinc-600">
-              <span className="hover:text-zinc-400 cursor-pointer">Privacy</span>
-              <span className="hover:text-zinc-400 cursor-pointer">Terms</span>
-              <span className="hover:text-zinc-400 cursor-pointer">Cookies</span>
+              <span className="hover:text-zinc-400 cursor-pointer transition-colors">Privacy</span>
+              <span className="hover:text-zinc-400 cursor-pointer transition-colors">Terms</span>
+              <span className="hover:text-zinc-400 cursor-pointer transition-colors">Cookies</span>
             </div>
           </div>
         </div>
       </footer>
+
+      {/* Ken Burns keyframe animation */}
+      <style jsx global>{`
+        @keyframes kenBurns {
+          0% { transform: scale(1) translate(0, 0); }
+          100% { transform: scale(1.08) translate(-1%, -1%); }
+        }
+      `}</style>
     </div>
   );
 }

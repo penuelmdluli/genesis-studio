@@ -171,79 +171,20 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
 
   switch (params.modelId) {
     case "wan-2.2":
-      // ComfyUI workflow format — the RunPod endpoint runs a ComfyUI worker
-      // Key MUST be "prompt" (ComfyUI API standard), NOT "workflow"
+      // wlsdml1114/generate_video handler — uses FLAT PARAMS, NOT a ComfyUI workflow.
+      // The handler loads its own internal workflow template and injects these values.
+      // See: https://github.com/wlsdml1114/generate_video
       return {
-        prompt: {
-          "1": {
-            class_type: "UNETLoader",
-            inputs: { unet_name: "wan2.2_t2v_5B_fp16.safetensors", weight_dtype: "fp16" },
-          },
-          "2": {
-            class_type: "CLIPLoader",
-            inputs: { clip_name: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", type: "wan" },
-          },
-          "3": {
-            class_type: "VAELoader",
-            inputs: { vae_name: "wan2.2_vae.safetensors" },
-          },
-          "4": {
-            class_type: "CLIPTextEncode",
-            inputs: { text: params.prompt, clip: ["2", 0] },
-          },
-          "5": {
-            class_type: "CLIPTextEncode",
-            inputs: { text: params.negativePrompt || "blurry, low quality, distorted", clip: ["2", 0] },
-          },
-          "6": {
-            class_type: "EmptyWanLatentVideo",
-            inputs: { width, height, length: numFrames, batch_size: 1 },
-          },
-          "7": {
-            class_type: "KSampler",
-            inputs: {
-              seed: params.seed ?? Math.floor(Math.random() * 2147483647),
-              steps,
-              cfg: guidance,
-              sampler_name: "euler",
-              scheduler: "normal",
-              denoise: 1.0,
-              model: ["1", 0],
-              positive: ["4", 0],
-              negative: ["5", 0],
-              latent_image: ["6", 0],
-            },
-          },
-          "8": {
-            class_type: "VAEDecode",
-            inputs: { samples: ["7", 0], vae: ["3", 0] },
-          },
-          "9": {
-            class_type: "VHS_VideoCombine",
-            inputs: {
-              images: ["8", 0],
-              frame_rate: params.fps,
-              loop_count: 0,
-              filename_prefix: "genesis",
-              format: "video/h264-mp4",
-              pingpong: false,
-              save_output: true,
-            },
-          },
-          // Include image/video inputs for i2v and motion control
-          ...(params.inputImageUrl && {
-            "10": {
-              class_type: "LoadImage",
-              inputs: { image: params.inputImageUrl },
-            },
-          }),
-          ...(params.inputVideoUrl && {
-            "11": {
-              class_type: "VHS_LoadVideo",
-              inputs: { video: params.inputVideoUrl, force_rate: params.fps, force_size: "Disabled" },
-            },
-          }),
-        },
+        prompt: params.prompt,
+        negative_prompt: params.negativePrompt || "blurry, low quality, distorted, watermark",
+        width,
+        height,
+        length: numFrames, // frame count — handler uses "length", not "num_frames"
+        steps: params.isDraft ? 6 : Math.min(steps, 20), // handler default is 10, max ~20 for speed
+        cfg: guidance <= 3 ? guidance : 2.0, // handler default is 2.0, NOT 7.5
+        seed: params.seed ?? Math.floor(Math.random() * 2147483647),
+        // Image input for i2v mode (handler requires one of image_url, image_base64, image_path)
+        ...(params.inputImageUrl && { image_url: params.inputImageUrl }),
       };
 
     case "mochi-1":

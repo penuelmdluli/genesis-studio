@@ -38,8 +38,8 @@ describe("durationToFrames", () => {
 });
 
 describe("buildRunPodInput", () => {
-  // --- Wan 2.2: ComfyUI workflow format ---
-  it("builds wan-2.2 input as ComfyUI workflow", () => {
+  // --- Wan 2.2: flat params format (wlsdml1114/generate_video handler) ---
+  it("builds wan-2.2 input with flat prompt string", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.2",
       type: "t2v",
@@ -49,32 +49,19 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    // Must return a workflow object, not flat params
-    expect(input.prompt).toBeDefined();
-    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    // Must be a flat string prompt, NOT a workflow object
+    expect(input.prompt).toBe("A cat walking");
+    expect(typeof input.prompt).toBe("string");
 
-    // Prompt is in CLIPTextEncode node
-    expect(wf["4"].class_type).toBe("CLIPTextEncode");
-    expect(wf["4"].inputs.text).toBe("A cat walking");
-
-    // Latent dimensions
-    expect(wf["6"].class_type).toBe("EmptyWanLatentVideo");
-    expect(wf["6"].inputs.width).toBe(1280);
-    expect(wf["6"].inputs.height).toBe(720);
-    expect(wf["6"].inputs.length).toBe(120); // 5s * 24fps
-
-    // KSampler params
-    expect(wf["7"].class_type).toBe("KSampler");
-    expect(wf["7"].inputs.steps).toBe(30);
-    expect(wf["7"].inputs.cfg).toBe(7.5);
-    expect(wf["7"].inputs.seed).toBeDefined();
-
-    // Video output
-    expect(wf["9"].class_type).toBe("VHS_VideoCombine");
-    expect(wf["9"].inputs.frame_rate).toBe(24);
+    // Frame count uses "length" field
+    expect(input.length).toBe(120); // 5s * 24fps
+    expect(input.width).toBe(1280);
+    expect(input.height).toBe(720);
+    expect(input.seed).toBeDefined();
+    expect(input.cfg).toBe(2.0);
   });
 
-  it("wan-2.2 includes negative prompt in workflow", () => {
+  it("wan-2.2 includes negative prompt as flat field", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.2",
       type: "t2v",
@@ -85,9 +72,7 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
-    expect(wf["5"].class_type).toBe("CLIPTextEncode");
-    expect(wf["5"].inputs.text).toBe("blurry, low quality");
+    expect(input.negative_prompt).toBe("blurry, low quality");
   });
 
   it("wan-2.2 applies draft mode with fewer steps", () => {
@@ -101,8 +86,22 @@ describe("buildRunPodInput", () => {
       isDraft: true,
     });
 
-    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
-    expect(wf["7"].inputs.steps).toBe(15);
+    expect(input.steps).toBe(6);
+  });
+
+  it("wan-2.2 passes image_url for i2v mode", () => {
+    const input = buildRunPodInput({
+      modelId: "wan-2.2",
+      type: "i2v",
+      prompt: "Animate this",
+      inputImageUrl: "https://example.com/photo.jpg",
+      resolution: "720p",
+      duration: 5,
+      fps: 24,
+    });
+
+    expect(input.image_url).toBe("https://example.com/photo.jpg");
+    expect(input.prompt).toBe("Animate this");
   });
 
   // --- Mochi-1: flat params format ---

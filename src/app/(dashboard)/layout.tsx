@@ -10,22 +10,46 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen, setUser } = useStore();
+  const { sidebarOpen, setUser, setVideos } = useStore();
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadData() {
       try {
-        const res = await fetch("/api/user");
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
+        const [userRes, videosRes] = await Promise.all([
+          fetch("/api/user"),
+          fetch("/api/videos"),
+        ]);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setUser(userData);
+        }
+        if (videosRes.ok) {
+          const videosData = await videosRes.json();
+          setVideos(
+            (videosData.videos || []).map((v: Record<string, unknown>) => ({
+              id: v.id,
+              userId: v.user_id,
+              jobId: v.job_id,
+              title: v.title,
+              url: v.url,
+              thumbnailUrl: v.thumbnail_url || "",
+              modelId: v.model_id,
+              prompt: v.prompt,
+              resolution: v.resolution,
+              duration: v.duration,
+              fps: v.fps,
+              fileSize: v.file_size || 0,
+              isPublic: v.is_public || false,
+              createdAt: v.created_at,
+            }))
+          );
         }
       } catch (err) {
-        console.error("Failed to load user:", err);
+        console.error("Failed to load data:", err);
       }
     }
-    loadUser();
-  }, [setUser]);
+    loadData();
+  }, [setUser, setVideos]);
 
   return (
     <div className="min-h-screen bg-black">

@@ -17,6 +17,7 @@ const R2 = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
+  forcePathStyle: true,
 });
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
@@ -36,7 +37,13 @@ export async function uploadVideo(
     })
   );
 
-  return `${PUBLIC_URL}/${key}`;
+  // If a public custom domain is configured, use direct URL.
+  // Otherwise return the key — caller should construct the appropriate URL.
+  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
+    return `${PUBLIC_URL}/${key}`;
+  }
+  // Return the storage key — videos are served via /api/videos/[videoId]
+  return key;
 }
 
 export async function uploadThumbnail(
@@ -53,7 +60,10 @@ export async function uploadThumbnail(
     })
   );
 
-  return `${PUBLIC_URL}/${key}`;
+  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
+    return `${PUBLIC_URL}/${key}`;
+  }
+  return key;
 }
 
 export async function getSignedUploadUrl(

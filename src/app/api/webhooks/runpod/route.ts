@@ -32,58 +32,53 @@ export async function POST(req: NextRequest) {
     }
 
     if (status === "COMPLETED" && output) {
-      let finalVideoUrl = "";
-      let finalThumbnailUrl = "";
-
       try {
         const vKey = videoStorageKey(job.user_id, job.id);
 
         // Handle base64 video data (common in RunPod Hub templates)
         if (output.video && !output.video.startsWith("http")) {
           const videoBuffer = Buffer.from(output.video, "base64");
-          finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+          await uploadVideo(vKey, videoBuffer);
         }
         // Handle URL-based video output
         else if (output.video_url || (output.video && output.video.startsWith("http"))) {
           const videoUrl = output.video_url || output.video;
           const videoRes = await fetch(videoUrl);
           const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-          finalVideoUrl = await uploadVideo(vKey, videoBuffer);
-        }
-
-        // Handle thumbnail if provided
-        if (output.thumbnail_url) {
-          const tKey = thumbnailStorageKey(job.user_id, job.id);
-          const thumbRes = await fetch(output.thumbnail_url);
-          const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer());
-          finalThumbnailUrl = await uploadThumbnail(tKey, thumbBuffer);
+          await uploadVideo(vKey, videoBuffer);
         }
       } catch (storageErr) {
         console.error("Storage upload error:", storageErr);
       }
 
-      await updateJobStatus(job.id, {
-        status: "completed",
-        progress: 100,
-        outputVideoUrl: finalVideoUrl,
-        thumbnailUrl: finalThumbnailUrl,
-        gpuTime: executionTime,
-        completedAt: new Date().toISOString(),
-      });
-
-      // Create video record
-      await createVideo({
+      // Create video record first to get the ID
+      const video = await createVideo({
         userId: job.user_id,
         jobId: job.id,
         title: job.prompt.slice(0, 100),
-        url: finalVideoUrl,
-        thumbnailUrl: finalThumbnailUrl,
+        url: "", // will update after we have the video ID
+        thumbnailUrl: "",
         modelId: job.model_id,
         prompt: job.prompt,
         resolution: job.resolution,
         duration: job.duration,
         fps: job.fps,
         fileSize: 0,
+      });
+
+      // Set URL to our streaming endpoint
+      const videoApiUrl = `/api/videos/${video.id}`;
+      await supabase
+        .from("videos")
+        .update({ url: videoApiUrl })
+        .eq("id", video.id);
+
+      await updateJobStatus(job.id, {
+        status: "completed",
+        progress: 100,
+        outputVideoUrl: videoApiUrl,
+        gpuTime: executionTime,
+        completedAt: new Date().toISOString(),
       });
     } else if (status === "FAILED") {
       await updateJobStatus(job.id, {

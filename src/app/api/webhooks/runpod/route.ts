@@ -31,6 +31,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (status === "COMPLETED" && output) {
+      // Guard: check if video was already created for this job (polling may have processed it first)
+      const { data: existingVideo } = await supabase
+        .from("videos")
+        .select("id")
+        .eq("job_id", job.id)
+        .maybeSingle();
+
+      if (existingVideo) {
+        // Already processed — skip to avoid duplicate
+        return NextResponse.json({ received: true });
+      }
+
       // Upload video to R2 — if this fails, mark job as failed and refund
       try {
         const vKey = videoStorageKey(job.user_id, job.id);

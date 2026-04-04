@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, videoStorageKey } from "@/lib/storage";
 import { ModelId } from "@/types";
+import { createSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
   req: NextRequest,
@@ -36,41 +38,92 @@ export async function GET(
         );
 
         if (runpodStatus.status === "COMPLETED" && runpodStatus.output) {
-          const output = runpodStatus.output as Record<string, string>;
-          let finalVideoUrl = "";
+          // Guard: check if video was already created for this job
+          // (webhook may have already processed this completion)
+          const supabase = createSupabaseAdmin();
+          const { data: existingVideo } = await supabase
+            .from("videos")
+            .select("id, url")
+            .eq("job_id", job.id)
+            .maybeSingle();
 
+          if (existingVideo) {
+            // Video already exists (webhook beat us) — just return the result
+            const videoApiUrl = existingVideo.url.startsWith("/api/videos/")
+              ? existingVideo.url
+              : `/api/videos/${existingVideo.id}`;
+
+            return NextResponse.json({
+              id: job.id,
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              modelId: job.model_id,
+              prompt: job.prompt,
+              resolution: job.resolution,
+              duration: job.duration,
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+              completedAt: job.completed_at || new Date().toISOString(),
+            });
+          }
+
+          const output = runpodStatus.output as Record<string, string>;
+
+          // Upload video to R2
           try {
             const vKey = videoStorageKey(job.user_id, job.id);
 
             // Handle base64 video data
             if (output.video && !output.video.startsWith("http")) {
               const videoBuffer = Buffer.from(output.video, "base64");
-              finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+              await uploadVideo(vKey, videoBuffer);
             }
             // Handle URL-based video
             else if (output.video_url || (output.video && output.video.startsWith("http"))) {
               const videoUrl = output.video_url || output.video;
               const videoRes = await fetch(videoUrl);
+              if (!videoRes.ok) {
+                throw new Error(`Failed to download video: ${videoRes.status}`);
+              }
               const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-              finalVideoUrl = await uploadVideo(vKey, videoBuffer);
+              await uploadVideo(vKey, videoBuffer);
+            } else {
+              throw new Error("No video data in RunPod output");
             }
           } catch (storageErr) {
             console.error("Storage upload error:", storageErr);
+            // Mark failed and refund — do NOT create a broken video record
+            await updateJobStatus(job.id, {
+              status: "failed",
+              errorMessage: `Video upload failed: ${storageErr instanceof Error ? storageErr.message : "Unknown error"}`,
+              completedAt: new Date().toISOString(),
+            });
+            await refundCredits(
+              job.user_id,
+              job.credits_cost,
+              job.id,
+              "Video upload failed — automatic refund"
+            );
+            return NextResponse.json({
+              id: job.id,
+              status: "failed",
+              errorMessage: "Video upload failed. Credits have been refunded.",
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+            });
           }
 
-          await updateJobStatus(job.id, {
-            status: "completed",
-            progress: 100,
-            outputVideoUrl: finalVideoUrl,
-            gpuTime: runpodStatus.executionTime,
-            completedAt: new Date().toISOString(),
-          });
+          // Create video record with correct API URL (same pattern as webhook)
+          const videoId = randomUUID();
+          const videoApiUrl = `/api/videos/${videoId}`;
 
           await createVideo({
+            id: videoId,
             userId: job.user_id,
             jobId: job.id,
             title: job.prompt.slice(0, 100),
-            url: finalVideoUrl,
+            url: videoApiUrl,
             thumbnailUrl: "",
             modelId: job.model_id,
             prompt: job.prompt,
@@ -83,11 +136,19 @@ export async function GET(
             audioTrackId: job.audio_track_id,
           });
 
+          await updateJobStatus(job.id, {
+            status: "completed",
+            progress: 100,
+            outputVideoUrl: videoApiUrl,
+            gpuTime: runpodStatus.executionTime,
+            completedAt: new Date().toISOString(),
+          });
+
           return NextResponse.json({
             id: job.id,
             status: "completed",
             progress: 100,
-            outputVideoUrl: finalVideoUrl,
+            outputVideoUrl: videoApiUrl,
             modelId: job.model_id,
             prompt: job.prompt,
             resolution: job.resolution,

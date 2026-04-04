@@ -38,7 +38,8 @@ describe("durationToFrames", () => {
 });
 
 describe("buildRunPodInput", () => {
-  it("builds wan-2.2 input with prompt field", () => {
+  // --- Wan 2.2: ComfyUI workflow format ---
+  it("builds wan-2.2 input as ComfyUI workflow", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.2",
       type: "t2v",
@@ -48,16 +49,63 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    expect(input.prompt).toBe("A cat walking");
-    expect(input.width).toBe(1280);
-    expect(input.height).toBe(720);
-    expect(input.num_frames).toBe(120);
-    expect(input.fps).toBe(24);
-    expect(input.guidance_scale).toBe(7.5);
-    expect(input.num_inference_steps).toBe(30);
-    expect(input.seed).toBeDefined();
+    // Must return a workflow object, not flat params
+    expect(input.workflow).toBeDefined();
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+
+    // Prompt is in CLIPTextEncode node
+    expect(wf["4"].class_type).toBe("CLIPTextEncode");
+    expect(wf["4"].inputs.text).toBe("A cat walking");
+
+    // Latent dimensions
+    expect(wf["6"].class_type).toBe("EmptyWanLatentVideo");
+    expect(wf["6"].inputs.width).toBe(1280);
+    expect(wf["6"].inputs.height).toBe(720);
+    expect(wf["6"].inputs.length).toBe(120); // 5s * 24fps
+
+    // KSampler params
+    expect(wf["7"].class_type).toBe("KSampler");
+    expect(wf["7"].inputs.steps).toBe(30);
+    expect(wf["7"].inputs.cfg).toBe(7.5);
+    expect(wf["7"].inputs.seed).toBeDefined();
+
+    // Video output
+    expect(wf["9"].class_type).toBe("VHS_VideoCombine");
+    expect(wf["9"].inputs.frame_rate).toBe(24);
   });
 
+  it("wan-2.2 includes negative prompt in workflow", () => {
+    const input = buildRunPodInput({
+      modelId: "wan-2.2",
+      type: "t2v",
+      prompt: "Test",
+      negativePrompt: "blurry, low quality",
+      resolution: "720p",
+      duration: 5,
+      fps: 24,
+    });
+
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(wf["5"].class_type).toBe("CLIPTextEncode");
+    expect(wf["5"].inputs.text).toBe("blurry, low quality");
+  });
+
+  it("wan-2.2 applies draft mode with fewer steps", () => {
+    const input = buildRunPodInput({
+      modelId: "wan-2.2",
+      type: "t2v",
+      prompt: "Test",
+      resolution: "480p",
+      duration: 3,
+      fps: 24,
+      isDraft: true,
+    });
+
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(wf["7"].inputs.steps).toBe(15);
+  });
+
+  // --- Mochi-1: flat params format ---
   it("builds mochi-1 input with positive_prompt field", () => {
     const input = buildRunPodInput({
       modelId: "mochi-1",
@@ -87,7 +135,8 @@ describe("buildRunPodInput", () => {
     expect(input.num_frames).toBe(163);
   });
 
-  it("builds hunyuan-video input with video_length and infer_steps", () => {
+  // --- Hunyuan Video: ComfyUI workflow format ---
+  it("builds hunyuan-video input as ComfyUI workflow", () => {
     const input = buildRunPodInput({
       modelId: "hunyuan-video",
       type: "t2v",
@@ -99,13 +148,22 @@ describe("buildRunPodInput", () => {
       guidanceScale: 6.0,
     });
 
-    expect(input.video_length).toBe(120);
-    expect(input.infer_steps).toBe(40);
-    expect(input.cfg_scale).toBe(6.0);
-    expect(input.num_frames).toBeUndefined();
+    expect(input.workflow).toBeDefined();
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+
+    // HunyuanVideoSampler node
+    expect(wf["1"].class_type).toBe("HunyuanVideoSampler");
+    expect(wf["1"].inputs.prompt).toBe("A forest scene");
+    expect(wf["1"].inputs.video_length).toBe(120);
+    expect(wf["1"].inputs.infer_steps).toBe(40);
+    expect(wf["1"].inputs.cfg_scale).toBe(6.0);
+
+    // Video output
+    expect(wf["2"].class_type).toBe("VHS_VideoCombine");
   });
 
-  it("builds ltx-video input with image and video URL support", () => {
+  // --- LTX Video: ComfyUI workflow format ---
+  it("builds ltx-video input as ComfyUI workflow", () => {
     const input = buildRunPodInput({
       modelId: "ltx-video",
       type: "v2v",
@@ -116,11 +174,21 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    expect(input.video_url).toBe("https://example.com/video.mp4");
-    expect(input.prompt).toBe("Restyle");
+    expect(input.workflow).toBeDefined();
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+
+    // Prompt in CLIPTextEncode
+    expect(wf["2"].class_type).toBe("CLIPTextEncode");
+    expect(wf["2"].inputs.text).toBe("Restyle");
+
+    // Video input node
+    expect(wf["9"]).toBeDefined();
+    expect(wf["9"].class_type).toBe("VHS_LoadVideo");
+    expect(wf["9"].inputs.video).toBe("https://example.com/video.mp4");
   });
 
-  it("builds wan-2.1-turbo input with capped inference steps", () => {
+  // --- Wan 2.1 Turbo: ComfyUI workflow format ---
+  it("builds wan-2.1-turbo input as ComfyUI workflow with capped steps", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.1-turbo",
       type: "i2v",
@@ -132,10 +200,19 @@ describe("buildRunPodInput", () => {
       numInferenceSteps: 30,
     });
 
-    expect(input.num_inference_steps).toBe(12);
-    expect(input.image_url).toBe("https://example.com/image.jpg");
+    expect(input.workflow).toBeDefined();
+    const wf = input.workflow as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+
+    // Steps capped at 12 for turbo
+    expect(wf["7"].inputs.steps).toBe(12);
+
+    // Image input node
+    expect(wf["10"]).toBeDefined();
+    expect(wf["10"].class_type).toBe("LoadImage");
+    expect(wf["10"].inputs.image).toBe("https://example.com/image.jpg");
   });
 
+  // --- CogVideoX: flat params format ---
   it("caps cogvideo-x frames at 49", () => {
     const input = buildRunPodInput({
       modelId: "cogvideo-x",
@@ -147,33 +224,5 @@ describe("buildRunPodInput", () => {
     });
 
     expect(input.num_frames).toBe(49);
-  });
-
-  it("applies draft mode with fewer inference steps", () => {
-    const input = buildRunPodInput({
-      modelId: "wan-2.2",
-      type: "t2v",
-      prompt: "Test",
-      resolution: "480p",
-      duration: 3,
-      fps: 24,
-      isDraft: true,
-    });
-
-    expect(input.num_inference_steps).toBe(15);
-  });
-
-  it("includes negative prompt", () => {
-    const input = buildRunPodInput({
-      modelId: "wan-2.2",
-      type: "t2v",
-      prompt: "Test",
-      negativePrompt: "blurry, low quality",
-      resolution: "720p",
-      duration: 5,
-      fps: 24,
-    });
-
-    expect(input.negative_prompt).toBe("blurry, low quality");
   });
 });

@@ -20,18 +20,43 @@ import {
   X,
   Shield,
   Brain,
+  MessageCircle,
+  Mic,
+  Subtitles,
+  ArrowUpCircle,
+  ImageIcon,
+  Lock,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
-const baseNavItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  section?: string;
+  comingSoon?: boolean;
+}
+
+const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/brain", label: "Brain Studio", icon: Brain, badge: "NEW" },
-  { href: "/generate", label: "Generate", icon: Sparkles },
-  { href: "/motion-control", label: "Motion Control", icon: Move },
-  { href: "/gallery", label: "Gallery", icon: Film },
-  { href: "/api-keys", label: "API Keys", icon: Key },
-  { href: "/pricing", label: "Pricing", icon: CreditCard },
-  { href: "/settings", label: "Settings", icon: Settings },
+  // --- CREATE ---
+  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
+  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "NEW" },
+  { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create" },
+  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "NEW" },
+  // --- ENHANCE ---
+  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
+  // --- AUDIO ---
+  { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio", badge: "NEW" },
+  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
+  // --- IMAGE ---
+  { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
+  // --- MANAGE ---
+  { href: "/gallery", label: "Gallery", icon: Film, section: "Manage" },
+  { href: "/api-keys", label: "API Keys", icon: Key, section: "Manage" },
+  { href: "/pricing", label: "Pricing", icon: CreditCard, section: "Manage" },
+  { href: "/settings", label: "Settings", icon: Settings, section: "Manage" },
 ];
 
 export function Sidebar() {
@@ -136,32 +161,41 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
-          {navItems.map((item) => {
+          {navItems.map((item, idx) => {
             const isActive = pathname === item.href;
+            const prevItem = navItems[idx - 1];
+            const showSection = (sidebarOpen || mobileMenuOpen) && item.section && item.section !== prevItem?.section;
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
-                  isActive
-                    ? "bg-violet-500/15 text-violet-300"
-                    : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
+              <div key={item.href}>
+                {showSection && (
+                  <div className="px-3 pt-4 pb-1.5 text-[10px] uppercase tracking-wider text-zinc-600 font-semibold">
+                    {item.section}
+                  </div>
                 )}
-              >
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-violet-500" />
-                )}
-                <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-300")} />
-                {(sidebarOpen || mobileMenuOpen) && (
-                  <span className="truncate flex-1">{item.label}</span>
-                )}
-                {(sidebarOpen || mobileMenuOpen) && item.badge && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 text-white leading-none">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative",
+                    isActive
+                      ? "bg-violet-500/15 text-violet-300"
+                      : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
+                  )}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-violet-500" />
+                  )}
+                  <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-300")} />
+                  {(sidebarOpen || mobileMenuOpen) && (
+                    <span className="truncate flex-1">{item.label}</span>
+                  )}
+                  {(sidebarOpen || mobileMenuOpen) && item.badge && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 text-white leading-none">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              </div>
             );
           })}
         </nav>

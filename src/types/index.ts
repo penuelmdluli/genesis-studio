@@ -20,6 +20,59 @@ export type ModelTier =
   | "budget";
 
 export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
+
+// --- Feature Types (RunPod Hub Expansion) ---
+export type FeatureId =
+  | "talking-avatar"
+  | "voiceover"
+  | "captions"
+  | "thumbnails"
+  | "video-effects"
+  | "video-upscale"
+  | "face-swap"
+  | "avatar-generator"
+  | "character-designer"
+  | "voice-clone"
+  | "presentations"
+  | "image-upscale";
+
+export type FeatureCategory = "create" | "enhance" | "audio" | "image";
+
+export interface FeatureConfig {
+  id: FeatureId;
+  name: string;
+  description: string;
+  category: FeatureCategory;
+  creditCost: string; // e.g. "2 credits/min" — for display
+  minPlan: PlanId;
+  endpointEnvKey: string; // e.g. "RUNPOD_ENDPOINT_CAPTIONS"
+  comingSoon?: boolean;
+}
+
+// --- Voiceover Types ---
+export interface VoiceOption {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  language: string;
+  preview?: string;
+  isClone?: boolean;
+}
+
+// --- Caption Types ---
+export type CaptionStyle = "tiktok" | "youtube" | "cinematic" | "custom";
+
+export interface CaptionResult {
+  srt: string;
+  words: { word: string; start: number; end: number }[];
+  language: string;
+}
+
+// --- Thumbnail Types ---
+export interface ThumbnailResult {
+  images: string[]; // base64 or URLs of generated thumbnails
+  prompt: string;
+}
 export type AspectRatio = "landscape" | "portrait" | "square";
 export type VideoFormat = "standard" | "reel";
 

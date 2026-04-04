@@ -155,6 +155,8 @@ export async function POST(req: NextRequest) {
         creditsCost: creditCost,
       });
     } catch (gpuError) {
+      console.error("GPU submission error:", gpuError);
+
       // If RunPod submission fails, refund credits
       const { refundCredits } = await import("@/lib/credits");
       await refundCredits(
@@ -164,13 +166,23 @@ export async function POST(req: NextRequest) {
         "GPU submission failed — automatic refund"
       );
 
+      const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
+      const isEndpointMissing = errorMsg.includes("No RunPod endpoint configured");
+
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: "Failed to submit to GPU. Credits refunded.",
+        errorMessage: isEndpointMissing
+          ? `No GPU endpoint configured for ${model.name}. Credits refunded.`
+          : `GPU submission failed: ${errorMsg}. Credits refunded.`,
       });
 
       return NextResponse.json(
-        { error: "GPU submission failed. Credits refunded.", jobId: job.id },
+        {
+          error: isEndpointMissing
+            ? `${model.name} is not available yet. Try a different model. Credits refunded.`
+            : "GPU submission failed. Credits refunded.",
+          jobId: job.id,
+        },
         { status: 503 }
       );
     }

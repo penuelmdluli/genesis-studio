@@ -237,7 +237,7 @@ export default function LandingPage() {
       {/* SECTION 1: CINEMATIC FULL-SCREEN HERO        */}
       {/* ============================================ */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Crossfading background videos with Ken Burns */}
+        {/* Crossfading background videos with Ken Burns — HIGH VISIBILITY */}
         <div className="absolute inset-0">
           {heroVideos.map((src, i) => (
             <video
@@ -247,7 +247,7 @@ export default function LandingPage() {
               loop
               playsInline
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ${
-                i === heroIndex ? (heroFading ? "opacity-0" : "opacity-[0.12]") : "opacity-0"
+                i === heroIndex ? (heroFading ? "opacity-0" : "opacity-40") : "opacity-0"
               }`}
               style={{
                 animation: i === heroIndex ? "kenBurns 12s ease-in-out infinite alternate" : "none",
@@ -256,17 +256,17 @@ export default function LandingPage() {
               <source src={src} type="video/mp4" />
             </video>
           ))}
-          {/* Gradient overlays */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/60 to-[#0A0A0F]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/40 via-transparent to-[#0A0A0F]/40" />
+          {/* Gradient overlays — dark enough for text, light enough for video to shine */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/80 via-[#0A0A0F]/40 to-[#0A0A0F]/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/20 via-transparent to-[#0A0A0F]/20" />
         </div>
 
-        {/* Atmospheric glow */}
+        {/* Atmospheric glow — more vibrant */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-glow-top opacity-70" />
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-violet-600/[0.06] rounded-full blur-[150px]" />
-          <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-500/[0.04] rounded-full blur-[120px]" />
+          <div className="absolute inset-0 bg-glow-top opacity-40" />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-violet-600/[0.12] rounded-full blur-[180px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/[0.08] rounded-full blur-[140px]" />
+          <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-pink-500/[0.06] rounded-full blur-[100px]" />
         </div>
 
         <div className="max-w-6xl mx-auto text-center relative z-10 px-4">
@@ -573,11 +573,11 @@ export default function LandingPage() {
         <div className="absolute inset-0">
           <video
             autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.04]"
+            className="absolute inset-0 w-full h-full object-cover opacity-20"
           >
             <source src="https://assets.mixkit.co/videos/34563/34563-720.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/90 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/90 via-[#0A0A0F]/60 to-[#0A0A0F]/90" />
         </div>
 
         <div className="max-w-6xl mx-auto relative z-10">
@@ -827,11 +827,11 @@ export default function LandingPage() {
         <div className="absolute inset-0">
           <video
             autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.03]"
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.15]"
           >
             <source src="https://assets.mixkit.co/videos/44688/44688-720.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/95 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/90 via-[#0A0A0F]/70 to-[#0A0A0F]/90" />
         </div>
 
         <div className="max-w-5xl mx-auto relative z-10">
@@ -1015,11 +1015,11 @@ export default function LandingPage() {
         <div className="absolute inset-0">
           <video
             autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.04]"
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.18]"
           >
             <source src="https://assets.mixkit.co/videos/48107/48107-720.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/95 to-[#0A0A0F]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/90 via-[#0A0A0F]/65 to-[#0A0A0F]/90" />
         </div>
 
         <div className="max-w-5xl mx-auto relative z-10">
@@ -1164,12 +1164,12 @@ export default function LandingPage() {
         <div className="absolute inset-0">
           <video
             autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.10]"
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.35]"
           >
             <source src="https://assets.mixkit.co/videos/4880/4880-720.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/60 to-[#0A0A0F]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/30 via-transparent to-[#0A0A0F]/30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/70 via-[#0A0A0F]/40 to-[#0A0A0F]/80" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0F]/20 via-transparent to-[#0A0A0F]/20" />
         </div>
         <div className="absolute inset-0 bg-glow-center" />
 

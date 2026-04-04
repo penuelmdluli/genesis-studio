@@ -196,7 +196,7 @@ export function Sidebar() {
                         ? "bg-gradient-to-r from-orange-500 to-red-500 text-white"
                         : "bg-gradient-to-r from-violet-500 to-cyan-500 text-white"
                     )}>
-                      {item.badge === "HOT" ? "🔥" : item.badge}
+                      {item.badge}
                     </span>
                   )}
                 </Link>

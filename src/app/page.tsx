@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import {
   StaggerGroup,
   StaggerItem,
   AnimatedCounter,
-  Parallax,
   GlowCard,
   motion,
 } from "@/components/ui/motion";
@@ -17,7 +17,6 @@ import {
   Sparkles,
   Zap,
   Shield,
-  Code,
   Film,
   Image as ImageIcon,
   RefreshCw,
@@ -32,7 +31,58 @@ import {
   Smartphone,
   Music,
   Terminal,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+
+// Real demo videos — royalty-free cinematic clips from Mixkit CDN
+const demoVideos = [
+  {
+    url: "https://assets.mixkit.co/videos/4880/4880-720.mp4",
+    prompt: "Ocean waves crashing on a rocky coastline at sunset, cinematic 4K",
+    model: "Wan 2.2",
+    resolution: "1080p",
+    duration: "5s",
+    label: "Cinematic",
+    color: "violet",
+  },
+  {
+    url: "https://assets.mixkit.co/videos/44688/44688-720.mp4",
+    prompt: "Aerial view of a busy city avenue at night, neon lights, timelapse",
+    model: "HunyuanVideo",
+    resolution: "1080p",
+    duration: "5s",
+    label: "Urban",
+    color: "cyan",
+  },
+  {
+    url: "https://assets.mixkit.co/videos/48107/48107-720.mp4",
+    prompt: "Ethereal light rays filtering through ancient forest trees, dreamlike",
+    model: "Mochi 1",
+    resolution: "720p",
+    duration: "5s",
+    label: "Nature",
+    color: "emerald",
+  },
+  {
+    url: "https://assets.mixkit.co/videos/5016/5016-720.mp4",
+    prompt: "Serene beach waves rolling onto golden sand, peaceful morning light",
+    model: "LTX-Video",
+    resolution: "720p",
+    duration: "3s",
+    label: "Fast",
+    color: "amber",
+  },
+];
+
+// Reel-format demo (vertical)
+const reelVideos = [
+  {
+    url: "https://assets.mixkit.co/videos/2213/2213-720.mp4",
+    prompt: "Waterfall cascading over rocks in a mystical forest, vertical reel",
+    model: "Wan 2.2",
+  },
+];
 
 const models = [
   { name: "Wan 2.2", tier: "FLAGSHIP", param: "A14B", desc: "Best cinematic quality. Complex motion.", color: "text-violet-400", bg: "from-violet-500/20 to-violet-500/5", border: "border-violet-500/20", time: "~300s" },
@@ -72,17 +122,59 @@ const competitors = [
   { name: "Sora", issue: "Discontinued. $15M/day burn rate." },
 ];
 
+const badgeColorMap: Record<string, "violet" | "cyan" | "emerald" | "amber"> = {
+  violet: "violet",
+  cyan: "cyan",
+  emerald: "emerald",
+  amber: "amber",
+};
+
 export default function LandingPage() {
+  const [activeVideo, setActiveVideo] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Auto-cycle showcase videos
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveVideo((prev) => (prev + 1) % demoVideos.length);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Play video on change
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {});
+    }
+  }, [activeVideo]);
+
+  const current = demoVideos[activeVideo];
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] relative">
       <Navbar />
 
-      {/* ===== HERO SECTION ===== */}
+      {/* ===== HERO SECTION with video background ===== */}
       <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-28 px-4 overflow-hidden">
+        {/* Background video — muted autoplay loop */}
+        <div className="absolute inset-0 overflow-hidden">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
+          >
+            <source src="https://assets.mixkit.co/videos/4880/4880-720.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/80 to-[#0A0A0F]" />
+        </div>
+
         {/* Atmospheric layers */}
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-glow-top" />
-          <div className="absolute inset-0 bg-grid opacity-40" />
+          <div className="absolute inset-0 bg-grid opacity-30" />
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-600/8 rounded-full blur-[120px]" />
         </div>
 
@@ -137,7 +229,7 @@ export default function LandingPage() {
             </Link>
           </motion.div>
 
-          {/* Stats row with animated counters */}
+          {/* Stats row */}
           <motion.div
             className="flex items-center justify-center gap-6 sm:gap-12"
             initial={{ opacity: 0 }}
@@ -169,138 +261,198 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== VIDEO SHOWCASE ===== */}
-      <MotionSection className="py-4 px-4 relative">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            className="relative rounded-2xl border border-white/[0.08] bg-[#111118]/60 backdrop-blur-sm overflow-hidden"
-            animate={{
-              boxShadow: [
-                "0 0 30px rgba(139, 92, 246, 0.05), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                "0 0 60px rgba(139, 92, 246, 0.12), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                "0 0 30px rgba(139, 92, 246, 0.05), 0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-              ],
-            }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {/* Glowing top border */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
+      {/* ===== VIDEO SHOWCASE — Real videos playing ===== */}
+      <MotionSection className="py-8 px-4 relative">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-8">
+            <Badge variant="violet" className="mb-3">Live Showcase</Badge>
+            <h2 className="text-2xl sm:text-4xl font-bold">
+              Watch AI <span className="gradient-text">Create</span> in Real-Time
+            </h2>
+          </div>
 
-            <div className="aspect-video relative bg-[#0D0D14] overflow-hidden">
-              {/* Animated background grid */}
-              <div className="absolute inset-0 bg-grid opacity-30" />
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-transparent to-cyan-900/10" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main video player */}
+            <div className="lg:col-span-2">
+              <motion.div
+                className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0D0D14]"
+                animate={{
+                  boxShadow: [
+                    "0 0 30px rgba(139, 92, 246, 0.06)",
+                    "0 0 60px rgba(139, 92, 246, 0.15)",
+                    "0 0 30px rgba(139, 92, 246, 0.06)",
+                  ],
+                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                layout
+              >
+                {/* Glowing top border */}
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent z-10" />
 
-              {/* Floating demo video thumbnails */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative w-full max-w-3xl px-8">
-                  {/* Center main "screen" */}
-                  <motion.div
-                    className="relative mx-auto rounded-xl overflow-hidden border border-white/[0.1] shadow-2xl shadow-violet-600/10"
-                    style={{ maxWidth: "70%" }}
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                {/* Video */}
+                <div className="aspect-video relative">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full h-full object-cover"
+                    key={current.url}
                   >
-                    <div className="aspect-video bg-gradient-to-br from-violet-600/20 via-[#18181F] to-cyan-600/10 relative flex items-center justify-center">
-                      {/* Fake video generation UI */}
-                      <div className="absolute top-3 left-3 flex gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-red-500/50" />
-                        <div className="w-2 h-2 rounded-full bg-amber-500/50" />
-                        <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
-                      </div>
-                      <div className="absolute top-3 right-3">
-                        <div className="px-2 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 font-mono">GENERATING</div>
-                      </div>
+                    <source src={current.url} type="video/mp4" />
+                  </video>
 
-                      {/* Animated progress bar */}
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/[0.05]">
-                        <motion.div
-                          className="h-full bg-gradient-to-r from-violet-600 to-cyan-500"
-                          animate={{ width: ["0%", "100%"] }}
-                          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                        />
-                      </div>
+                  {/* Overlay gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                      {/* Center play area */}
-                      <div className="text-center">
-                        <motion.div
-                          className="w-16 h-16 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mx-auto mb-3 backdrop-blur-sm"
-                          animate={{
-                            scale: [1, 1.08, 1],
-                            boxShadow: [
-                              "0 0 20px rgba(139, 92, 246, 0.15)",
-                              "0 0 50px rgba(139, 92, 246, 0.35)",
-                              "0 0 20px rgba(139, 92, 246, 0.15)",
-                            ],
-                          }}
-                          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                        >
-                          <Play className="w-6 h-6 text-violet-400 ml-0.5" />
-                        </motion.div>
-                        <motion.p
-                          className="text-zinc-300 text-sm font-medium"
-                          animate={{ opacity: [0.6, 1, 0.6] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          &ldquo;A majestic eagle soaring over mountains at golden hour&rdquo;
-                        </motion.p>
-                        <p className="text-zinc-600 text-xs mt-1">Wan 2.2 &middot; 1080p &middot; 5s</p>
+                  {/* Top bar */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                      </div>
+                      <span className="text-[10px] text-zinc-400 font-mono ml-1">Genesis Studio</span>
+                    </div>
+                    <motion.div
+                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 flex items-center gap-1"
+                      animate={{ opacity: [0.7, 1, 0.7] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE
+                    </motion.div>
+                  </div>
+
+                  {/* Bottom info */}
+                  <div className="absolute bottom-3 left-3 right-3 z-10">
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-xs text-zinc-300 font-medium mb-1 max-w-md leading-relaxed">
+                          &ldquo;{current.prompt}&rdquo;
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={badgeColorMap[current.color] || "violet"} className="text-[10px]">
+                            {current.model}
+                          </Badge>
+                          <span className="text-[10px] text-zinc-500">{current.resolution} &middot; {current.duration}</span>
+                        </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
 
-                  {/* Floating side cards */}
-                  <motion.div
-                    className="absolute -left-2 top-1/2 -translate-y-1/2 w-24 sm:w-32 rounded-lg border border-white/[0.06] bg-[#111118]/80 overflow-hidden shadow-lg"
-                    animate={{ y: [-60, -52, -60], opacity: [0.6, 0.85, 0.6] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                  >
-                    <div className="aspect-[9/16] bg-gradient-to-b from-cyan-900/20 to-pink-900/10 flex items-center justify-center">
-                      <div className="text-center">
-                        <Smartphone className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
-                        <p className="text-[8px] text-zinc-500">Reel</p>
-                      </div>
-                    </div>
-                  </motion.div>
+                  {/* Progress bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/[0.05] z-10">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-violet-600 to-cyan-500"
+                      key={activeVideo}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 8, ease: "linear" }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
 
-                  <motion.div
-                    className="absolute -right-2 top-1/2 -translate-y-1/2 w-24 sm:w-32 rounded-lg border border-white/[0.06] bg-[#111118]/80 overflow-hidden shadow-lg"
-                    animate={{ y: [-40, -48, -40], opacity: [0.6, 0.85, 0.6] }}
-                    transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                  >
-                    <div className="aspect-video bg-gradient-to-br from-amber-900/15 to-emerald-900/10 flex items-center justify-center">
-                      <div className="text-center">
-                        <Film className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                        <p className="text-[8px] text-zinc-500">LTX ~30s</p>
-                      </div>
+            {/* Video selector sidebar */}
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold px-1">Generated Samples</p>
+              {demoVideos.map((video, index) => (
+                <motion.button
+                  key={index}
+                  onClick={() => setActiveVideo(index)}
+                  className={`w-full flex gap-3 p-3 rounded-xl border transition-all duration-300 text-left ${
+                    activeVideo === index
+                      ? "border-violet-500/30 bg-violet-500/[0.06]"
+                      : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                  }`}
+                  whileHover={{ x: 3 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {/* Mini video preview */}
+                  <div className="w-20 h-12 rounded-lg overflow-hidden shrink-0 relative bg-[#0D0D14]">
+                    <video
+                      src={video.url}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      className="w-full h-full object-cover"
+                    />
+                    {activeVideo === index && (
+                      <div className="absolute inset-0 border-2 border-violet-500 rounded-lg" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Badge variant={badgeColorMap[video.color] || "violet"} className="text-[9px]">
+                        {video.label}
+                      </Badge>
+                      <span className="text-[10px] text-zinc-600">{video.model}</span>
                     </div>
-                  </motion.div>
+                    <p className="text-xs text-zinc-400 truncate leading-relaxed">{video.prompt}</p>
+                  </div>
+                </motion.button>
+              ))}
+
+              {/* Reel preview */}
+              <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold px-1 mb-3">Reel Format</p>
+                <div className="relative w-24 mx-auto rounded-xl overflow-hidden border border-cyan-500/20 shadow-lg shadow-cyan-500/5">
+                  <div className="aspect-[9/16] relative">
+                    <video
+                      src={reelVideos[0].url}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    <div className="absolute bottom-1.5 left-1.5">
+                      <Badge variant="cyan" className="text-[8px]">
+                        <Smartphone className="w-2.5 h-2.5 mr-0.5" /> 9:16
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Floating particles */}
-              <motion.div
-                className="absolute top-[20%] left-[15%] w-1.5 h-1.5 rounded-full bg-violet-400/30"
-                animate={{ y: [0, -20, 0], opacity: [0.3, 0.7, 0.3] }}
-                transition={{ duration: 3, repeat: Infinity, delay: 0 }}
-              />
-              <motion.div
-                className="absolute top-[30%] right-[20%] w-1 h-1 rounded-full bg-cyan-400/30"
-                animate={{ y: [0, -15, 0], opacity: [0.2, 0.6, 0.2] }}
-                transition={{ duration: 4, repeat: Infinity, delay: 1.5 }}
-              />
-              <motion.div
-                className="absolute bottom-[25%] left-[25%] w-1 h-1 rounded-full bg-pink-400/20"
-                animate={{ y: [0, -18, 0], opacity: [0.2, 0.5, 0.2] }}
-                transition={{ duration: 3.5, repeat: Infinity, delay: 0.8 }}
-              />
             </div>
-          </motion.div>
+          </div>
         </div>
       </MotionSection>
 
+      {/* ===== VIDEO GALLERY STRIP ===== */}
+      <section className="py-8 overflow-hidden">
+        <div className="flex gap-4 animate-scroll-left">
+          {[...demoVideos, ...demoVideos].map((video, i) => (
+            <div
+              key={i}
+              className="shrink-0 w-64 rounded-xl overflow-hidden border border-white/[0.06] bg-[#111118]/60 group"
+            >
+              <div className="aspect-video relative overflow-hidden">
+                <video
+                  src={video.url}
+                  muted
+                  loop
+                  playsInline
+                  autoPlay
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
+                  <p className="text-[10px] text-zinc-300 truncate">{video.prompt}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ===== SOCIAL PROOF ===== */}
-      <MotionSection className="py-16 px-4">
+      <MotionSection className="py-12 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 text-zinc-600">
             <div className="flex items-center gap-2">
@@ -532,10 +684,21 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== CTA ===== */}
+      {/* ===== CTA with video background ===== */}
       <section className="py-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.06]"
+          >
+            <source src="https://assets.mixkit.co/videos/48107/48107-720.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0A0A0F]/70 to-[#0A0A0F]" />
+        </div>
         <div className="absolute inset-0 bg-glow-center" />
-        <div className="absolute inset-0 bg-grid opacity-20" />
 
         <MotionSection className="max-w-3xl mx-auto text-center relative z-10">
           <h2 className="text-3xl sm:text-5xl font-bold mb-6">

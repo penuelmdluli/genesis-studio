@@ -165,7 +165,8 @@ export interface ApiKey {
 export interface Plan {
   id: PlanId;
   name: string;
-  price: number; // monthly in dollars
+  price: number; // monthly in dollars (USD)
+  priceZAR?: number; // monthly in South African Rand
   credits: number; // monthly credits, -1 for unlimited
   maxResolution: string;
   features: string[];
@@ -176,7 +177,8 @@ export interface Plan {
 export interface CreditPack {
   id: string;
   credits: number;
-  price: number;
+  price: number; // USD
+  priceZAR?: number; // South African Rand
   stripePriceId?: string;
 }
 

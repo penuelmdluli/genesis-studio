@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
-import { AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Error({
   error,
@@ -16,43 +14,31 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-glow-center opacity-30" />
-
-      <div className="relative z-10 text-center max-w-md mx-auto">
-        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle className="w-8 h-8 text-red-400" />
+    <div className="min-h-screen bg-[#07070A] flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center font-bold text-3xl text-white mx-auto mb-8 shadow-lg shadow-red-600/20">
+          !
         </div>
-
-        <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 mb-3">
-          Something went wrong
-        </h1>
-
-        <p className="text-zinc-500 text-sm leading-relaxed mb-8">
+        <h1 className="text-4xl font-extrabold text-zinc-100 mb-4">Something went wrong</h1>
+        <p className="text-zinc-400 mb-8">
           An unexpected error occurred. Our team has been notified.
-          You can try again or return to the dashboard.
         </p>
-
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={reset}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-violet-500 text-white text-sm font-medium shadow-lg shadow-violet-600/20 hover:shadow-violet-500/30 transition-all duration-200 press-effect"
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold text-sm hover:from-violet-500 hover:to-violet-400 transition-all shadow-lg shadow-violet-600/20"
           >
-            <RefreshCw className="w-4 h-4" />
             Try Again
           </button>
-          <Link
+          <a
             href="/dashboard"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.04] text-zinc-300 text-sm font-medium hover:bg-white/[0.08] transition-all duration-200"
+            className="px-6 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-zinc-300 font-semibold text-sm hover:bg-white/[0.08] transition-all"
           >
-            Dashboard
-          </Link>
+            Go to Dashboard
+          </a>
         </div>
-
         {error.digest && (
-          <p className="mt-8 text-xs text-zinc-600 font-mono">
-            Error ID: {error.digest}
-          </p>
+          <p className="mt-6 text-xs text-zinc-600">Error ID: {error.digest}</p>
         )}
       </div>
     </div>

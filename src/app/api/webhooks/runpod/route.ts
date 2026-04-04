@@ -5,13 +5,11 @@ import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey } fr
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify webhook secret (if configured)
+    // Verify webhook secret (required in production)
     const webhookSecret = process.env.RUNPOD_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const secret = req.headers.get("x-webhook-secret");
-      if (secret !== webhookSecret) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    const providedSecret = req.headers.get("x-webhook-secret");
+    if (webhookSecret && providedSecret !== webhookSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -32,6 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (status === "COMPLETED" && output) {
+      // Upload video to R2 — if this fails, mark job as failed and refund
       try {
         const vKey = videoStorageKey(job.user_id, job.id);
 
@@ -44,14 +43,36 @@ export async function POST(req: NextRequest) {
         else if (output.video_url || (output.video && output.video.startsWith("http"))) {
           const videoUrl = output.video_url || output.video;
           const videoRes = await fetch(videoUrl);
+          if (!videoRes.ok) {
+            throw new Error(`Failed to download video from source: ${videoRes.status}`);
+          }
           const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
           await uploadVideo(vKey, videoBuffer);
+        } else {
+          throw new Error("No video data in RunPod output");
         }
       } catch (storageErr) {
         console.error("Storage upload error:", storageErr);
+
+        // Mark job as failed since we have no usable file
+        await updateJobStatus(job.id, {
+          status: "failed",
+          errorMessage: `Storage upload failed: ${storageErr instanceof Error ? storageErr.message : "Unknown error"}`,
+          completedAt: new Date().toISOString(),
+        });
+
+        // Refund credits
+        await refundCredits(
+          job.user_id,
+          job.credits_cost,
+          job.id,
+          "Storage upload failed — automatic refund"
+        );
+
+        return NextResponse.json({ received: true });
       }
 
-      // Create video record first to get the ID
+      // Upload succeeded — create video record
       const video = await createVideo({
         userId: job.user_id,
         jobId: job.id,

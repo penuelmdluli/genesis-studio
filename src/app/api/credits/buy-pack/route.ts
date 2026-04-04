@@ -4,6 +4,7 @@ import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { CREDIT_PACKS } from "@/lib/constants";
+import { getProvider, getDefaultProvider } from "@/lib/payments";
 
 const PACK_PRICE_IDS: Record<string, string | undefined> = {
   "pack-500": process.env.STRIPE_CREDIT_PACK_500_PRICE_ID,
@@ -23,15 +24,86 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { packId } = await req.json();
+    const { packId, provider: providerName } = await req.json();
     const pack = CREDIT_PACKS.find((p) => p.id === packId);
-    const priceId = PACK_PRICE_IDS[packId];
 
-    if (!pack || !priceId) {
+    if (!pack) {
       return NextResponse.json({ error: "Invalid pack" }, { status: 400 });
     }
 
-    // Create or get Stripe customer
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+
+    // --- SA payment providers (Yoco, PayFast, Paystack) ---
+    if (providerName && providerName !== "stripe") {
+      const paymentProvider = getProvider(providerName);
+      const priceZAR = pack.priceZAR;
+      if (!priceZAR) {
+        return NextResponse.json(
+          { error: "ZAR pricing not available for this pack" },
+          { status: 400 }
+        );
+      }
+
+      const checkout = await paymentProvider.createCheckout({
+        amount: priceZAR * 100, // cents
+        currency: "ZAR",
+        email: user.email,
+        userId: user.id,
+        description: `Genesis Studio ${pack.credits} Credit Pack`,
+        metadata: {
+          type: "credit_pack",
+          packId: pack.id,
+          credits: String(pack.credits),
+          userId: user.id,
+        },
+        successUrl: `${appUrl}/dashboard?pack_success=true`,
+        cancelUrl: `${appUrl}/pricing?cancelled=true`,
+        notifyUrl: `${appUrl}/api/webhooks/${paymentProvider.name}`,
+      });
+
+      return NextResponse.json({ url: checkout.redirectUrl });
+    }
+
+    // --- Auto-detect: use first available SA provider if no Stripe config ---
+    const priceId = PACK_PRICE_IDS[packId];
+    if (!priceId) {
+      try {
+        const defaultProvider = getDefaultProvider();
+        const priceZAR = pack.priceZAR;
+        if (!priceZAR) {
+          return NextResponse.json(
+            { error: "No pricing available for this pack" },
+            { status: 400 }
+          );
+        }
+
+        const checkout = await defaultProvider.createCheckout({
+          amount: priceZAR * 100,
+          currency: "ZAR",
+          email: user.email,
+          userId: user.id,
+          description: `Genesis Studio ${pack.credits} Credit Pack`,
+          metadata: {
+            type: "credit_pack",
+            packId: pack.id,
+            credits: String(pack.credits),
+            userId: user.id,
+          },
+          successUrl: `${appUrl}/dashboard?pack_success=true`,
+          cancelUrl: `${appUrl}/pricing?cancelled=true`,
+          notifyUrl: `${appUrl}/api/webhooks/${defaultProvider.name}`,
+        });
+
+        return NextResponse.json({ url: checkout.redirectUrl });
+      } catch {
+        return NextResponse.json(
+          { error: "No payment provider available" },
+          { status: 500 }
+        );
+      }
+    }
+
+    // --- Stripe fallback (existing logic) ---
     let customerId = user.stripe_customer_id;
     if (!customerId) {
       const customer = await createStripeCustomer(user.email, user.name);
@@ -48,8 +120,8 @@ export async function POST(req: NextRequest) {
       customerId,
       priceId,
       mode: "payment",
-      successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?pack_success=true`,
-      cancelUrl: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
+      successUrl: `${appUrl}/dashboard?pack_success=true`,
+      cancelUrl: `${appUrl}/pricing?cancelled=true`,
     });
 
     return NextResponse.json({ url: session.url });

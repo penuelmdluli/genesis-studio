@@ -33,7 +33,9 @@ import {
   Terminal,
   Volume2,
   VolumeX,
+  CreditCard,
 } from "lucide-react";
+import { PLANS } from "@/lib/constants";
 
 // Real demo videos — royalty-free cinematic clips from Mixkit CDN
 const demoVideos = [
@@ -681,6 +683,82 @@ export default function LandingPage() {
               </div>
             </MotionSection>
           </div>
+        </div>
+      </section>
+
+      {/* ===== PRICING PREVIEW ===== */}
+      <section id="pricing" className="py-20 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.02] to-transparent" />
+        <div className="max-w-5xl mx-auto relative z-10">
+          <MotionSection className="text-center mb-12">
+            <Badge variant="violet" className="mb-4">Pricing</Badge>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              Simple, <span className="gradient-text">Transparent</span> Pricing
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Credits never expire. No watermarks on paid plans. API access on every tier.
+            </p>
+          </MotionSection>
+
+          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {PLANS.map((plan) => (
+              <StaggerItem key={plan.id}>
+                <div
+                  className={`relative p-5 rounded-xl border transition-all duration-300 ${
+                    plan.popular
+                      ? "border-violet-500/30 bg-violet-500/[0.06] ring-1 ring-violet-500/20 shadow-lg shadow-violet-500/10"
+                      : "border-white/[0.06] bg-[#111118]/50 hover:border-white/[0.1]"
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                      <Badge variant="violet" className="text-[10px] px-2.5 shadow-lg shadow-violet-500/20">
+                        <Sparkles className="w-2.5 h-2.5 mr-1" /> BEST VALUE
+                      </Badge>
+                    </div>
+                  )}
+                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3 pt-1">{plan.name}</h3>
+                  <div className="mb-4">
+                    <span className="text-3xl font-extrabold text-zinc-100">
+                      R{(plan.priceZAR ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-sm text-zinc-500">/mo</span>
+                    {plan.price > 0 && (
+                      <div className="text-xs text-zinc-600 mt-0.5">${plan.price}/mo</div>
+                    )}
+                  </div>
+                  <div className="space-y-2 mb-5">
+                    {plan.features.slice(0, 4).map((feature) => (
+                      <div key={feature} className="flex items-start gap-2 text-xs">
+                        <Check className="w-3.5 h-3.5 text-violet-400 shrink-0 mt-0.5" />
+                        <span className="text-zinc-400">{feature}</span>
+                      </div>
+                    ))}
+                    {plan.features.length > 4 && (
+                      <div className="text-xs text-zinc-600">+{plan.features.length - 4} more</div>
+                    )}
+                  </div>
+                  <Link href="/pricing" className="block">
+                    <Button
+                      variant={plan.popular ? "primary" : "secondary"}
+                      className={`w-full text-xs ${plan.popular ? "shadow-lg shadow-violet-600/20" : ""}`}
+                      size="sm"
+                    >
+                      {plan.id === "free" ? "Start Free" : `Get ${plan.name}`}
+                    </Button>
+                  </Link>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+
+          <MotionSection delay={0.2} className="text-center">
+            <Link href="/pricing">
+              <Button variant="outline" className="text-sm">
+                <CreditCard className="w-4 h-4" /> View Full Pricing & Credit Packs <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </MotionSection>
         </div>
       </section>
 

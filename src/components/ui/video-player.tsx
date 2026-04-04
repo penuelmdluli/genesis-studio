@@ -13,6 +13,8 @@ import {
   SkipForward,
   Download,
   Loader2,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 
 interface VideoPlayerProps {
@@ -23,6 +25,7 @@ interface VideoPlayerProps {
   className?: string;
   autoPlay?: boolean;
   loop?: boolean;
+  duration?: number;
   onEnded?: () => void;
 }
 
@@ -34,6 +37,7 @@ export function VideoPlayer({
   className,
   autoPlay = false,
   loop = false,
+  duration: fallbackDuration,
   onEnded,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +56,8 @@ export function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Format time as m:ss
   const formatTime = (seconds: number) => {
@@ -148,6 +154,18 @@ export function VideoPlayer({
     a.click();
   }, [src, title]);
 
+  // Retry loading the video
+  const handleRetry = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    setError(null);
+    setIsLoading(true);
+    setRetryCount((c) => c + 1);
+    // Force reload by resetting the src
+    video.src = src;
+    video.load();
+  }, [src]);
+
   // Auto-hide controls
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -169,11 +187,39 @@ export function VideoPlayer({
       }
     };
     const onLoadedMetadata = () => {
-      setDuration(video.duration);
+      // Use video's reported duration, but fall back to prop if it's 0/NaN/Infinity
+      const reported = video.duration;
+      if (isFinite(reported) && reported > 0) {
+        setDuration(reported);
+      } else if (fallbackDuration && fallbackDuration > 0) {
+        setDuration(fallbackDuration);
+      }
+      setIsLoading(false);
+      setError(null);
+    };
+    const onVideoError = () => {
+      const mediaError = video.error;
+      let message = "Failed to load video";
+      if (mediaError) {
+        switch (mediaError.code) {
+          case MediaError.MEDIA_ERR_NETWORK:
+            message = "Network error — could not load video";
+            break;
+          case MediaError.MEDIA_ERR_DECODE:
+            message = "Video file is corrupted or unsupported";
+            break;
+          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+            message = "Video format not supported";
+            break;
+          default:
+            message = "An error occurred while loading the video";
+        }
+      }
+      setError(message);
       setIsLoading(false);
     };
     const onWaiting = () => setIsLoading(true);
-    const onCanPlay = () => setIsLoading(false);
+    const onCanPlay = () => { setIsLoading(false); setError(null); };
     const onEnded = () => {
       setIsPlaying(false);
       audioRef.current?.pause();
@@ -188,6 +234,7 @@ export function VideoPlayer({
     video.addEventListener("ended", onEnded);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
+    video.addEventListener("error", onVideoError);
 
     return () => {
       video.removeEventListener("timeupdate", onTimeUpdate);
@@ -197,8 +244,9 @@ export function VideoPlayer({
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
+      video.removeEventListener("error", onVideoError);
     };
-  }, []);
+  }, [fallbackDuration]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -278,15 +326,33 @@ export function VideoPlayer({
         <audio ref={audioRef} src={audioSrc} loop={loop} muted={isMuted} />
       )}
 
+      {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/95 z-10">
+          <AlertTriangle className="w-10 h-10 text-violet-400 mb-3" />
+          <p className="text-sm text-white/80 mb-1 text-center px-4">{error}</p>
+          {retryCount > 0 && (
+            <p className="text-xs text-white/40 mb-3">Attempt {retryCount + 1}</p>
+          )}
+          <button
+            onClick={handleRetry}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Loading spinner */}
-      {isLoading && (
+      {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
           <Loader2 className="w-10 h-10 text-white animate-spin" />
         </div>
       )}
 
       {/* Big play button when paused */}
-      {!isPlaying && !isLoading && (
+      {!isPlaying && !isLoading && !error && (
         <button
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity"

@@ -16,8 +16,16 @@ export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [currency, setCurrency] = useState<"USD" | "ZAR">("ZAR");
   const [referralData, setReferralData] = useState<{ code: string; shareUrl: string; referralCount: number; creditsEarned: number } | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
+
+  const formatPrice = (usd: number, zar?: number) => {
+    if (currency === "ZAR" && zar) return `R${zar.toLocaleString()}`;
+    return `$${usd}`;
+  };
+
+  const currencySymbol = currency === "ZAR" ? "R" : "$";
 
   const loadReferral = async () => {
     setReferralLoading(true);
@@ -31,17 +39,21 @@ export default function PricingPage() {
     setReferralLoading(false);
   };
 
+  const getProvider = () => currency === "ZAR" ? "yoco" : undefined;
+
   const handleSubscribe = async (planId: string) => {
     setLoadingPlan(planId);
     try {
       const res = await fetch("/api/credits/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, provider: getProvider() }),
       });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.error) {
+        toast(data.error, "error");
       }
     } catch (err) {
       console.error("Subscribe failed:", err);
@@ -57,11 +69,13 @@ export default function PricingPage() {
       const res = await fetch("/api/credits/buy-pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packId }),
+        body: JSON.stringify({ packId, provider: getProvider() }),
       });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.error) {
+        toast(data.error, "error");
       }
     } catch (err) {
       console.error("Buy pack failed:", err);
@@ -91,23 +105,42 @@ export default function PricingPage() {
           Credits never expire. No watermarks on paid plans. API access on every tier.
         </p>
 
-        {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-3 mt-6">
-          <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-500"}`}>Monthly</span>
-          <button
-            onClick={() => setBillingCycle((prev) => prev === "monthly" ? "annual" : "monthly")}
-            className={`relative w-12 h-6 rounded-full transition-colors ${billingCycle === "annual" ? "bg-violet-600" : "bg-white/10"}`}
-          >
-            <div
-              className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`}
-            />
-          </button>
-          <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>
-            Annual
-          </span>
-          {billingCycle === "annual" && (
-            <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>
-          )}
+        {/* Currency + Billing Toggles */}
+        <div className="flex flex-col items-center gap-3 mt-6">
+          {/* Currency selector */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+            <button
+              onClick={() => setCurrency("ZAR")}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${currency === "ZAR" ? "bg-violet-600 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              ZAR (R)
+            </button>
+            <button
+              onClick={() => setCurrency("USD")}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${currency === "USD" ? "bg-violet-600 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              USD ($)
+            </button>
+          </div>
+
+          {/* Billing cycle toggle */}
+          <div className="flex items-center gap-3">
+            <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-500"}`}>Monthly</span>
+            <button
+              onClick={() => setBillingCycle((prev) => prev === "monthly" ? "annual" : "monthly")}
+              className={`relative w-12 h-6 rounded-full transition-colors ${billingCycle === "annual" ? "bg-violet-600" : "bg-white/10"}`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`}
+              />
+            </button>
+            <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>
+              Annual
+            </span>
+            {billingCycle === "annual" && (
+              <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -135,16 +168,22 @@ export default function PricingPage() {
                     {billingCycle === "annual" && ANNUAL_PLANS[plan.id] ? (
                       <>
                         <span className="text-4xl font-extrabold text-zinc-100">
-                          ${Math.round(ANNUAL_PLANS[plan.id].annualPrice / 12)}
+                          {currencySymbol}{currency === "ZAR" && plan.priceZAR
+                            ? Math.round((plan.priceZAR * 12 * 0.8) / 12)
+                            : Math.round(ANNUAL_PLANS[plan.id].annualPrice / 12)}
                         </span>
                         <span className="text-sm text-zinc-500">/mo</span>
                         <div className="text-xs text-emerald-400 mt-1">
-                          ${ANNUAL_PLANS[plan.id].annualPrice}/yr — save ${ANNUAL_PLANS[plan.id].savings}
+                          {currencySymbol}{currency === "ZAR" && plan.priceZAR
+                            ? Math.round(plan.priceZAR * 12 * 0.8).toLocaleString()
+                            : ANNUAL_PLANS[plan.id].annualPrice}/yr — save 20%
                         </div>
                       </>
                     ) : (
                       <>
-                        <span className="text-4xl font-extrabold text-zinc-100">${plan.price}</span>
+                        <span className="text-4xl font-extrabold text-zinc-100">
+                          {formatPrice(plan.price, plan.priceZAR)}
+                        </span>
                         <span className="text-sm text-zinc-500">/mo</span>
                       </>
                     )}
@@ -206,9 +245,13 @@ export default function PricingPage() {
                   <div className="text-xs text-zinc-500 mt-0.5">credits</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-emerald-400">${pack.price}</div>
+                  <div className="text-xl font-bold text-emerald-400">
+                    {formatPrice(pack.price, pack.priceZAR)}
+                  </div>
                   <div className="text-xs text-zinc-500 mt-0.5">
-                    ${(pack.price / pack.credits * 100).toFixed(1)}&cent; per credit
+                    {currency === "ZAR" && pack.priceZAR
+                      ? `${(pack.priceZAR / pack.credits).toFixed(1)}c per credit`
+                      : `${(pack.price / pack.credits * 100).toFixed(1)}\u00A2 per credit`}
                   </div>
                 </div>
                 <Button

@@ -16,33 +16,34 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Genesis Studio — AI Video Creation Platform",
+    default: "Genesis Studio | AI Video Generation Platform",
     template: "%s | Genesis Studio",
   },
   description:
-    "Create stunning AI-generated videos with open-source models. Text-to-video, image-to-video, and more. Hollywood-grade tools at indie prices.",
+    "Create stunning AI-generated videos with open-source models on serverless GPUs. Text-to-video, image-to-video, and multi-scene productions.",
   keywords: [
     "AI video",
+    "video generation",
     "text to video",
-    "image to video",
-    "AI generation",
-    "video creation",
+    "AI video maker",
     "Genesis Studio",
+    "image to video",
     "AI video generator",
     "open source AI",
     "serverless GPU",
   ],
   openGraph: {
-    title: "Genesis Studio — From Nothing, Create Everything",
+    title: "Genesis Studio | AI Video Generation",
     description:
-      "The AI video creation platform that puts Hollywood-grade generation tools in everyone's hands.",
+      "Create stunning AI-generated videos with open-source models.",
     type: "website",
     siteName: "Genesis Studio",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Genesis Studio — AI Video Creation Platform",
-    description: "Hollywood-grade AI video generation. 70-90% cheaper than competitors.",
+    title: "Genesis Studio | AI Video Generation",
+    description:
+      "Create stunning AI-generated videos with open-source models.",
   },
   robots: {
     index: true,

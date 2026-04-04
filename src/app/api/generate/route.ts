@@ -6,6 +6,7 @@ import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { isProfitable } from "@/lib/profitability";
+import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 
 export async function POST(req: NextRequest) {
@@ -20,7 +21,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const body: GenerateRequest = await req.json();
+    const rawBody = await req.json();
+    const parsed = generateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+    const body = parsed.data;
 
     // Validate model access (owners have access to all models)
     const ownerAccount = isOwnerClerkId(clerkId);
@@ -79,20 +85,6 @@ export async function POST(req: NextRequest) {
     const profit = isProfitable(creditCost, body.modelId, duration, resolution);
     if (!profit.profitable) {
       console.warn(`[MARGIN WARNING] ${body.modelId} ${resolution} ${duration}s: margin=${profit.margin}% gpuCost=$${profit.gpuCost} revenue=$${profit.revenue}`);
-    }
-
-    // Prompt validation
-    if (!body.prompt || body.prompt.trim().length < 5) {
-      return NextResponse.json(
-        { error: "Prompt is too short (minimum 5 characters)" },
-        { status: 400 }
-      );
-    }
-    if (body.prompt.length > 2000) {
-      return NextResponse.json(
-        { error: "Prompt is too long (maximum 2000 characters)" },
-        { status: 400 }
-      );
     }
 
     // Resolve audio track URL if selected

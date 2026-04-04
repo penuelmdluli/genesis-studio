@@ -92,6 +92,7 @@ export const PLANS: Plan[] = [
     id: "free",
     name: "Free",
     price: 0,
+    priceZAR: 0,
     credits: 50,
     maxResolution: "720p",
     features: [
@@ -106,6 +107,7 @@ export const PLANS: Plan[] = [
     id: "creator",
     name: "Creator",
     price: 15,
+    priceZAR: 275,
     credits: 500,
     maxResolution: "1080p",
     features: [
@@ -122,6 +124,7 @@ export const PLANS: Plan[] = [
     id: "pro",
     name: "Pro",
     price: 39,
+    priceZAR: 720,
     credits: 2000,
     maxResolution: "4k",
     popular: true,
@@ -140,6 +143,7 @@ export const PLANS: Plan[] = [
     id: "studio",
     name: "Studio",
     price: 99,
+    priceZAR: 1825,
     credits: -1,
     maxResolution: "4k",
     features: [
@@ -158,9 +162,9 @@ export const PLANS: Plan[] = [
 
 // --- Credit Packs ---
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "pack-500", credits: 500, price: 12 },
-  { id: "pack-2000", credits: 2000, price: 40 },
-  { id: "pack-10000", credits: 10000, price: 150 },
+  { id: "pack-500", credits: 500, price: 12, priceZAR: 220 },
+  { id: "pack-2000", credits: 2000, price: 40, priceZAR: 740 },
+  { id: "pack-10000", credits: 10000, price: 150, priceZAR: 2775 },
 ];
 
 // --- Annual Plan Pricing (20% discount) ---

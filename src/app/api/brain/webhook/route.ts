@@ -15,6 +15,13 @@ import { createSupabaseAdmin } from "@/lib/supabase";
  */
 export async function POST(req: NextRequest) {
   try {
+    // Verify webhook secret (required in production)
+    const webhookSecret = process.env.RUNPOD_WEBHOOK_SECRET;
+    const providedSecret = req.headers.get("x-webhook-secret");
+    if (webhookSecret && providedSecret !== webhookSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { id: runpodJobId, status, output, error: jobError } = body;
 

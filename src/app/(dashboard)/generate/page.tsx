@@ -139,6 +139,34 @@ export default function GeneratePage() {
 
     setIsGenerating(true);
     try {
+      // Upload input image to R2 if present (for i2v mode)
+      let inputImageUrl: string | undefined;
+      if (form.inputImage && (form.type === "i2v" || form.type === "v2v")) {
+        try {
+          const presignRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: form.inputImage.name,
+              contentType: form.inputImage.type,
+              purpose: "image",
+            }),
+          });
+          if (presignRes.ok) {
+            const { uploadUrl, downloadUrl } = await presignRes.json();
+            await fetch(uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": form.inputImage.type },
+              body: form.inputImage,
+            });
+            inputImageUrl = downloadUrl;
+          }
+        } catch {
+          // If upload fails, continue without image
+          console.error("Image upload failed, continuing without image");
+        }
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,6 +175,7 @@ export default function GeneratePage() {
           modelId: modelId,
           prompt: form.prompt,
           negativePrompt: form.negativePrompt || undefined,
+          inputImageUrl,
           resolution: form.resolution,
           duration: form.duration,
           fps: form.fps,

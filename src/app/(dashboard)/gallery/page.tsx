@@ -255,26 +255,15 @@ export default function GalleryPage() {
                 layout
               >
                 <div className={`${video.aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} bg-[#0D0D14] relative overflow-hidden`}>
-                  {video.thumbnailUrl ? (
-                    <img
-                      src={video.thumbnailUrl}
-                      alt={video.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">
-                      <Film className="w-8 h-8 text-zinc-800" />
-                    </div>
-                  )}
-
-                  {/* Video hover preview */}
-                  {video.url && (
+                  {/* Video preview — always visible, plays on hover */}
+                  {video.url ? (
                     <video
                       src={video.url}
-                      className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       muted
                       loop
                       playsInline
+                      preload="metadata"
                       onMouseEnter={(e) => {
                         const el = e.currentTarget;
                         el.currentTime = 0;
@@ -284,6 +273,16 @@ export default function GalleryPage() {
                         e.currentTarget.pause();
                       }}
                     />
+                  ) : video.thumbnailUrl ? (
+                    <img
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">
+                      <Film className="w-8 h-8 text-zinc-800" />
+                    </div>
                   )}
 
                   {/* Hover overlay */}
@@ -355,7 +354,9 @@ export default function GalleryPage() {
               onClick={() => setSelectedVideo(video.id)}
             >
               <div className="w-24 h-14 rounded-lg bg-[#0D0D14] overflow-hidden shrink-0 relative group">
-                {video.thumbnailUrl ? (
+                {video.url ? (
+                  <video src={video.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                ) : video.thumbnailUrl ? (
                   <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">

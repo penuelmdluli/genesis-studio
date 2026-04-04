@@ -766,10 +766,38 @@ export default function BrainStudioPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary">
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  const videoUrl = outputVideoUrls?.[aspectRatio] || Object.values(outputVideoUrls || {})[0];
+                  if (!videoUrl) return;
+                  try {
+                    const res = await fetch(videoUrl);
+                    const blob = await res.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = blobUrl;
+                    a.download = `${(plan?.title || concept.slice(0, 50)).replace(/[^a-zA-Z0-9]/g, "_")}.mp4`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                    toast("Download started", "success");
+                  } catch {
+                    toast("Download failed", "error");
+                  }
+                }}
+              >
                 <Download className="w-4 h-4" /> Download
               </Button>
-              <Button variant="secondary">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  const shareUrl = window.location.origin + "/gallery";
+                  await navigator.clipboard.writeText(shareUrl);
+                  toast("Link copied to clipboard", "success");
+                }}
+              >
                 <Share2 className="w-4 h-4" /> Share
               </Button>
               <Button variant="outline" onClick={() => setBrainState("review")}>

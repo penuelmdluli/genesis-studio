@@ -118,11 +118,45 @@ export async function GET(
             createdAt: job.created_at,
           });
         } else if (runpodStatus.status === "IN_PROGRESS") {
-          await updateJobStatus(job.id, { status: "processing" });
+          // Estimate progress based on elapsed time vs expected time
+          const { AI_MODELS } = await import("@/lib/constants");
+          const model = AI_MODELS[job.model_id as keyof typeof AI_MODELS];
+          const avgTime = model?.avgGenerationTime || 120;
+          const elapsed = (Date.now() - new Date(job.created_at).getTime()) / 1000;
+          const estimatedProgress = Math.min(Math.round((elapsed / avgTime) * 95), 95); // Cap at 95% until actually done
+
+          await updateJobStatus(job.id, {
+            status: "processing",
+            progress: estimatedProgress,
+          });
           job.status = "processing";
+          job.progress = estimatedProgress;
         }
       } catch (pollErr) {
         console.error("RunPod poll error:", pollErr);
+      }
+
+      // Timeout check — if job has been running for more than 10 minutes, fail it
+      const jobAge = (Date.now() - new Date(job.created_at).getTime()) / 1000;
+      if (jobAge > 600 && (job.status === "queued" || job.status === "processing")) {
+        await updateJobStatus(job.id, {
+          status: "failed",
+          errorMessage: "Generation timed out after 10 minutes. Credits have been refunded.",
+          completedAt: new Date().toISOString(),
+        });
+        await refundCredits(
+          job.user_id,
+          job.credits_cost,
+          job.id,
+          "Generation timed out — automatic refund"
+        );
+        return NextResponse.json({
+          id: job.id,
+          status: "failed",
+          errorMessage: "Generation timed out after 10 minutes. Credits have been refunded.",
+          creditsCost: job.credits_cost,
+          createdAt: job.created_at,
+        });
       }
     }
 

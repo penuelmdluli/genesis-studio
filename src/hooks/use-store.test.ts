@@ -24,6 +24,7 @@ describe("useStore", () => {
       activeJobs: [],
       videos: [],
       sidebarOpen: true,
+      mobileMenuOpen: false,
     });
   });
 
@@ -216,6 +217,17 @@ describe("useStore", () => {
       expect(useStore.getState().sidebarOpen).toBe(false);
       useStore.getState().toggleSidebar();
       expect(useStore.getState().sidebarOpen).toBe(true);
+    });
+
+    it("mobile menu starts closed", () => {
+      expect(useStore.getState().mobileMenuOpen).toBe(false);
+    });
+
+    it("opens and closes mobile menu", () => {
+      useStore.getState().setMobileMenuOpen(true);
+      expect(useStore.getState().mobileMenuOpen).toBe(true);
+      useStore.getState().setMobileMenuOpen(false);
+      expect(useStore.getState().mobileMenuOpen).toBe(false);
     });
   });
 });

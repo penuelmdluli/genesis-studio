@@ -15,6 +15,7 @@ interface UserState {
   creditBalance: number;
   monthlyCreditsUsed: number;
   monthlyCreditsLimit: number;
+  isOwner?: boolean;
 }
 
 interface GenerateFormState {
@@ -66,6 +67,8 @@ interface StoreState {
   // UI
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
 }
 
 const defaultForm: GenerateFormState = {
@@ -124,4 +127,6 @@ export const useStore = create<StoreState>((set) => ({
   sidebarOpen: true,
   toggleSidebar: () =>
     set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  mobileMenuOpen: false,
+  setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
 }));

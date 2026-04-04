@@ -94,6 +94,10 @@ export async function POST(req: NextRequest) {
 
       case "invoice.paid": {
         // Recurring subscription payment — grant monthly credits
+        // IMPORTANT: Only handle renewal cycles here.
+        // Initial subscription is handled by checkout.session.completed above.
+        // billing_reason "subscription_create" = first invoice (skip to avoid double-credit)
+        // billing_reason "subscription_cycle" = recurring renewal (grant credits)
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
@@ -113,6 +117,37 @@ export async function POST(req: NextRequest) {
           const credits = creditAmounts[user.plan] || 0;
           if (credits > 0) {
             await grantSubscriptionCredits(user.id, credits);
+            console.log(`[STRIPE] Granted ${credits} monthly credits to user ${user.id} (${user.plan} plan renewal)`);
+          }
+        } else if (user && invoice.billing_reason === "subscription_create") {
+          // Skip — initial subscription credits already granted by checkout.session.completed
+          console.log(`[STRIPE] Skipping invoice.paid for initial subscription (user ${user.id})`);
+        }
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        // Handle plan upgrades/downgrades mid-cycle
+        const updatedSub = event.data.object as Stripe.Subscription;
+        const updatedCustomerId = updatedSub.customer as string;
+
+        const { data: updatedUser } = await supabase
+          .from("users")
+          .select("*")
+          .eq("stripe_customer_id", updatedCustomerId)
+          .single();
+
+        if (updatedUser && updatedSub.status === "active") {
+          const priceId = updatedSub.items.data[0]?.price.id;
+          const planMap: Record<string, PlanId> = {
+            [process.env.STRIPE_CREATOR_PRICE_ID!]: "creator",
+            [process.env.STRIPE_PRO_PRICE_ID!]: "pro",
+            [process.env.STRIPE_STUDIO_PRICE_ID!]: "studio",
+          };
+          const newPlan = planMap[priceId];
+          if (newPlan && newPlan !== updatedUser.plan) {
+            await updateUserPlan(updatedUser.id, newPlan, updatedCustomerId, updatedSub.id);
+            console.log(`[STRIPE] Plan changed: user ${updatedUser.id} ${updatedUser.plan} → ${newPlan}`);
           }
         }
         break;
@@ -131,6 +166,7 @@ export async function POST(req: NextRequest) {
         if (user) {
           // Downgrade to free plan but keep existing credits
           await updateUserPlan(user.id, "free", customerId);
+          console.log(`[STRIPE] Subscription cancelled: user ${user.id} downgraded to free`);
         }
         break;
       }

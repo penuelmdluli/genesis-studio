@@ -2,7 +2,7 @@
 // GENESIS STUDIO — Constants & Configuration
 // ============================================
 
-import { AIModel, Plan, CreditPack, ModelId, AudioTrack } from "@/types";
+import { AIModel, Plan, CreditPack, ModelId, AudioTrack, MotionPreset } from "@/types";
 
 // --- AI Models Registry ---
 export const AI_MODELS: Record<ModelId, AIModel> = {
@@ -163,6 +163,44 @@ export const CREDIT_PACKS: CreditPack[] = [
   { id: "pack-10000", credits: 10000, price: 150 },
 ];
 
+// --- Annual Plan Pricing (20% discount) ---
+export const ANNUAL_PLANS: Record<string, { monthlyPrice: number; annualPrice: number; savings: number; stripePriceId?: string }> = {
+  creator: {
+    monthlyPrice: 15,
+    annualPrice: 144, // $12/mo billed annually
+    savings: 36,
+    stripePriceId: process.env.STRIPE_CREATOR_ANNUAL_PRICE_ID,
+  },
+  pro: {
+    monthlyPrice: 39,
+    annualPrice: 374, // $31.17/mo billed annually
+    savings: 94,
+    stripePriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
+  },
+  studio: {
+    monthlyPrice: 99,
+    annualPrice: 948, // $79/mo billed annually
+    savings: 240,
+    stripePriceId: process.env.STRIPE_STUDIO_ANNUAL_PRICE_ID,
+  },
+};
+
+// --- Referral Program ---
+export const REFERRAL_REWARDS = {
+  referrerCredits: 100,    // Credits the referrer gets
+  refereeCredits: 50,      // Credits the new user gets (bonus on signup)
+  maxReferrals: 50,        // Max referrals per user
+  minPlanRequired: "free" as const, // Any plan can refer
+};
+
+// --- Credit Pack Upsell Thresholds ---
+export const UPSELL_THRESHOLDS = {
+  lowCreditWarning: 20,     // Show "running low" warning
+  outOfCreditsUpsell: true,  // Show pack upsell when credits hit 0
+  postGenerationUpsell: 5,   // Show upsell after N generations
+  upgradePromptAt: 0.8,     // Show plan upgrade when 80% of monthly credits used
+};
+
 // --- Resolution Options ---
 export const RESOLUTIONS = [
   { value: "480p", label: "480p (SD)", width: 854, height: 480 },
@@ -300,6 +338,147 @@ export const BUILT_IN_AUDIO_TRACKS: AudioTrack[] = [
     url: "/audio/classical-piano.mp3",
     bpm: 72,
     isBuiltIn: true,
+  },
+];
+
+// --- Motion Library Presets ---
+export const MOTION_CATEGORIES = [
+  "All",
+  "Dance",
+  "Walk",
+  "Gesture",
+  "Sport",
+  "Expression",
+] as const;
+
+export const MOTION_PRESETS: MotionPreset[] = [
+  {
+    id: "motion-dance-hiphop",
+    name: "Hip Hop Dance",
+    description: "Urban dance moves with groove",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-dancing-hip-hop-in-a-dark-studio-34588-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-dancing-hip-hop-in-a-dark-studio-34588-large.mp4",
+    category: "dance",
+  },
+  {
+    id: "motion-dance-contemporary",
+    name: "Contemporary Dance",
+    description: "Flowing contemporary dance movement",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-ballerina-on-a-dark-stage-doing-a-slow-dance-32807-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-ballerina-on-a-dark-stage-doing-a-slow-dance-32807-large.mp4",
+    category: "dance",
+  },
+  {
+    id: "motion-dance-freestyle",
+    name: "Freestyle Groove",
+    description: "Energetic freestyle dance moves",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-a-contemporary-dance-at-sunset-4793-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-a-contemporary-dance-at-sunset-4793-large.mp4",
+    category: "dance",
+  },
+  {
+    id: "motion-walk-forward",
+    name: "Walk Forward",
+    description: "Natural walking motion, forward facing",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-walking-on-the-beach-1582-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-walking-on-the-beach-1582-large.mp4",
+    category: "walk",
+  },
+  {
+    id: "motion-walk-casual",
+    name: "Casual Stroll",
+    description: "Relaxed walking with arm swing",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-man-walking-through-a-park-4764-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-man-walking-through-a-park-4764-large.mp4",
+    category: "walk",
+  },
+  {
+    id: "motion-walk-runway",
+    name: "Runway Walk",
+    description: "Confident fashion-style walk",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-walking-in-slow-motion-through-a-city-4458-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-walking-in-slow-motion-through-a-city-4458-large.mp4",
+    category: "walk",
+  },
+  {
+    id: "motion-wave",
+    name: "Friendly Wave",
+    description: "Casual hand wave greeting",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-a-girl-waving-from-a-window-50283-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-a-girl-waving-from-a-window-50283-large.mp4",
+    category: "gesture",
+  },
+  {
+    id: "motion-point",
+    name: "Point & Present",
+    description: "Pointing gesture for presentations",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-pointing-at-camera-in-slow-motion-39791-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-pointing-at-camera-in-slow-motion-39791-large.mp4",
+    category: "gesture",
+  },
+  {
+    id: "motion-clap",
+    name: "Clapping",
+    description: "Enthusiastic clapping motion",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-hands-performing-clapping-gesture-19510-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-hands-performing-clapping-gesture-19510-large.mp4",
+    category: "gesture",
+  },
+  {
+    id: "motion-run-sprint",
+    name: "Sprint",
+    description: "Full speed running motion",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-running-on-the-beach-at-sunset-1928-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-running-on-the-beach-at-sunset-1928-large.mp4",
+    category: "sport",
+  },
+  {
+    id: "motion-jumping-jack",
+    name: "Jumping Jacks",
+    description: "Classic exercise jumping jacks",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-jumping-jacks-at-the-gym-23227-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-jumping-jacks-at-the-gym-23227-large.mp4",
+    category: "sport",
+  },
+  {
+    id: "motion-yoga-pose",
+    name: "Yoga Flow",
+    description: "Smooth yoga pose transitions",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-yoga-on-a-hill-4645-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-yoga-on-a-hill-4645-large.mp4",
+    category: "sport",
+  },
+  {
+    id: "motion-smile",
+    name: "Smile & Laugh",
+    description: "Natural smiling expression",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-woman-smiling-1168-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-woman-smiling-1168-large.mp4",
+    category: "expression",
+  },
+  {
+    id: "motion-surprise",
+    name: "Surprise Reaction",
+    description: "Expressive surprise face and body",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-in-front-of-a-camera-43031-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-in-front-of-a-camera-43031-large.mp4",
+    category: "expression",
+  },
+  {
+    id: "motion-talk",
+    name: "Talking Head",
+    description: "Natural talking with hand gestures",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-girl-talking-to-camera-and-gesturing-with-her-hands-42345-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-girl-talking-to-camera-and-gesturing-with-her-hands-42345-large.mp4",
+    category: "expression",
+  },
+  {
+    id: "motion-sit-down",
+    name: "Sit Down",
+    description: "Standing to sitting transition",
+    thumbnailUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-sitting-down-on-a-couch-42082-large.mp4",
+    previewVideoUrl: "https://assets.mixkit.co/videos/preview/mixkit-woman-sitting-down-on-a-couch-42082-large.mp4",
+    category: "gesture",
   },
 ];
 

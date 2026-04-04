@@ -6,15 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
-import { PLANS, CREDIT_PACKS } from "@/lib/constants";
+import { PLANS, CREDIT_PACKS, ANNUAL_PLANS, REFERRAL_REWARDS } from "@/lib/constants";
 import { PageTransition, StaggerGroup, StaggerItem } from "@/components/ui/motion";
-import { Check, Zap, CreditCard, ArrowRight, Sparkles } from "lucide-react";
+import { Check, Zap, CreditCard, ArrowRight, Sparkles, Gift, Copy, Users } from "lucide-react";
 
 export default function PricingPage() {
   const { user } = useStore();
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [referralData, setReferralData] = useState<{ code: string; shareUrl: string; referralCount: number; creditsEarned: number } | null>(null);
+  const [referralLoading, setReferralLoading] = useState(false);
+
+  const loadReferral = async () => {
+    setReferralLoading(true);
+    try {
+      const res = await fetch("/api/referral");
+      if (res.ok) {
+        const data = await res.json();
+        setReferralData(data);
+      }
+    } catch { /* ignore */ }
+    setReferralLoading(false);
+  };
 
   const handleSubscribe = async (planId: string) => {
     setLoadingPlan(planId);
@@ -75,6 +90,25 @@ export default function PricingPage() {
         <p className="text-zinc-400 max-w-lg mx-auto">
           Credits never expire. No watermarks on paid plans. API access on every tier.
         </p>
+
+        {/* Billing Toggle */}
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-500"}`}>Monthly</span>
+          <button
+            onClick={() => setBillingCycle((prev) => prev === "monthly" ? "annual" : "monthly")}
+            className={`relative w-12 h-6 rounded-full transition-colors ${billingCycle === "annual" ? "bg-violet-600" : "bg-white/10"}`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`}
+            />
+          </button>
+          <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>
+            Annual
+          </span>
+          {billingCycle === "annual" && (
+            <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>
+          )}
+        </div>
       </div>
 
       {/* Plans */}
@@ -98,8 +132,22 @@ export default function PricingPage() {
                 <div>
                   <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">{plan.name}</h3>
                   <div className="mt-3">
-                    <span className="text-4xl font-extrabold text-zinc-100">${plan.price}</span>
-                    <span className="text-sm text-zinc-500">/mo</span>
+                    {billingCycle === "annual" && ANNUAL_PLANS[plan.id] ? (
+                      <>
+                        <span className="text-4xl font-extrabold text-zinc-100">
+                          ${Math.round(ANNUAL_PLANS[plan.id].annualPrice / 12)}
+                        </span>
+                        <span className="text-sm text-zinc-500">/mo</span>
+                        <div className="text-xs text-emerald-400 mt-1">
+                          ${ANNUAL_PLANS[plan.id].annualPrice}/yr — save ${ANNUAL_PLANS[plan.id].savings}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-extrabold text-zinc-100">${plan.price}</span>
+                        <span className="text-sm text-zinc-500">/mo</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -176,6 +224,73 @@ export default function PricingPage() {
           ))}
         </div>
       </div>
+
+      {/* Referral Program */}
+      <Card className="border-violet-500/15 bg-gradient-to-br from-violet-500/[0.03] to-transparent overflow-hidden">
+        <CardContent className="p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Gift className="w-5 h-5 text-violet-400" />
+                <h3 className="text-lg font-bold text-zinc-100">Referral Program</h3>
+              </div>
+              <p className="text-sm text-zinc-500">
+                Earn {REFERRAL_REWARDS.referrerCredits} credits for every friend who joins. They get {REFERRAL_REWARDS.refereeCredits} bonus credits too.
+              </p>
+            </div>
+            {!referralData && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadReferral}
+                loading={referralLoading}
+              >
+                <Users className="w-4 h-4" /> Get My Link
+              </Button>
+            )}
+          </div>
+
+          {referralData && (
+            <div className="grid sm:grid-cols-3 gap-4">
+              {/* Referral Link */}
+              <div className="sm:col-span-2 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <label className="text-xs text-zinc-500 font-medium mb-2 block">Your Referral Link</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={referralData.shareUrl}
+                    className="flex-1 bg-white/[0.03] rounded-lg px-3 py-2 text-sm text-zinc-300 border border-white/[0.06] truncate"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(referralData.shareUrl);
+                      toast("Link copied!", "success");
+                    }}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-zinc-600 mt-2">Code: {referralData.code}</p>
+              </div>
+
+              {/* Stats */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
+                <div>
+                  <div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div>
+                  <div className="text-xs text-zinc-500">Referrals</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-300">{referralData.creditsEarned}</div>
+                  <div className="text-xs text-zinc-500">Credits Earned</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* FAQ */}
       <Card>

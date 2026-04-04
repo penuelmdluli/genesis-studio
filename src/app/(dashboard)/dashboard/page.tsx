@@ -26,7 +26,7 @@ export default function DashboardPage() {
   const numericStats = [
     {
       label: "Credit Balance",
-      numValue: user?.creditBalance ?? 50,
+      numValue: user?.isOwner ? -1 : (user?.creditBalance ?? 50),
       icon: Zap,
       gradient: "from-violet-500/20 to-violet-500/5",
       iconBg: "bg-violet-500/15",
@@ -89,10 +89,14 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-zinc-500 font-medium mb-1.5">{stat.label}</p>
-                    <AnimatedCounter
-                      value={stat.numValue}
-                      className="text-2xl font-bold text-zinc-100"
-                    />
+                    {stat.numValue === -1 ? (
+                      <span className="text-2xl font-bold text-zinc-100">&infin;</span>
+                    ) : (
+                      <AnimatedCounter
+                        value={stat.numValue}
+                        className="text-2xl font-bold text-zinc-100"
+                      />
+                    )}
                   </div>
                   <motion.div
                     className={`w-10 h-10 rounded-xl ${stat.iconBg} flex items-center justify-center`}
@@ -302,8 +306,10 @@ export default function DashboardPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">
-                            <Film className="w-6 h-6 text-zinc-700" />
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#111118] to-fuchsia-900/10 p-2">
+                            <Film className="w-5 h-5 text-violet-500/50 mb-1" />
+                            <p className="text-[9px] text-zinc-500 text-center line-clamp-2">{video.title}</p>
+                            <p className="text-[8px] text-zinc-600 mt-0.5">{video.resolution} · {video.duration}s</p>
                           </div>
                         )}
                       </motion.div>

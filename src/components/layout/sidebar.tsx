@@ -15,11 +15,19 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  Move,
+  Menu,
+  X,
+  Shield,
+  Brain,
 } from "lucide-react";
+import { useEffect, useMemo } from "react";
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/brain", label: "Brain Studio", icon: Brain, badge: "NEW" },
   { href: "/generate", label: "Generate", icon: Sparkles },
+  { href: "/motion-control", label: "Motion Control", icon: Move },
   { href: "/gallery", label: "Gallery", icon: Film },
   { href: "/api-keys", label: "API Keys", icon: Key },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
@@ -28,103 +36,169 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, sidebarOpen, toggleSidebar } = useStore();
+  const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen } = useStore();
+
+  // Add admin nav item for owners
+  const navItems = useMemo(() => {
+    const items = [...baseNavItems];
+    if (user?.isOwner) {
+      items.push({ href: "/admin", label: "Admin", icon: Shield });
+    }
+    return items;
+  }, [user?.isOwner]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname, setMobileMenuOpen]);
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [setMobileMenuOpen]);
 
   return (
-    <aside
-      className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-white/[0.06] bg-[#0A0A0F]/95 backdrop-blur-xl transition-all duration-300",
-        sidebarOpen ? "w-64" : "w-16"
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileMenuOpen(true)}
+        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#0A0A0F]/90 border border-white/[0.06] backdrop-blur-xl text-zinc-400 hover:text-white transition-colors md:hidden"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
       )}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 p-4 h-16 border-b border-white/[0.06]">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-lg shadow-violet-600/20">
-          G
-        </div>
-        {sidebarOpen && (
-          <span className="text-lg font-bold gradient-text truncate">
-            Genesis Studio
-          </span>
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          // Base: hidden on mobile, visible on md+
+          "fixed left-0 top-0 bottom-0 z-50 flex flex-col border-r border-white/[0.06] bg-[#0A0A0F]/95 backdrop-blur-xl transition-all duration-300",
+          // Desktop: show based on sidebarOpen state
+          "hidden md:flex",
+          sidebarOpen ? "md:w-64" : "md:w-16",
+          // Mobile: show as overlay when mobileMenuOpen
+          mobileMenuOpen && "!flex w-72"
         )}
-      </div>
-
-      {/* Credit Balance */}
-      <div className={cn(
-        "mx-3 mt-3 rounded-xl bg-gradient-to-r from-violet-500/10 to-cyan-500/5 border border-violet-500/20 transition-all",
-        sidebarOpen ? "p-3" : "p-2"
-      )}>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
-            <Zap className="w-3.5 h-3.5 text-violet-400" />
+      >
+        {/* Logo + Mobile close */}
+        <div className="flex items-center gap-2.5 p-4 h-16 border-b border-white/[0.06]">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-lg shadow-violet-600/20">
+            G
           </div>
-          {sidebarOpen && (
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</div>
-              <div className="text-sm font-bold text-violet-300">
-                {user?.creditBalance?.toLocaleString() ?? "—"}
-              </div>
-            </div>
+          {(sidebarOpen || mobileMenuOpen) && (
+            <span className="text-lg font-bold gradient-text truncate flex-1">
+              Genesis Studio
+            </span>
           )}
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
-                isActive
-                  ? "bg-violet-500/15 text-violet-300"
-                  : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
-              )}
+          {/* Mobile close button */}
+          {mobileMenuOpen && (
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors md:hidden"
+              aria-label="Close menu"
             >
-              {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-violet-500" />
-              )}
-              <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-300")} />
-              {sidebarOpen && <span className="truncate">{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* User + Collapse */}
-      <div className="border-t border-white/[0.06] p-3">
-        <div className="flex items-center gap-3">
-          <UserButton
-            appearance={{
-              elements: { avatarBox: "w-8 h-8 rounded-lg" },
-            }}
-          />
-          {sidebarOpen && (
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-zinc-200 truncate">
-                {user?.name || "User"}
-              </div>
-              <div className="text-xs text-zinc-500 truncate capitalize">
-                {user?.plan || "free"} plan
-              </div>
-            </div>
+              <X className="w-4 h-4" />
+            </button>
           )}
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors"
-            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {sidebarOpen ? (
-              <ChevronLeft className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
         </div>
-      </div>
-    </aside>
+
+        {/* Credit Balance */}
+        <div className={cn(
+          "mx-3 mt-3 rounded-xl bg-gradient-to-r from-violet-500/10 to-cyan-500/5 border border-violet-500/20 transition-all",
+          (sidebarOpen || mobileMenuOpen) ? "p-3" : "p-2"
+        )}>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
+              <Zap className="w-3.5 h-3.5 text-violet-400" />
+            </div>
+            {(sidebarOpen || mobileMenuOpen) && (
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</div>
+                <div className="text-sm font-bold text-violet-300">
+                  {user?.isOwner ? "∞ Unlimited" : (user?.creditBalance?.toLocaleString() ?? "—")}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
+                  isActive
+                    ? "bg-violet-500/15 text-violet-300"
+                    : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
+                )}
+              >
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-violet-500" />
+                )}
+                <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-300")} />
+                {(sidebarOpen || mobileMenuOpen) && (
+                  <span className="truncate flex-1">{item.label}</span>
+                )}
+                {(sidebarOpen || mobileMenuOpen) && item.badge && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 text-white leading-none">
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User + Collapse */}
+        <div className="border-t border-white/[0.06] p-3">
+          <div className="flex items-center gap-3">
+            <UserButton
+              appearance={{
+                elements: { avatarBox: "w-8 h-8 rounded-lg" },
+              }}
+            />
+            {(sidebarOpen || mobileMenuOpen) && (
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-zinc-200 truncate">
+                  {user?.name || "User"}
+                </div>
+                <div className="text-xs text-zinc-500 truncate capitalize">
+                  {user?.plan || "free"} plan
+                </div>
+              </div>
+            )}
+            {/* Desktop-only collapse toggle */}
+            <button
+              onClick={toggleSidebar}
+              className="hidden md:block p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors"
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {sidebarOpen ? (
+                <ChevronLeft className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

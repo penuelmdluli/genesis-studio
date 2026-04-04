@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { VideoPlayer } from "@/components/ui/video-player";
 import { SkeletonVideoCard } from "@/components/ui/skeleton";
 import { PageTransition, StaggerGroup, StaggerItem, MotionSection, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
@@ -358,22 +359,14 @@ export default function GalleryPage() {
           onClose={() => setSelectedVideo(null)}
           size={currentVideo.aspectRatio === "portrait" ? "sm" : "full"}
         >
-          <div className={currentVideo.aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} style={{ background: "black", borderRadius: "12px", overflow: "hidden", position: "relative" }}>
-            <video
-              src={currentVideo.url}
-              controls
-              autoPlay
-              className="w-full h-full"
-            />
-            {currentVideo.audioUrl && (
-              <audio
-                src={currentVideo.audioUrl}
-                autoPlay
-                loop
-                muted={audioMuted}
-              />
-            )}
-          </div>
+          <VideoPlayer
+            src={currentVideo.url}
+            poster={currentVideo.thumbnailUrl}
+            audioSrc={currentVideo.audioUrl}
+            title={currentVideo.title}
+            autoPlay
+            className={currentVideo.aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"}
+          />
           <div className="flex items-center justify-between mt-4">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-zinc-200 truncate">{currentVideo.title}</p>
@@ -384,14 +377,7 @@ export default function GalleryPage() {
                 <Badge variant="cyan"><Smartphone className="w-3 h-3 mr-1" /> Reel</Badge>
               )}
               <Badge>{currentVideo.resolution}</Badge>
-              {currentVideo.audioUrl && (
-                <button
-                  onClick={() => setAudioMuted(!audioMuted)}
-                  className="p-1.5 rounded-lg border border-white/[0.06] text-zinc-400 hover:text-zinc-200 transition-colors"
-                >
-                  {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
-              )}
+              <span className="text-xs text-zinc-500">{formatDuration(currentVideo.duration)}</span>
             </div>
           </div>
         </Modal>

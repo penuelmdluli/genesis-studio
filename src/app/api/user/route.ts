@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getUserByClerkId, createUser } from "@/lib/db";
+import { isOwnerClerkId } from "@/lib/credits";
 
 export async function GET() {
   try {
@@ -37,6 +38,7 @@ export async function GET() {
       monthlyCreditsUsed: user.monthly_credits_used,
       monthlyCreditsLimit: user.monthly_credits_limit,
       createdAt: user.created_at,
+      isOwner: isOwnerClerkId(clerkId),
     });
   } catch (error) {
     console.error("Get user error:", error);

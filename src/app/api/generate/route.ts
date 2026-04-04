@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
-import { deductCredits } from "@/lib/credits";
+import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
+import { isProfitable } from "@/lib/profitability";
 import { GenerateRequest, ModelId } from "@/types";
 
 export async function POST(req: NextRequest) {
@@ -21,13 +22,16 @@ export async function POST(req: NextRequest) {
 
     const body: GenerateRequest = await req.json();
 
-    // Validate model access
-    const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
-    if (!allowedModels.includes(body.modelId)) {
-      return NextResponse.json(
-        { error: "Model not available on your plan" },
-        { status: 403 }
-      );
+    // Validate model access (owners have access to all models)
+    const ownerAccount = isOwnerClerkId(clerkId);
+    if (!ownerAccount) {
+      const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
+      if (!allowedModels.includes(body.modelId)) {
+        return NextResponse.json(
+          { error: "Model not available on your plan" },
+          { status: 403 }
+        );
+      }
     }
 
     // Validate model exists and supports the generation type
@@ -35,7 +39,9 @@ export async function POST(req: NextRequest) {
     if (!model) {
       return NextResponse.json({ error: "Invalid model" }, { status: 400 });
     }
-    if (!model.types.includes(body.type)) {
+    // Motion control uses v2v/i2v-capable models under the hood
+    const effectiveType = body.type === "motion" ? "i2v" : body.type;
+    if (!model.types.includes(effectiveType)) {
       return NextResponse.json(
         { error: `Model ${model.name} does not support ${body.type}` },
         { status: 400 }
@@ -52,18 +58,40 @@ export async function POST(req: NextRequest) {
       body.isDraft || false
     );
 
-    // Deduct credits
-    const { success, newBalance } = await deductCredits(
-      user.id,
-      creditCost,
-      "", // job ID will be updated after job creation
-      `Video generation: ${model.name} ${resolution} ${duration}s`
-    );
+    if (!ownerAccount) {
+      // Deduct credits
+      const { success, newBalance } = await deductCredits(
+        user.id,
+        creditCost,
+        "", // job ID will be updated after job creation
+        `Video generation: ${model.name} ${resolution} ${duration}s`
+      );
 
-    if (!success) {
+      if (!success) {
+        return NextResponse.json(
+          { error: "Insufficient credits", required: creditCost, balance: newBalance },
+          { status: 402 }
+        );
+      }
+    }
+
+    // Log profitability metrics
+    const profit = isProfitable(creditCost, body.modelId, duration, resolution);
+    if (!profit.profitable) {
+      console.warn(`[MARGIN WARNING] ${body.modelId} ${resolution} ${duration}s: margin=${profit.margin}% gpuCost=$${profit.gpuCost} revenue=$${profit.revenue}`);
+    }
+
+    // Prompt validation
+    if (!body.prompt || body.prompt.trim().length < 5) {
       return NextResponse.json(
-        { error: "Insufficient credits", required: creditCost, balance: newBalance },
-        { status: 402 }
+        { error: "Prompt is too short (minimum 5 characters)" },
+        { status: 400 }
+      );
+    }
+    if (body.prompt.length > 2000) {
+      return NextResponse.json(
+        { error: "Prompt is too long (maximum 2000 characters)" },
+        { status: 400 }
       );
     }
 
@@ -72,10 +100,10 @@ export async function POST(req: NextRequest) {
       ? BUILT_IN_AUDIO_TRACKS.find((t) => t.id === body.audioTrackId)
       : undefined;
 
-    // Create job record
+    // Create job record (use effectiveType for DB constraint compatibility)
     const job = await createJob({
       userId: user.id,
-      type: body.type,
+      type: effectiveType,
       modelId: body.modelId,
       prompt: body.prompt,
       negativePrompt: body.negativePrompt,
@@ -97,7 +125,7 @@ export async function POST(req: NextRequest) {
     // Build RunPod input (model-specific schema)
     const runpodInput = buildRunPodInput({
       modelId: body.modelId,
-      type: body.type,
+      type: effectiveType,
       prompt: body.prompt,
       negativePrompt: body.negativePrompt,
       inputImageUrl: body.inputImageUrl,

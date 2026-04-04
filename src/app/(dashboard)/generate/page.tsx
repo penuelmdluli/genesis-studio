@@ -24,6 +24,7 @@ import {
   AUDIO_GENRES,
 } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
+import { CreditUpsell, useUpsellContext } from "@/components/ui/credit-upsell";
 import { ModelId, GenerationType, VideoFormat } from "@/types";
 import {
   Sparkles,
@@ -61,6 +62,7 @@ export default function GeneratePage() {
   const [audioGenreFilter, setAudioGenreFilter] = useState<string>("All");
   const isLoading = !user;
   const isReel = form.videoFormat === "reel";
+  const upsellContext = useUpsellContext();
 
   const userPlan = user?.plan || "free";
   const availableModels = MODEL_ACCESS[userPlan] || MODEL_ACCESS.free;
@@ -68,7 +70,7 @@ export default function GeneratePage() {
   const modelId = availableModels.includes(form.modelId) ? form.modelId : availableModels[0];
   const currentModel = AI_MODELS[modelId];
   const creditCost = estimateCreditCost(modelId, form.resolution, form.duration, form.isDraft);
-  const hasEnoughCredits = (user?.creditBalance ?? 0) >= creditCost;
+  const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
 
   const resolutionSource = isReel ? REEL_RESOLUTIONS : RESOLUTIONS;
   const durationSource = isReel ? REEL_DURATIONS : DURATIONS;
@@ -93,11 +95,37 @@ export default function GeneratePage() {
     }
   };
 
+  const handleCancelJob = async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+      if (res.ok) {
+        toast("Generation cancelled. Credits refunded.", "success");
+      }
+    } catch {
+      toast("Failed to cancel generation.", "error");
+    }
+  };
+
   const handleGenerate = async () => {
     setError(null);
 
-    if (!form.prompt.trim()) {
+    const trimmedPrompt = form.prompt.trim();
+    if (!trimmedPrompt) {
       setError("Please enter a prompt.");
+      return;
+    }
+    if (trimmedPrompt.length < 5) {
+      setError("Prompt is too short. Please describe the video you want (min 5 characters).");
+      return;
+    }
+    if (trimmedPrompt.length > 2000) {
+      setError("Prompt is too long (max 2000 characters). Please shorten it.");
+      return;
+    }
+    // Block obvious non-prompts (markdown, code, etc.)
+    const markdownPatterns = /^(#{1,6}\s|```|\*\*|>\s|\|\s|---)/m;
+    if (markdownPatterns.test(trimmedPrompt) && trimmedPrompt.length > 200) {
+      setError("This looks like a document, not a video prompt. Please describe the video you want to generate.");
       return;
     }
     if (isLoading) {
@@ -365,34 +393,25 @@ export default function GeneratePage() {
                   <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Resolution</label>
                   <Select
                     value={form.resolution}
-                    onChange={(e) => setFormField("resolution", e.target.value)}
-                  >
-                    {availableResolutions.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setFormField("resolution", v)}
+                    options={availableResolutions.map((r) => ({ value: r.value, label: r.label }))}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Duration</label>
                   <Select
                     value={form.duration.toString()}
-                    onChange={(e) => setFormField("duration", parseInt(e.target.value))}
-                  >
-                    {durationSource.map((d) => (
-                      <option key={d} value={d}>{d}s</option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setFormField("duration", parseInt(v))}
+                    options={durationSource.map((d) => ({ value: String(d), label: `${d}s` }))}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 block mb-1.5 font-medium">FPS</label>
                   <Select
                     value={form.fps.toString()}
-                    onChange={(e) => setFormField("fps", parseInt(e.target.value))}
-                  >
-                    {FPS_OPTIONS.map((f) => (
-                      <option key={f} value={f}>{f} fps</option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setFormField("fps", parseInt(v))}
+                    options={FPS_OPTIONS.map((f) => ({ value: String(f), label: `${f} fps` }))}
+                  />
                 </div>
               </div>
 
@@ -626,7 +645,7 @@ export default function GeneratePage() {
                 <div className="flex justify-between mt-1.5">
                   <span className="text-xs text-zinc-500">Your balance</span>
                   <span className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
-                    {user?.creditBalance?.toLocaleString() ?? 50} credits
+                    {user?.isOwner ? "∞ Unlimited" : `${user?.creditBalance?.toLocaleString() ?? 50} credits`}
                   </span>
                 </div>
               </div>
@@ -665,6 +684,11 @@ export default function GeneratePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Credit Upsell */}
+          {upsellContext && (
+            <CreditUpsell variant="inline" context={upsellContext} />
+          )}
         </div>
       </div>
     </PageTransition>

@@ -19,7 +19,7 @@ export type ModelTier =
   | "realism"
   | "budget";
 
-export type GenerationType = "t2v" | "i2v" | "v2v";
+export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
 export type AspectRatio = "landscape" | "portrait" | "square";
 export type VideoFormat = "standard" | "reel";
 
@@ -53,6 +53,7 @@ export interface User {
   monthlyCreditsUsed: number;
   monthlyCreditsLimit: number;
   apiKeyHash?: string;
+  isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -196,6 +197,11 @@ export interface GenerateRequest {
   isDraft?: boolean;
   aspectRatio?: AspectRatio;
   audioTrackId?: string;
+  // Motion control fields
+  motionVideoUrl?: string;
+  characterImageUrl?: string;
+  characterOrientation?: CharacterOrientation;
+  motionPresetId?: string;
 }
 
 export interface GenerateResponse {
@@ -205,6 +211,42 @@ export interface GenerateResponse {
   creditsCost: number;
 }
 
+// --- Motion Control ---
+export type CharacterOrientation = "match_video" | "match_image";
+
+export interface MotionPreset {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  previewVideoUrl?: string;
+  category: MotionCategory;
+}
+
+export type MotionCategory =
+  | "dance"
+  | "walk"
+  | "gesture"
+  | "sport"
+  | "expression"
+  | "custom";
+
+export interface MotionControlRequest {
+  modelId: ModelId;
+  prompt: string;
+  negativePrompt?: string;
+  motionVideoUrl: string; // reference video with actions to mimic
+  characterImageUrl: string; // character to apply motion to
+  characterOrientation: CharacterOrientation;
+  resolution?: string;
+  duration?: number;
+  fps?: number;
+  seed?: number;
+  guidanceScale?: number;
+  numInferenceSteps?: number;
+  aspectRatio?: AspectRatio;
+}
+
 export interface JobStatusResponse {
   id: string;
   status: JobStatus;
@@ -212,4 +254,183 @@ export interface JobStatusResponse {
   outputVideoUrl?: string;
   thumbnailUrl?: string;
   errorMessage?: string;
+}
+
+// --- Genesis Brain ---
+export type VideoStyle =
+  | "cinematic"
+  | "social"
+  | "commercial"
+  | "story"
+  | "meme"
+  | "tutorial"
+  | "documentary"
+  | "music_video"
+  | "explainer"
+  | "vlog";
+
+export type TransitionType =
+  | "cut"
+  | "crossfade"
+  | "fade_black"
+  | "fade_white"
+  | "wipe_left"
+  | "wipe_right"
+  | "zoom_in"
+  | "zoom_out"
+  | "glitch"
+  | "blur";
+
+export type ProductionStatus =
+  | "planning"
+  | "planned"
+  | "generating"
+  | "assembling"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface BrainInput {
+  concept: string;
+  targetDuration: number; // 15-120 seconds
+  style: VideoStyle;
+  aspectRatio: AspectRatio;
+  voiceover: boolean;
+  voiceoverLanguage?: string;
+  voiceoverVoice?: string;
+  captions: boolean;
+  music: boolean;
+  characterRefs?: string[];
+  brandKit?: BrandKit;
+  outputFormats?: AspectRatio[];
+  template?: string;
+}
+
+export interface BrandKit {
+  logo?: string;
+  colors?: string[];
+  font?: string;
+  watermark?: string;
+  watermarkPosition?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+}
+
+export interface ScenePlan {
+  title: string;
+  totalDuration: number;
+  scenes: SceneDefinition[];
+  characters: CharacterDefinition[];
+  musicMood: string;
+  musicTempo: "slow" | "medium" | "fast";
+  colorPalette: string[];
+  overallStyle: string;
+  voiceoverScript?: string;
+  voiceoverTimings?: VoiceoverTiming[];
+}
+
+export interface SceneDefinition {
+  sceneNumber: number;
+  description: string;
+  prompt: string;
+  negativePrompt: string;
+  modelId: ModelId;
+  duration: number;
+  resolution: string;
+  cameraMovement: string;
+  transitionIn: TransitionType;
+  transitionOut: TransitionType;
+  textOverlay?: TextOverlay;
+  voiceoverLine?: string;
+  soundEffect?: string;
+  characterIds?: string[];
+  colorGrade?: string;
+}
+
+export interface TextOverlay {
+  text: string;
+  position: "top" | "center" | "bottom";
+  style: "title" | "subtitle" | "caption" | "cta";
+  animateIn: "fade" | "slide-up" | "typewriter" | "none";
+  animateOut: "fade" | "slide-down" | "none";
+  startTime: number;
+  endTime: number;
+}
+
+export interface VoiceoverTiming {
+  sceneNumber: number;
+  text: string;
+  startTime: number;
+  endTime: number;
+}
+
+export interface CharacterDefinition {
+  id: string;
+  name: string;
+  description: string;
+  referenceImageUrl?: string;
+  appearsInScenes: number[];
+  clothing?: string;
+  age?: string;
+  ethnicity?: string;
+  distinguishingFeatures?: string;
+}
+
+export interface Production {
+  id: string;
+  userId: string;
+  status: ProductionStatus;
+  concept: string;
+  style: VideoStyle;
+  targetDuration: number;
+  aspectRatio: AspectRatio;
+  plan?: ScenePlan;
+  voiceover: boolean;
+  music: boolean;
+  captions: boolean;
+  totalCredits: number;
+  outputVideoUrls?: Record<string, string>; // aspectRatio -> url
+  thumbnailUrl?: string;
+  gifPreviewUrl?: string;
+  voiceoverUrl?: string;
+  musicUrl?: string;
+  captionsUrl?: string;
+  errorMessage?: string;
+  progress: number;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface ProductionScene {
+  id: string;
+  productionId: string;
+  sceneNumber: number;
+  status: JobStatus;
+  prompt: string;
+  modelId: ModelId;
+  duration: number;
+  resolution: string;
+  outputVideoUrl?: string;
+  runpodJobId?: string;
+  gpuTime?: number;
+  errorMessage?: string;
+  progress: number;
+  createdAt: string;
+}
+
+export interface ProductionTemplate {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  concept: string;
+  style: VideoStyle;
+  aspectRatio: AspectRatio;
+  targetDuration: number;
+  voiceover: boolean;
+  music: boolean;
+  captions: boolean;
+  sceneStructure?: ScenePlan;
+  isPublic: boolean;
+  usageCount: number;
+  createdAt: string;
 }

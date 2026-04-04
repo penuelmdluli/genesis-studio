@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/db";
 import { createJob, updateJobStatus } from "@/lib/db";
-import { deductCredits } from "@/lib/credits";
+import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
@@ -53,13 +53,16 @@ export async function POST(req: NextRequest) {
     const fps = body.fps || 24;
     const isDraft = body.draft || false;
 
-    // Validate model access
-    const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
-    if (!allowedModels.includes(modelId)) {
-      return NextResponse.json(
-        { error: `Model ${modelId} not available on ${user.plan} plan` },
-        { status: 403 }
-      );
+    // Validate model access (owners have access to all models)
+    const ownerAccount = isOwnerClerkId(user.clerk_id);
+    if (!ownerAccount) {
+      const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
+      if (!allowedModels.includes(modelId)) {
+        return NextResponse.json(
+          { error: `Model ${modelId} not available on ${user.plan} plan` },
+          { status: 403 }
+        );
+      }
     }
 
     const model = AI_MODELS[modelId as keyof typeof AI_MODELS];
@@ -70,20 +73,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate and deduct credits
+    // Calculate credits
     const creditCost = estimateCreditCost(modelId, resolution, duration, isDraft);
-    const { success } = await deductCredits(
-      user.id,
-      creditCost,
-      "",
-      `API: ${model.name} ${resolution} ${duration}s`
-    );
 
-    if (!success) {
-      return NextResponse.json(
-        { error: "Insufficient credits", credits_required: creditCost, credits_balance: user.credit_balance },
-        { status: 402 }
+    if (!ownerAccount) {
+      const { success } = await deductCredits(
+        user.id,
+        creditCost,
+        "",
+        `API: ${model.name} ${resolution} ${duration}s`
       );
+
+      if (!success) {
+        return NextResponse.json(
+          { error: "Insufficient credits", credits_required: creditCost, credits_balance: user.credit_balance },
+          { status: 402 }
+        );
+      }
     }
 
     // Resolve audio track

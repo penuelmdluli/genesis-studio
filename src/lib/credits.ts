@@ -9,6 +9,16 @@ function getSupabase() {
   return createSupabaseAdmin();
 }
 
+/** Check if a user is an owner (unlimited credits, no deduction). */
+export function isOwnerClerkId(clerkId: string): boolean {
+  const ownerIds = process.env.OWNER_CLERK_IDS?.split(",").map((s) => s.trim()) ?? [];
+  return ownerIds.includes(clerkId);
+}
+
+export function isOwnerUserId(userId: string, clerkId: string): boolean {
+  return isOwnerClerkId(clerkId);
+}
+
 export async function getCreditBalance(userId: string): Promise<number> {
   const { data, error } = await getSupabase()
     .from("users")

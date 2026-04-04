@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 
@@ -55,8 +56,9 @@ export default function DashboardLayout({
   }, [setUser, setVideos]);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-[#0A0A0F]">
       <Sidebar />
+      <CommandPalette />
       <main
         className={cn(
           "min-h-screen transition-all duration-300",

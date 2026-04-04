@@ -1,12 +1,19 @@
 import { cn } from "@/lib/utils";
 import { HTMLAttributes, forwardRef } from "react";
 
-const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  glow?: boolean;
+  hover?: boolean;
+}
+
+const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ className, glow, hover, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm",
+        "rounded-xl border border-white/[0.06] bg-[#111118]/80 backdrop-blur-sm",
+        glow && "card-glow",
+        hover && "card-hover",
         className
       )}
       {...props}

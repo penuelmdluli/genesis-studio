@@ -1,14 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
-import { User, CreditCard, Bell, Shield, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useStore();
+  const { toast } = useToast();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [notifications, setNotifications] = useState({
+    generationComplete: true,
+    lowCredits: true,
+    productUpdates: true,
+  });
 
   const handleManageBilling = async () => {
     try {
@@ -19,11 +30,17 @@ export default function SettingsPage() {
       }
     } catch (err) {
       console.error("Billing portal error:", err);
+      toast("Failed to open billing portal", "error");
     }
   };
 
+  const toggleNotification = (key: keyof typeof notifications) => {
+    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+    toast("Notification preference updated", "success");
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in max-w-3xl">
+    <PageTransition className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
         <p className="text-sm text-zinc-500 mt-1">
@@ -35,37 +52,42 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <User className="w-4 h-4 text-violet-400" />
+            <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-violet-400" />
+            </div>
             Profile
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-400 block mb-1.5">Name</label>
-              <Input value={user?.name || ""} readOnly className="bg-zinc-900" />
+              <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Name</label>
+              <Input value={user?.name || ""} readOnly className="bg-white/[0.02] cursor-default" />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 block mb-1.5">Email</label>
-              <Input value={user?.email || ""} readOnly className="bg-zinc-900" />
+              <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Email</label>
+              <Input value={user?.email || ""} readOnly className="bg-white/[0.02] cursor-default" />
             </div>
           </div>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-500 flex items-center gap-1">
             Profile is managed through Clerk. Click your avatar to update.
+            <ExternalLink className="w-3 h-3" />
           </p>
         </CardContent>
       </Card>
 
       {/* Subscription */}
-      <Card>
+      <Card glow>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <CreditCard className="w-4 h-4 text-emerald-400" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
             Subscription
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-800/30 border border-zinc-800">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-200">
@@ -96,25 +118,35 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Bell className="w-4 h-4 text-amber-400" />
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
+              <Bell className="w-3.5 h-3.5 text-amber-400" />
+            </div>
             Notifications
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { label: "Generation complete", desc: "Get notified when your video is ready" },
-            { label: "Low credits", desc: "Alert when credits drop below 10" },
-            { label: "Product updates", desc: "New features and model releases" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between py-2">
+        <CardContent className="space-y-1">
+          {([
+            { key: "generationComplete" as const, label: "Generation complete", desc: "Get notified when your video is ready" },
+            { key: "lowCredits" as const, label: "Low credits", desc: "Alert when credits drop below 10" },
+            { key: "productUpdates" as const, label: "Product updates", desc: "New features and model releases" },
+          ]).map((item) => (
+            <div key={item.key} className="flex items-center justify-between py-3 px-1">
               <div>
                 <p className="text-sm text-zinc-200">{item.label}</p>
                 <p className="text-xs text-zinc-500">{item.desc}</p>
               </div>
-              <button className="w-9 h-5 rounded-full bg-violet-500 relative">
+              <button
+                onClick={() => toggleNotification(item.key)}
+                className={`w-10 h-[22px] rounded-full transition-colors duration-200 relative ${
+                  notifications[item.key] ? "bg-violet-500" : "bg-white/[0.1]"
+                }`}
+                role="switch"
+                aria-checked={notifications[item.key]}
+                aria-label={item.label}
+              >
                 <div
-                  className="w-4 h-4 rounded-full bg-white shadow absolute top-0.5"
-                  style={{ right: "2px" }}
+                  className="w-[18px] h-[18px] rounded-full bg-white shadow-sm absolute top-[2px] transition-transform duration-200"
+                  style={{ transform: notifications[item.key] ? "translateX(20px)" : "translateX(2px)" }}
                 />
               </button>
             </div>
@@ -123,10 +155,12 @@ export default function SettingsPage() {
       </Card>
 
       {/* Danger Zone */}
-      <Card className="border-red-500/20">
+      <Card className="border-red-500/15">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-red-400">
-            <Shield className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center">
+              <Shield className="w-3.5 h-3.5 text-red-400" />
+            </div>
             Danger Zone
           </CardTitle>
         </CardHeader>
@@ -138,12 +172,37 @@ export default function SettingsPage() {
                 Permanently delete your account and all data. This cannot be undone.
               </p>
             </div>
-            <Button variant="danger" size="sm">
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}>
               <Trash2 className="w-3 h-3" /> Delete
             </Button>
           </div>
         </CardContent>
       </Card>
-    </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Account"
+        description="This action is permanent and cannot be undone."
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-red-500/[0.06] border border-red-500/15">
+            <p className="text-sm text-zinc-300">
+              All your data, including videos, API keys, and credit balance, will be permanently deleted.
+            </p>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm">
+              <Trash2 className="w-3 h-3" /> Delete My Account
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </PageTransition>
   );
 }

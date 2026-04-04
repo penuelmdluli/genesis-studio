@@ -172,6 +172,7 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
         fps: params.fps,
         seed: params.seed ?? Math.floor(Math.random() * 2147483647),
         ...(params.inputImageUrl && { image_url: params.inputImageUrl }),
+        ...(params.inputVideoUrl && { video_url: params.inputVideoUrl }),
       };
 
     case "mochi-1":

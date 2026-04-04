@@ -177,6 +177,41 @@ export default function MotionControlPage() {
     hasEnoughCredits &&
     !isLoading;
 
+  // Helper: upload a file to R2 via presigned URL
+  const uploadFileToR2 = async (
+    file: File,
+    purpose: "video" | "image"
+  ): Promise<string> => {
+    // 1. Get presigned URLs from our API
+    const presignRes = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type,
+        purpose,
+      }),
+    });
+    if (!presignRes.ok) {
+      const err = await presignRes.json();
+      throw new Error(err.error || "Failed to get upload URL");
+    }
+    const { uploadUrl, downloadUrl } = await presignRes.json();
+
+    // 2. Upload file directly to R2
+    const uploadRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!uploadRes.ok) {
+      throw new Error("Failed to upload file to storage");
+    }
+
+    // 3. Return the signed download URL (RunPod can access this)
+    return downloadUrl;
+  };
+
   const handleGenerate = async () => {
     setError(null);
 
@@ -195,6 +230,25 @@ export default function MotionControlPage() {
 
     setIsGenerating(true);
     try {
+      // Upload files to R2 first
+      toast("Uploading files...", "info");
+
+      let inputVideoUrl: string | undefined;
+      let inputImageUrl: string | undefined;
+
+      // Upload character image
+      inputImageUrl = await uploadFileToR2(characterImage, "image");
+
+      // Upload motion video (or use preset URL)
+      if (motionVideo) {
+        inputVideoUrl = await uploadFileToR2(motionVideo, "video");
+      } else if (selectedPreset) {
+        const preset = MOTION_PRESETS.find((p) => p.id === selectedPreset);
+        inputVideoUrl = preset?.previewVideoUrl || undefined;
+      }
+
+      toast("Starting generation...", "info");
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,6 +257,8 @@ export default function MotionControlPage() {
           modelId,
           prompt: prompt.trim() || "Motion control generation — transfer character motion with high quality",
           negativePrompt: negativePrompt || undefined,
+          inputImageUrl,
+          inputVideoUrl,
           resolution,
           duration,
           fps,

@@ -63,21 +63,26 @@ export function estimateCreditCost(
   duration: number,
   isDraft: boolean
 ): number {
-  // Base costs from model config, adjusted by duration and draft mode
-  const baseCosts: Record<string, Record<string, number>> = {
-    "wan-2.2": { "480p": 20, "720p": 40, "1080p": 80 },
-    "hunyuan-video": { "480p": 12, "720p": 25 },
-    "ltx-video": { "480p": 5, "720p": 8 },
-    "wan-2.1-turbo": { "480p": 10, "720p": 20 },
-    "mochi-1": { "480p": 20, "720p": 35, "1080p": 70 },
-    "cogvideo-x": { "480p": 3 },
-    "mimic-motion": { "480p": 15, "720p": 30 },
-  };
+  // Import AI_MODELS dynamically to avoid circular deps — use inline require
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AI_MODELS } = require("@/lib/constants");
+  const model = AI_MODELS[modelId];
 
-  const modelCosts = baseCosts[modelId];
-  if (!modelCosts) return 10;
+  if (!model || !model.creditCost) {
+    // Unknown model — charge a safe minimum (never give away free GPU time)
+    console.warn(`[PRICING] Unknown model "${modelId}" — charging fallback 50 credits`);
+    return 50;
+  }
 
-  const baseCost = modelCosts[resolution] || modelCosts["480p"] || 10;
+  // Get base cost from model's creditCost map at the requested resolution
+  // Fall back to the highest available resolution cost (never undercharge)
+  const costMap = model.creditCost as Record<string, number>;
+  const baseCost = costMap[resolution]
+    || costMap["1080p"]
+    || costMap["720p"]
+    || costMap["480p"]
+    || 50;
+
   const durationMultiplier = duration / 5; // normalized to 5s base
   const draftDiscount = isDraft ? 0.3 : 1;
 

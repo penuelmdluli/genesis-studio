@@ -23,6 +23,19 @@ export const MODEL_GPU_MAP: Record<string, string> = {
   "wan-2.2": "L40S",
   "mochi-1": "A6000",
   "mimic-motion": "RTX_4090",
+  // FAL.AI models — costs are per-API-call, not GPU rental
+  "kling-2.6": "FAL_API",
+  "kling-3.0": "FAL_API",
+  "veo-3.1": "FAL_API",
+  "seedance-1.5": "FAL_API",
+};
+
+// FAL.AI per-second API costs (USD) — these are what FAL charges us
+export const FAL_API_COSTS: Record<string, number> = {
+  "kling-2.6": 0.035,    // ~$0.35 per 10s video
+  "kling-3.0": 0.050,    // ~$0.50 per 10s video
+  "veo-3.1": 0.100,      // ~$0.80 per 8s video
+  "seedance-1.5": 0.020, // ~$0.20 per 10s video
 };
 
 // Credit value in USD (based on Creator plan: 500 credits / $15)
@@ -39,19 +52,27 @@ export const FIXED_COSTS_MONTHLY = {
 };
 
 /**
- * Estimate GPU cost for a generation in USD
+ * Estimate GPU/API cost for a generation in USD
  */
 export function estimateGpuCostUsd(
   modelId: string,
   durationSeconds: number,
   resolution: string
 ): number {
-  const gpuType = MODEL_GPU_MAP[modelId] || "RTX_4090";
-  const hourlyRate = GPU_RATES[gpuType] || 0.69;
   const model = AI_MODELS[modelId as ModelId];
   if (!model) return 0;
 
-  // Estimated GPU seconds based on model avg time + duration multiplier
+  // FAL.AI models — flat per-second API pricing
+  if (FAL_API_COSTS[modelId]) {
+    const perSecondRate = FAL_API_COSTS[modelId];
+    const resMultiplier = resolution === "1080p" ? 1.5 : 1; // 1080p costs more
+    return perSecondRate * durationSeconds * resMultiplier;
+  }
+
+  // RunPod models — estimated GPU rental cost
+  const gpuType = MODEL_GPU_MAP[modelId] || "RTX_4090";
+  const hourlyRate = GPU_RATES[gpuType] || 0.69;
+
   const baseSecs = model.avgGenerationTime;
   const durationMultiplier = durationSeconds / 5; // Normalized to 5s
   const resMultiplier = resolution === "1080p" ? 2.5 : resolution === "4k" ? 5 : resolution === "720p" ? 1.5 : 1;

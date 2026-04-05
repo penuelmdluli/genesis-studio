@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/db";
 import { createJob, updateJobStatus } from "@/lib/db";
-import { deductCredits, isOwnerClerkId } from "@/lib/credits";
+import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
+import { submitFalJob } from "@/lib/fal";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
@@ -120,40 +121,85 @@ export async function POST(req: NextRequest) {
       audioUrl: audioTrack?.url,
     });
 
-    // Submit to RunPod
-    const runpodInput = buildRunPodInput({
-      modelId: modelId as ModelId,
-      type,
-      prompt: body.prompt,
-      negativePrompt: body.negative_prompt,
-      inputImageUrl: body.input_image_url,
-      resolution,
-      duration,
-      fps,
-      seed: body.seed,
-      guidanceScale: body.guidance_scale,
-      numInferenceSteps: body.num_inference_steps,
-      isDraft,
-      aspectRatio,
-    });
+    // Route to the correct provider (FAL.AI or RunPod)
+    try {
+      if (model.provider === "fal") {
+        // FAL.AI — premium models with native audio
+        const falResult = await submitFalJob({
+          modelId: modelId as ModelId,
+          type: type as "t2v" | "i2v",
+          prompt: body.prompt,
+          negativePrompt: body.negative_prompt,
+          imageUrl: body.input_image_url,
+          duration,
+          aspectRatio,
+          enableAudio: body.enable_audio,
+          seed: body.seed,
+        });
 
-    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const webhookUrl = `${appUrl}/api/webhooks/runpod`;
-    const runpodJob = await submitRunPodJob(
-      modelId as keyof typeof AI_MODELS,
-      runpodInput,
-      webhookUrl
-    );
+        await updateJobStatus(job.id, {
+          runpodJobId: falResult.request_id,
+          status: "queued",
+        });
+      } else {
+        // RunPod — open-source models
+        const runpodInput = buildRunPodInput({
+          modelId: modelId as ModelId,
+          type,
+          prompt: body.prompt,
+          negativePrompt: body.negative_prompt,
+          inputImageUrl: body.input_image_url,
+          resolution,
+          duration,
+          fps,
+          seed: body.seed,
+          guidanceScale: body.guidance_scale,
+          numInferenceSteps: body.num_inference_steps,
+          isDraft,
+          aspectRatio,
+        });
 
-    await updateJobStatus(job.id, { runpodJobId: runpodJob.id });
+        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const webhookUrl = `${appUrl}/api/webhooks/runpod`;
+        const runpodJob = await submitRunPodJob(
+          modelId as keyof typeof AI_MODELS,
+          runpodInput,
+          webhookUrl
+        );
 
-    return NextResponse.json({
-      id: job.id,
-      status: "queued",
-      estimated_seconds: Math.round(model.avgGenerationTime * (isDraft ? 0.3 : 1)),
-      credits_charged: creditCost,
-      poll_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/v1/status/${job.id}`,
-    });
+        await updateJobStatus(job.id, { runpodJobId: runpodJob.id, status: "queued" });
+      }
+
+      return NextResponse.json({
+        id: job.id,
+        status: "queued",
+        estimated_seconds: Math.round(model.avgGenerationTime * (isDraft ? 0.3 : 1)),
+        credits_charged: creditCost,
+        poll_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/v1/status/${job.id}`,
+      });
+    } catch (gpuError) {
+      console.error("API v1 GPU submission error:", gpuError);
+
+      // Refund credits on submission failure
+      if (!ownerAccount) {
+        await refundCredits(
+          user.id,
+          creditCost,
+          job.id,
+          "API v1 submission failed — automatic refund"
+        );
+      }
+
+      await updateJobStatus(job.id, {
+        status: "failed",
+        errorMessage: gpuError instanceof Error ? gpuError.message : "Submission failed",
+      });
+
+      return NextResponse.json(
+        { error: "GPU submission failed. Credits refunded.", id: job.id },
+        { status: 503 }
+      );
+    }
   } catch (error) {
     console.error("API v1 generate error:", error);
     return NextResponse.json(

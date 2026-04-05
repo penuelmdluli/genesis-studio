@@ -196,7 +196,9 @@ export function estimateMotionCost(
 ): { costUsd: number; credits: number } {
   const ratePerSec = quality === "pro" ? 0.14 : 0.07;
   const costUsd = ratePerSec * duration;
-  // Convert to credits: roughly $0.01 per credit, 3x markup
-  const credits = Math.ceil(costUsd * 300);
+  // Convert to credits with 4x markup: costUsd * 400 (1 credit ≈ $0.01 face, $0.03 revenue)
+  // Standard 10s: $0.70 → 280 credits ($8.40 revenue, 12x margin)
+  // Pro 10s: $1.40 → 560 credits ($16.80 revenue, 12x margin)
+  const credits = Math.ceil(costUsd * 400);
   return { costUsd, credits };
 }

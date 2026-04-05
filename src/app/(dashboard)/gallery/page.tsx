@@ -536,6 +536,7 @@ function VideoCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -553,6 +554,8 @@ function VideoCard({
     }
   }, []);
 
+  const isPortrait = video.aspectRatio === "portrait";
+
   return (
     <motion.div
       className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ${
@@ -568,26 +571,34 @@ function VideoCard({
       transition={{ duration: 0.25 }}
       layout
     >
-      {/* Video container */}
-      <div className={`${video.aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} bg-[#0D0D14] relative overflow-hidden`}>
+      {/* Video container — always aspect-video for uniform grid */}
+      <div className="aspect-video bg-[#0D0D14] relative overflow-hidden">
+        {/* Loading shimmer while video metadata loads */}
+        {video.url && !videoLoaded && (
+          <div className="absolute inset-0 z-[5]">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/15 via-[#0D0D14] to-fuchsia-900/10" />
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[shimmer_2s_infinite]" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-2 border-transparent border-t-violet-500/60 animate-spin" />
+            </div>
+          </div>
+        )}
+
         {/* Video element — always mounted for instant playback */}
         {video.url ? (
           <video
             ref={videoRef}
             src={`${video.url}#t=0.5`}
-            className={`w-full h-full object-cover transition-all duration-500 ${
+            className={`w-full h-full ${isPortrait ? "object-contain" : "object-cover"} transition-all duration-500 ${
               isHovered ? "scale-105" : "scale-100"
             }`}
             muted
             loop
             playsInline
             preload="metadata"
-          />
-        ) : video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt={video.title}
-            className="w-full h-full object-cover"
+            onLoadedData={() => setVideoLoaded(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">

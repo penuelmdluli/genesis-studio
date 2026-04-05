@@ -237,7 +237,7 @@ export default function CaptionsPage() {
       // Poll for completion (simplified — in production, use webhooks)
       const pollInterval = setInterval(async () => {
         try {
-          const statusRes = await fetch(`/api/jobs/${data.jobId}`);
+          const statusRes = await fetch(`/api/captions/${data.jobId}`);
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             if (statusData.status === "completed" && statusData.output?.srt) {

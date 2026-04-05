@@ -76,11 +76,13 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           input: {
-            audio_url: videoUrl,
+            audio: videoUrl,
+            model: "large-v3",
+            transcription: "plain_text",
+            translate: false,
             language: language || "en",
             word_timestamps: true,
           },
-          webhook: `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhooks/runpod`,
         }),
       });
 

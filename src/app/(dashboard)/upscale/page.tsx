@@ -539,9 +539,7 @@ export default function UpscalePage() {
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"
                     }`}
                   >
-                    {user?.isOwner
-                      ? "\u221E Unlimited"
-                      : `${user?.creditBalance?.toLocaleString() ?? 0} credits`}
+                    {`${user?.creditBalance?.toLocaleString() ?? 0} credits`}
                   </span>
                 </div>
               </div>

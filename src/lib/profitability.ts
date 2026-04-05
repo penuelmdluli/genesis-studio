@@ -157,9 +157,9 @@ export const PLAN_LIMITS = {
     maxCreditPerGeneration: 500,
   },
   studio: {
-    maxGenerationsPerDay: 1000,
+    maxGenerationsPerDay: 500,
     maxConcurrentJobs: 10,
-    maxCreditsPerMonth: -1, // unlimited
+    maxCreditsPerMonth: 10000,
     maxCreditPerGeneration: 1000,
   },
 } as const;

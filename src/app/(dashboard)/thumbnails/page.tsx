@@ -331,9 +331,7 @@ export default function ThumbnailsPage() {
                   <span
                     className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}
                   >
-                    {user?.isOwner
-                      ? "Unlimited"
-                      : `${user?.creditBalance?.toLocaleString() ?? 0} credits`}
+                    {`${user?.creditBalance?.toLocaleString() ?? 0} credits`}
                   </span>
                 </div>
               </div>

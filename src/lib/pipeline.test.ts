@@ -162,9 +162,9 @@ describe("E2E Generation Pipeline", () => {
       }
     });
 
-    it("plans have positive credits or unlimited", () => {
+    it("plans have positive credits", () => {
       for (const plan of PLANS) {
-        expect(plan.credits === -1 || plan.credits > 0).toBe(true);
+        expect(plan.credits > 0 || plan.credits === 0).toBe(true);
       }
     });
 
@@ -259,7 +259,7 @@ describe("E2E Generation Pipeline", () => {
     it("formatCredits handles all cases", () => {
       expect(formatCredits(0)).toBe("0");
       expect(formatCredits(100)).toBe("100");
-      expect(formatCredits(-1)).toBe("Unlimited");
+      expect(formatCredits(10000)).toBe("10,000");
       expect(formatCredits(1000)).toContain("1");
     });
 

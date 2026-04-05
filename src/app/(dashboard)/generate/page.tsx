@@ -714,7 +714,7 @@ export default function GeneratePage() {
                 <div className="flex justify-between mt-1.5">
                   <span className="text-xs text-zinc-500">Your balance</span>
                   <span className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
-                    {user?.isOwner ? "∞ Unlimited" : `${user?.creditBalance?.toLocaleString() ?? 50} credits`}
+                    {`${user?.creditBalance?.toLocaleString() ?? 50} credits`}
                   </span>
                 </div>
               </div>

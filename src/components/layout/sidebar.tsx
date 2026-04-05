@@ -152,7 +152,7 @@ export function Sidebar() {
               <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</div>
                 <div className="text-sm font-bold text-violet-300">
-                  {user?.isOwner ? "∞ Unlimited" : (user?.creditBalance?.toLocaleString() ?? "—")}
+                  {user?.creditBalance?.toLocaleString() ?? "—"} credits
                 </div>
               </div>
             )}

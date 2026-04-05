@@ -236,7 +236,7 @@ export interface Plan {
   name: string;
   price: number; // monthly in dollars (USD)
   priceZAR?: number; // monthly in South African Rand
-  credits: number; // monthly credits, -1 for unlimited
+  credits: number; // monthly credits allocation
   maxResolution: string;
   features: string[];
   stripePriceId?: string;

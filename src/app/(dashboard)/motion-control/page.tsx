@@ -797,9 +797,7 @@ export default function MotionControlPage() {
                     <span className={`text-sm font-medium ${
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"
                     }`}>
-                      {user?.isOwner
-                        ? "Unlimited"
-                        : `${user?.creditBalance?.toLocaleString() ?? "—"} credits`}
+                      {`${user?.creditBalance?.toLocaleString() ?? "—"} credits`}
                     </span>
                   </div>
                 </div>

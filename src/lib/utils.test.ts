@@ -25,8 +25,8 @@ describe("cn", () => {
 });
 
 describe("formatCredits", () => {
-  it("returns 'Unlimited' for negative values", () => {
-    expect(formatCredits(-1)).toBe("Unlimited");
+  it("formats large values with commas", () => {
+    expect(formatCredits(10000)).toBe("10,000");
   });
 
   it("formats positive numbers with locale string", () => {

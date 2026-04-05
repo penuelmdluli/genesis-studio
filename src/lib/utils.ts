@@ -6,7 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCredits(credits: number): string {
-  if (credits < 0) return "Unlimited";
   return credits.toLocaleString();
 }
 

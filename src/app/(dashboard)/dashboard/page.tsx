@@ -177,7 +177,7 @@ export default function DashboardPage() {
       ) : (
         <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Credits", value: user?.isOwner ? -1 : (user?.creditBalance ?? 50), icon: Zap, color: "violet" },
+            { label: "Credits", value: user?.creditBalance ?? 50, icon: Zap, color: "violet" },
             { label: "Videos", value: (videos || []).length, icon: Film, color: "emerald" },
             { label: "Active Jobs", value: pendingJobs.length, icon: Clock, color: "amber" },
             { label: "Plan", value: planLabel, icon: user?.plan === "free" ? Rocket : Crown, color: "cyan" },
@@ -198,11 +198,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     {typeof stat.value === "number" ? (
-                      stat.value === -1 ? (
-                        <span className="text-2xl font-bold text-white">&infin;</span>
-                      ) : (
-                        <AnimatedCounter value={stat.value} className="text-2xl font-bold text-white" />
-                      )
+                      <AnimatedCounter value={stat.value} className="text-2xl font-bold text-white" />
                     ) : (
                       <p className="text-2xl font-bold text-white">{stat.value}</p>
                     )}

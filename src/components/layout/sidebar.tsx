@@ -26,6 +26,8 @@ import {
   ArrowUpCircle,
   ImageIcon,
   Lock,
+  Plus,
+  ArrowUpRight,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
@@ -139,25 +141,107 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Credit Balance */}
-        <div className={cn(
-          "mx-3 mt-3 rounded-xl bg-gradient-to-r from-violet-500/10 to-cyan-500/5 border border-violet-500/20 transition-all",
-          (sidebarOpen || mobileMenuOpen) ? "p-3" : "p-2"
-        )}>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
-              <Zap className="w-3.5 h-3.5 text-violet-400" />
-            </div>
-            {(sidebarOpen || mobileMenuOpen) && (
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</div>
-                <div className="text-sm font-bold text-violet-300">
-                  {user?.creditBalance?.toLocaleString() ?? "—"} credits
+        {/* Credit Balance Widget */}
+        {(() => {
+          const credits = user?.creditBalance ?? 0;
+          const limit = user?.monthlyCreditsLimit ?? 50;
+          const isLow = credits < 100 && credits > 0;
+          const isEmpty = credits <= 0;
+          const expanded = sidebarOpen || mobileMenuOpen;
+
+          return (
+            <div className={cn(
+              "mx-3 mt-3 rounded-xl border transition-all",
+              isEmpty
+                ? "bg-red-500/8 border-red-500/25"
+                : isLow
+                  ? "bg-amber-500/8 border-amber-500/20"
+                  : "bg-gradient-to-r from-violet-500/10 to-cyan-500/5 border-violet-500/20",
+              expanded ? "p-3" : "p-2"
+            )}>
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                  isEmpty ? "bg-red-500/20" : isLow ? "bg-amber-500/20" : "bg-violet-500/20"
+                )}>
+                  <Zap className={cn(
+                    "w-3.5 h-3.5",
+                    isEmpty ? "text-red-400" : isLow ? "text-amber-400" : "text-violet-400"
+                  )} />
                 </div>
+                {expanded && (
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</span>
+                    </div>
+                    <span className={cn(
+                      "text-sm font-bold tabular-nums",
+                      isEmpty ? "text-red-400" : isLow ? "text-amber-400" : "text-violet-300"
+                    )}>
+                      {credits.toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+
+              {/* Progress bar */}
+              {expanded && (
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden mt-2 mb-2.5">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      isEmpty ? "bg-red-500" : isLow ? "bg-amber-500" : "bg-violet-500"
+                    )}
+                    style={{ width: `${Math.min((credits / limit) * 100, 100)}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Buy / Upgrade buttons */}
+              {expanded && (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => useStore.getState().setCreditPurchaseOpen(true)}
+                    className={cn(
+                      "flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1",
+                      isEmpty
+                        ? "bg-red-500 hover:bg-red-400 text-white"
+                        : "bg-violet-600 hover:bg-violet-500 text-white"
+                    )}
+                  >
+                    <Plus className="w-3 h-3" /> Buy
+                  </button>
+                  {user?.plan !== "studio" && (
+                    <Link
+                      href="/pricing"
+                      className="px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] font-medium text-zinc-300 transition-all flex items-center gap-1"
+                    >
+                      Upgrade <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              {/* Collapsed: just show buy icon */}
+              {!expanded && (
+                <button
+                  onClick={() => useStore.getState().setCreditPurchaseOpen(true)}
+                  className="w-7 h-7 rounded-lg bg-violet-600 hover:bg-violet-500 flex items-center justify-center mt-2 mx-auto transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-white" />
+                </button>
+              )}
+
+              {/* Warning text */}
+              {expanded && isLow && !isEmpty && (
+                <p className="text-[10px] text-amber-400/60 mt-1.5 text-center">Running low — top up to keep creating</p>
+              )}
+              {expanded && isEmpty && (
+                <p className="text-[10px] text-red-400/60 mt-1.5 text-center">No credits left — buy more to continue</p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Navigation */}
         <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">

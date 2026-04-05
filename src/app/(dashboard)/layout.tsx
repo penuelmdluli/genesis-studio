@@ -3,6 +3,8 @@
 import { useEffect, useCallback, useRef } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { CommandPalette } from "@/components/ui/command-palette";
+import { CreditPurchaseModal } from "@/components/credit-purchase-modal";
+import { LowCreditBanner } from "@/components/low-credit-banner";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
@@ -185,6 +187,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-[#0A0A0F]">
       <Sidebar />
       <CommandPalette />
+      <CreditPurchaseModal />
       <main
         className={cn(
           "min-h-screen transition-all duration-300",
@@ -193,6 +196,7 @@ export default function DashboardLayout({
           sidebarOpen && "md:ml-64"
         )}
       >
+        <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}
         <div className="px-4 pt-16 pb-6 md:p-6 max-w-7xl mx-auto">{children}</div>
       </main>

@@ -69,6 +69,8 @@ interface StoreState {
   toggleSidebar: () => void;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
+  creditPurchaseOpen: boolean;
+  setCreditPurchaseOpen: (open: boolean) => void;
 }
 
 const defaultForm: GenerateFormState = {
@@ -129,4 +131,6 @@ export const useStore = create<StoreState>((set) => ({
     set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   mobileMenuOpen: false,
   setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
+  creditPurchaseOpen: false,
+  setCreditPurchaseOpen: (open) => set({ creditPurchaseOpen: open }),
 }));

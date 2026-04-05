@@ -72,7 +72,7 @@ const CAPTION_STYLES = [
 const CREDITS_PER_MINUTE = 2;
 
 export default function CaptionsPage() {
-  const { user, videos, updateCreditBalance } = useStore();
+  const { user, videos, updateCreditBalance, setCreditPurchaseOpen } = useStore();
   const { toast } = useToast();
 
   // Input state
@@ -620,12 +620,12 @@ export default function CaptionsPage() {
               {!isLoading && !hasEnoughCredits && videoDuration && !error && (
                 <p className="text-xs text-center text-red-400">
                   You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
-                  <a
-                    href="/pricing"
+                  <button
+                    onClick={() => setCreditPurchaseOpen(true)}
                     className="underline hover:text-red-300 transition-colors"
                   >
                     Buy credits
-                  </a>
+                  </button>
                 </p>
               )}
             </CardContent>

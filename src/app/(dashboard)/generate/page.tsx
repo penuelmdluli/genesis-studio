@@ -56,7 +56,7 @@ const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; d
 ];
 
 export default function GeneratePage() {
-  const { form, setFormField, user, addJob, updateCreditBalance } = useStore();
+  const { form, setFormField, user, addJob, updateCreditBalance, setCreditPurchaseOpen } = useStore();
   const { toast } = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -748,7 +748,7 @@ export default function GeneratePage() {
               {!isLoading && !hasEnoughCredits && !error && (
                 <p className="text-xs text-center text-red-400">
                   You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
-                  <a href="/pricing" className="underline hover:text-red-300 transition-colors">Buy credits</a>
+                  <button onClick={() => setCreditPurchaseOpen(true)} className="underline hover:text-red-300 transition-colors">Buy credits</button>
                 </p>
               )}
             </CardContent>

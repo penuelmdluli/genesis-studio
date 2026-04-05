@@ -28,7 +28,7 @@ const INTERPOLATION_OPTIONS = [
 ] as { value: string; label: string; minPlan: string; badge?: string }[];
 
 export default function UpscalePage() {
-  const { user, updateCreditBalance, videos } = useStore();
+  const { user, updateCreditBalance, videos, setCreditPurchaseOpen } = useStore();
   const { toast } = useToast();
 
   // Upload state
@@ -596,12 +596,12 @@ export default function UpscalePage() {
                 <p className="text-xs text-center text-red-400">
                   You need {creditCost - (user?.creditBalance ?? 0)} more
                   credits.{" "}
-                  <a
-                    href="/pricing"
+                  <button
+                    onClick={() => setCreditPurchaseOpen(true)}
                     className="underline hover:text-red-300 transition-colors"
                   >
                     Buy credits
-                  </a>
+                  </button>
                 </p>
               )}
             </CardContent>

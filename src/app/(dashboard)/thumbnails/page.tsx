@@ -41,7 +41,7 @@ interface GeneratedImage {
 }
 
 export default function ThumbnailsPage() {
-  const { user, updateCreditBalance } = useStore();
+  const { user, updateCreditBalance, setCreditPurchaseOpen } = useStore();
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState("");
@@ -368,12 +368,12 @@ export default function ThumbnailsPage() {
                 <p className="text-xs text-center text-red-400">
                   You need {creditCost - (user?.creditBalance ?? 0)} more
                   credits.{" "}
-                  <a
-                    href="/pricing"
+                  <button
+                    onClick={() => setCreditPurchaseOpen(true)}
                     className="underline hover:text-red-300 transition-colors"
                   >
                     Buy credits
-                  </a>
+                  </button>
                 </p>
               )}
             </CardContent>

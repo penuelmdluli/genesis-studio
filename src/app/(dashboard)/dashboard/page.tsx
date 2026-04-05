@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,18 @@ import {
   ArrowRight,
   Play,
   ArrowUpRight,
+  Volume2,
+  Download,
 } from "lucide-react";
+import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { user, activeJobs, videos } = useStore();
   const isLoading = !user;
+
+  const pendingJobs = (activeJobs || []).filter(
+    (j) => j.status === "processing" || j.status === "queued"
+  );
 
   const numericStats = [
     {
@@ -35,7 +43,7 @@ export default function DashboardPage() {
     },
     {
       label: "Videos Created",
-      numValue: videos.length,
+      numValue: (videos || []).length,
       icon: Film,
       gradient: "from-emerald-500/20 to-emerald-500/5",
       iconBg: "bg-emerald-500/15",
@@ -44,7 +52,7 @@ export default function DashboardPage() {
     },
     {
       label: "Active Jobs",
-      numValue: activeJobs.filter((j) => j.status === "processing" || j.status === "queued").length,
+      numValue: pendingJobs.length,
       icon: Clock,
       gradient: "from-amber-500/20 to-amber-500/5",
       iconBg: "bg-amber-500/15",
@@ -109,7 +117,6 @@ export default function DashboardPage() {
               </GlowCard>
             </StaggerItem>
           ))}
-          {/* Plan card — not numeric, uses text */}
           <StaggerItem>
             <GlowCard className="rounded-xl border border-cyan-500/10 bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 p-5">
               <div className="flex items-center justify-between">
@@ -174,7 +181,7 @@ export default function DashboardPage() {
         </Card>
       </MotionSection>
 
-      {/* Active Jobs */}
+      {/* Active Generations — Premium animated section */}
       <MotionSection delay={0.15}>
         <Card>
           <CardHeader>
@@ -191,7 +198,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {activeJobs.length === 0 ? (
+            {pendingJobs.length === 0 && (activeJobs || []).length === 0 ? (
               <div className="text-center py-10 relative">
                 <div className="absolute inset-0 bg-glow-center opacity-30" />
                 <div className="relative z-10">
@@ -208,40 +215,58 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                {activeJobs.slice(0, 5).map((job, index) => (
+              <div className="space-y-3">
+                {(activeJobs || []).slice(0, 5).map((job, index) => (
                   <motion.div
                     key={job.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05, duration: 0.3 }}
-                    className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition-colors"
+                    className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.1] transition-all"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
-                      <Play className="w-4 h-4 text-violet-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-zinc-200 truncate">{job.prompt}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          variant={
-                            job.status === "completed"
-                              ? "emerald"
-                              : job.status === "failed"
-                              ? "red"
-                              : job.status === "processing"
-                              ? "amber"
-                              : "default"
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                        <span className="text-xs text-zinc-600">{job.modelId}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0 relative">
+                        {(job.status === "processing" || job.status === "queued") && (
+                          <div className="absolute inset-0 rounded-xl bg-violet-500/20 animate-ping" />
+                        )}
+                        <Sparkles className="w-4 h-4 text-violet-400 relative z-10" />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-zinc-200 truncate font-medium">
+                          &ldquo;{job.prompt}&rdquo;
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge
+                            variant={
+                              job.status === "completed" ? "emerald"
+                              : job.status === "failed" ? "red"
+                              : job.status === "processing" ? "amber"
+                              : "default"
+                            }
+                            className="text-[10px]"
+                          >
+                            {job.status === "processing" ? "Generating..." : job.status === "queued" ? "In Queue" : job.status}
+                          </Badge>
+                          <span className="text-[11px] text-zinc-600">{job.modelId}</span>
+                        </div>
+                      </div>
+                      {job.status === "processing" && (
+                        <div className="w-24 shrink-0">
+                          <Progress value={job.progress} size="sm" showLabel />
+                        </div>
+                      )}
                     </div>
-                    {job.status === "processing" && (
-                      <div className="w-28 shrink-0">
-                        <Progress value={job.progress} size="sm" showLabel />
+                    {/* Progress bar for queued/processing */}
+                    {(job.status === "queued" || job.status === "processing") && (
+                      <div className="mt-2.5 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                          initial={{ width: "5%" }}
+                          animate={{
+                            width: job.progress > 0 ? `${job.progress}%` : job.status === "processing" ? "50%" : "10%",
+                          }}
+                          transition={{ duration: 2, ease: "easeInOut" }}
+                        />
                       </div>
                     )}
                   </motion.div>
@@ -252,7 +277,7 @@ export default function DashboardPage() {
         </Card>
       </MotionSection>
 
-      {/* Recent Videos */}
+      {/* Recent Videos — Live hover-to-play previews */}
       <MotionSection delay={0.2}>
         <Card>
           <CardHeader>
@@ -275,7 +300,7 @@ export default function DashboardPage() {
                   <SkeletonVideoCard key={i} />
                 ))}
               </div>
-            ) : videos.length === 0 ? (
+            ) : (videos || []).length === 0 ? (
               <div className="text-center py-10 relative">
                 <div className="absolute inset-0 bg-glow-center opacity-30" />
                 <div className="relative z-10">
@@ -288,38 +313,9 @@ export default function DashboardPage() {
               </div>
             ) : (
               <StaggerGroup fast className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {videos.slice(0, 8).map((video) => (
+                {(videos || []).slice(0, 8).map((video) => (
                   <StaggerItem key={video.id}>
-                    <Link
-                      href="/gallery"
-                      className="relative group rounded-xl overflow-hidden border border-white/[0.06] bg-[#111118] aspect-video cursor-pointer block"
-                    >
-                      <motion.div
-                        className="w-full h-full"
-                        whileHover={{ scale: 1.03 }}
-                        transition={{ duration: 0.25 }}
-                      >
-                        {video.thumbnailUrl ? (
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#111118] to-fuchsia-900/10 p-2">
-                            <Film className="w-5 h-5 text-violet-500/50 mb-1" />
-                            <p className="text-[9px] text-zinc-500 text-center line-clamp-2">{video.title}</p>
-                            <p className="text-[8px] text-zinc-600 mt-0.5">{video.resolution} · {video.duration}s</p>
-                          </div>
-                        )}
-                      </motion.div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-                        <div>
-                          <p className="text-xs font-medium text-zinc-200 truncate">{video.title}</p>
-                          <p className="text-[10px] text-zinc-400">{video.resolution} · {video.duration}s</p>
-                        </div>
-                      </div>
-                    </Link>
+                    <DashboardVideoCard video={video} />
                   </StaggerItem>
                 ))}
               </StaggerGroup>
@@ -328,5 +324,116 @@ export default function DashboardPage() {
         </Card>
       </MotionSection>
     </PageTransition>
+  );
+}
+
+/* ================================================
+   DashboardVideoCard — Hover-to-play mini card
+   ================================================ */
+function DashboardVideoCard({ video }: {
+  video: {
+    id: string;
+    url: string;
+    thumbnailUrl?: string;
+    title: string;
+    prompt: string;
+    duration: number;
+    resolution: string;
+    aspectRatio?: string;
+    audioUrl?: string;
+    createdAt: string;
+  };
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  }, []);
+
+  return (
+    <Link href="/gallery">
+      <motion.div
+        className="group relative rounded-xl overflow-hidden cursor-pointer aspect-video"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        whileHover={{
+          scale: 1.04,
+          boxShadow: "0 8px 30px rgba(139, 92, 246, 0.15)",
+        }}
+        transition={{ duration: 0.25 }}
+      >
+        {/* Video element — always mounted */}
+        {video.url ? (
+          <video
+            ref={videoRef}
+            src={`${video.url}#t=0.5`}
+            className={`w-full h-full object-cover transition-transform duration-500 ${
+              isHovered ? "scale-110" : "scale-100"
+            }`}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/10">
+            <Film className="w-6 h-6 text-zinc-700" />
+          </div>
+        )}
+
+        {/* Bottom gradient — always visible */}
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+        {/* Info overlay — always visible at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-2.5 z-10">
+          <p className="text-[11px] font-medium text-white truncate">{video.title}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-white/50">{video.resolution}</span>
+            <span className="text-[10px] text-white/30">&middot;</span>
+            <span className="text-[10px] text-white/50">{formatDuration(video.duration)}</span>
+            {video.audioUrl && (
+              <>
+                <span className="text-[10px] text-white/30">&middot;</span>
+                <Volume2 className="w-2.5 h-2.5 text-violet-300" />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Hover play icon */}
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
+          isHovered ? "opacity-100" : "opacity-0"
+        }`}>
+          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20">
+            <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+          </div>
+        </div>
+
+        {/* Duration badge — top right */}
+        <div className="absolute top-2 right-2 z-10">
+          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-black/60 text-white backdrop-blur-sm">
+            {formatDuration(video.duration)}
+          </span>
+        </div>
+
+        {/* Border on hover */}
+        <div className={`absolute inset-0 rounded-xl border-2 transition-all duration-300 pointer-events-none ${
+          isHovered ? "border-violet-500/40" : "border-white/[0.06]"
+        }`} />
+      </motion.div>
+    </Link>
   );
 }

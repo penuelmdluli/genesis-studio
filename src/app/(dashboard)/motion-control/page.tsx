@@ -155,35 +155,24 @@ export default function MotionControlPage() {
     hasEnoughCredits &&
     !isLoading;
 
-  // Upload file to R2 via presigned URL
+  // Upload file to R2 via server proxy (avoids CORS)
   const uploadFileToR2 = async (
     file: File,
     purpose: "video" | "image"
   ): Promise<string> => {
-    const presignRes = await fetch("/api/upload", {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("purpose", purpose);
+
+    const res = await fetch("/api/upload", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type,
-        purpose,
-      }),
+      body: formData,
     });
-    if (!presignRes.ok) {
-      const err = await presignRes.json();
-      throw new Error(err.error || "Failed to get upload URL");
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to upload file");
     }
-    const { uploadUrl, downloadUrl } = await presignRes.json();
-
-    const uploadRes = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-    if (!uploadRes.ok) {
-      throw new Error("Failed to upload file to storage");
-    }
-
+    const { downloadUrl } = await res.json();
     return downloadUrl;
   };
 

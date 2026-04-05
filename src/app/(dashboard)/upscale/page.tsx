@@ -168,26 +168,16 @@ export default function UpscalePage() {
       let videoUrl: string;
 
       if (videoFile) {
-        const presignRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: videoFile.name,
-            contentType: videoFile.type,
-            purpose: "video",
-          }),
-        });
+        const formData = new FormData();
+        formData.append("file", videoFile);
+        formData.append("purpose", "video");
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
 
-        if (!presignRes.ok) {
-          throw new Error("Failed to get upload URL");
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload video");
         }
 
-        const { uploadUrl, downloadUrl } = await presignRes.json();
-        await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": videoFile.type },
-          body: videoFile,
-        });
+        const { downloadUrl } = await uploadRes.json();
         videoUrl = downloadUrl;
       } else if (selectedGalleryVideo) {
         videoUrl = selectedGalleryVideo.url;

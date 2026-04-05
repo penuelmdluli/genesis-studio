@@ -165,22 +165,12 @@ export default function CaptionsPage() {
     // For file upload, we need to upload first
     if (inputMode === "upload" && videoFile) {
       try {
-        const presignRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: videoFile.name,
-            contentType: videoFile.type,
-            purpose: "video",
-          }),
-        });
-        if (!presignRes.ok) throw new Error("Upload failed");
-        const { uploadUrl, downloadUrl } = await presignRes.json();
-        await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": videoFile.type },
-          body: videoFile,
-        });
+        const formData = new FormData();
+        formData.append("file", videoFile);
+        formData.append("purpose", "video");
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!uploadRes.ok) throw new Error("Upload failed");
+        const { downloadUrl } = await uploadRes.json();
         targetUrl = downloadUrl;
       } catch {
         setError("Failed to upload video. Please try again.");

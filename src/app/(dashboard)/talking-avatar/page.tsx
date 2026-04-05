@@ -152,29 +152,15 @@ export default function TalkingAvatarPage() {
     file: File,
     purpose: "image" | "audio"
   ): Promise<string> => {
-    const presignRes = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type,
-        purpose,
-      }),
-    });
-    if (!presignRes.ok) {
-      const err = await presignRes.json();
-      throw new Error(err.error || "Failed to get upload URL");
-    }
-    const { uploadUrl, downloadUrl } = await presignRes.json();
-
-    const uploadRes = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("purpose", purpose);
+    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
     if (!uploadRes.ok) {
-      throw new Error("Failed to upload file to storage");
+      const err = await uploadRes.json();
+      throw new Error(err.error || "Failed to upload file");
     }
+    const { downloadUrl } = await uploadRes.json();
     return downloadUrl;
   };
 

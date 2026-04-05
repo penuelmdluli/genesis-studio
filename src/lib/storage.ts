@@ -149,6 +149,22 @@ export function audioStorageKey(userId: string, jobId: string): string {
   return `audio/${userId}/${jobId}.mp3`;
 }
 
+// Generic upload for any file type (used by server-side proxy upload)
+export async function uploadToR2(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  await R2.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+}
+
 export async function uploadAudio(
   key: string,
   body: Buffer,

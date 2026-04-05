@@ -179,22 +179,15 @@ export default function GeneratePage() {
       let inputImageUrl: string | undefined;
       if (form.inputImage && (form.type === "i2v" || form.type === "v2v")) {
         try {
-          const presignRes = await fetch("/api/upload", {
+          const formData = new FormData();
+          formData.append("file", form.inputImage);
+          formData.append("purpose", "image");
+          const uploadRes = await fetch("/api/upload", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              filename: form.inputImage.name,
-              contentType: form.inputImage.type,
-              purpose: "image",
-            }),
+            body: formData,
           });
-          if (presignRes.ok) {
-            const { uploadUrl, downloadUrl } = await presignRes.json();
-            await fetch(uploadUrl, {
-              method: "PUT",
-              headers: { "Content-Type": form.inputImage.type },
-              body: form.inputImage,
-            });
+          if (uploadRes.ok) {
+            const { downloadUrl } = await uploadRes.json();
             inputImageUrl = downloadUrl;
           }
         } catch {

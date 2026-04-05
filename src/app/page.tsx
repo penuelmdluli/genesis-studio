@@ -1053,7 +1053,7 @@ export default function LandingPage() {
                   <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3 pt-1">{plan.name}</h3>
                   <div className="mb-4">
                     <span className="text-3xl font-extrabold text-zinc-100">
-                      R{(plan.priceZAR ?? 0).toLocaleString()}
+                      R{(plan.priceZAR ?? 0).toLocaleString("en-US")}
                     </span>
                     <span className="text-sm text-zinc-500">/mo</span>
                     {plan.price > 0 && (

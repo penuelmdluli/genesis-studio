@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         "http://localhost:3000";
       const webhookUrl = `${appUrl}/api/webhooks/runpod`;
 
-      const runpodRes = await fetch(`${endpointUrl}/run`, {
+      const runpodRes = await fetch(`https://api.runpod.ai/v2/${endpointUrl}/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

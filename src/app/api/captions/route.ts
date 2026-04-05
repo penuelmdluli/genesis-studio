@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         throw new Error("RunPod API key not configured");
       }
 
-      const runpodRes = await fetch(`${captionsEndpoint}/run`, {
+      const runpodRes = await fetch(`https://api.runpod.ai/v2/${captionsEndpoint}/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

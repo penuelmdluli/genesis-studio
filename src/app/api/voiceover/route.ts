@@ -2,14 +2,45 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
-
-const RUNPOD_ENDPOINT = process.env.RUNPOD_ENDPOINT_VOICEOVER;
-const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
+import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { uploadAudio, audioStorageKey } from "@/lib/storage";
+import { randomUUID } from "crypto";
 
 const MIN_TEXT_LENGTH = 10;
 const MAX_TEXT_LENGTH = 5000;
 const CHARS_PER_30S = 150;
 const CREDITS_PER_30S = 3;
+
+// Map our voice IDs to Edge TTS voice names
+const VOICE_MAP: Record<string, string> = {
+  "voice-aria": "en-US-AriaNeural",
+  "voice-james": "en-US-GuyNeural",
+  "voice-luna": "en-US-JennyNeural",
+  "voice-alex": "en-US-ChristopherNeural",
+  "voice-sophia": "en-US-MichelleNeural",
+  "voice-marcus": "en-US-DavisNeural",
+  "voice-naledi": "en-ZA-LeahNeural",
+  "voice-thabo": "en-ZA-LukeNeural",
+  "voice-sakura": "ja-JP-NanamiNeural",
+  "voice-carlos": "es-ES-AlvaroNeural",
+  "voice-amelie": "fr-FR-DeniseNeural",
+  "voice-hans": "de-DE-ConradNeural",
+  // Edge TTS neural voice names (from Brain audio module)
+  "en-US-GuyNeural": "en-US-GuyNeural",
+  "en-US-JennyNeural": "en-US-JennyNeural",
+  "en-US-AriaNeural": "en-US-AriaNeural",
+  "en-US-DavisNeural": "en-US-DavisNeural",
+  "en-GB-RyanNeural": "en-GB-RyanNeural",
+  "en-GB-SoniaNeural": "en-GB-SoniaNeural",
+  "es-ES-AlvaroNeural": "es-ES-AlvaroNeural",
+  "es-ES-ElviraNeural": "es-ES-ElviraNeural",
+  "fr-FR-HenriNeural": "fr-FR-HenriNeural",
+  "fr-FR-DeniseNeural": "fr-FR-DeniseNeural",
+  "zu-ZA-ThandoNeural": "zu-ZA-ThandoNeural",
+  "zu-ZA-ThembaNeural": "zu-ZA-ThembaNeural",
+  "af-ZA-WillemNeural": "af-ZA-WillemNeural",
+  "af-ZA-AdriNeural": "af-ZA-AdriNeural",
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -86,74 +117,54 @@ export async function POST(req: NextRequest) {
       newBalance = result.newBalance;
     }
 
-    // --- Check if endpoint is configured ---
-    if (!RUNPOD_ENDPOINT) {
-      // Refund credits since we can't process
-      if (!ownerAccount) {
-        const refundedBalance = await refundCredits(
-          user.id,
-          creditCost,
-          "",
-          "Voiceover refund: endpoint not configured"
-        );
-        newBalance = refundedBalance;
-      }
-      return NextResponse.json(
-        { error: "AI Voiceover coming soon", newBalance },
-        { status: 503 }
-      );
-    }
-
-    // --- Submit to RunPod ---
+    // --- Generate with Edge TTS (free, no API key needed) ---
     try {
-      const runpodResponse = await fetch(`${RUNPOD_ENDPOINT}/run`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNPOD_API_KEY}`,
-        },
-        body: JSON.stringify({
-          input: {
-            text,
-            voice_id: voiceId,
-            speed: safeSpeed,
-            output_format: "mp3",
-            ...(language && { language }),
-          },
-        }),
+      const edgeVoice = VOICE_MAP[voiceId] || "en-US-GuyNeural";
+
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata(edgeVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+
+      // Adjust speech rate based on speed parameter
+      const ratePercent = Math.round((safeSpeed - 1.0) * 100);
+      const rateStr = ratePercent >= 0 ? `+${ratePercent}%` : `${ratePercent}%`;
+
+      const { audioStream } = tts.toStream(text, { rate: rateStr, pitch: "+0Hz" });
+
+      // Collect all audio chunks into a buffer
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        audioStream.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        audioStream.on("end", () => resolve());
+        audioStream.on("error", (err: Error) => reject(err));
+        audioStream.on("close", () => resolve());
       });
 
-      if (!runpodResponse.ok) {
-        const errText = await runpodResponse.text();
-        console.error("[voiceover] RunPod error:", runpodResponse.status, errText);
+      const audioBuffer = Buffer.concat(chunks);
 
-        // Refund on failure
-        if (!ownerAccount) {
-          const refundedBalance = await refundCredits(
-            user.id,
-            creditCost,
-            "",
-            "Voiceover refund: RunPod submission failed"
-          );
-          newBalance = refundedBalance;
-        }
-
-        return NextResponse.json(
-          { error: "Failed to start voiceover generation", newBalance },
-          { status: 502 }
-        );
+      if (audioBuffer.length === 0) {
+        throw new Error("Edge TTS returned empty audio");
       }
 
-      const runpodData = await runpodResponse.json();
+      // Upload to R2
+      const jobId = randomUUID();
+      const storageKey = audioStorageKey(user.id, jobId);
+      await uploadAudio(storageKey, audioBuffer);
+
+      const audioUrl = `/api/audio/${jobId}`;
 
       return NextResponse.json({
-        jobId: runpodData.id,
+        jobId,
+        audioUrl,
         estimatedDuration,
         creditsCost: creditCost,
         newBalance,
+        status: "completed",
+        voice: edgeVoice,
       });
-    } catch (runpodError) {
-      console.error("[voiceover] RunPod fetch error:", runpodError);
+    } catch (ttsError) {
+      console.error("[voiceover] Edge TTS error:", ttsError);
 
       // Refund on failure
       if (!ownerAccount) {
@@ -161,13 +172,13 @@ export async function POST(req: NextRequest) {
           user.id,
           creditCost,
           "",
-          "Voiceover refund: network error"
+          "Voiceover refund: Edge TTS generation failed"
         );
         newBalance = refundedBalance;
       }
 
       return NextResponse.json(
-        { error: "Failed to connect to voiceover service", newBalance },
+        { error: "Failed to generate voiceover. Please try again.", newBalance },
         { status: 502 }
       );
     }

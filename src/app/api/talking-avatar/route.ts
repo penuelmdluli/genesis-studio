@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const runpodResponse = await fetch(`${endpointUrl}/runsync`, {
+      const runpodResponse = await fetch(`https://api.runpod.ai/v2/${endpointUrl}/runsync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

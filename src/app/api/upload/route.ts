@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
-import { getSignedUploadUrl, getSignedDownloadUrl, uploadToR2 } from "@/lib/storage";
+import { createSupabaseAdmin } from "@/lib/supabase";
 
-// POST /api/upload — upload file via server proxy (avoids R2 CORS issues)
-// Accepts multipart form data with: file, purpose (image|video)
-// OR JSON with: filename, contentType, purpose (returns presigned URLs for legacy flow)
+// POST /api/upload — returns a signed upload URL for direct client-to-Supabase upload
+// Client uploads directly to Supabase Storage (no Vercel body size limit, no CORS issues)
 export async function POST(req: NextRequest) {
   try {
     const { userId: clerkId } = await auth();
@@ -18,51 +17,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const contentTypeHeader = req.headers.get("content-type") || "";
-
-    // --- Multipart upload (server proxy) ---
-    if (contentTypeHeader.includes("multipart/form-data")) {
-      const formData = await req.formData();
-      const file = formData.get("file") as File | null;
-      const purpose = (formData.get("purpose") as string) || "image";
-
-      if (!file) {
-        return NextResponse.json({ error: "No file provided" }, { status: 400 });
-      }
-
-      // Validate file type
-      const allowedTypes = [
-        "image/jpeg", "image/png", "image/webp",
-        "video/mp4", "video/webm", "video/quicktime",
-      ];
-      if (!allowedTypes.includes(file.type)) {
-        return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
-      }
-
-      // Validate file size (50MB for video, 10MB for image)
-      const maxSize = purpose === "video" ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        return NextResponse.json(
-          { error: `File too large. Max ${purpose === "video" ? "50MB" : "10MB"}.` },
-          { status: 400 }
-        );
-      }
-
-      const prefix = purpose === "video" ? "inputs/videos" : "inputs/images";
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const key = `${prefix}/${user.id}/${Date.now()}-${safeName}`;
-
-      // Upload to R2 server-side
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await uploadToR2(key, buffer, file.type);
-
-      // Get signed download URL for FAL/RunPod to fetch
-      const downloadUrl = await getSignedDownloadUrl(key, 86400);
-
-      return NextResponse.json({ downloadUrl, key });
-    }
-
-    // --- JSON (presigned URL flow, legacy fallback) ---
     const body = await req.json();
     const { filename, contentType, purpose } = body;
 
@@ -73,9 +27,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate file type
     const allowedTypes = [
       "image/jpeg", "image/png", "image/webp",
       "video/mp4", "video/webm", "video/quicktime",
+      "audio/mpeg", "audio/wav", "audio/mp3",
     ];
     if (!allowedTypes.includes(contentType)) {
       return NextResponse.json(
@@ -84,17 +40,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prefix = purpose === "video" ? "inputs/videos" : "inputs/images";
-    const key = `${prefix}/${user.id}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    // Build storage path
+    const ext = filename.split(".").pop() || "bin";
+    const prefix = purpose === "video" ? "videos" : purpose === "audio" ? "audio" : "images";
+    const path = `${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const uploadUrl = await getSignedUploadUrl(key, contentType, 600);
-    const downloadUrl = await getSignedDownloadUrl(key, 86400);
+    const supabase = createSupabaseAdmin();
 
-    return NextResponse.json({ uploadUrl, downloadUrl, key });
+    // Create a signed upload URL (client uploads directly to Supabase, bypasses RLS)
+    const { data: signedData, error: signedError } = await supabase.storage
+      .from("uploads")
+      .createSignedUploadUrl(path);
+
+    if (signedError || !signedData) {
+      console.error("Signed URL error:", signedError);
+      return NextResponse.json(
+        { error: "Failed to create upload URL" },
+        { status: 500 }
+      );
+    }
+
+    // Get the public URL for the file (FAL/RunPod will fetch from this)
+    const { data: publicData } = supabase.storage
+      .from("uploads")
+      .getPublicUrl(path);
+
+    return NextResponse.json({
+      uploadUrl: signedData.signedUrl,
+      token: signedData.token,
+      path,
+      publicUrl: publicData.publicUrl,
+    });
   } catch (error) {
-    console.error("Upload error:", error);
+    console.error("Upload presign error:", error);
     return NextResponse.json(
-      { error: "Failed to upload file" },
+      { error: "Failed to generate upload URL" },
       { status: 500 }
     );
   }

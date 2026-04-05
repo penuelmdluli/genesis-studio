@@ -35,172 +35,7 @@ import {
 } from "lucide-react";
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 
-// ============================================
-// VIDEO ASSETS — Royalty-free from Mixkit
-// ============================================
-
-const heroVideos = [
-  "https://assets.mixkit.co/videos/4880/4880-720.mp4",
-  "https://assets.mixkit.co/videos/44688/44688-720.mp4",
-  "https://assets.mixkit.co/videos/48107/48107-720.mp4",
-  "https://assets.mixkit.co/videos/34563/34563-720.mp4",
-  "https://assets.mixkit.co/videos/5016/5016-720.mp4",
-];
-
-const showcaseVideos: ExploreVideo[] = [
-  {
-    id: "showcase-1",
-    prompt: "Ocean waves crashing on a rocky coastline at sunset, cinematic 4K",
-    modelId: "wan-2.2",
-    videoUrl: "https://assets.mixkit.co/videos/4880/4880-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 5,
-    resolution: "1080p",
-    hasAudio: false,
-    type: "standard",
-    views: 3420,
-    likes: 287,
-    recreates: 64,
-    creatorName: "Genesis Team",
-    isFreeTier: true,
-    isFeatured: true,
-    tags: ["cinematic", "ocean", "sunset"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-2",
-    prompt: "Aerial view of a busy city avenue at night, neon lights, timelapse",
-    modelId: "kling-2.6",
-    videoUrl: "https://assets.mixkit.co/videos/44688/44688-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 5,
-    resolution: "1080p",
-    hasAudio: true,
-    type: "standard",
-    views: 2810,
-    likes: 195,
-    recreates: 42,
-    creatorName: "NightOwl",
-    isFreeTier: false,
-    isFeatured: false,
-    tags: ["city", "neon", "aerial"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-3",
-    prompt: "Ethereal light rays filtering through ancient forest trees, dreamlike",
-    modelId: "veo-3.1",
-    videoUrl: "https://assets.mixkit.co/videos/48107/48107-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 5,
-    resolution: "720p",
-    hasAudio: true,
-    type: "standard",
-    views: 1950,
-    likes: 163,
-    recreates: 38,
-    creatorName: "ForestWalker",
-    isFreeTier: false,
-    isFeatured: false,
-    tags: ["nature", "forest", "ethereal"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-4",
-    prompt: "Serene beach waves rolling onto golden sand, peaceful morning light",
-    modelId: "seedance-1.5",
-    videoUrl: "https://assets.mixkit.co/videos/5016/5016-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 3,
-    resolution: "720p",
-    hasAudio: false,
-    type: "standard",
-    views: 1280,
-    likes: 98,
-    recreates: 21,
-    creatorName: "BeachVibes",
-    isFreeTier: true,
-    isFeatured: false,
-    tags: ["beach", "waves", "peaceful"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-5",
-    prompt: "A dancer performing contemporary moves in a dimly lit studio, slow motion",
-    modelId: "kling-2.6",
-    videoUrl: "https://assets.mixkit.co/videos/2213/2213-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 6,
-    resolution: "1080p",
-    hasAudio: true,
-    type: "motion",
-    views: 4100,
-    likes: 340,
-    recreates: 89,
-    creatorName: "MotionArtist",
-    isFreeTier: false,
-    isFeatured: true,
-    tags: ["dance", "motion", "studio"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-6",
-    prompt: "Abstract digital particles swirling in cosmic space, vibrant colors",
-    modelId: "wan-2.2",
-    videoUrl: "https://assets.mixkit.co/videos/34563/34563-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 5,
-    resolution: "1080p",
-    hasAudio: false,
-    type: "standard",
-    views: 2200,
-    likes: 178,
-    recreates: 55,
-    creatorName: "CosmicVFX",
-    isFreeTier: true,
-    isFeatured: false,
-    tags: ["abstract", "particles", "cosmic"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-7",
-    prompt: "Close-up of a woman speaking with perfect lip sync, studio lighting",
-    modelId: "veo-3.1",
-    videoUrl: "https://assets.mixkit.co/videos/4880/4880-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 8,
-    resolution: "1080p",
-    hasAudio: true,
-    type: "standard",
-    views: 5600,
-    likes: 420,
-    recreates: 112,
-    creatorName: "AudioVision",
-    isFreeTier: false,
-    isFeatured: true,
-    tags: ["lip-sync", "audio", "portrait"],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "showcase-8",
-    prompt: "A robot discovering a flower in a post-apocalyptic cityscape, cinematic",
-    modelId: "kling-3.0",
-    videoUrl: "https://assets.mixkit.co/videos/44688/44688-720.mp4",
-    thumbnailUrl: undefined,
-    duration: 10,
-    resolution: "1080p",
-    hasAudio: true,
-    type: "brain",
-    views: 8900,
-    likes: 710,
-    recreates: 203,
-    creatorName: "BrainStudio",
-    isFreeTier: false,
-    isFeatured: true,
-    tags: ["brain-studio", "sci-fi", "cinematic"],
-    createdAt: new Date().toISOString(),
-  },
-];
+// No hardcoded videos — everything pulled from API/database
 
 // ============================================
 // FILTER TABS
@@ -278,6 +113,7 @@ export default function LandingPage() {
   // Hero crossfade
   const [heroIndex, setHeroIndex] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const [heroVideos, setHeroVideos] = useState<string[]>([]);
 
   // Community feed
   const [feedTab, setFeedTab] = useState<FeedTab>("trending");
@@ -288,13 +124,32 @@ export default function LandingPage() {
   const [shareVideo, setShareVideo] = useState<ExploreVideo | null>(null);
   const [recreateVideo, setRecreateVideo] = useState<ExploreVideo | null>(null);
 
+  // ---- Fetch hero videos from featured explore_videos ----
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/explore?tab=picks&limit=6");
+        if (res.ok) {
+          const data = await res.json();
+          const urls = (data.videos || [])
+            .map((v: ExploreVideo) => v.videoUrl)
+            .filter(Boolean);
+          if (urls.length > 0) setHeroVideos(urls);
+        }
+      } catch {
+        // No hero videos available yet
+      }
+    })();
+  }, []);
+
   // ---- Hero crossfade every 5s ----
   useEffect(() => {
+    if (heroVideos.length === 0) return;
     const interval = setInterval(() => {
       setHeroIndex((prev) => (prev + 1) % heroVideos.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [heroVideos.length]);
 
   // ---- Fetch community feed ----
   const fetchFeed = useCallback(async (tab: FeedTab) => {
@@ -306,13 +161,13 @@ export default function LandingPage() {
         if (data.videos && data.videos.length > 0) {
           setFeedVideos(data.videos);
         } else {
-          setFeedVideos(showcaseVideos);
+          setFeedVideos([]);
         }
       } else {
-        setFeedVideos(showcaseVideos);
+        setFeedVideos([]);
       }
     } catch {
-      setFeedVideos(showcaseVideos);
+      setFeedVideos([]);
     } finally {
       setFeedLoading(false);
     }
@@ -343,8 +198,8 @@ export default function LandingPage() {
           SECTION 1: HERO — Full-screen video bg
       ======================================== */}
       <section className="relative h-screen w-full overflow-hidden">
-        {/* Video layers for crossfade */}
-        {heroVideos.map((src, i) => (
+        {/* Video layers for crossfade — pulled from featured explore_videos */}
+        {heroVideos.length > 0 ? heroVideos.map((src, i) => (
           <video
             key={src}
             ref={(el) => { heroVideoRefs.current[i] = el; }}
@@ -356,7 +211,9 @@ export default function LandingPage() {
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1500 ease-in-out"
             style={{ opacity: i === heroIndex ? 1 : 0 }}
           />
-        ))}
+        )) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-[#0A0A0F] to-blue-900/30" />
+        )}
 
         {/* Dark gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-transparent" />
@@ -464,6 +321,16 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          ) : feedVideos.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-zinc-500 text-lg mb-4">Community feed is being built — check back soon!</p>
+              <Link href="/generate">
+                <Button variant="outline">
+                  <Sparkles className="w-4 h-4" />
+                  Create the first video
+                </Button>
+              </Link>
+            </div>
           ) : (
             <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {feedVideos.map((video) => (
@@ -479,15 +346,17 @@ export default function LandingPage() {
           )}
 
           {/* Explore all link */}
-          <MotionSection className="text-center mt-10">
-            <Link
-              href="/explore"
-              className="inline-flex items-center gap-2 text-violet-400 hover:text-violet-300 font-medium transition-colors"
-            >
-              Explore all 12,000+ videos
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </MotionSection>
+          {feedVideos.length > 0 && (
+            <MotionSection className="text-center mt-10">
+              <Link
+                href="/explore"
+                className="inline-flex items-center gap-2 text-violet-400 hover:text-violet-300 font-medium transition-colors"
+              >
+                Explore all videos
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </MotionSection>
+          )}
         </div>
       </section>
 

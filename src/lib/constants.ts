@@ -456,6 +456,8 @@ export const MOTION_CATEGORIES = [
   "Expression",
 ] as const;
 
+// Motion reference presets — real human motion videos from stock library.
+// These are used as pose/motion references for MimicMotion, not for display.
 export const MOTION_PRESETS: MotionPreset[] = [
   {
     id: "motion-dance-hiphop",

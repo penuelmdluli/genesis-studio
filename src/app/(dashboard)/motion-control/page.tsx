@@ -31,6 +31,7 @@ import {
   FUN_EFFECT_CATEGORIES,
   type FunEffect,
 } from "@/lib/motion-control";
+import { uploadFile } from "@/lib/upload-client";
 
 type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
@@ -155,26 +156,8 @@ export default function MotionControlPage() {
     hasEnoughCredits &&
     !isLoading;
 
-  // Upload file to R2 via server proxy (avoids CORS)
-  const uploadFileToR2 = async (
-    file: File,
-    purpose: "video" | "image"
-  ): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("purpose", purpose);
-
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Failed to upload file");
-    }
-    const { downloadUrl } = await res.json();
-    return downloadUrl;
-  };
+  const uploadFileToR2 = async (file: File, purpose: "video" | "image") =>
+    uploadFile(file, purpose);
 
   const handleGenerate = async () => {
     setError(null);

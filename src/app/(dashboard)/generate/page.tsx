@@ -26,6 +26,7 @@ import {
 import { estimateCreditCost } from "@/lib/utils";
 import { CreditUpsell, useUpsellContext } from "@/components/ui/credit-upsell";
 import { ModelId, GenerationType, VideoFormat } from "@/types";
+import { uploadFile } from "@/lib/upload-client";
 import {
   Sparkles,
   Zap,
@@ -179,19 +180,8 @@ export default function GeneratePage() {
       let inputImageUrl: string | undefined;
       if (form.inputImage && (form.type === "i2v" || form.type === "v2v")) {
         try {
-          const formData = new FormData();
-          formData.append("file", form.inputImage);
-          formData.append("purpose", "image");
-          const uploadRes = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-          });
-          if (uploadRes.ok) {
-            const { downloadUrl } = await uploadRes.json();
-            inputImageUrl = downloadUrl;
-          }
+          inputImageUrl = await uploadFile(form.inputImage, "image");
         } catch {
-          // If upload fails, continue without image
           console.error("Image upload failed, continuing without image");
         }
       }

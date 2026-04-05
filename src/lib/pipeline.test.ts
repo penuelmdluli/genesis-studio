@@ -28,9 +28,9 @@ describe("E2E Generation Pipeline", () => {
       expect(model.license).toBeTruthy();
     });
 
-    it("every model supports at least t2v or i2v", () => {
+    it("every model supports at least t2v, i2v, or motion", () => {
       for (const model of Object.values(AI_MODELS)) {
-        const hasBaseType = model.types.includes("t2v") || model.types.includes("i2v");
+        const hasBaseType = model.types.includes("t2v") || model.types.includes("i2v") || model.types.includes("motion");
         expect(hasBaseType).toBe(true);
       }
     });
@@ -241,17 +241,17 @@ describe("E2E Generation Pipeline", () => {
   });
 
   describe("Generation Type Coverage", () => {
-    const generationTypes: GenerationType[] = ["t2v", "i2v", "v2v"];
+    const generationTypes: GenerationType[] = ["t2v", "i2v", "v2v", "motion"];
 
     it.each(generationTypes)("at least one model supports '%s'", (type) => {
       const supporting = Object.values(AI_MODELS).filter((m) => m.types.includes(type));
       expect(supporting.length).toBeGreaterThan(0);
     });
 
-    it("motion type maps to i2v for processing", () => {
-      // Motion type should map to i2v — verify at least one i2v model exists
-      const i2vModels = Object.values(AI_MODELS).filter((m) => m.types.includes("i2v"));
-      expect(i2vModels.length).toBeGreaterThan(0);
+    it("MimicMotion model supports motion type natively", () => {
+      const motionModels = Object.values(AI_MODELS).filter((m) => m.types.includes("motion"));
+      expect(motionModels.length).toBeGreaterThan(0);
+      expect(motionModels[0].id).toBe("mimic-motion");
     });
   });
 

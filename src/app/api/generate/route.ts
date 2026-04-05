@@ -45,13 +45,24 @@ export async function POST(req: NextRequest) {
     if (!model) {
       return NextResponse.json({ error: "Invalid model" }, { status: 400 });
     }
-    // Motion control uses v2v/i2v-capable models under the hood
-    const effectiveType = body.type === "motion" ? "i2v" : body.type;
+    // Keep original type for model routing; use "i2v" for DB (constraint only allows t2v/i2v/v2v)
+    const effectiveType = body.type;
+    const dbType = body.type === "motion" ? "i2v" : body.type;
     if (!model.types.includes(effectiveType)) {
       return NextResponse.json(
         { error: `Model ${model.name} does not support ${body.type}` },
         { status: 400 }
       );
+    }
+
+    // Motion control requires both a reference video and a character image
+    if (body.type === "motion") {
+      if (!body.inputVideoUrl || !body.inputImageUrl) {
+        return NextResponse.json(
+          { error: "Motion control requires both a motion reference video and a character image" },
+          { status: 400 }
+        );
+      }
     }
 
     // Calculate credit cost
@@ -92,10 +103,10 @@ export async function POST(req: NextRequest) {
       ? BUILT_IN_AUDIO_TRACKS.find((t) => t.id === body.audioTrackId)
       : undefined;
 
-    // Create job record (use effectiveType for DB constraint compatibility)
+    // Create job record (use dbType for DB constraint compatibility — "motion" stored as "i2v")
     const job = await createJob({
       userId: user.id,
-      type: effectiveType,
+      type: dbType,
       modelId: body.modelId,
       prompt: body.prompt,
       negativePrompt: body.negativePrompt,

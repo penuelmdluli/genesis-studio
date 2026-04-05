@@ -2,15 +2,16 @@ import { describe, it, expect } from "vitest";
 import { AI_MODELS, PLANS, CREDIT_PACKS, RESOLUTIONS, DURATIONS, FPS_OPTIONS, MODEL_ACCESS } from "./constants";
 
 describe("AI_MODELS", () => {
-  it("has all 6 models defined", () => {
+  it("has all 7 models defined", () => {
     const modelIds = Object.keys(AI_MODELS);
-    expect(modelIds).toHaveLength(6);
+    expect(modelIds).toHaveLength(7);
     expect(modelIds).toContain("wan-2.2");
     expect(modelIds).toContain("hunyuan-video");
     expect(modelIds).toContain("ltx-video");
     expect(modelIds).toContain("wan-2.1-turbo");
     expect(modelIds).toContain("mochi-1");
     expect(modelIds).toContain("cogvideo-x");
+    expect(modelIds).toContain("mimic-motion");
   });
 
   it("each model has required fields", () => {
@@ -37,7 +38,7 @@ describe("AI_MODELS", () => {
   });
 
   it("generation types are valid", () => {
-    const validTypes = ["t2v", "i2v", "v2v"];
+    const validTypes = ["t2v", "i2v", "v2v", "motion"];
     for (const model of Object.values(AI_MODELS)) {
       for (const type of model.types) {
         expect(validTypes).toContain(type);
@@ -46,7 +47,7 @@ describe("AI_MODELS", () => {
   });
 
   it("tiers are valid", () => {
-    const validTiers = ["flagship", "workhorse", "speed", "turbo", "realism", "budget"];
+    const validTiers = ["flagship", "workhorse", "speed", "turbo", "realism", "budget", "motion"];
     for (const model of Object.values(AI_MODELS)) {
       expect(validTiers).toContain(model.tier);
     }
@@ -142,14 +143,14 @@ describe("FPS_OPTIONS", () => {
 });
 
 describe("MODEL_ACCESS", () => {
-  it("free plan has cogvideo-x, wan-2.2, and mochi-1", () => {
-    expect(MODEL_ACCESS.free).toEqual(["cogvideo-x", "wan-2.2", "mochi-1"]);
+  it("free plan has cogvideo-x, wan-2.2, mochi-1, and mimic-motion", () => {
+    expect(MODEL_ACCESS.free).toEqual(["cogvideo-x", "wan-2.2", "mochi-1", "mimic-motion"]);
   });
 
-  it("creator, pro, studio have all 6 models", () => {
-    expect(MODEL_ACCESS.creator).toHaveLength(6);
-    expect(MODEL_ACCESS.pro).toHaveLength(6);
-    expect(MODEL_ACCESS.studio).toHaveLength(6);
+  it("creator, pro, studio have all 7 models", () => {
+    expect(MODEL_ACCESS.creator).toHaveLength(7);
+    expect(MODEL_ACCESS.pro).toHaveLength(7);
+    expect(MODEL_ACCESS.studio).toHaveLength(7);
   });
 
   it("all model IDs in access lists are valid", () => {

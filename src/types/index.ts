@@ -9,7 +9,8 @@ export type ModelId =
   | "ltx-video"
   | "wan-2.1-turbo"
   | "mochi-1"
-  | "cogvideo-x";
+  | "cogvideo-x"
+  | "mimic-motion";
 
 export type ModelTier =
   | "flagship"
@@ -17,7 +18,8 @@ export type ModelTier =
   | "speed"
   | "turbo"
   | "realism"
-  | "budget";
+  | "budget"
+  | "motion";
 
 export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
 

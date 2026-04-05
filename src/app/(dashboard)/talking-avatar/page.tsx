@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,11 +14,13 @@ import {
   Mic,
   Zap,
   Play,
+  Square,
   Image as ImageIcon,
   X,
   Lock,
   Globe,
   Clock,
+  Loader2,
 } from "lucide-react";
 
 type InputMode = "script" | "audio";
@@ -67,6 +69,34 @@ export default function TalkingAvatarPage() {
   const faceInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const generateLockRef = useRef(false);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
+
+  const handlePreviewVoice = useCallback((vid: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (previewingVoice === vid && previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+      setPreviewingVoice(null);
+      return;
+    }
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+    setLoadingPreview(vid);
+    const audio = new Audio(`/api/voiceover/preview?voiceId=${vid}`);
+    previewAudioRef.current = audio;
+    audio.oncanplaythrough = () => {
+      setLoadingPreview(null);
+      setPreviewingVoice(vid);
+      audio.play();
+    };
+    audio.onended = () => setPreviewingVoice(null);
+    audio.onerror = () => { setLoadingPreview(null); setPreviewingVoice(null); };
+    audio.load();
+  }, [previewingVoice]);
 
   const isLoading = !user;
   const userPlan = user?.plan || "free";
@@ -392,15 +422,34 @@ export default function TalkingAvatarPage() {
                         <button
                           key={voice.id}
                           onClick={() => setVoiceId(voice.id)}
-                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                             voiceId === voice.id
                               ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
                               : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
                           }`}
                         >
-                          <span>{voice.name}</span>
-                          <span className="ml-1 text-[10px] text-zinc-600">
-                            {voice.gender === "female" ? "F" : "M"} / {voice.language}
+                          <span>
+                            <span>{voice.name}</span>
+                            <span className="ml-1 text-[10px] text-zinc-600">
+                              {voice.gender === "female" ? "F" : "M"} / {voice.language}
+                            </span>
+                          </span>
+                          <span
+                            onClick={(e) => handlePreviewVoice(voice.id, e)}
+                            className={`ml-1 flex h-5 w-5 items-center justify-center rounded-full transition-all ${
+                              previewingVoice === voice.id
+                                ? "bg-violet-500 text-white"
+                                : "bg-zinc-700/50 text-zinc-400 hover:bg-violet-500/30 hover:text-violet-300"
+                            }`}
+                            title={previewingVoice === voice.id ? "Stop" : "Preview"}
+                          >
+                            {loadingPreview === voice.id ? (
+                              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                            ) : previewingVoice === voice.id ? (
+                              <Square className="h-2 w-2" />
+                            ) : (
+                              <Play className="h-2.5 w-2.5 ml-px" />
+                            )}
                           </span>
                         </button>
                       ))}

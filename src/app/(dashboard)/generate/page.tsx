@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +42,10 @@ import {
   Monitor,
   Music,
   Volume2,
+  Square,
   X,
   Info,
+  Pause,
 } from "lucide-react";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
@@ -61,6 +63,29 @@ export default function GeneratePage() {
   const [error, setError] = useState<string | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string | null>(null);
   const [audioGenreFilter, setAudioGenreFilter] = useState<string>("All");
+  const musicPreviewRef = useRef<HTMLAudioElement | null>(null);
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+
+  const handlePreviewTrack = useCallback((trackId: string, trackUrl: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playingTrackId === trackId && musicPreviewRef.current) {
+      musicPreviewRef.current.pause();
+      musicPreviewRef.current.currentTime = 0;
+      setPlayingTrackId(null);
+      return;
+    }
+    if (musicPreviewRef.current) {
+      musicPreviewRef.current.pause();
+      musicPreviewRef.current.currentTime = 0;
+    }
+    const audio = new Audio(trackUrl);
+    musicPreviewRef.current = audio;
+    setPlayingTrackId(trackId);
+    audio.play();
+    audio.onended = () => setPlayingTrackId(null);
+    audio.onerror = () => setPlayingTrackId(null);
+  }, [playingTrackId]);
+
   const isLoading = !user;
   const isReel = form.videoFormat === "reel";
   const upsellContext = useUpsellContext();
@@ -579,11 +604,21 @@ export default function GeneratePage() {
                       }`}
                     >
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? "bg-violet-500/20" : "bg-white/[0.04]"
+                        onClick={(e) => handlePreviewTrack(track.id, track.url, e)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+                          playingTrackId === track.id
+                            ? "bg-violet-500 text-white"
+                            : isSelected
+                              ? "bg-violet-500/20 hover:bg-violet-500/40"
+                              : "bg-white/[0.04] hover:bg-white/[0.1]"
                         }`}
+                        title={playingTrackId === track.id ? "Stop" : "Preview"}
                       >
-                        <Volume2 className={`w-4 h-4 ${isSelected ? "text-violet-400" : "text-zinc-600"}`} />
+                        {playingTrackId === track.id ? (
+                          <Square className={`w-3 h-3 text-white`} />
+                        ) : (
+                          <Play className={`w-4 h-4 ml-0.5 ${isSelected ? "text-violet-400" : "text-zinc-600"}`} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-300"}`}>

@@ -22,6 +22,7 @@ export const MODEL_GPU_MAP: Record<string, string> = {
   "wan-2.1-turbo": "RTX_4090",
   "wan-2.2": "L40S",
   "mochi-1": "A6000",
+  "mimic-motion": "RTX_4090",
 };
 
 // Credit value in USD (based on Creator plan: 500 credits / $15)

@@ -224,4 +224,64 @@ describe("buildRunPodInput", () => {
 
     expect(input.num_frames).toBe(49);
   });
+
+  // --- MimicMotion: ComfyUI workflow format ---
+  it("builds mimic-motion input as ComfyUI workflow with motion transfer nodes", () => {
+    const input = buildRunPodInput({
+      modelId: "mimic-motion",
+      type: "motion",
+      prompt: "Dance motion transfer",
+      inputVideoUrl: "https://example.com/dance.mp4",
+      inputImageUrl: "https://example.com/character.jpg",
+      resolution: "720p",
+      duration: 5,
+      fps: 24,
+      numInferenceSteps: 25,
+      guidanceScale: 2.5,
+    });
+
+    expect(input.prompt).toBeDefined();
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+
+    // LoadImage node for character reference
+    expect(wf["1"].class_type).toBe("LoadImage");
+    expect(wf["1"].inputs.image).toBe("https://example.com/character.jpg");
+
+    // VHS_LoadVideo for motion reference
+    expect(wf["2"].class_type).toBe("VHS_LoadVideo");
+    expect(wf["2"].inputs.video).toBe("https://example.com/dance.mp4");
+
+    // DWPose for pose extraction
+    expect(wf["3"].class_type).toBe("DWPose");
+
+    // MimicMotionSampler with correct params
+    expect(wf["4"].class_type).toBe("MimicMotionSampler");
+    expect(wf["4"].inputs.width).toBe(1280);
+    expect(wf["4"].inputs.height).toBe(720);
+    expect(wf["4"].inputs.num_frames).toBe(120);
+    expect(wf["4"].inputs.num_inference_steps).toBe(25);
+    expect(wf["4"].inputs.guidance_scale).toBe(2.5);
+    expect(wf["4"].inputs.frames_overlap).toBe(6);
+    expect(wf["4"].inputs.seed).toBeDefined();
+
+    // VHS_VideoCombine output
+    expect(wf["5"].class_type).toBe("VHS_VideoCombine");
+  });
+
+  it("mimic-motion caps inference steps at 25", () => {
+    const input = buildRunPodInput({
+      modelId: "mimic-motion",
+      type: "motion",
+      prompt: "Test",
+      inputVideoUrl: "https://example.com/video.mp4",
+      inputImageUrl: "https://example.com/image.jpg",
+      resolution: "720p",
+      duration: 5,
+      fps: 24,
+      numInferenceSteps: 50,
+    });
+
+    const wf = input.prompt as Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+    expect(wf["4"].inputs.num_inference_steps).toBe(25);
+  });
 });

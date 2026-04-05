@@ -15,7 +15,6 @@ import {
   AI_MODELS,
   RESOLUTIONS,
   FPS_OPTIONS,
-  MODEL_ACCESS,
   MOTION_PRESETS,
   MOTION_CATEGORIES,
 } from "@/lib/constants";
@@ -79,12 +78,8 @@ export default function MotionControlPage() {
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   const isLoading = !user;
-  const userPlan = user?.plan || "free";
-  const availableModels = (MODEL_ACCESS[userPlan] || MODEL_ACCESS.free).filter((id) => {
-    const model = AI_MODELS[id];
-    return model && (model.types.includes("v2v") || model.types.includes("i2v"));
-  });
-  const modelId = availableModels[0] || "wan-2.2";
+  // Motion control always uses MimicMotion — the only model that truly supports motion transfer
+  const modelId = "mimic-motion" as const;
   const currentModel = AI_MODELS[modelId];
   const creditCost = estimateCreditCost(modelId, resolution, duration, false);
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;

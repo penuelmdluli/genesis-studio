@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
-import { Mic, Play, Download, Zap } from "lucide-react";
+import { Mic, Play, Square, Download, Zap, Loader2 } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "\u{1F1FA}\u{1F1F8}",
@@ -47,6 +47,43 @@ export default function VoiceoverPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const generateLockRef = useRef(false);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
+
+  const handlePreviewVoice = useCallback((voiceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // If already playing this voice, stop it
+    if (previewingVoice === voiceId && previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+      setPreviewingVoice(null);
+      return;
+    }
+
+    // Stop any current preview
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+
+    setLoadingPreview(voiceId);
+    const audio = new Audio(`/api/voiceover/preview?voiceId=${voiceId}`);
+    previewAudioRef.current = audio;
+
+    audio.oncanplaythrough = () => {
+      setLoadingPreview(null);
+      setPreviewingVoice(voiceId);
+      audio.play();
+    };
+    audio.onended = () => setPreviewingVoice(null);
+    audio.onerror = () => {
+      setLoadingPreview(null);
+      setPreviewingVoice(null);
+    };
+    audio.load();
+  }, [previewingVoice]);
 
   const isLoading = !user;
   const charCount = text.length;
@@ -198,19 +235,38 @@ export default function VoiceoverPage() {
                           {LANGUAGE_FLAGS[voice.language] ?? "\u{1F30D}"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                            voice.gender === "female"
-                              ? "bg-pink-500/20 text-pink-400"
-                              : "bg-sky-500/20 text-sky-400"
+                      <div className="flex w-full items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                              voice.gender === "female"
+                                ? "bg-pink-500/20 text-pink-400"
+                                : "bg-sky-500/20 text-sky-400"
+                            }`}
+                          >
+                            {voice.gender === "female" ? "F" : "M"}
+                          </span>
+                          <span className="text-xs text-zinc-500">
+                            {voice.language.toUpperCase()}
+                          </span>
+                        </div>
+                        <button
+                          onClick={(e) => handlePreviewVoice(voice.id, e)}
+                          className={`flex h-7 w-7 items-center justify-center rounded-full transition-all ${
+                            previewingVoice === voice.id
+                              ? "bg-violet-500 text-white"
+                              : "bg-zinc-700/50 text-zinc-400 hover:bg-violet-500/30 hover:text-violet-300"
                           }`}
+                          title={previewingVoice === voice.id ? "Stop preview" : "Preview voice"}
                         >
-                          {voice.gender === "female" ? "F" : "M"}
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          {voice.language.toUpperCase()}
-                        </span>
+                          {loadingPreview === voice.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : previewingVoice === voice.id ? (
+                            <Square className="h-3 w-3" />
+                          ) : (
+                            <Play className="h-3.5 w-3.5 ml-0.5" />
+                          )}
+                        </button>
                       </div>
                     </button>
                   );

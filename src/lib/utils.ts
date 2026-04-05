@@ -71,6 +71,7 @@ export function estimateCreditCost(
     "wan-2.1-turbo": { "480p": 10, "720p": 20 },
     "mochi-1": { "480p": 20, "720p": 35, "1080p": 70 },
     "cogvideo-x": { "480p": 3 },
+    "mimic-motion": { "480p": 15, "720p": 30 },
   };
 
   const modelCosts = baseCosts[modelId];

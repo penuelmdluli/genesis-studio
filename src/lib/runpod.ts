@@ -14,6 +14,7 @@ const ENDPOINT_MAP: Record<ModelId, string> = {
   "wan-2.1-turbo": process.env.RUNPOD_ENDPOINT_WAN21_TURBO || "",
   "mochi-1": process.env.RUNPOD_ENDPOINT_MOCHI || "",
   "cogvideo-x": process.env.RUNPOD_ENDPOINT_COGVIDEO || "",
+  "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
 };
 
 interface RunPodRunResponse {
@@ -385,6 +386,63 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
         guidance_scale: guidance,
         fps: params.fps,
         seed: params.seed ?? Math.floor(Math.random() * 2147483647),
+      };
+
+    case "mimic-motion":
+      // MimicMotion — EngUI ComfyUI worker (wlsdml1114/engui_mimicmotion)
+      // Extracts pose from reference video via DWPose, applies to character image using SVD
+      return {
+        prompt: {
+          "1": {
+            class_type: "LoadImage",
+            inputs: {
+              image: params.inputImageUrl,  // Character reference image (appearance)
+            },
+          },
+          "2": {
+            class_type: "VHS_LoadVideo",
+            inputs: {
+              video: params.inputVideoUrl,  // Motion reference video (pose source)
+              force_rate: params.fps,
+              force_size: "Disabled",
+            },
+          },
+          "3": {
+            class_type: "DWPose",
+            inputs: {
+              images: ["2", 0],  // Extract pose from motion video
+            },
+          },
+          "4": {
+            class_type: "MimicMotionSampler",
+            inputs: {
+              ref_image: ["1", 0],       // Character appearance
+              pose_images: ["3", 0],     // Extracted pose sequence
+              width,
+              height,
+              num_frames: numFrames,
+              frames_overlap: 6,
+              num_inference_steps: Math.min(steps, 25),
+              guidance_scale: guidance,
+              noise_aug_strength: 0.0625,
+              sample_stride: 2,
+              fps: params.fps,
+              seed: params.seed ?? Math.floor(Math.random() * 2147483647),
+            },
+          },
+          "5": {
+            class_type: "VHS_VideoCombine",
+            inputs: {
+              images: ["4", 0],
+              frame_rate: params.fps,
+              loop_count: 0,
+              filename_prefix: "genesis_mimicmotion",
+              format: "video/h264-mp4",
+              pingpong: false,
+              save_output: true,
+            },
+          },
+        },
       };
 
     default:

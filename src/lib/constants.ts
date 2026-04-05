@@ -85,6 +85,19 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     license: "Apache 2.0",
     comingSoon: true,
   },
+  "mimic-motion": {
+    id: "mimic-motion",
+    name: "MimicMotion",
+    tier: "motion",
+    types: ["motion"],
+    description:
+      "Motion transfer — extracts pose from a reference video and applies it to your character image.",
+    maxResolution: "720p",
+    avgGenerationTime: 120,
+    creditCost: { "480p": 15, "720p": 30 },
+    gpuRequirement: "24GB+ (RTX 4090/A6000)",
+    license: "Apache 2.0",
+  },
 };
 
 // --- Pricing Plans ---
@@ -500,7 +513,7 @@ export const MOTION_PRESETS: MotionPreset[] = [
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {
-  free: ["cogvideo-x", "wan-2.2", "mochi-1"],
+  free: ["cogvideo-x", "wan-2.2", "mochi-1", "mimic-motion"],
   creator: [
     "cogvideo-x",
     "ltx-video",
@@ -508,6 +521,7 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "wan-2.1-turbo",
     "wan-2.2",
     "mochi-1",
+    "mimic-motion",
   ],
   pro: [
     "cogvideo-x",
@@ -516,6 +530,7 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "wan-2.1-turbo",
     "wan-2.2",
     "mochi-1",
+    "mimic-motion",
   ],
   studio: [
     "cogvideo-x",
@@ -524,6 +539,7 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "wan-2.1-turbo",
     "wan-2.2",
     "mochi-1",
+    "mimic-motion",
   ],
 };
 

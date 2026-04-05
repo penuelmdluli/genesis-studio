@@ -184,9 +184,12 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
   const guidance = params.guidanceScale ?? 7.5;
 
   switch (params.modelId) {
-    case "wan-2.2":
+    case "wan-2.2": {
       // RunPod Hub public endpoints: wan-2-2-t2v-720 and wan-2-2-i2v-720-lora
-      // These are pre-built, always-warm endpoints with documented input formats
+      // Hub constraints: size must be "1280*720" or "720*1280", duration must be 5 or 8
+      const hubSize = params.aspectRatio === "portrait" ? "720*1280" : "1280*720";
+      const hubDuration = params.duration >= 7 ? 8 : 5;
+
       if (params.type === "i2v" && params.inputImageUrl) {
         // Image-to-video: wan-2-2-i2v-720-lora endpoint
         return {
@@ -194,7 +197,7 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
           image: params.inputImageUrl,
           high_noise_loras: [],
           low_noise_loras: [],
-          duration: params.duration,
+          duration: hubDuration,
           seed: params.seed ?? -1,
           enable_safety_checker: false,
         };
@@ -205,13 +208,14 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
         negative_prompt: params.negativePrompt || "blurry, low quality, distorted, watermark",
         num_inference_steps: params.isDraft ? 15 : steps,
         guidance: guidance,
-        size: `${width}*${height}`,
-        duration: params.duration,
+        size: hubSize,
+        duration: hubDuration,
         flow_shift: 5,
         seed: params.seed ?? -1,
         enable_prompt_optimization: true,
         enable_safety_checker: false,
       };
+    }
 
     case "mochi-1":
       // Mochi Hub template uses positive_prompt / negative_prompt

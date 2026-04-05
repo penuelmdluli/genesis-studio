@@ -80,9 +80,9 @@ export async function GET(
               const videoBuffer = Buffer.from(output.video, "base64");
               await uploadVideo(vKey, videoBuffer);
             }
-            // Handle URL-based video
-            else if (output.video_url || (output.video && output.video.startsWith("http"))) {
-              const videoUrl = output.video_url || output.video;
+            // Handle URL-based video (Hub uses output.result, others use output.video_url)
+            else if (output.result || output.video_url || (output.video && output.video.startsWith("http"))) {
+              const videoUrl = output.result || output.video_url || output.video;
               const videoRes = await fetch(videoUrl);
               if (!videoRes.ok) {
                 throw new Error(`Failed to download video: ${videoRes.status}`);

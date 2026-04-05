@@ -41,10 +41,10 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   // --- CREATE ---
-  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "HOT" },
+  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "NEW" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "NEW" },
-  { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create" },
-  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "HOT" },
+  { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
+  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "NEW" },
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
   // --- AUDIO ---
@@ -190,14 +190,18 @@ export function Sidebar() {
                     <span className="truncate flex-1">{item.label}</span>
                   )}
                   {(sidebarOpen || mobileMenuOpen) && item.badge && (
-                    <span className={cn(
-                      "px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none",
-                      item.badge === "HOT"
-                        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white"
-                        : "bg-gradient-to-r from-violet-500 to-cyan-500 text-white"
-                    )}>
-                      {item.badge}
-                    </span>
+                    item.badge === "HOT" ? (
+                      <span className="relative flex items-center">
+                        <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
+                        <span className="relative px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full leading-none bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/30 animate-pulse">
+                          🔥 HOT
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none bg-gradient-to-r from-violet-500 to-cyan-500 text-white">
+                        {item.badge}
+                      </span>
+                    )
                   )}
                 </Link>
               </div>

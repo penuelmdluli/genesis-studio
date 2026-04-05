@@ -259,3 +259,48 @@ export function checkPlanLimits(
   }
   return { allowed: true };
 }
+
+/**
+ * Storage limits per plan tier
+ */
+export const STORAGE_LIMITS = {
+  free: {
+    maxVideos: 10,
+    retentionDays: 30,
+    maxFileSizeBytes: 50_000_000, // 50MB
+  },
+  creator: {
+    maxVideos: 100,
+    retentionDays: 180,
+    maxFileSizeBytes: 100_000_000, // 100MB
+  },
+  pro: {
+    maxVideos: 500,
+    retentionDays: 365,
+    maxFileSizeBytes: 200_000_000, // 200MB
+  },
+  studio: {
+    maxVideos: -1, // Unlimited
+    retentionDays: -1, // Forever
+    maxFileSizeBytes: 500_000_000, // 500MB
+  },
+} as const;
+
+/**
+ * Check if user can store another video based on their plan
+ */
+export function checkStorageLimits(
+  plan: string,
+  currentVideoCount: number
+): { allowed: boolean; reason?: string } {
+  const limits = STORAGE_LIMITS[plan as keyof typeof STORAGE_LIMITS] || STORAGE_LIMITS.free;
+
+  if (limits.maxVideos !== -1 && currentVideoCount >= limits.maxVideos) {
+    return {
+      allowed: false,
+      reason: `Storage limit reached (${limits.maxVideos} videos on ${plan} plan). Delete old videos or upgrade.`,
+    };
+  }
+
+  return { allowed: true };
+}

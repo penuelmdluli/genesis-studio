@@ -41,6 +41,7 @@ interface ExploreVideoCardProps {
   onRecreate?: (video: ExploreVideo) => void;
   onLike?: (video: ExploreVideo) => void;
   onShare?: (video: ExploreVideo) => void;
+  onClick?: (video: ExploreVideo) => void;
   className?: string;
 }
 
@@ -72,6 +73,7 @@ export function ExploreVideoCard({
   onRecreate,
   onLike,
   onShare,
+  onClick,
   className,
 }: ExploreVideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -120,6 +122,10 @@ export function ExploreVideoCard({
     onRecreate?.(video);
   }, [onRecreate, video]);
 
+  const handleClick = useCallback(() => {
+    onClick?.(video);
+  }, [onClick, video]);
+
   const modelLabel = MODEL_LABELS[video.modelId] || video.modelId;
 
   const typeBadge = (() => {
@@ -138,6 +144,7 @@ export function ExploreVideoCard({
           "transition-all duration-300 ease-out",
           isHovered && "scale-[1.03] shadow-[0_0_30px_-5px_rgba(124,58,237,0.3)]"
         )}
+        onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -207,10 +214,16 @@ export function ExploreVideoCard({
 
           {/* Bottom overlay content */}
           <div className="absolute inset-x-0 bottom-0 p-3 z-10">
-            {/* Prompt text */}
-            <p className="text-sm text-white/90 font-medium line-clamp-2 leading-snug mb-2 drop-shadow-lg">
-              {video.prompt}
+            {/* Prompt text with typing cursor */}
+            <p className="text-sm text-white/90 font-medium line-clamp-2 leading-snug mb-1 drop-shadow-lg italic">
+              &ldquo;{video.prompt}&rdquo;
             </p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-purple-400 text-[10px] font-medium">
+                Prompt
+              </span>
+              <span className="w-1 h-3 bg-purple-400 animate-pulse rounded-sm" />
+            </div>
 
             {/* Stats row */}
             <div className="flex items-center gap-3 text-[11px] text-white/60">

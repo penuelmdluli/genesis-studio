@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,17 +9,27 @@ import { Modal } from "@/components/ui/modal";
 import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink } from "lucide-react";
+import { STORAGE_LIMITS } from "@/lib/profitability";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useStore();
   const { toast } = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [videoCount, setVideoCount] = useState(0);
   const [notifications, setNotifications] = useState({
     generationComplete: true,
     lowCredits: true,
     productUpdates: true,
   });
+
+  // Fetch video count for storage display
+  useEffect(() => {
+    fetch("/api/videos")
+      .then((r) => r.ok ? r.json() : { videos: [] })
+      .then((data) => setVideoCount(data.videos?.length || 0))
+      .catch(() => {});
+  }, []);
 
   const handleManageBilling = async () => {
     try {
@@ -111,6 +121,65 @@ export default function SettingsPage() {
               {user?.creditBalance?.toLocaleString() || 50} credits
             </span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Storage Usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center">
+              <HardDrive className="w-3.5 h-3.5 text-cyan-400" />
+            </div>
+            Storage
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const plan = (user?.plan || "free") as keyof typeof STORAGE_LIMITS;
+            const limits = STORAGE_LIMITS[plan] || STORAGE_LIMITS.free;
+            const isUnlimited = limits.maxVideos === -1;
+            const pct = isUnlimited ? 0 : Math.min(100, Math.round((videoCount / limits.maxVideos) * 100));
+            const isNearLimit = !isUnlimited && pct >= 80;
+
+            return (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-400">Videos stored</span>
+                  <span className={`font-bold ${isNearLimit ? "text-amber-400" : "text-cyan-300"}`}>
+                    {videoCount} {isUnlimited ? "videos" : `/ ${limits.maxVideos}`}
+                  </span>
+                </div>
+
+                {!isUnlimited && (
+                  <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isNearLimit ? "bg-amber-500" : "bg-cyan-500"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span>
+                    {isUnlimited
+                      ? "Unlimited storage on Studio plan"
+                      : `${limits.retentionDays} day retention on ${plan} plan`}
+                  </span>
+                  {!isUnlimited && plan !== "studio" && (
+                    <a
+                      href="/pricing"
+                      className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors"
+                    >
+                      Upgrade for more <ArrowUpRight className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
 

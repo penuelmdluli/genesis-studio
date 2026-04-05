@@ -10,6 +10,7 @@ import {
 } from "@/components/explore/video-card";
 import { ShareModal } from "@/components/explore/share-modal";
 import { RecreateModal } from "@/components/explore/recreate-modal";
+import { VideoViewerModal } from "@/components/explore/video-viewer-modal";
 import {
   Flame,
   Sparkles,
@@ -87,6 +88,7 @@ export default function ExplorePage() {
   const [selectedVideo, setSelectedVideo] = useState<ExploreVideo | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [recreateOpen, setRecreateOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   // Refs
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -210,6 +212,11 @@ export default function ExplorePage() {
   const handleRecreate = useCallback((video: ExploreVideo) => {
     setSelectedVideo(video);
     setRecreateOpen(true);
+  }, []);
+
+  const handleVideoClick = useCallback((video: ExploreVideo) => {
+    setSelectedVideo(video);
+    setViewerOpen(true);
   }, []);
 
   const handleTabChange = useCallback((tabId: string) => {
@@ -349,6 +356,7 @@ export default function ExplorePage() {
                 onLike={handleLike}
                 onShare={handleShare}
                 onRecreate={handleRecreate}
+                onClick={handleVideoClick}
               />
             ))}
           </div>
@@ -375,6 +383,13 @@ export default function ExplorePage() {
       {/* ========== Modals ========== */}
       {selectedVideo && (
         <>
+          <VideoViewerModal
+            isOpen={viewerOpen}
+            onClose={() => setViewerOpen(false)}
+            video={selectedVideo}
+            onLike={handleLike}
+            onShare={handleShare}
+          />
           <ShareModal
             isOpen={shareOpen}
             onClose={() => setShareOpen(false)}

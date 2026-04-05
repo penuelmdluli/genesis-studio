@@ -7,11 +7,13 @@ import {
   isProfitable,
   calculateBreakEven,
   checkPlanLimits,
+  checkStorageLimits,
   CREDIT_VALUE_USD,
   GPU_RATES,
   MODEL_GPU_MAP,
   FIXED_COSTS_MONTHLY,
   PLAN_LIMITS,
+  STORAGE_LIMITS,
   VAT_RATE,
   PAYMENT_PROCESSOR_FEE,
   NET_REVENUE_MULTIPLIER,
@@ -199,6 +201,50 @@ describe("profitability", () => {
         .toBeGreaterThan(PLAN_LIMITS.creator.maxGenerationsPerDay);
       expect(PLAN_LIMITS.studio.maxGenerationsPerDay)
         .toBeGreaterThan(PLAN_LIMITS.pro.maxGenerationsPerDay);
+    });
+  });
+
+  describe("STORAGE_LIMITS", () => {
+    it("free has strictest storage limits", () => {
+      expect(STORAGE_LIMITS.free.maxVideos).toBe(10);
+      expect(STORAGE_LIMITS.free.retentionDays).toBe(30);
+    });
+
+    it("studio has unlimited storage", () => {
+      expect(STORAGE_LIMITS.studio.maxVideos).toBe(-1);
+      expect(STORAGE_LIMITS.studio.retentionDays).toBe(-1);
+    });
+
+    it("file size limits increase with plan tier", () => {
+      expect(STORAGE_LIMITS.creator.maxFileSizeBytes)
+        .toBeGreaterThan(STORAGE_LIMITS.free.maxFileSizeBytes);
+      expect(STORAGE_LIMITS.pro.maxFileSizeBytes)
+        .toBeGreaterThan(STORAGE_LIMITS.creator.maxFileSizeBytes);
+      expect(STORAGE_LIMITS.studio.maxFileSizeBytes)
+        .toBeGreaterThan(STORAGE_LIMITS.pro.maxFileSizeBytes);
+    });
+  });
+
+  describe("checkStorageLimits", () => {
+    it("allows storage when under limit", () => {
+      const result = checkStorageLimits("free", 5);
+      expect(result.allowed).toBe(true);
+    });
+
+    it("blocks storage at limit", () => {
+      const result = checkStorageLimits("free", 10);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain("Storage limit reached");
+    });
+
+    it("allows unlimited storage for studio", () => {
+      const result = checkStorageLimits("studio", 10000);
+      expect(result.allowed).toBe(true);
+    });
+
+    it("uses free limits for unknown plans", () => {
+      const result = checkStorageLimits("unknown", 10);
+      expect(result.allowed).toBe(false);
     });
   });
 });

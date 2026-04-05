@@ -11,6 +11,7 @@ import {
 } from "@/components/explore/video-card";
 import { ShareModal } from "@/components/explore/share-modal";
 import { RecreateModal } from "@/components/explore/recreate-modal";
+import { VideoViewerModal } from "@/components/explore/video-viewer-modal";
 import {
   MotionSection,
   StaggerGroup,
@@ -123,6 +124,7 @@ export default function LandingPage() {
   // Modals
   const [shareVideo, setShareVideo] = useState<ExploreVideo | null>(null);
   const [recreateVideo, setRecreateVideo] = useState<ExploreVideo | null>(null);
+  const [viewerVideo, setViewerVideo] = useState<ExploreVideo | null>(null);
 
   // ---- Fetch hero videos from featured explore_videos ----
   useEffect(() => {
@@ -184,6 +186,10 @@ export default function LandingPage() {
 
   const handleShare = useCallback((video: ExploreVideo) => {
     setShareVideo(video);
+  }, []);
+
+  const handleVideoClick = useCallback((video: ExploreVideo) => {
+    setViewerVideo(video);
   }, []);
 
   // ---- Pricing helpers ----
@@ -339,6 +345,7 @@ export default function LandingPage() {
                     video={video}
                     onRecreate={handleRecreate}
                     onShare={handleShare}
+                    onClick={handleVideoClick}
                   />
                 </StaggerItem>
               ))}
@@ -694,6 +701,14 @@ export default function LandingPage() {
       {/* ========================================
           MODALS
       ======================================== */}
+      {viewerVideo && (
+        <VideoViewerModal
+          isOpen={!!viewerVideo}
+          onClose={() => setViewerVideo(null)}
+          video={viewerVideo}
+          onShare={handleShare}
+        />
+      )}
       {shareVideo && (
         <ShareModal
           isOpen={!!shareVideo}

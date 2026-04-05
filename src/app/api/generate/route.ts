@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // Log profitability metrics
     const profit = isProfitable(creditCost, body.modelId, duration, resolution);
     if (!profit.profitable) {
-      console.warn(`[MARGIN WARNING] ${body.modelId} ${resolution} ${duration}s: margin=${profit.margin}% gpuCost=$${profit.gpuCost} revenue=$${profit.revenue}`);
+      console.warn(`[MARGIN WARNING] ${body.modelId} ${resolution} ${duration}s: margin=${profit.margin}% gpuCost=$${profit.gpuCost} netRevenue=$${profit.netRevenue}`);
     }
 
     // Resolve audio track URL if selected

@@ -2,7 +2,7 @@
 // GENESIS STUDIO — Constants & Configuration
 // ============================================
 
-import { AIModel, Plan, CreditPack, ModelId, AudioTrack, MotionPreset, FeatureConfig, VoiceOption } from "@/types";
+import { AIModel, Plan, CreditPack, ModelId, AudioTrack, MotionPreset, FeatureConfig, VoiceOption, VideoProvider } from "@/types";
 
 // --- AI Models Registry ---
 export const AI_MODELS: Record<ModelId, AIModel> = {
@@ -18,6 +18,8 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     creditCost: { "480p": 20, "720p": 40, "1080p": 80 },
     gpuRequirement: "48GB+ (A6000/H100)",
     license: "Apache 2.0",
+    provider: "runpod-hub",
+    maxDuration: 8,
   },
   "hunyuan-video": {
     id: "hunyuan-video",
@@ -97,6 +99,79 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     creditCost: { "480p": 15, "720p": 30 },
     gpuRequirement: "24GB+ (RTX 4090/A6000)",
     license: "Apache 2.0",
+    provider: "runpod-custom",
+  },
+
+  // --- Hollywood Tier (FAL.AI) — Native Audio ---
+  "kling-2.6": {
+    id: "kling-2.6",
+    name: "Kling 2.6 Pro",
+    tier: "hollywood",
+    types: ["t2v", "i2v"],
+    description:
+      "Hollywood-grade video with native audio — dialogue, sound effects, ambient sound. Best audio+video sync.",
+    maxResolution: "1080p",
+    avgGenerationTime: 120,
+    creditCost: { "720p": 50, "1080p": 80 },
+    gpuRequirement: "Managed (FAL.AI)",
+    license: "Commercial",
+    provider: "fal",
+    hasAudio: true,
+    falModelId: "fal-ai/kling-video/v2.6/pro/text-to-video",
+    falModelIdI2V: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    maxDuration: 10,
+  },
+  "kling-3.0": {
+    id: "kling-3.0",
+    name: "Kling 3.0 Pro",
+    tier: "hollywood",
+    types: ["t2v", "i2v"],
+    description:
+      "Latest Kling — multi-shot narrative, native audio, best character consistency.",
+    maxResolution: "1080p",
+    avgGenerationTime: 150,
+    creditCost: { "720p": 70, "1080p": 100 },
+    gpuRequirement: "Managed (FAL.AI)",
+    license: "Commercial",
+    provider: "fal",
+    hasAudio: true,
+    falModelId: "fal-ai/kling-video/v3/pro/text-to-video",
+    falModelIdI2V: "fal-ai/kling-video/v3/pro/image-to-video",
+    maxDuration: 10,
+  },
+  "veo-3.1": {
+    id: "veo-3.1",
+    name: "Veo 3.1",
+    tier: "hollywood",
+    types: ["t2v"],
+    description:
+      "Google's best — perfect lip sync, environmental audio, cinematic quality.",
+    maxResolution: "1080p",
+    avgGenerationTime: 180,
+    creditCost: { "720p": 100, "1080p": 150 },
+    gpuRequirement: "Managed (FAL.AI)",
+    license: "Commercial",
+    provider: "fal",
+    hasAudio: true,
+    falModelId: "fal-ai/veo3",
+    maxDuration: 8,
+  },
+  "seedance-1.5": {
+    id: "seedance-1.5",
+    name: "Seedance 1.5 Pro",
+    tier: "hollywood",
+    types: ["t2v"],
+    description:
+      "Multi-scene narrative videos. Great motion quality at lower cost.",
+    maxResolution: "1080p",
+    avgGenerationTime: 90,
+    creditCost: { "720p": 35, "1080p": 50 },
+    gpuRequirement: "Managed (FAL.AI)",
+    license: "Commercial",
+    provider: "fal",
+    hasAudio: false,
+    falModelId: "fal-ai/seedance/v1.5/pro",
+    maxDuration: 8,
   },
 };
 
@@ -513,33 +588,43 @@ export const MOTION_PRESETS: MotionPreset[] = [
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {
-  free: ["cogvideo-x", "wan-2.2", "mochi-1", "mimic-motion"],
+  free: ["wan-2.2", "seedance-1.5", "mimic-motion"],
   creator: [
-    "cogvideo-x",
+    "wan-2.2",
+    "seedance-1.5",
+    "kling-2.6",
+    "mimic-motion",
     "ltx-video",
     "hunyuan-video",
     "wan-2.1-turbo",
-    "wan-2.2",
     "mochi-1",
-    "mimic-motion",
+    "cogvideo-x",
   ],
   pro: [
-    "cogvideo-x",
+    "wan-2.2",
+    "seedance-1.5",
+    "kling-2.6",
+    "kling-3.0",
+    "veo-3.1",
+    "mimic-motion",
     "ltx-video",
     "hunyuan-video",
     "wan-2.1-turbo",
-    "wan-2.2",
     "mochi-1",
-    "mimic-motion",
+    "cogvideo-x",
   ],
   studio: [
-    "cogvideo-x",
+    "wan-2.2",
+    "seedance-1.5",
+    "kling-2.6",
+    "kling-3.0",
+    "veo-3.1",
+    "mimic-motion",
     "ltx-video",
     "hunyuan-video",
     "wan-2.1-turbo",
-    "wan-2.2",
     "mochi-1",
-    "mimic-motion",
+    "cogvideo-x",
   ],
 };
 

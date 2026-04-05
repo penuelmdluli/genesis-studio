@@ -3,9 +3,11 @@ import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
+import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId, GenerationType } from "@/types";
+import { AI_MODELS } from "@/lib/constants";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
@@ -29,9 +31,99 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // If job is still queued/processing and has a RunPod job ID, poll RunPod for updates
+    // If job is still queued/processing and has a job ID, poll for updates
     if ((job.status === "queued" || job.status === "processing") && job.runpod_job_id) {
+      // Determine provider for this model
+      const modelConfig = AI_MODELS[job.model_id as ModelId];
+      const isFal = modelConfig?.provider === "fal";
+
       try {
+        // --- FAL.AI Provider ---
+        if (isFal) {
+          const falStatus = await getFalJobStatus(
+            job.model_id as ModelId,
+            job.runpod_job_id
+          );
+
+          if (falStatus.status === "COMPLETED") {
+            // Get the result
+            const falResult = await getFalJobResult(
+              job.model_id as ModelId,
+              job.runpod_job_id
+            );
+
+            // Download and upload to R2
+            const vKey = videoStorageKey(job.user_id, job.id);
+            const videoRes = await fetch(falResult.videoUrl);
+            if (!videoRes.ok) throw new Error(`Failed to download FAL video: ${videoRes.status}`);
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            await uploadVideo(vKey, videoBuffer);
+            await verifyR2Upload(vKey);
+
+            // Create video record
+            const videoId = randomUUID();
+            const videoApiUrl = `/api/videos/${videoId}`;
+
+            await createVideo({
+              id: videoId,
+              userId: job.user_id,
+              jobId: job.id,
+              title: job.prompt.slice(0, 100),
+              url: videoApiUrl,
+              thumbnailUrl: "",
+              modelId: job.model_id,
+              prompt: job.prompt,
+              resolution: job.resolution,
+              duration: job.duration,
+              fps: job.fps,
+              fileSize: videoBuffer.length,
+              aspectRatio: job.aspect_ratio,
+              audioUrl: job.audio_url,
+              audioTrackId: job.audio_track_id,
+            });
+
+            await updateJobStatus(job.id, {
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              completedAt: new Date().toISOString(),
+            });
+
+            return NextResponse.json({
+              id: job.id,
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              modelId: job.model_id,
+              prompt: job.prompt,
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+              completedAt: new Date().toISOString(),
+            });
+          } else if (falStatus.status === "FAILED") {
+            await updateJobStatus(job.id, {
+              status: "failed",
+              errorMessage: falStatus.error || "FAL.AI generation failed",
+              completedAt: new Date().toISOString(),
+            });
+            await refundCredits(job.user_id, job.credits_cost, job.id, "FAL.AI generation failed — automatic refund");
+            return NextResponse.json({
+              id: job.id,
+              status: "failed",
+              errorMessage: falStatus.error || "Generation failed",
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+            });
+          } else if (falStatus.status === "IN_PROGRESS") {
+            await updateJobStatus(job.id, { status: "processing", progress: 50 });
+            job.status = "processing";
+            job.progress = 50;
+          }
+          // IN_QUEUE — keep as queued, fall through to return current status
+        }
+
+        // --- RunPod Provider ---
+        if (!isFal) {
         const runpodStatus = await getRunPodJobStatus(
           job.model_id as ModelId,
           job.runpod_job_id,
@@ -206,9 +298,8 @@ export async function GET(
           });
         } else if (runpodStatus.status === "IN_PROGRESS") {
           // Estimate progress based on elapsed time vs expected time
-          const { AI_MODELS } = await import("@/lib/constants");
-          const model = AI_MODELS[job.model_id as keyof typeof AI_MODELS];
-          const avgTime = model?.avgGenerationTime || 120;
+          const rpModel = AI_MODELS[job.model_id as keyof typeof AI_MODELS];
+          const avgTime = rpModel?.avgGenerationTime || 120;
           const elapsed = (Date.now() - new Date(job.created_at).getTime()) / 1000;
           const estimatedProgress = Math.min(Math.round((elapsed / avgTime) * 95), 95); // Cap at 95% until actually done
 
@@ -219,8 +310,9 @@ export async function GET(
           job.status = "processing";
           job.progress = estimatedProgress;
         }
+        } // end if (!isFal)
       } catch (pollErr) {
-        console.error("RunPod poll error:", pollErr);
+        console.error("Job poll error:", pollErr);
       }
 
       // Timeout check — if job has been running for more than 30 minutes, fail it

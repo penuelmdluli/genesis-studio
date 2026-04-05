@@ -29,11 +29,10 @@ RULES:
    - Include atmospheric details (fog, particles, bokeh)
 4. CHARACTER CONSISTENCY: Use the EXACT same description string for any character across ALL scenes they appear in.
 5. Pick optimal model per scene:
-   - Hero cinematic shots: "wan-2.2" (best quality, slowest)
-   - Fast establishing/environment shots: "ltx-video" (fastest)
-   - Budget/preview scenes: "cogvideo-x" (cheapest)
-   - Photorealistic close-ups: "mochi-1" (best realism)
-   - Character-driven scenes: "hunyuan-video" (good people)
+   - Hollywood scenes with dialogue/sound: "kling-2.6" (native audio, best for talking/sound)
+   - Hero cinematic shots (no audio needed): "wan-2.2" (best open-source quality)
+   - Scenes with important dialogue: "kling-3.0" (best character consistency + audio)
+   - Budget/fast shots: "wan-2.2" (reliable, always works)
 6. Transitions should feel PROFESSIONAL:
    - Default to "crossfade" for most cuts
    - Use "cut" for energy and impact
@@ -42,7 +41,7 @@ RULES:
 8. If voiceover requested: write NATURAL conversational script timed to scenes
 9. Text overlays: use sparingly — opening hook, key stats, CTA at end
 
-VALID MODELS: "wan-2.2", "hunyuan-video", "ltx-video", "wan-2.1-turbo", "mochi-1", "cogvideo-x"
+VALID MODELS: "wan-2.2", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 

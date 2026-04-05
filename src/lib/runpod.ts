@@ -7,7 +7,9 @@ import { ModelId, GenerationType, AspectRatio } from "@/types";
 const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 
 // Map model IDs to RunPod endpoint IDs
-const ENDPOINT_MAP: Record<ModelId, string> = {
+// Only RunPod-hosted models need endpoint mappings
+// FAL.AI models (kling, veo, seedance) are handled by src/lib/fal.ts
+const ENDPOINT_MAP: Partial<Record<ModelId, string>> = {
   "wan-2.2": process.env.RUNPOD_ENDPOINT_WAN22 || "",
   "hunyuan-video": process.env.RUNPOD_ENDPOINT_HUNYUAN || "",
   "ltx-video": process.env.RUNPOD_ENDPOINT_LTX || "",
@@ -23,9 +25,9 @@ const WAN22_I2V_ENDPOINT = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
 // Get the correct endpoint for a model, considering generation type
 function getEndpointForModel(modelId: ModelId, type?: GenerationType): string {
   if (modelId === "wan-2.2" && (type === "i2v" || type === "motion")) {
-    return WAN22_I2V_ENDPOINT || ENDPOINT_MAP["wan-2.2"];
+    return WAN22_I2V_ENDPOINT || ENDPOINT_MAP["wan-2.2"] || "";
   }
-  return ENDPOINT_MAP[modelId];
+  return ENDPOINT_MAP[modelId] || "";
 }
 
 interface RunPodRunResponse {

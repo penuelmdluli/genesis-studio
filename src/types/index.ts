@@ -10,7 +10,11 @@ export type ModelId =
   | "wan-2.1-turbo"
   | "mochi-1"
   | "cogvideo-x"
-  | "mimic-motion";
+  | "mimic-motion"
+  | "kling-2.6"
+  | "kling-3.0"
+  | "veo-3.1"
+  | "seedance-1.5";
 
 export type ModelTier =
   | "flagship"
@@ -19,7 +23,10 @@ export type ModelTier =
   | "turbo"
   | "realism"
   | "budget"
-  | "motion";
+  | "motion"
+  | "hollywood";
+
+export type VideoProvider = "runpod-hub" | "runpod-custom" | "fal";
 
 export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
 
@@ -91,6 +98,12 @@ export interface AIModel {
   license: string;
   runpodEndpointId?: string;
   comingSoon?: boolean;
+  // Provider & audio support
+  provider?: VideoProvider;
+  hasAudio?: boolean;
+  falModelId?: string;      // FAL.AI model ID for t2v
+  falModelIdI2V?: string;   // FAL.AI model ID for i2v
+  maxDuration?: number;     // max duration in seconds
 }
 
 // --- Users & Auth ---

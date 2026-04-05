@@ -221,6 +221,7 @@ export default function GeneratePage() {
           isDraft: form.isDraft,
           aspectRatio: form.aspectRatio,
           audioTrackId: form.audioTrackId || undefined,
+          enableAudio: currentModel?.hasAudio || false,
         }),
       });
 
@@ -422,6 +423,8 @@ export default function GeneratePage() {
                     turbo: "text-cyan-400",
                     realism: "text-pink-400",
                     budget: "text-cyan-400",
+                    hollywood: "text-yellow-400",
+                    motion: "text-orange-400",
                   };
 
                   return (
@@ -433,7 +436,9 @@ export default function GeneratePage() {
                         !supportsType
                           ? "opacity-30 cursor-not-allowed border-white/[0.04]"
                           : isSelected
-                          ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
+                          ? model.tier === "hollywood"
+                            ? "border-yellow-500/40 bg-yellow-500/10 shadow-lg shadow-yellow-500/10"
+                            : "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
                           : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
                       }`}
                     >
@@ -441,6 +446,11 @@ export default function GeneratePage() {
                         <span className={`text-[10px] font-bold uppercase tracking-wider ${tierColors[model.tier] || "text-zinc-400"}`}>
                           {model.tier}
                         </span>
+                        {model.hasAudio && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded-full">
+                            AUDIO
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm font-medium text-zinc-200 truncate">{model.name}</div>
                       <div className="text-xs text-zinc-500 mt-0.5">~{model.avgGenerationTime}s</div>

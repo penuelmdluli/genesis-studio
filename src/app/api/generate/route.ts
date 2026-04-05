@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
+import { submitFalJob } from "@/lib/fal";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { isProfitable } from "@/lib/profitability";
@@ -125,40 +126,60 @@ export async function POST(req: NextRequest) {
       audioUrl: audioTrack?.url,
     });
 
-    // Build RunPod input (model-specific schema)
-    const runpodInput = buildRunPodInput({
-      modelId: body.modelId,
-      type: effectiveType,
-      prompt: body.prompt,
-      negativePrompt: body.negativePrompt,
-      inputImageUrl: body.inputImageUrl,
-      inputVideoUrl: body.inputVideoUrl,
-      resolution,
-      duration,
-      fps: body.fps || 24,
-      seed: body.seed,
-      guidanceScale: body.guidanceScale,
-      numInferenceSteps: body.numInferenceSteps,
-      isDraft: body.isDraft,
-      aspectRatio: body.aspectRatio,
-    });
-
-    // Submit to RunPod — use server-side URL for webhook (not NEXT_PUBLIC_ which may be localhost)
-    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const webhookUrl = `${appUrl}/api/webhooks/runpod`;
-
+    // Route to the correct provider (FAL.AI or RunPod)
     try {
-      const runpodJob = await submitRunPodJob(
-        body.modelId,
-        runpodInput,
-        webhookUrl,
-        effectiveType
-      );
+      if (model.provider === "fal") {
+        // FAL.AI — premium models with native audio
+        const falResult = await submitFalJob({
+          modelId: body.modelId,
+          type: effectiveType as "t2v" | "i2v",
+          prompt: body.prompt,
+          negativePrompt: body.negativePrompt,
+          imageUrl: body.inputImageUrl,
+          duration,
+          aspectRatio: body.aspectRatio,
+          enableAudio: body.enableAudio,
+          seed: body.seed,
+        });
 
-      await updateJobStatus(job.id, {
-        runpodJobId: runpodJob.id,
-        status: "queued",
-      });
+        await updateJobStatus(job.id, {
+          runpodJobId: falResult.request_id, // reuse field for FAL request ID
+          status: "queued",
+        });
+      } else {
+        // RunPod — open-source models
+        const runpodInput = buildRunPodInput({
+          modelId: body.modelId,
+          type: effectiveType,
+          prompt: body.prompt,
+          negativePrompt: body.negativePrompt,
+          inputImageUrl: body.inputImageUrl,
+          inputVideoUrl: body.inputVideoUrl,
+          resolution,
+          duration,
+          fps: body.fps || 24,
+          seed: body.seed,
+          guidanceScale: body.guidanceScale,
+          numInferenceSteps: body.numInferenceSteps,
+          isDraft: body.isDraft,
+          aspectRatio: body.aspectRatio,
+        });
+
+        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const webhookUrl = `${appUrl}/api/webhooks/runpod`;
+
+        const runpodJob = await submitRunPodJob(
+          body.modelId,
+          runpodInput,
+          webhookUrl,
+          effectiveType
+        );
+
+        await updateJobStatus(job.id, {
+          runpodJobId: runpodJob.id,
+          status: "queued",
+        });
+      }
 
       return NextResponse.json({
         jobId: job.id,
@@ -169,7 +190,6 @@ export async function POST(req: NextRequest) {
     } catch (gpuError) {
       console.error("GPU submission error:", gpuError);
 
-      // If RunPod submission fails, refund credits
       const { refundCredits } = await import("@/lib/credits");
       await refundCredits(
         user.id,
@@ -179,20 +199,15 @@ export async function POST(req: NextRequest) {
       );
 
       const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
-      const isEndpointMissing = errorMsg.includes("No RunPod endpoint configured");
 
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: isEndpointMissing
-          ? `No GPU endpoint configured for ${model.name}. Credits refunded.`
-          : `GPU submission failed: ${errorMsg}. Credits refunded.`,
+        errorMessage: `Submission failed: ${errorMsg}. Credits refunded.`,
       });
 
       return NextResponse.json(
         {
-          error: isEndpointMissing
-            ? `${model.name} is not available yet. Try a different model. Credits refunded.`
-            : "GPU submission failed. Credits refunded.",
+          error: `${model.name} submission failed. Credits refunded.`,
           jobId: job.id,
         },
         { status: 503 }

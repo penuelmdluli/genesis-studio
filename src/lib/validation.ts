@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const generateSchema = z.object({
   prompt: z.string().min(5, "Prompt must be at least 5 characters").max(2000, "Prompt too long"),
-  modelId: z.enum(["wan-2.2", "hunyuan-video", "ltx-video", "wan-2.1-turbo", "mochi-1", "cogvideo-x", "mimic-motion"]),
+  modelId: z.enum(["wan-2.2", "hunyuan-video", "ltx-video", "wan-2.1-turbo", "mochi-1", "cogvideo-x", "mimic-motion", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"]),
   type: z.enum(["t2v", "i2v", "v2v", "motion"]).default("t2v"),
   resolution: z.enum(["480p", "720p", "1080p", "4k"]).default("720p"),
   duration: z.number().int().min(1).max(60).default(5),
@@ -16,6 +16,7 @@ export const generateSchema = z.object({
   inputVideoUrl: z.string().url().optional(),
   aspectRatio: z.enum(["landscape", "portrait", "square"]).default("landscape"),
   audioTrackId: z.string().optional(),
+  enableAudio: z.boolean().default(false),
 });
 
 export const brainInputSchema = z.object({

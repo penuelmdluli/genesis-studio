@@ -50,7 +50,6 @@ export default function DashboardPage() {
       href: "/generate",
       gradient: "from-violet-600 to-fuchsia-600",
       shadow: "shadow-violet-600/25",
-      hot: true,
     },
     {
       label: "Motion Control",
@@ -59,6 +58,7 @@ export default function DashboardPage() {
       href: "/motion-control",
       gradient: "from-fuchsia-600 to-pink-600",
       shadow: "shadow-fuchsia-600/25",
+      hot: true,
     },
     {
       label: "Brain Studio",
@@ -233,7 +233,16 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-3">
                     <action.icon className="w-6 h-6 text-white" />
                     {action.hot && (
-                      <Badge className="bg-white/20 text-white text-[9px] border-0 backdrop-blur-sm">HOT</Badge>
+                      <motion.div
+                        animate={{ scale: [1, 1.15, 1], opacity: [1, 0.85, 1] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative"
+                      >
+                        <div className="absolute inset-0 rounded-full bg-red-500/40 blur-md animate-ping" />
+                        <Badge className="relative bg-gradient-to-r from-red-500 to-orange-500 text-white text-[9px] font-black border-0 shadow-lg shadow-red-500/40 px-2 py-0.5 tracking-wider">
+                          🔥 HOT
+                        </Badge>
+                      </motion.div>
                     )}
                   </div>
                   <p className="text-sm font-bold text-white">{action.label}</p>

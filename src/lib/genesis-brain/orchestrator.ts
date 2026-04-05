@@ -6,8 +6,10 @@
 import { BrainInput, ScenePlan, Production, ProductionScene, ModelId } from "@/types";
 import { planProduction, calculateBrainCredits } from "./planner";
 import { consistencyEngine } from "./consistency";
-import { generateVoiceover, selectMusic, generateCaptions } from "./audio";
+import { generateVoiceover, selectMusic, generateCaptions, buildAudioPromptFromSoundDesign } from "./audio";
 import { submitRunPodJob, buildRunPodInput, getRunPodJobStatus } from "@/lib/runpod";
+import { submitFalJob } from "@/lib/fal";
+import { AI_MODELS } from "@/lib/constants";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
@@ -246,7 +248,7 @@ export async function executeProduction(
       );
     }
 
-    // Step 5: Submit all scenes to RunPod in parallel
+    // Step 5: Submit all scenes — route to FAL (Hollywood) or RunPod based on model provider
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const webhookUrl = `${appUrl}/api/brain/webhook`;
 
@@ -254,29 +256,72 @@ export async function executeProduction(
       const sceneDef = enhancedPlan.scenes[i];
       if (!sceneDef) return;
 
+      const model = AI_MODELS[sceneDef.modelId];
+      const isFalModel = model?.provider === "fal";
+
+      // For audio models, enrich the prompt with sound design cues
+      let scenePrompt = sceneDef.prompt;
+      if (isFalModel && model?.hasAudio && sceneDef.soundDesign) {
+        const audioDesc = buildAudioPromptFromSoundDesign(sceneDef.soundDesign);
+        if (audioDesc && !scenePrompt.toLowerCase().includes("sound")) {
+          scenePrompt = `${scenePrompt}. Audio: ${audioDesc}`;
+        }
+      }
+
       try {
-        const runpodInput = buildRunPodInput({
-          modelId: sceneDef.modelId,
-          type: "t2v",
-          prompt: sceneDef.prompt,
-          negativePrompt: sceneDef.negativePrompt,
-          resolution: sceneDef.resolution,
-          duration: sceneDef.duration,
-          fps: 24,
-          seed: undefined,
-          guidanceScale: undefined,
-          numInferenceSteps: undefined,
-          isDraft: false,
-          aspectRatio: input.aspectRatio,
-        });
+        if (isFalModel) {
+          // --- FAL.AI Hollywood models (Kling, Veo, Seedance) ---
+          const falResult = await submitFalJob({
+            modelId: sceneDef.modelId,
+            type: "t2v",
+            prompt: scenePrompt,
+            negativePrompt: sceneDef.negativePrompt,
+            duration: sceneDef.duration,
+            aspectRatio: input.aspectRatio,
+            enableAudio: model?.hasAudio ?? false,
+          });
 
-        const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl);
+          await updateProductionScene(scene.id, {
+            status: "processing",
+            runpod_job_id: falResult.request_id, // Store FAL request_id in same field
+            progress: 10,
+          });
 
-        await updateProductionScene(scene.id, {
-          status: "processing",
-          runpod_job_id: job.id,
-          progress: 10,
-        });
+          // Store provider info for webhook/polling to know which API to check
+          const supabase = createSupabaseAdmin();
+          await supabase
+            .from("production_scenes")
+            .update({
+              provider: "fal",
+              model_has_audio: model?.hasAudio ?? false,
+            })
+            .eq("id", scene.id);
+
+        } else {
+          // --- RunPod models (Wan 2.2, LTX, Hunyuan, etc.) ---
+          const runpodInput = buildRunPodInput({
+            modelId: sceneDef.modelId,
+            type: "t2v",
+            prompt: scenePrompt,
+            negativePrompt: sceneDef.negativePrompt,
+            resolution: sceneDef.resolution,
+            duration: sceneDef.duration,
+            fps: 24,
+            seed: undefined,
+            guidanceScale: undefined,
+            numInferenceSteps: undefined,
+            isDraft: false,
+            aspectRatio: input.aspectRatio,
+          });
+
+          const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl);
+
+          await updateProductionScene(scene.id, {
+            status: "processing",
+            runpod_job_id: job.id,
+            progress: 10,
+          });
+        }
       } catch (err) {
         await updateProductionScene(scene.id, {
           status: "failed",

@@ -209,19 +209,19 @@ describe("Planner", () => {
     it("adds credits for voiceover option", () => {
       const without = estimateBrainCredits(makeBrainInput({ voiceover: false }));
       const withVo = estimateBrainCredits(makeBrainInput({ voiceover: true }));
-      expect(withVo - without).toBe(3);
+      expect(withVo - without).toBe(5);
     });
 
     it("adds credits for music option", () => {
       const without = estimateBrainCredits(makeBrainInput({ music: false }));
       const withMusic = estimateBrainCredits(makeBrainInput({ music: true }));
-      expect(withMusic - without).toBe(2);
+      expect(withMusic - without).toBe(3);
     });
 
     it("adds credits for captions option", () => {
       const without = estimateBrainCredits(makeBrainInput({ captions: false }));
       const withCaptions = estimateBrainCredits(makeBrainInput({ captions: true }));
-      expect(withCaptions - without).toBe(1);
+      expect(withCaptions - without).toBe(2);
     });
 
     it("adds credits for multiple output formats", () => {
@@ -232,18 +232,20 @@ describe("Planner", () => {
       expect(multi - single).toBe(4); // (3 - 1) * 2
     });
 
-    it("includes base planning fee of 2 and assembly fee of 3", () => {
-      // Minimum: 2 (planning) + scenes * 10 + 3 (assembly)
+    it("includes base planning fee of 2 and assembly fee of 5", () => {
+      // 2 (planning) + scenes * 10 + MMAudio + 5 (assembly)
+      // targetDuration=15: scenesEstimate = max(3, ceil(15/8)) = 3
+      // MMAudio = ceil(3 * 0.5) * 2 = ceil(1.5) * 2 = 2 * 2 = 4
+      // Total: 2 + 30 + 4 + 5 = 41
       const input = makeBrainInput({ targetDuration: 15 });
       const credits = estimateBrainCredits(input);
-      // 15/8 = 1.875, ceil = 2, but min 3 scenes => 3 * 10 = 30; 2 + 30 + 3 = 35
-      expect(credits).toBe(35);
+      expect(credits).toBe(41);
     });
 
     it("estimates at least 3 scenes even for very short durations", () => {
       const short = estimateBrainCredits(makeBrainInput({ targetDuration: 15 }));
-      // min 3 scenes: 2 + 3*10 + 3 = 35
-      expect(short).toBe(35);
+      // min 3 scenes: 2 + 3*10 + ceil(3*0.5)*2 + 5 = 2 + 30 + 4 + 5 = 41
+      expect(short).toBe(41);
     });
   });
 
@@ -259,9 +261,10 @@ describe("Planner", () => {
       // Scene 1: wan-2.2 @ 720p = 40, dur=5 => multiplier=1 => 40
       // Scene 2: ltx-video @ 720p = 8, dur=5 => multiplier=1 => 8
       // Scene 3: cogvideo-x @ 480p = 3, dur=5 => multiplier=1 => 3
-      // Assembly: 3
-      // Total: 2 + 40 + 8 + 3 + 3 = 56
-      expect(credits).toBe(56);
+      // MMAudio: all 3 scenes are silent (no hasAudio) => 3 * 2 = 6
+      // Assembly: 5
+      // Total: 2 + 40 + 8 + 3 + 6 + 5 = 64
+      expect(credits).toBe(64);
     });
 
     it("applies duration multiplier for scenes longer than 5 seconds", () => {
@@ -273,9 +276,10 @@ describe("Planner", () => {
 
       // Planning: 2
       // Scene: ltx-video @ 720p = 8, dur=10 => multiplier=2 => ceil(16) = 16
-      // Assembly: 3
-      // Total: 2 + 16 + 3 = 21
-      expect(credits).toBe(21);
+      // MMAudio: 1 silent scene => 1 * 2 = 2
+      // Assembly: 5
+      // Total: 2 + 16 + 2 + 5 = 25
+      expect(credits).toBe(25);
     });
 
     it("adds voiceover, music, and caption fees", () => {
@@ -283,8 +287,8 @@ describe("Planner", () => {
       const input = makeBrainInput({ voiceover: true, music: true, captions: true });
       const credits = calculateBrainCredits(plan, input);
 
-      // Planning: 2 + Scene: 40 + VO: 3 + Music: 2 + Captions: 1 + Assembly: 3 = 51
-      expect(credits).toBe(51);
+      // Planning: 2 + Scene: 40 + VO: 5 + Music: 3 + Captions: 2 + MMAudio: 1*2=2 + Assembly: 5 = 59
+      expect(credits).toBe(59);
     });
 
     it("adds multi-format export cost", () => {
@@ -294,8 +298,8 @@ describe("Planner", () => {
       });
       const credits = calculateBrainCredits(plan, input);
 
-      // Planning: 2 + Scene: 40 + Assembly: 3 + Extra formats: (3-1)*2 = 4 => Total: 49
-      expect(credits).toBe(49);
+      // Planning: 2 + Scene: 40 + MMAudio: 1*2=2 + Assembly: 5 + Extra formats: (3-1)*2 = 4 => Total: 53
+      expect(credits).toBe(53);
     });
 
     it("uses default cost of 8 for unknown model IDs", () => {
@@ -305,8 +309,8 @@ describe("Planner", () => {
       const input = makeBrainInput();
       const credits = calculateBrainCredits(plan, input);
 
-      // Planning: 2 + Default: 8 + Assembly: 3 = 13
-      expect(credits).toBe(13);
+      // Planning: 2 + Default: 8 + MMAudio: 1*2=2 + Assembly: 5 = 17
+      expect(credits).toBe(17);
     });
 
     it("uses 720p fallback cost when resolution is not in creditCost map", () => {
@@ -319,8 +323,8 @@ describe("Planner", () => {
       // cogvideo-x only has 480p cost (3). 720p is not available.
       // Fallback chain: creditCost["720p"] || creditCost["720p"] || 8
       // Neither exists, so falls back to 8
-      // Planning: 2 + 8 + Assembly: 3 = 13
-      expect(credits).toBe(13);
+      // Planning: 2 + 8 + MMAudio: 1*2=2 + Assembly: 5 = 17
+      expect(credits).toBe(17);
     });
   });
 

@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { AI_MODELS, PLANS, CREDIT_PACKS, RESOLUTIONS, DURATIONS, FPS_OPTIONS, MODEL_ACCESS } from "./constants";
 
 describe("AI_MODELS", () => {
-  it("has all 7 models defined", () => {
+  it("has all 11 models defined", () => {
     const modelIds = Object.keys(AI_MODELS);
-    expect(modelIds).toHaveLength(7);
+    expect(modelIds).toHaveLength(11);
     expect(modelIds).toContain("wan-2.2");
     expect(modelIds).toContain("hunyuan-video");
     expect(modelIds).toContain("ltx-video");
@@ -12,6 +12,10 @@ describe("AI_MODELS", () => {
     expect(modelIds).toContain("mochi-1");
     expect(modelIds).toContain("cogvideo-x");
     expect(modelIds).toContain("mimic-motion");
+    expect(modelIds).toContain("kling-2.6");
+    expect(modelIds).toContain("kling-3.0");
+    expect(modelIds).toContain("veo-3.1");
+    expect(modelIds).toContain("seedance-1.5");
   });
 
   it("each model has required fields", () => {
@@ -47,7 +51,7 @@ describe("AI_MODELS", () => {
   });
 
   it("tiers are valid", () => {
-    const validTiers = ["flagship", "workhorse", "speed", "turbo", "realism", "budget", "motion"];
+    const validTiers = ["flagship", "workhorse", "speed", "turbo", "realism", "budget", "motion", "hollywood"];
     for (const model of Object.values(AI_MODELS)) {
       expect(validTiers).toContain(model.tier);
     }
@@ -143,14 +147,14 @@ describe("FPS_OPTIONS", () => {
 });
 
 describe("MODEL_ACCESS", () => {
-  it("free plan has cogvideo-x, wan-2.2, mochi-1, and mimic-motion", () => {
-    expect(MODEL_ACCESS.free).toEqual(["cogvideo-x", "wan-2.2", "mochi-1", "mimic-motion"]);
+  it("free plan has wan-2.2, seedance-1.5, and mimic-motion", () => {
+    expect(MODEL_ACCESS.free).toEqual(["wan-2.2", "seedance-1.5", "mimic-motion"]);
   });
 
-  it("creator, pro, studio have all 7 models", () => {
-    expect(MODEL_ACCESS.creator).toHaveLength(7);
-    expect(MODEL_ACCESS.pro).toHaveLength(7);
-    expect(MODEL_ACCESS.studio).toHaveLength(7);
+  it("creator has 9, pro has 11, studio has 11 models", () => {
+    expect(MODEL_ACCESS.creator).toHaveLength(9);
+    expect(MODEL_ACCESS.pro).toHaveLength(11);
+    expect(MODEL_ACCESS.studio).toHaveLength(11);
   });
 
   it("all model IDs in access lists are valid", () => {

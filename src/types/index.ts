@@ -414,6 +414,13 @@ export interface SceneDefinition {
   soundEffect?: string;
   characterIds?: string[];
   colorGrade?: string;
+  soundDesign?: SoundDesign;
+}
+
+export interface SoundDesign {
+  ambientDescription: string;
+  dialogueLines: Array<{ speaker: string; line: string }>;
+  sfxCues: string[];
 }
 
 export interface TextOverlay {

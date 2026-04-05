@@ -39,7 +39,7 @@ describe("durationToFrames", () => {
 
 describe("buildRunPodInput", () => {
   // --- Wan 2.2: flat params format (wlsdml1114/generate_video handler) ---
-  it("builds wan-2.2 input with flat prompt string", () => {
+  it("builds wan-2.2 t2v input with Hub format fields", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.2",
       type: "t2v",
@@ -53,12 +53,14 @@ describe("buildRunPodInput", () => {
     expect(input.prompt).toBe("A cat walking");
     expect(typeof input.prompt).toBe("string");
 
-    // Frame count uses "length" field
-    expect(input.length).toBe(120); // 5s * 24fps
-    expect(input.width).toBe(1280);
-    expect(input.height).toBe(720);
+    // Hub format uses "size" and "duration" instead of width/height/length
+    expect(input.size).toBe("1280*720");
+    expect(input.duration).toBe(5);
     expect(input.seed).toBeDefined();
-    expect(input.cfg).toBe(2.0);
+    expect(input.guidance).toBe(7.5);
+    expect(input.flow_shift).toBe(5);
+    expect(input.enable_prompt_optimization).toBe(true);
+    expect(input.enable_safety_checker).toBe(false);
   });
 
   it("wan-2.2 includes negative prompt as flat field", () => {
@@ -86,10 +88,10 @@ describe("buildRunPodInput", () => {
       isDraft: true,
     });
 
-    expect(input.steps).toBe(6);
+    expect(input.num_inference_steps).toBe(15);
   });
 
-  it("wan-2.2 passes image_url for i2v mode", () => {
+  it("wan-2.2 passes image field for i2v mode", () => {
     const input = buildRunPodInput({
       modelId: "wan-2.2",
       type: "i2v",
@@ -100,8 +102,9 @@ describe("buildRunPodInput", () => {
       fps: 24,
     });
 
-    expect(input.image_url).toBe("https://example.com/photo.jpg");
+    expect(input.image).toBe("https://example.com/photo.jpg");
     expect(input.prompt).toBe("Animate this");
+    expect(input.enable_safety_checker).toBe(false);
   });
 
   // --- Mochi-1: flat params format ---

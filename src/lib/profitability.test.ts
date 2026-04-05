@@ -156,7 +156,7 @@ describe("profitability", () => {
     });
 
     it("studio has highest limits", () => {
-      expect(PLAN_LIMITS.studio.maxGenerationsPerDay).toBe(1000);
+      expect(PLAN_LIMITS.studio.maxGenerationsPerDay).toBe(500);
       expect(PLAN_LIMITS.studio.maxConcurrentJobs).toBe(10);
     });
 

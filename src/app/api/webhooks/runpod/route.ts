@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { updateJobStatus, createVideo } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey, verifyR2Upload } from "@/lib/storage";
+import { autoPublishToExplore } from "@/lib/auto-publish";
 
 export async function POST(req: NextRequest) {
   try {
@@ -132,6 +133,31 @@ export async function POST(req: NextRequest) {
         gpuTime: executionTime,
         completedAt: new Date().toISOString(),
       });
+
+      // Auto-publish free-tier videos to Explore feed (fire-and-forget)
+      const { data: user } = await supabase
+        .from("users")
+        .select("plan, name, avatar_url")
+        .eq("id", job.user_id)
+        .single();
+
+      autoPublishToExplore({
+        jobId: job.id,
+        userId: job.user_id,
+        prompt: job.prompt,
+        modelId: job.model_id,
+        videoUrl: videoApiUrl,
+        thumbnailUrl: "",
+        duration: job.duration,
+        resolution: job.resolution,
+        hasAudio: !!job.audio_url,
+        type: job.type === "motion" ? "motion" : "standard",
+        userPlan: user?.plan,
+        creatorName: user?.name || "Genesis Creator",
+        creatorAvatarUrl: user?.avatar_url,
+      }).catch((err) =>
+        console.error("[WEBHOOK] Auto-publish failed:", err)
+      );
     } else if (status === "FAILED") {
       await updateJobStatus(job.id, {
         status: "failed",

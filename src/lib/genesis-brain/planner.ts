@@ -6,8 +6,9 @@
 import { BrainInput, ScenePlan, SceneDefinition, CharacterDefinition, VoiceoverTiming, ModelId, TransitionType, VideoStyle } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 
-const BRAIN_SYSTEM_PROMPT = `You are Genesis Brain, the world's most advanced AI film director.
+const BRAIN_SYSTEM_PROMPT = `You are Genesis Brain, the world's most advanced AI film director and sound designer.
 You take a user's creative concept and produce a production-ready shot list as a JSON object.
+People should watch your output and DEBATE whether it's real or AI.
 
 YOU ARE AN EXPERT AT:
 - Cinematic storytelling and visual narrative structure
@@ -17,35 +18,47 @@ YOU ARE AN EXPERT AT:
 - Pacing: building tension, creating rhythm, delivering payoff
 - Music selection: matching mood, tempo, and energy to visuals
 - Typography: when and how to use text overlays effectively
+- SOUND DESIGN: ambient audio, dialogue, foley, sound effects, environmental audio
 
 RULES:
 1. Break the concept into 3-8 scenes based on target duration
 2. Each scene: 3-10 seconds (AI models generate best at 5s)
-3. Prompts must be EXTREMELY specific and VISUAL:
+3. Prompts must be EXTREMELY specific and VISUAL + AUDITORY:
    - Describe EXACTLY what the camera sees
    - Include lighting direction and quality
    - Include camera movement with speed
    - Include depth of field and focus
    - Include atmospheric details (fog, particles, bokeh)
+   - FOR AUDIO MODELS (kling-2.6, kling-3.0, veo-3.1): Include SOUND in the prompt!
+     * Describe what the viewer HEARS: dialogue, ambient sound, footsteps, wind, music, etc.
+     * Example: "A man in a leather jacket walks through a rainy alley, his boots splashing in puddles, distant thunder rolling, neon signs buzzing overhead, he mutters 'we need to go'"
+     * The audio model generates synchronized audio FROM the prompt — every sound you describe will be rendered
 4. CHARACTER CONSISTENCY: Use the EXACT same description string for any character across ALL scenes they appear in.
-5. Pick optimal model per scene:
-   - Hollywood scenes with dialogue/sound: "kling-2.6" (native audio, best for talking/sound)
-   - Hero cinematic shots (no audio needed): "wan-2.2" (best open-source quality)
-   - Scenes with important dialogue: "kling-3.0" (best character consistency + audio)
-   - Budget/fast shots: "wan-2.2" (reliable, always works)
-6. Transitions should feel PROFESSIONAL:
+5. Pick optimal model per scene based on AUDIO NEEDS:
+   - Scenes with dialogue/talking: "kling-3.0" (best lip sync + character consistency + native audio)
+   - Scenes with rich environmental sound (rain, crowds, machines): "kling-2.6" (native audio, great ambient)
+   - Hero cinematic shots with complex audio (music, effects): "veo-3.1" (Google's best audio sync)
+   - Silent cinematic beauty shots: "wan-2.2" (best open-source quality — audio added via MMAudio post-processing)
+   - Budget/fast establishing shots: "wan-2.2" or "seedance-1.5"
+6. SOUND DESIGN per scene — set the "soundDesign" field:
+   - "ambientDescription": What the environment sounds like (e.g. "busy city traffic, distant sirens, construction noise")
+   - "dialogueLines": Any spoken words in the scene (array of { speaker, line })
+   - "sfxCues": Specific sound effects timed to action (e.g. "door slam at 2s", "glass break at 4s")
+   - This field drives MMAudio post-processing for silent models AND enriches prompts for audio models
+7. Transitions should feel PROFESSIONAL:
    - Default to "crossfade" for most cuts
    - Use "cut" for energy and impact
    - Use "fade_black" for time passage
-7. Keep total scene duration within 10% of target
-8. If voiceover requested: write NATURAL conversational script timed to scenes
-9. Text overlays: use sparingly — opening hook, key stats, CTA at end
+8. Keep total scene duration within 10% of target
+9. If voiceover requested: write NATURAL conversational script timed to scenes
+10. Text overlays: use sparingly — opening hook, key stats, CTA at end
 
 VALID MODELS: "wan-2.2", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
-OUTPUT: Return ONLY a valid JSON ScenePlan. No markdown. No explanation.`;
+OUTPUT FORMAT: Return ONLY a valid JSON ScenePlan. No markdown. No explanation.
+Each scene MUST include a "soundDesign" object with { ambientDescription, dialogueLines, sfxCues }.`;
 
 function buildUserPrompt(input: BrainInput): string {
   let prompt = `CONCEPT: "${input.concept}"
@@ -187,6 +200,11 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
       soundEffect: scene.soundEffect,
       characterIds: scene.characterIds,
       colorGrade: scene.colorGrade,
+      soundDesign: scene.soundDesign || {
+        ambientDescription: "",
+        dialogueLines: [],
+        sfxCues: [],
+      },
     };
 
     // Ensure prompt is not empty
@@ -250,12 +268,22 @@ export function calculateBrainCredits(plan: ScenePlan, input: BrainInput): numbe
   }
 
   // Audio credits
-  if (input.voiceover) total += 3;
-  if (input.music) total += 2;
-  if (input.captions) total += 1;
+  if (input.voiceover) total += 5; // TTS generation
+  if (input.music) total += 3; // Music selection/generation
+  if (input.captions) total += 2; // Caption generation
 
-  // Assembly fee
-  total += 3;
+  // MMAudio post-processing for silent models (wan-2.2, ltx-video, etc.)
+  const silentScenes = plan.scenes.filter((s) => {
+    const m = AI_MODELS[s.modelId];
+    return !m?.hasAudio; // No native audio = needs MMAudio
+  });
+  if (silentScenes.length > 0) {
+    // MMAudio V2 cost: ~2 credits per silent scene
+    total += silentScenes.length * 2;
+  }
+
+  // Assembly fee (FFmpeg concatenation + audio mixing)
+  total += 5;
 
   // Multi-format export
   if (input.outputFormats && input.outputFormats.length > 1) {
@@ -274,10 +302,11 @@ export function estimateBrainCredits(input: BrainInput): number {
 
   let total = 2; // Planning
   total += scenesEstimate * avgCostPerScene;
-  if (input.voiceover) total += 3;
-  if (input.music) total += 2;
-  if (input.captions) total += 1;
-  total += 3; // Assembly
+  if (input.voiceover) total += 5;
+  if (input.music) total += 3;
+  if (input.captions) total += 2;
+  total += Math.ceil(scenesEstimate * 0.5) * 2; // MMAudio for ~half the scenes
+  total += 5; // Assembly (FFmpeg)
   if (input.outputFormats && input.outputFormats.length > 1) {
     total += (input.outputFormats.length - 1) * 2;
   }

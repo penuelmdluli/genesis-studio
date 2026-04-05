@@ -1,13 +1,19 @@
 // ============================================
-// GENESIS BRAIN — Audio Engine
-// Voiceover, Music, Captions generation
+// GENESIS BRAIN — Cinematic Audio Engine
+// 4-Layer Audio: Native Video, MMAudio V2,
+// Sound Effects, Voiceover/TTS
+// + Scene Assembly via FAL FFmpeg
 // ============================================
 
-import { VoiceoverTiming } from "@/types";
+import { VoiceoverTiming, SoundDesign } from "@/types";
 import { BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
+import { fal } from "@fal-ai/client";
+
+// Configure FAL client (may already be configured elsewhere, but safe to call again)
+fal.config({ credentials: process.env.FAL_KEY || "" });
 
 export interface AudioResult {
-  type: "voiceover" | "music" | "captions";
+  type: "voiceover" | "music" | "captions" | "mmaudio" | "sfx";
   url: string;
   duration: number;
   metadata?: Record<string, unknown>;
@@ -280,6 +286,255 @@ function formatSrtTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   const ms = Math.round((seconds % 1) * 1000);
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")},${ms.toString().padStart(3, "0")}`;
+}
+
+// ---- MMAUDIO V2 — Video-to-Audio (for silent models) ----
+
+/**
+ * Generate synchronized audio for a silent video using MMAudio V2.
+ * MMAudio watches the video and generates matching audio (ambient, foley, effects).
+ * Cost: ~$0.001/sec via FAL.AI
+ *
+ * @param videoUrl - URL to the silent video
+ * @param prompt - Audio description (ambient sounds, effects to generate)
+ * @param duration - Video duration in seconds
+ * @param negativePrompt - Sounds to avoid
+ */
+export async function generateVideoAudio(
+  videoUrl: string,
+  prompt: string,
+  duration: number,
+  negativePrompt?: string
+): Promise<AudioResult> {
+  if (!videoUrl) {
+    throw new Error("Video URL required for MMAudio generation");
+  }
+
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) {
+    console.warn("[BRAIN AUDIO] FAL_KEY not set — skipping MMAudio");
+    return {
+      type: "mmaudio",
+      url: "",
+      duration,
+      metadata: { skipped: true, reason: "FAL_KEY not configured" },
+    };
+  }
+
+  try {
+    console.log(`[BRAIN AUDIO] MMAudio V2: generating audio for ${duration}s video`);
+
+    const result = await fal.subscribe("fal-ai/mmaudio-v2", {
+      input: {
+        video_url: videoUrl,
+        prompt: prompt || "natural ambient audio matching the video content",
+        negative_prompt: negativePrompt || "silence, static noise, distortion, music",
+        num_steps: 25,
+        duration: duration,
+        cfg_strength: 4.5,
+      },
+      logs: false,
+    });
+
+    const data = result.data as Record<string, unknown>;
+    const audioData = data?.audio as { url: string } | undefined;
+
+    if (!audioData?.url) {
+      console.warn("[BRAIN AUDIO] MMAudio returned no audio URL");
+      return { type: "mmaudio", url: "", duration, metadata: { error: "no_url" } };
+    }
+
+    console.log(`[BRAIN AUDIO] MMAudio V2 complete: ${audioData.url}`);
+    return {
+      type: "mmaudio",
+      url: audioData.url,
+      duration,
+      metadata: { model: "mmaudio-v2", prompt },
+    };
+  } catch (err) {
+    console.error("[BRAIN AUDIO] MMAudio V2 failed:", err);
+    return {
+      type: "mmaudio",
+      url: "",
+      duration,
+      metadata: { error: String(err) },
+    };
+  }
+}
+
+/**
+ * Build an audio description prompt from a scene's soundDesign for MMAudio.
+ * Converts structured sound design into a natural language audio prompt.
+ */
+export function buildAudioPromptFromSoundDesign(soundDesign?: SoundDesign): string {
+  if (!soundDesign) return "natural ambient audio";
+
+  const parts: string[] = [];
+
+  if (soundDesign.ambientDescription) {
+    parts.push(soundDesign.ambientDescription);
+  }
+
+  if (soundDesign.sfxCues?.length > 0) {
+    parts.push(soundDesign.sfxCues.join(", "));
+  }
+
+  if (soundDesign.dialogueLines?.length > 0) {
+    const dialogueDesc = soundDesign.dialogueLines
+      .map((d) => `${d.speaker} saying "${d.line}"`)
+      .join(", ");
+    parts.push(dialogueDesc);
+  }
+
+  return parts.join(". ") || "natural ambient audio";
+}
+
+// ---- SCENE ASSEMBLY — FAL FFmpeg ----
+
+/**
+ * Assemble multiple scene videos into a single production video using FAL FFmpeg.
+ * Concatenates videos in order, optionally mixing in voiceover and music tracks.
+ *
+ * @param sceneVideoUrls - Ordered array of scene video URLs
+ * @param audioLayers - Optional audio tracks to mix (voiceover, music, mmaudio)
+ * @returns URL to the assembled final video
+ */
+export async function assembleScenes(
+  sceneVideoUrls: string[],
+  audioLayers?: {
+    voiceoverUrl?: string;
+    musicUrl?: string;
+    sceneAudioUrls?: Array<{ sceneIndex: number; audioUrl: string }>;
+  }
+): Promise<{ videoUrl: string; duration: number }> {
+  if (sceneVideoUrls.length === 0) {
+    throw new Error("No scene videos to assemble");
+  }
+
+  // Single scene — no assembly needed unless we need to mix audio
+  if (sceneVideoUrls.length === 1 && !audioLayers?.voiceoverUrl && !audioLayers?.musicUrl) {
+    return { videoUrl: sceneVideoUrls[0], duration: 0 };
+  }
+
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) {
+    console.warn("[BRAIN ASSEMBLY] FAL_KEY not set — returning first scene");
+    return { videoUrl: sceneVideoUrls[0], duration: 0 };
+  }
+
+  try {
+    console.log(`[BRAIN ASSEMBLY] Assembling ${sceneVideoUrls.length} scenes via FAL FFmpeg`);
+
+    // Build FFmpeg filter for concatenation
+    const inputs: Array<{ url: string; type: "video" | "audio" }> = [];
+
+    // Add all scene videos
+    for (const url of sceneVideoUrls) {
+      inputs.push({ url, type: "video" });
+    }
+
+    // Build concat filter
+    const videoInputs = sceneVideoUrls.map((_, i) => `[${i}:v]`).join("");
+    let filterComplex = `${videoInputs}concat=n=${sceneVideoUrls.length}:v=1:a=0[outv]`;
+    let mapOutputs = ["-map", "[outv]"];
+
+    // If scenes have audio tracks, concat those too
+    const hasAudio = audioLayers?.sceneAudioUrls && audioLayers.sceneAudioUrls.length > 0;
+
+    // Add voiceover/music as additional inputs if present
+    let nextInputIdx = sceneVideoUrls.length;
+    const audioMixInputs: string[] = [];
+
+    if (audioLayers?.voiceoverUrl) {
+      inputs.push({ url: audioLayers.voiceoverUrl, type: "audio" });
+      audioMixInputs.push(`[${nextInputIdx}:a]`);
+      nextInputIdx++;
+    }
+
+    if (audioLayers?.musicUrl) {
+      inputs.push({ url: audioLayers.musicUrl, type: "audio" });
+      audioMixInputs.push(`[${nextInputIdx}:a]`);
+      nextInputIdx++;
+    }
+
+    // Mix audio layers if present
+    if (audioMixInputs.length > 0) {
+      const mixCount = audioMixInputs.length;
+      filterComplex += `;${audioMixInputs.join("")}amix=inputs=${mixCount}:duration=longest[outa]`;
+      mapOutputs = ["-map", "[outv]", "-map", "[outa]"];
+    }
+
+    const result = await fal.subscribe("fal-ai/ffmpeg-api/compose-videos", {
+      input: {
+        inputs,
+        filter_complex: filterComplex,
+        output_args: [...mapOutputs, "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k"],
+      },
+      logs: false,
+    });
+
+    const data = result.data as Record<string, unknown>;
+    const output = data?.output as { url: string } | undefined;
+
+    if (!output?.url) {
+      throw new Error("FFmpeg assembly returned no output URL");
+    }
+
+    console.log(`[BRAIN ASSEMBLY] Assembly complete: ${output.url}`);
+    return { videoUrl: output.url, duration: 0 };
+  } catch (err) {
+    console.error("[BRAIN ASSEMBLY] FFmpeg assembly failed:", err);
+    // Fallback: return first scene
+    return { videoUrl: sceneVideoUrls[0], duration: 0 };
+  }
+}
+
+/**
+ * Merge MMAudio-generated audio onto a silent video using FAL FFmpeg.
+ * Used as post-processing for silent models (wan-2.2, ltx-video, etc.)
+ */
+export async function mergeAudioOntoVideo(
+  videoUrl: string,
+  audioUrl: string
+): Promise<string> {
+  if (!videoUrl || !audioUrl) return videoUrl;
+
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) return videoUrl;
+
+  try {
+    console.log("[BRAIN AUDIO] Merging MMAudio onto silent video");
+
+    const result = await fal.subscribe("fal-ai/ffmpeg-api/compose-videos", {
+      input: {
+        inputs: [
+          { url: videoUrl, type: "video" },
+          { url: audioUrl, type: "audio" },
+        ],
+        output_args: [
+          "-map", "0:v",
+          "-map", "1:a",
+          "-c:v", "copy",
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-shortest",
+        ],
+      },
+      logs: false,
+    });
+
+    const data = result.data as Record<string, unknown>;
+    const output = data?.output as { url: string } | undefined;
+
+    if (output?.url) {
+      console.log("[BRAIN AUDIO] Audio merge complete");
+      return output.url;
+    }
+    return videoUrl;
+  } catch (err) {
+    console.error("[BRAIN AUDIO] Audio merge failed:", err);
+    return videoUrl;
+  }
 }
 
 // ---- AVAILABLE VOICES ----

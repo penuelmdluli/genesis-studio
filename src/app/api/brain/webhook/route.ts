@@ -4,6 +4,7 @@ import {
   updateProductionScene,
   updateProduction,
 } from "@/lib/genesis-brain/orchestrator";
+import { triggerBrainAssembly } from "@/lib/genesis-brain/assembly";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 /**
@@ -108,8 +109,8 @@ export async function POST(req: NextRequest) {
           `[BRAIN WEBHOOK] Production ${productionId} → assembling (${completedScenes}/${totalScenes} scenes)`
         );
 
-        // Trigger assembly in background
-        triggerAssembly(productionId, allScenes).catch((err) => {
+        // Trigger cinematic assembly pipeline in background
+        triggerBrainAssembly(productionId, allScenes).catch((err) => {
           console.error(`[BRAIN WEBHOOK] Assembly failed for ${productionId}:`, err);
         });
       }
@@ -125,58 +126,3 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Trigger video assembly after all scenes are generated.
- * This collects scene video URLs and would invoke FFmpeg for stitching.
- * For now: marks production as completed with scene URLs.
- */
-async function triggerAssembly(
-  productionId: string,
-  scenes: Array<{ id: string; sceneNumber: number; status: string; outputVideoUrl?: string }>
-): Promise<void> {
-  try {
-    // Collect completed scene video URLs in order
-    const completedScenes = scenes
-      .filter((s) => s.status === "completed" && s.outputVideoUrl)
-      .sort((a, b) => a.sceneNumber - b.sceneNumber);
-
-    if (completedScenes.length === 0) {
-      await updateProduction(productionId, {
-        status: "failed",
-        error_message: "No scene videos available for assembly",
-        completed_at: new Date().toISOString(),
-      });
-      return;
-    }
-
-    // For MVP: use first scene as thumbnail, store all URLs
-    const videoUrls: Record<string, string> = {};
-    completedScenes.forEach((s) => {
-      videoUrls[`scene_${s.sceneNumber}`] = s.outputVideoUrl!;
-    });
-
-    // If only one scene, use it directly as the output
-    const primaryUrl = completedScenes[0].outputVideoUrl!;
-
-    // TODO: When FFmpeg Docker container is ready, submit assembly job here
-    // For now, mark as completed with individual scene URLs
-    await updateProduction(productionId, {
-      status: "completed",
-      output_video_urls: JSON.stringify(videoUrls),
-      thumbnail_url: primaryUrl.replace(/\.mp4$/, "_thumb.jpg"),
-      progress: 100,
-      completed_at: new Date().toISOString(),
-    });
-
-    console.log(
-      `[BRAIN ASSEMBLY] Production ${productionId} completed with ${completedScenes.length} scenes`
-    );
-  } catch (err) {
-    console.error(`[BRAIN ASSEMBLY] Error for ${productionId}:`, err);
-    await updateProduction(productionId, {
-      status: "failed",
-      error_message: "Video assembly failed",
-      completed_at: new Date().toISOString(),
-    });
-  }
-}

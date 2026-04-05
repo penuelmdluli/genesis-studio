@@ -7,7 +7,6 @@ import {
   Heart,
   Eye,
   Share2,
-  Play,
   Volume2,
   Sparkles,
   Film,
@@ -85,18 +84,16 @@ export function ExploreVideoCard({
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
     const vid = videoRef.current;
-    if (vid) {
-      vid.currentTime = 0;
-      vid.play().catch(() => {});
+    if (vid && video.hasAudio) {
+      vid.muted = false;
     }
-  }, []);
+  }, [video.hasAudio]);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
     const vid = videoRef.current;
     if (vid) {
-      vid.pause();
-      vid.currentTime = 0;
+      vid.muted = true;
     }
   }, []);
 
@@ -146,41 +143,17 @@ export function ExploreVideoCard({
       >
         {/* Thumbnail / Video area */}
         <div className={cn("relative w-full overflow-hidden", isVertical ? "aspect-[9/16]" : "aspect-video")}>
-          {/* Thumbnail image */}
-          {video.thumbnailUrl && (
-            <img
-              src={video.thumbnailUrl}
-              alt={video.prompt}
-              className={cn(
-                "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
-                isHovered ? "opacity-0" : "opacity-100"
-              )}
-            />
-          )}
-
-          {/* Video element (hover-to-play) */}
+          {/* Always-playing video — autoPlay, muted, loop, playsInline */}
           <video
             ref={videoRef}
             src={video.videoUrl}
+            autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
-            poster={video.thumbnailUrl || undefined}
-            className={cn(
-              "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
-              isHovered ? "opacity-100" : "opacity-0"
-            )}
+            preload="auto"
+            className="absolute inset-0 w-full h-full object-cover"
           />
-
-          {/* Play icon overlay when not hovering */}
-          {!isHovered && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
-              </div>
-            </div>
-          )}
 
           {/* Gradient overlay at bottom */}
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />

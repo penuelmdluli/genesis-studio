@@ -222,12 +222,13 @@ export async function GET(
         console.error("RunPod poll error:", pollErr);
       }
 
-      // Timeout check — if job has been running for more than 10 minutes, fail it
+      // Timeout check — if job has been running for more than 20 minutes, fail it
+      // (includes queue wait time + GPU processing; 720p Wan 2.2 alone takes ~5 min GPU)
       const jobAge = (Date.now() - new Date(job.created_at).getTime()) / 1000;
-      if (jobAge > 600 && (job.status === "queued" || job.status === "processing")) {
+      if (jobAge > 1200 && (job.status === "queued" || job.status === "processing")) {
         await updateJobStatus(job.id, {
           status: "failed",
-          errorMessage: "Generation timed out after 10 minutes. Credits have been refunded.",
+          errorMessage: "Generation timed out after 20 minutes. Credits have been refunded.",
           completedAt: new Date().toISOString(),
         });
         await refundCredits(
@@ -239,7 +240,7 @@ export async function GET(
         return NextResponse.json({
           id: job.id,
           status: "failed",
-          errorMessage: "Generation timed out after 10 minutes. Credits have been refunded.",
+          errorMessage: "Generation timed out after 20 minutes. Credits have been refunded.",
           creditsCost: job.credits_cost,
           createdAt: job.created_at,
         });

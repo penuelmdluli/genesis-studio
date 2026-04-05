@@ -17,6 +17,17 @@ const ENDPOINT_MAP: Record<ModelId, string> = {
   "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
 };
 
+// Wan 2.2 uses separate Hub endpoints for t2v vs i2v
+const WAN22_I2V_ENDPOINT = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
+
+// Get the correct endpoint for a model, considering generation type
+function getEndpointForModel(modelId: ModelId, type?: GenerationType): string {
+  if (modelId === "wan-2.2" && (type === "i2v" || type === "motion")) {
+    return WAN22_I2V_ENDPOINT || ENDPOINT_MAP["wan-2.2"];
+  }
+  return ENDPOINT_MAP[modelId];
+}
+
 interface RunPodRunResponse {
   id: string;
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "CANCELLED";
@@ -54,9 +65,10 @@ async function runpodFetch(endpoint: string, options: RequestInit = {}) {
 export async function submitRunPodJob(
   modelId: ModelId,
   input: Record<string, unknown>,
-  webhookUrl?: string
+  webhookUrl?: string,
+  type?: GenerationType
 ): Promise<RunPodRunResponse> {
-  const endpointId = ENDPOINT_MAP[modelId];
+  const endpointId = getEndpointForModel(modelId, type);
   if (!endpointId) {
     throw new Error(`No RunPod endpoint configured for model: ${modelId}`);
   }
@@ -84,9 +96,10 @@ export async function submitRunPodJob(
 
 export async function getRunPodJobStatus(
   modelId: ModelId,
-  jobId: string
+  jobId: string,
+  type?: GenerationType
 ): Promise<RunPodStatusResponse> {
-  const endpointId = ENDPOINT_MAP[modelId];
+  const endpointId = getEndpointForModel(modelId, type);
   if (!endpointId) {
     throw new Error(`No RunPod endpoint configured for model: ${modelId}`);
   }
@@ -172,72 +185,32 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
 
   switch (params.modelId) {
     case "wan-2.2":
-      // ComfyUI workflow format for runpod/worker-comfyui:5.0.0-sd3
-      // Must send as workflow dict — flat string prompt is ignored by the worker.
+      // RunPod Hub public endpoints: wan-2-2-t2v-720 and wan-2-2-i2v-720-lora
+      // These are pre-built, always-warm endpoints with documented input formats
+      if (params.type === "i2v" && params.inputImageUrl) {
+        // Image-to-video: wan-2-2-i2v-720-lora endpoint
+        return {
+          prompt: params.prompt,
+          image: params.inputImageUrl,
+          high_noise_loras: [],
+          low_noise_loras: [],
+          duration: params.duration,
+          seed: params.seed ?? -1,
+          enable_safety_checker: false,
+        };
+      }
+      // Text-to-video: wan-2-2-t2v-720 endpoint
       return {
-        prompt: {
-          "1": {
-            class_type: "UNETLoader",
-            inputs: { unet_name: "wan2.2_t2v_14B_fp8_e4m3fn.safetensors", weight_dtype: "fp8_e4m3fn" },
-          },
-          "2": {
-            class_type: "CLIPLoader",
-            inputs: { clip_name: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", type: "wan" },
-          },
-          "3": {
-            class_type: "VAELoader",
-            inputs: { vae_name: "wan2.2_vae.safetensors" },
-          },
-          "4": {
-            class_type: "CLIPTextEncode",
-            inputs: { text: params.prompt, clip: ["2", 0] },
-          },
-          "5": {
-            class_type: "CLIPTextEncode",
-            inputs: { text: params.negativePrompt || "blurry, low quality, distorted, watermark", clip: ["2", 0] },
-          },
-          "6": {
-            class_type: "EmptyWanLatentVideo",
-            inputs: { width, height, length: numFrames, batch_size: 1 },
-          },
-          "7": {
-            class_type: "KSampler",
-            inputs: {
-              seed: params.seed ?? Math.floor(Math.random() * 2147483647),
-              steps: params.isDraft ? 6 : Math.min(steps, 20),
-              cfg: guidance <= 3 ? guidance : 2.0,
-              sampler_name: "euler",
-              scheduler: "normal",
-              denoise: 1.0,
-              model: ["1", 0],
-              positive: ["4", 0],
-              negative: ["5", 0],
-              latent_image: ["6", 0],
-            },
-          },
-          "8": {
-            class_type: "VAEDecode",
-            inputs: { samples: ["7", 0], vae: ["3", 0] },
-          },
-          "9": {
-            class_type: "VHS_VideoCombine",
-            inputs: {
-              images: ["8", 0],
-              frame_rate: params.fps,
-              loop_count: 0,
-              filename_prefix: "genesis_wan22",
-              format: "video/h264-mp4",
-              pingpong: false,
-              save_output: true,
-            },
-          },
-          ...(params.inputImageUrl && {
-            "10": {
-              class_type: "LoadImage",
-              inputs: { image: params.inputImageUrl },
-            },
-          }),
-        },
+        prompt: params.prompt,
+        negative_prompt: params.negativePrompt || "blurry, low quality, distorted, watermark",
+        num_inference_steps: params.isDraft ? 15 : steps,
+        guidance: guidance,
+        size: `${width}*${height}`,
+        duration: params.duration,
+        flow_shift: 5,
+        seed: params.seed ?? -1,
+        enable_prompt_optimization: true,
+        enable_safety_checker: false,
       };
 
     case "mochi-1":

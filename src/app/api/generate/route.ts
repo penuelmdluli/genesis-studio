@@ -151,7 +151,8 @@ export async function POST(req: NextRequest) {
       const runpodJob = await submitRunPodJob(
         body.modelId,
         runpodInput,
-        webhookUrl
+        webhookUrl,
+        effectiveType
       );
 
       await updateJobStatus(job.id, {

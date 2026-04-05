@@ -5,7 +5,7 @@ import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
-import { ModelId } from "@/types";
+import { ModelId, GenerationType } from "@/types";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
@@ -34,7 +34,8 @@ export async function GET(
       try {
         const runpodStatus = await getRunPodJobStatus(
           job.model_id as ModelId,
-          job.runpod_job_id
+          job.runpod_job_id,
+          job.type as GenerationType
         );
 
         if (runpodStatus.status === "COMPLETED" && runpodStatus.output) {
@@ -222,13 +223,13 @@ export async function GET(
         console.error("RunPod poll error:", pollErr);
       }
 
-      // Timeout check — if job has been running for more than 20 minutes, fail it
-      // (includes queue wait time + GPU processing; 720p Wan 2.2 alone takes ~5 min GPU)
+      // Timeout check — if job has been running for more than 30 minutes, fail it
+      // (includes queue wait time + cold start + GPU processing)
       const jobAge = (Date.now() - new Date(job.created_at).getTime()) / 1000;
-      if (jobAge > 1200 && (job.status === "queued" || job.status === "processing")) {
+      if (jobAge > 1800 && (job.status === "queued" || job.status === "processing")) {
         await updateJobStatus(job.id, {
           status: "failed",
-          errorMessage: "Generation timed out after 20 minutes. Credits have been refunded.",
+          errorMessage: "Generation timed out after 30 minutes. Credits have been refunded.",
           completedAt: new Date().toISOString(),
         });
         await refundCredits(
@@ -240,7 +241,7 @@ export async function GET(
         return NextResponse.json({
           id: job.id,
           status: "failed",
-          errorMessage: "Generation timed out after 20 minutes. Credits have been refunded.",
+          errorMessage: "Generation timed out after 30 minutes. Credits have been refunded.",
           creditsCost: job.credits_cost,
           createdAt: job.created_at,
         });

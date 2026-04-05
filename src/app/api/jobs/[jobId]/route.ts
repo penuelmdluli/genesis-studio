@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId, GenerationType } from "@/types";
@@ -36,10 +37,79 @@ export async function GET(
       // Determine provider for this model
       const modelConfig = AI_MODELS[job.model_id as ModelId];
       const isFal = modelConfig?.provider === "fal";
+      // Motion control jobs store "fal:endpoint:requestId" in runpod_job_id
+      const isFalMotion = job.runpod_job_id.startsWith("fal:");
 
       try {
-        // --- FAL.AI Provider ---
-        if (isFal) {
+        // --- FAL.AI Motion Control ---
+        if (isFalMotion) {
+          const parts = job.runpod_job_id.split(":");
+          const falEndpoint = parts.slice(1, -1).join(":");
+          const falRequestId = parts[parts.length - 1];
+
+          const motionStatus = await getMotionJobStatus(falEndpoint, falRequestId);
+
+          if (motionStatus.status === "COMPLETED") {
+            const motionResult = await getMotionJobResult(falEndpoint, falRequestId);
+            const vKey = videoStorageKey(job.user_id, job.id);
+            const videoRes = await fetch(motionResult.videoUrl);
+            if (!videoRes.ok) throw new Error(`Failed to download motion video: ${videoRes.status}`);
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            await uploadVideo(vKey, videoBuffer);
+            await verifyR2Upload(vKey);
+
+            const videoId = randomUUID();
+            const videoApiUrl = `/api/videos/${videoId}`;
+            await createVideo({
+              id: videoId,
+              userId: job.user_id,
+              jobId: job.id,
+              title: job.prompt.slice(0, 100),
+              url: videoApiUrl,
+              thumbnailUrl: "",
+              modelId: job.model_id,
+              prompt: job.prompt,
+              resolution: job.resolution,
+              duration: job.duration,
+              fps: job.fps,
+              fileSize: videoBuffer.length,
+              aspectRatio: job.aspect_ratio,
+            });
+
+            await updateJobStatus(job.id, {
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              completedAt: new Date().toISOString(),
+            });
+
+            return NextResponse.json({
+              id: job.id, status: "completed", progress: 100,
+              outputVideoUrl: videoApiUrl, modelId: job.model_id,
+              prompt: job.prompt, creditsCost: job.credits_cost,
+              createdAt: job.created_at, completedAt: new Date().toISOString(),
+            });
+          } else if (motionStatus.status === "FAILED") {
+            await updateJobStatus(job.id, {
+              status: "failed",
+              errorMessage: motionStatus.error || "Motion control failed",
+              completedAt: new Date().toISOString(),
+            });
+            await refundCredits(job.user_id, job.credits_cost, job.id, "Motion control failed — automatic refund");
+            return NextResponse.json({
+              id: job.id, status: "failed",
+              errorMessage: motionStatus.error || "Motion control failed",
+              creditsCost: job.credits_cost, createdAt: job.created_at,
+            });
+          } else if (motionStatus.status === "IN_PROGRESS") {
+            await updateJobStatus(job.id, { status: "processing", progress: 50 });
+            job.status = "processing";
+            job.progress = 50;
+          }
+        }
+
+        // --- FAL.AI Provider (t2v/i2v) ---
+        if (!isFalMotion && isFal) {
           const falStatus = await getFalJobStatus(
             job.model_id as ModelId,
             job.runpod_job_id

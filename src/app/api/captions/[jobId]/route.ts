@@ -73,26 +73,31 @@ export async function GET(
     if (statusData.status === "COMPLETED") {
       const output = statusData.output;
 
-      // Faster Whisper returns: { segments: [...], detected_language: "en" }
-      // or sometimes just the transcription object directly
+      // RunPod ai-api-faster-whisper output formats:
+      // - SRT format: { transcription: "1\n00:00:00,000 --> ...\ntext\n\n..." }
+      // - Plain text: { transcription: "text..." }
+      // - Segments: { segments: [{start, end, text}...] }
+      // - Direct string: "text..."
+      let srt = "";
       let segments = output?.segments || output?.transcription?.segments || [];
       let plainText = "";
 
-      // Handle different output formats
       if (typeof output === "string") {
-        // Plain text output
+        // Direct string output — could be SRT or plain text
+        srt = output.includes("-->") ? output : "";
         plainText = output;
-        segments = [];
       } else if (output?.transcription && typeof output.transcription === "string") {
+        // Transcription as string — SRT or plain text
+        srt = output.transcription.includes("-->") ? output.transcription : "";
         plainText = output.transcription;
+      } else if (segments.length > 0) {
+        // Segments array — convert to SRT
+        srt = segmentsToSrt(segments);
+        plainText = segments.map((s: { text: string }) => s.text).join(" ");
       }
 
-      // Convert segments to SRT if we have them
-      let srt = "";
-      if (segments.length > 0) {
-        srt = segmentsToSrt(segments);
-      } else if (plainText) {
-        // No timestamps — wrap entire text in a single SRT entry
+      // Fallback: if we got plain text but no SRT, wrap it
+      if (!srt && plainText) {
         srt = `1\n00:00:00,000 --> 00:05:00,000\n${plainText}\n`;
       }
 
@@ -101,8 +106,8 @@ export async function GET(
         output: {
           srt,
           segments,
-          detectedLanguage: output?.detected_language || output?.language || "en",
-          plainText: plainText || segments.map((s: { text: string }) => s.text).join(" "),
+          detectedLanguage: output?.detected_language || output?.language || "auto",
+          plainText,
         },
       });
     }

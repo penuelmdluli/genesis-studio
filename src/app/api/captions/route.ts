@@ -78,9 +78,9 @@ export async function POST(req: NextRequest) {
           input: {
             audio: videoUrl,
             model: "large-v3",
-            transcription: "plain_text",
+            transcription: "srt",
             translate: false,
-            language: language || "en",
+            language: language || null,
             word_timestamps: true,
           },
         }),

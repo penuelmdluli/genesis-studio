@@ -258,7 +258,7 @@ export default function GalleryPage() {
                   {/* Video preview — always visible, plays on hover */}
                   {video.url ? (
                     <video
-                      src={video.url}
+                      src={`${video.url}#t=0.1`}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       muted
                       loop

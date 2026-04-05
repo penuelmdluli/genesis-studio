@@ -5,50 +5,42 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Tooltip } from "@/components/ui/tooltip";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import {
-  AI_MODELS,
-  RESOLUTIONS,
-  FPS_OPTIONS,
-  MOTION_PRESETS,
-  MOTION_CATEGORIES,
-} from "@/lib/constants";
-import { estimateCreditCost } from "@/lib/utils";
-import { ModelId, CharacterOrientation, MotionPreset as MotionPresetType } from "@/types";
-import {
   Sparkles,
-  Zap,
   Upload,
   Play,
   Settings2,
   Wand2,
-  Film,
   Image as ImageIcon,
   User,
   Video,
   X,
-  Info,
   ChevronDown,
   ChevronUp,
-  RotateCcw,
-  Library,
   Clock,
   Move,
-  PersonStanding,
+  Zap,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import {
+  FUN_EFFECTS,
+  FUN_EFFECT_CATEGORIES,
+  type FunEffect,
+} from "@/lib/motion-control";
 
-type MotionTab = "upload" | "library" | "history";
+type MotionTab = "upload" | "effects" | "history";
+type MotionQuality = "standard" | "pro";
+type MotionModel = "kling-v3" | "kling-v2.6";
 
-// Motion control supports longer durations (up to 30s) to match reference videos
-const MOTION_DURATIONS = [3, 5, 8, 10, 15, 20, 30];
+// Kling motion control supports 5s or 10s
+const MOTION_DURATIONS = [5, 10];
 
 export default function MotionControlPage() {
-  const { form, setFormField, user, addJob, updateCreditBalance } = useStore();
+  const { user, addJob, updateCreditBalance } = useStore();
   const { toast } = useToast();
 
   // Motion-specific state
@@ -56,43 +48,41 @@ export default function MotionControlPage() {
   const [motionVideoPreview, setMotionVideoPreview] = useState<string | null>(null);
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterImagePreview, setCharacterImagePreview] = useState<string | null>(null);
-  const [orientation, setOrientation] = useState<CharacterOrientation>("match_video");
-  const [motionTab, setMotionTab] = useState<MotionTab>("upload");
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
-  const [motionCategoryFilter, setMotionCategoryFilter] = useState("All");
+  const [motionTab, setMotionTab] = useState<MotionTab>("effects");
+  const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
+  const [effectCategoryFilter, setEffectCategoryFilter] = useState("All");
   const [prompt, setPrompt] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Parameters
-  const [resolution, setResolution] = useState("720p");
-  const [duration, setDuration] = useState(10);
-  const [fps, setFps] = useState(24);
+  // Model & quality
+  const [model, setModel] = useState<MotionModel>("kling-v3");
+  const [quality, setQuality] = useState<MotionQuality>("standard");
+  const [duration, setDuration] = useState(5);
+  const [enableAudio, setEnableAudio] = useState(false);
+  const [keepOriginalSound, setKeepOriginalSound] = useState(false);
   const [seed, setSeed] = useState<number | undefined>(undefined);
-  const [guidanceScale, setGuidanceScale] = useState(7.5);
-  const [numInferenceSteps, setNumInferenceSteps] = useState(30);
+  const [orientation, setOrientation] = useState<"video" | "image">("video");
 
   const motionVideoRef = useRef<HTMLInputElement>(null);
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   const isLoading = !user;
-  // Motion control always uses MimicMotion — the only model that truly supports motion transfer
-  const modelId = "mimic-motion" as const;
-  const currentModel = AI_MODELS[modelId];
-  const creditCost = estimateCreditCost(modelId, resolution, duration, false);
+
+  // Credit cost estimation (matches server-side estimateMotionCost)
+  const ratePerSec = quality === "pro" ? 0.14 : 0.07;
+  const creditCost = Math.ceil(ratePerSec * duration * 300);
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
 
-  const filteredPresets = MOTION_PRESETS.filter(
-    (p) => motionCategoryFilter === "All" || p.category === motionCategoryFilter.toLowerCase()
+  const filteredEffects = FUN_EFFECTS.filter(
+    (e) => effectCategoryFilter === "All" || e.category === effectCategoryFilter
   );
 
   const handleMotionVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
       setError("Video file too large. Maximum size is 50MB.");
       toast("Video too large (max 50MB)", "error");
@@ -100,30 +90,24 @@ export default function MotionControlPage() {
     }
 
     const url = URL.createObjectURL(file);
-
-    // Auto-detect video duration and clamp to 30s max
     const video = document.createElement("video");
     video.preload = "metadata";
     video.onloadedmetadata = () => {
       const videoDur = Math.round(video.duration);
       if (videoDur > 30) {
-        setError("Video is longer than 30 seconds. Please trim it or use a shorter clip.");
+        setError("Video must be 30 seconds or shorter.");
         toast("Video must be 30 seconds or shorter", "error");
         URL.revokeObjectURL(url);
         return;
       }
-      // Set duration to match the uploaded video
-      const closestDuration = MOTION_DURATIONS.reduce((prev, curr) =>
-        Math.abs(curr - videoDur) < Math.abs(prev - videoDur) ? curr : prev
-      );
-      setDuration(closestDuration);
+      setDuration(videoDur <= 7 ? 5 : 10);
       setMotionVideo(file);
-      setSelectedPreset(null);
+      setSelectedEffect(null);
       setMotionVideoPreview(url);
       setError(null);
     };
     video.onerror = () => {
-      setError("Could not read video file. Please try a different format.");
+      setError("Could not read video file.");
       URL.revokeObjectURL(url);
     };
     video.src = url;
@@ -133,7 +117,6 @@ export default function MotionControlPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       setError("Image file too large. Maximum size is 10MB.");
       toast("Image too large (max 10MB)", "error");
@@ -147,16 +130,16 @@ export default function MotionControlPage() {
     reader.readAsDataURL(file);
   };
 
-  const handlePresetSelect = (preset: MotionPresetType) => {
-    setSelectedPreset(preset.id);
+  const handleEffectSelect = (effect: FunEffect) => {
+    setSelectedEffect(effect.id);
     setMotionVideo(null);
-    setMotionVideoPreview(preset.previewVideoUrl || null);
+    setMotionVideoPreview(null);
   };
 
   const clearMotionVideo = () => {
     setMotionVideo(null);
     setMotionVideoPreview(null);
-    setSelectedPreset(null);
+    setSelectedEffect(null);
     if (motionVideoRef.current) motionVideoRef.current.value = "";
   };
 
@@ -167,17 +150,16 @@ export default function MotionControlPage() {
   };
 
   const canGenerate =
-    (motionVideo || selectedPreset) &&
+    (motionVideo || selectedEffect) &&
     characterImage &&
     hasEnoughCredits &&
     !isLoading;
 
-  // Helper: upload a file to R2 via presigned URL
+  // Upload file to R2 via presigned URL
   const uploadFileToR2 = async (
     file: File,
     purpose: "video" | "image"
   ): Promise<string> => {
-    // 1. Get presigned URLs from our API
     const presignRes = await fetch("/api/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -193,7 +175,6 @@ export default function MotionControlPage() {
     }
     const { uploadUrl, downloadUrl } = await presignRes.json();
 
-    // 2. Upload file directly to R2
     const uploadRes = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": file.type },
@@ -203,15 +184,14 @@ export default function MotionControlPage() {
       throw new Error("Failed to upload file to storage");
     }
 
-    // 3. Return the signed download URL (RunPod can access this)
     return downloadUrl;
   };
 
   const handleGenerate = async () => {
     setError(null);
 
-    if (!motionVideo && !selectedPreset) {
-      setError("Please upload a motion reference video or select from the library.");
+    if (!motionVideo && !selectedEffect) {
+      setError("Upload a reference video or pick a fun effect.");
       return;
     }
     if (!characterImage) {
@@ -219,50 +199,40 @@ export default function MotionControlPage() {
       return;
     }
     if (!hasEnoughCredits) {
-      setError(`Not enough credits. You need ${creditCost} but have ${user?.creditBalance ?? 0}.`);
+      setError(`Not enough credits. Need ${creditCost}, have ${user?.creditBalance ?? 0}.`);
       return;
     }
 
     setIsGenerating(true);
     try {
-      // Upload files to R2 first
       toast("Uploading files...", "info");
 
-      let inputVideoUrl: string | undefined;
-      let inputImageUrl: string | undefined;
-
       // Upload character image
-      inputImageUrl = await uploadFileToR2(characterImage, "image");
+      const characterImageUrl = await uploadFileToR2(characterImage, "image");
 
-      // Upload motion video (or use preset URL)
+      // Upload motion video if provided
+      let referenceVideoUrl: string | undefined;
       if (motionVideo) {
-        inputVideoUrl = await uploadFileToR2(motionVideo, "video");
-      } else if (selectedPreset) {
-        const preset = MOTION_PRESETS.find((p) => p.id === selectedPreset);
-        inputVideoUrl = preset?.previewVideoUrl || undefined;
+        referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
       }
 
-      toast("Starting generation...", "info");
+      toast("Starting motion control...", "info");
 
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/motion-control", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "motion" as const,
-          modelId,
-          prompt: prompt.trim() || "Motion control generation — transfer character motion with high quality",
-          negativePrompt: negativePrompt || undefined,
-          inputImageUrl,
-          inputVideoUrl,
-          resolution,
+          characterImageUrl,
+          referenceVideoUrl,
+          effect: selectedEffect || undefined,
+          prompt: prompt.trim() || undefined,
+          quality,
+          model,
+          orientation,
           duration,
-          fps,
+          enableAudio,
+          keepOriginalSound,
           seed,
-          guidanceScale,
-          numInferenceSteps,
-          isDraft: false,
-          aspectRatio: "landscape",
-          motionPresetId: selectedPreset || undefined,
         }),
       });
 
@@ -272,19 +242,19 @@ export default function MotionControlPage() {
           id: data.jobId,
           userId: user?.id || "",
           status: "queued",
-          type: "motion",
-          modelId,
-          prompt: prompt.trim() || "Motion control generation",
-          resolution,
+          type: "i2v",
+          modelId: "mimic-motion",
+          prompt: prompt.trim() || `Motion: ${selectedEffect || "custom"}`,
+          resolution: "720p",
           duration,
-          fps,
+          fps: 24,
           isDraft: false,
-          creditsCost: creditCost,
+          creditsCost: data.creditsCost || creditCost,
           progress: 0,
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        toast("Motion control generation started! Check your gallery.", "success");
+        toast("Motion control started! Check your gallery.", "success");
         setError(null);
       } else {
         setError(data.error || "Generation failed.");
@@ -299,6 +269,8 @@ export default function MotionControlPage() {
     }
   };
 
+  const selectedEffectObj = FUN_EFFECTS.find((e) => e.id === selectedEffect);
+
   return (
     <PageTransition className="space-y-6">
       {/* Header */}
@@ -310,18 +282,20 @@ export default function MotionControlPage() {
           <div>
             <h1 className="text-2xl font-bold text-zinc-100">Motion Control</h1>
             <p className="text-sm text-zinc-500 mt-0.5">
-              Transfer motion from a reference video onto any character image
+              Apply motion effects or transfer reference video motion onto any character
             </p>
           </div>
+          <Badge className="ml-auto bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs">
+            Powered by Kling AI
+          </Badge>
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2">
           {[
-            { num: 1, label: "Motion", done: !!(motionVideo || selectedPreset) },
+            { num: 1, label: "Motion / Effect", done: !!(motionVideo || selectedEffect) },
             { num: 2, label: "Character", done: !!characterImage },
-            { num: 3, label: "Settings", done: !!(motionVideo || selectedPreset) && !!characterImage },
-            { num: 4, label: "Generate", done: false },
+            { num: 3, label: "Generate", done: false },
           ].map((step, i) => (
             <div key={step.num} className="flex items-center gap-2">
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
@@ -338,7 +312,7 @@ export default function MotionControlPage() {
                 )}
                 {step.label}
               </div>
-              {i < 3 && <div className={`w-6 h-px ${step.done ? "bg-violet-500/40" : "bg-white/[0.06]"}`} />}
+              {i < 2 && <div className={`w-6 h-px ${step.done ? "bg-violet-500/40" : "bg-white/[0.06]"}`} />}
             </div>
           ))}
         </div>
@@ -352,17 +326,17 @@ export default function MotionControlPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Video className="w-4 h-4 text-violet-400" />
-                Motion Reference
+                Motion Source
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Tabs: Upload / Library / History */}
+              {/* Tabs: Fun Effects / Upload / History */}
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 {([
-                  { key: "upload", label: "Upload Video", icon: Upload },
-                  { key: "library", label: "Motion Library", icon: Library },
-                  { key: "history", label: "History", icon: Clock },
-                ] as const).map((tab) => (
+                  { key: "effects" as const, label: "Fun Effects", icon: Sparkles },
+                  { key: "upload" as const, label: "Upload Video", icon: Upload },
+                  { key: "history" as const, label: "History", icon: Clock },
+                ]).map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setMotionTab(tab.key)}
@@ -377,6 +351,84 @@ export default function MotionControlPage() {
                   </button>
                 ))}
               </div>
+
+              {/* Fun Effects Tab */}
+              {motionTab === "effects" && (
+                <div className="space-y-3">
+                  {/* Category Filter */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {FUN_EFFECT_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setEffectCategoryFilter(cat)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          effectCategoryFilter === cat
+                            ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                            : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Effects Grid */}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                    {filteredEffects.map((effect) => {
+                      const isSelected = selectedEffect === effect.id;
+                      return (
+                        <button
+                          key={effect.id}
+                          onClick={() => handleEffectSelect(effect)}
+                          className={`relative rounded-xl border p-3 text-center transition-all duration-200 group ${
+                            isSelected
+                              ? "border-violet-500/50 ring-2 ring-violet-500/30 bg-violet-500/10"
+                              : "border-white/[0.06] hover:border-violet-500/30 bg-white/[0.02] hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          {/* Effect icon placeholder */}
+                          <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${
+                            isSelected ? "bg-violet-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
+                          }`}>
+                            <Sparkles className={`w-5 h-5 ${isSelected ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-400"}`} />
+                          </div>
+                          <div className={`text-[11px] font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-400"}`}>
+                            {effect.name}
+                          </div>
+                          <div className="text-[9px] text-zinc-600 mt-0.5 capitalize">
+                            {effect.category}
+                          </div>
+                          {/* Selected indicator */}
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
+                              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedEffect && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                      <svg className="w-4 h-4 text-violet-400 shrink-0" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-xs text-violet-300">
+                        Effect: <strong>{selectedEffectObj?.name}</strong>
+                      </span>
+                      <button
+                        onClick={() => setSelectedEffect(null)}
+                        className="ml-auto text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Upload Tab */}
               {motionTab === "upload" && (
@@ -415,116 +467,12 @@ export default function MotionControlPage() {
                         <Video className="w-7 h-7 text-violet-400" />
                       </div>
                       <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
-                        Add video of character actions to mimic
+                        Upload a reference video for motion transfer
                       </span>
                       <span className="text-xs text-zinc-600 mt-1">
                         MP4, WebM or MOV — up to 30 seconds, max 50MB
                       </span>
                     </label>
-                  )}
-                </div>
-              )}
-
-              {/* Library Tab */}
-              {motionTab === "library" && (
-                <div className="space-y-3">
-                  {/* Category Filter */}
-                  <div className="flex gap-1.5 flex-wrap">
-                    {MOTION_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => setMotionCategoryFilter(cat)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          motionCategoryFilter === cat
-                            ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                            : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Preset Grid — real video previews */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
-                    {filteredPresets.map((preset) => {
-                      const isSelected = selectedPreset === preset.id;
-                      return (
-                        <button
-                          key={preset.id}
-                          onClick={() => handlePresetSelect(preset)}
-                          className={`relative rounded-xl border overflow-hidden text-left transition-all duration-200 group ${
-                            isSelected
-                              ? "border-violet-500/50 ring-2 ring-violet-500/30 bg-violet-500/10"
-                              : "border-white/[0.06] hover:border-violet-500/30 bg-white/[0.02]"
-                          }`}
-                        >
-                          {/* Video thumbnail — auto-plays on hover */}
-                          <div className="aspect-[4/3] bg-zinc-900 relative overflow-hidden">
-                            <video
-                              src={preset.previewVideoUrl || preset.thumbnailUrl}
-                              className="w-full h-full object-cover"
-                              muted
-                              loop
-                              playsInline
-                              preload="metadata"
-                              onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
-                              onMouseLeave={(e) => {
-                                const vid = e.target as HTMLVideoElement;
-                                vid.pause();
-                                vid.currentTime = 0;
-                              }}
-                            />
-                            {/* Play indicator on hover */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                                <Play className="w-4 h-4 text-white ml-0.5" />
-                              </div>
-                            </div>
-                            {/* Category badge */}
-                            <div className="absolute top-1.5 left-1.5">
-                              <span className="px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[9px] font-medium text-zinc-300 capitalize">
-                                {preset.category}
-                              </span>
-                            </div>
-                            {/* Selected checkmark */}
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-violet-500 flex items-center justify-center shadow-lg">
-                                <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                          {/* Label */}
-                          <div className="p-2.5">
-                            <div className={`text-xs font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-300"}`}>
-                              {preset.name}
-                            </div>
-                            <div className="text-[10px] text-zinc-500 truncate mt-0.5">
-                              {preset.description}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {selectedPreset && (
-                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                      <svg className="w-4 h-4 text-violet-400 shrink-0" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-xs text-violet-300">
-                        Selected: <strong>{MOTION_PRESETS.find((p) => p.id === selectedPreset)?.name}</strong>
-                      </span>
-                      <button
-                        onClick={() => { setSelectedPreset(null); setMotionVideoPreview(null); }}
-                        className="ml-auto text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
                   )}
                 </div>
               )}
@@ -535,7 +483,7 @@ export default function MotionControlPage() {
                   <Clock className="w-8 h-8 text-zinc-700 mb-2" />
                   <p className="text-sm text-zinc-500">No motion history yet</p>
                   <p className="text-xs text-zinc-600 mt-1">
-                    Your previously used motions will appear here
+                    Your previous motion generations will appear here
                   </p>
                 </div>
               )}
@@ -588,99 +536,6 @@ export default function MotionControlPage() {
             </CardContent>
           </Card>
 
-          {/* Character Orientation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <RotateCcw className="w-4 h-4 text-fuchsia-400" />
-                Character Orientation
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setOrientation("match_video")}
-                  className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                    orientation === "match_video"
-                      ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                      : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                      orientation === "match_video"
-                        ? "bg-violet-500/20"
-                        : "bg-white/[0.04]"
-                    }`}>
-                      <Video className={`w-4 h-4 ${
-                        orientation === "match_video" ? "text-violet-400" : "text-zinc-500"
-                      }`} />
-                    </div>
-                    <div>
-                      <div className={`text-sm font-medium ${
-                        orientation === "match_video" ? "text-violet-300" : "text-zinc-400"
-                      }`}>
-                        Matches Video
-                      </div>
-                      <div className="text-[11px] text-zinc-600">
-                        Character follows video orientation
-                      </div>
-                    </div>
-                  </div>
-                  {orientation === "match_video" && (
-                    <div className="flex justify-end">
-                      <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setOrientation("match_image")}
-                  className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                    orientation === "match_image"
-                      ? "border-cyan-500/40 bg-cyan-500/10 shadow-lg shadow-cyan-500/5"
-                      : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                      orientation === "match_image"
-                        ? "bg-cyan-500/20"
-                        : "bg-white/[0.04]"
-                    }`}>
-                      <ImageIcon className={`w-4 h-4 ${
-                        orientation === "match_image" ? "text-cyan-400" : "text-zinc-500"
-                      }`} />
-                    </div>
-                    <div>
-                      <div className={`text-sm font-medium ${
-                        orientation === "match_image" ? "text-cyan-300" : "text-zinc-400"
-                      }`}>
-                        Matches Image
-                      </div>
-                      <div className="text-[11px] text-zinc-600">
-                        Preserves character&apos;s original pose
-                      </div>
-                    </div>
-                  </div>
-                  {orientation === "match_image" && (
-                    <div className="flex justify-end">
-                      <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Prompt (Optional) */}
           <Card>
             <CardHeader>
@@ -692,7 +547,7 @@ export default function MotionControlPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Textarea
-                placeholder="Optionally describe the scene... e.g., 'Cinematic lighting, flowing dress, sunlit garden' — leave empty to auto-generate from the motion"
+                placeholder="Optionally describe the scene... e.g., 'Cinematic lighting, flowing dress, sunlit garden'"
                 value={prompt}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
                 className="min-h-[80px] bg-white/[0.03] border-white/[0.08] focus:border-violet-500/50 resize-none"
@@ -710,7 +565,7 @@ export default function MotionControlPage() {
               <CardTitle className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Settings2 className="w-4 h-4 text-zinc-400" />
-                  Parameters
+                  Settings
                 </div>
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
@@ -722,24 +577,34 @@ export default function MotionControlPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              {/* Model & Quality */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Resolution</label>
+                  <label className="block text-xs text-zinc-500 mb-1.5">Model</label>
                   <select
-                    value={resolution}
-                    onChange={(e) => setResolution(e.target.value)}
+                    value={model}
+                    onChange={(e) => setModel(e.target.value as MotionModel)}
                     className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
-                    {RESOLUTIONS.filter((r) => {
-                      const resOrder = ["480p", "720p", "1080p", "4k"];
-                      return resOrder.indexOf(r.value) <= resOrder.indexOf(currentModel?.maxResolution || "720p");
-                    }).map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
+                    <option value="kling-v3">Kling V3 (Latest)</option>
+                    <option value="kling-v2.6">Kling V2.6</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1.5">Quality</label>
+                  <select
+                    value={quality}
+                    onChange={(e) => setQuality(e.target.value as MotionQuality)}
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="pro">Pro (Higher Quality)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Duration */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1.5">Duration</label>
                   <select
@@ -748,32 +613,56 @@ export default function MotionControlPage() {
                     className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
                     {MOTION_DURATIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d >= 60 ? `${d / 60}m` : `${d}s`}
-                      </option>
+                      <option key={d} value={d}>{d}s</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">FPS</label>
+                  <label className="block text-xs text-zinc-500 mb-1.5">Orientation</label>
                   <select
-                    value={fps}
-                    onChange={(e) => setFps(Number(e.target.value))}
+                    value={orientation}
+                    onChange={(e) => setOrientation(e.target.value as "video" | "image")}
                     className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
-                    {FPS_OPTIONS.map((f) => (
-                      <option key={f} value={f}>
-                        {f} fps
-                      </option>
-                    ))}
+                    <option value="video">Match Video</option>
+                    <option value="image">Match Image</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Audio Toggle */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                <button
+                  onClick={() => setEnableAudio(!enableAudio)}
+                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                    enableAudio ? "bg-violet-500" : "bg-zinc-700"
+                  }`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                    enableAudio ? "translate-x-5.5 left-0.5" : "left-0.5"
+                  }`} style={{ transform: enableAudio ? "translateX(20px)" : "translateX(0)" }} />
+                </button>
+                <div className="flex items-center gap-2">
+                  {enableAudio ? (
+                    <Volume2 className="w-4 h-4 text-violet-400" />
+                  ) : (
+                    <VolumeX className="w-4 h-4 text-zinc-500" />
+                  )}
+                  <div>
+                    <div className="text-xs font-medium text-zinc-300">
+                      {enableAudio ? "Audio Enabled" : "No Audio"}
+                    </div>
+                    <div className="text-[10px] text-zinc-600">
+                      Generate native audio with the video
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Advanced Settings */}
               {showAdvanced && (
                 <div className="space-y-3 pt-3 border-t border-white/[0.06]">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-zinc-500 mb-1.5">Seed</label>
                       <input
@@ -785,39 +674,16 @@ export default function MotionControlPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-zinc-500 mb-1.5">Guidance Scale</label>
-                      <input
-                        type="number"
-                        value={guidanceScale}
-                        onChange={(e) => setGuidanceScale(Number(e.target.value))}
-                        min={1}
-                        max={20}
-                        step={0.5}
+                      <label className="block text-xs text-zinc-500 mb-1.5">Keep Original Sound</label>
+                      <select
+                        value={keepOriginalSound ? "yes" : "no"}
+                        onChange={(e) => setKeepOriginalSound(e.target.value === "yes")}
                         className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
-                      />
+                      >
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                      </select>
                     </div>
-                    <div>
-                      <label className="block text-xs text-zinc-500 mb-1.5">Inference Steps</label>
-                      <input
-                        type="number"
-                        value={numInferenceSteps}
-                        onChange={(e) => setNumInferenceSteps(Number(e.target.value))}
-                        min={10}
-                        max={100}
-                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Negative Prompt */}
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-1.5">Negative Prompt</label>
-                    <Textarea
-                      placeholder="Things to avoid... e.g., 'blurry, distorted face, bad anatomy'"
-                      value={negativePrompt}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNegativePrompt(e.target.value)}
-                      className="min-h-[60px] bg-white/[0.03] border-white/[0.08] focus:border-violet-500/50 resize-none text-sm"
-                    />
                   </div>
                 </div>
               )}
@@ -828,10 +694,9 @@ export default function MotionControlPage() {
         {/* Right Column: Summary & Generate */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 space-y-4">
-            {/* Preview Card — shows motion + character side by side */}
+            {/* Preview Card */}
             <Card className="overflow-hidden">
               <div className="bg-gradient-to-br from-violet-950/50 via-zinc-900 to-fuchsia-950/30 relative">
-                {/* Two-panel preview: Motion + Character */}
                 <div className="grid grid-cols-2 gap-0.5">
                   {/* Motion preview */}
                   <div className="aspect-square bg-black/40 flex items-center justify-center relative">
@@ -844,6 +709,11 @@ export default function MotionControlPage() {
                         loop
                         playsInline
                       />
+                    ) : selectedEffect ? (
+                      <div className="text-center p-2">
+                        <Sparkles className="w-8 h-8 text-violet-400 mx-auto mb-1" />
+                        <p className="text-[10px] text-violet-300 font-medium">{selectedEffectObj?.name}</p>
+                      </div>
                     ) : (
                       <div className="text-center p-2">
                         <Video className="w-6 h-6 text-zinc-700 mx-auto mb-1" />
@@ -852,7 +722,7 @@ export default function MotionControlPage() {
                     )}
                     <div className="absolute bottom-1 left-1">
                       <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[9px] text-violet-300 font-medium">
-                        Motion
+                        {selectedEffect ? "Effect" : "Motion"}
                       </span>
                     </div>
                   </div>
@@ -877,15 +747,15 @@ export default function MotionControlPage() {
                     </div>
                   </div>
                 </div>
-                {/* Status badge */}
-                {(motionVideo || selectedPreset) && characterImagePreview && (
+                {/* Ready badge */}
+                {(motionVideo || selectedEffect) && characterImagePreview && (
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10">
                     <Badge className="bg-violet-500/90 text-white text-[10px] shadow-lg">
                       Ready to Generate
                     </Badge>
                   </div>
                 )}
-                {/* Arrow indicator between panels */}
+                {/* Plus indicator */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-zinc-900/80 border border-white/10 flex items-center justify-center z-10">
                   <span className="text-[10px] text-zinc-400">+</span>
                 </div>
@@ -904,14 +774,16 @@ export default function MotionControlPage() {
                     <span className="text-zinc-300">Motion Control</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Model</span>
-                    <span className="text-zinc-300">{currentModel?.name || "—"}</span>
+                    <span className="text-zinc-500">Engine</span>
+                    <span className="text-zinc-300">
+                      {model === "kling-v3" ? "Kling V3" : "Kling V2.6"} {quality === "pro" ? "Pro" : "Standard"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Motion</span>
                     <span className="text-zinc-300 truncate max-w-[140px]">
-                      {selectedPreset
-                        ? MOTION_PRESETS.find((p) => p.id === selectedPreset)?.name
+                      {selectedEffect
+                        ? selectedEffectObj?.name
                         : motionVideo
                         ? motionVideo.name
                         : "—"}
@@ -924,18 +796,14 @@ export default function MotionControlPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Orientation</span>
-                    <span className="text-zinc-300">
-                      {orientation === "match_video" ? "Matches Video" : "Matches Image"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Resolution</span>
-                    <span className="text-zinc-300">{resolution}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-zinc-500">Duration</span>
-                    <span className="text-zinc-300">{duration >= 60 ? `${duration / 60}m` : `${duration}s`}</span>
+                    <span className="text-zinc-300">{duration}s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Audio</span>
+                    <span className={enableAudio ? "text-violet-300" : "text-zinc-500"}>
+                      {enableAudio ? "Enabled" : "Off"}
+                    </span>
                   </div>
                 </div>
 
@@ -949,7 +817,7 @@ export default function MotionControlPage() {
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs text-zinc-500">Est. Time</span>
                     <span className="text-xs text-zinc-400">
-                      ~{Math.ceil((currentModel?.avgGenerationTime || 120) * (duration / 5) / 60)} min
+                      ~{Math.ceil(duration * 12 / 60)} min
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -958,7 +826,7 @@ export default function MotionControlPage() {
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"
                     }`}>
                       {user?.isOwner
-                        ? "∞ Unlimited"
+                        ? "Unlimited"
                         : `${user?.creditBalance?.toLocaleString() ?? "—"} credits`}
                     </span>
                   </div>
@@ -982,7 +850,7 @@ export default function MotionControlPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
+                      <Zap className="w-4 h-4" />
                       Generate Motion
                     </div>
                   )}

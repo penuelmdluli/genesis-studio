@@ -99,13 +99,14 @@ describe("E2E Generation Pipeline", () => {
         expect(profit).toHaveProperty("profitable");
         expect(profit).toHaveProperty("margin");
         expect(profit).toHaveProperty("gpuCost");
-        expect(profit).toHaveProperty("revenue");
+        expect(profit).toHaveProperty("grossRevenue");
+        expect(profit).toHaveProperty("netRevenue");
         expect(profit.gpuCost).toBeGreaterThan(0);
-        expect(profit.revenue).toBeGreaterThan(0);
+        expect(profit.grossRevenue).toBeGreaterThan(0);
         expect(typeof profit.profitable).toBe("boolean");
 
-        // Step 6: Revenue should be credit_cost * CREDIT_VALUE_USD
-        expect(profit.revenue).toBeCloseTo(creditCost * CREDIT_VALUE_USD, 2);
+        // Step 6: Gross revenue should be credit_cost * CREDIT_VALUE_USD
+        expect(profit.grossRevenue).toBeCloseTo(creditCost * CREDIT_VALUE_USD, 2);
       }
     });
 
@@ -255,7 +256,7 @@ describe("E2E Generation Pipeline", () => {
         const result = isProfitable(creditCost, modelId, 5, resolution);
 
         // All models should be designed to be profitable at standard rates
-        expect(result.revenue).toBeGreaterThan(0);
+        expect(result.grossRevenue).toBeGreaterThan(0);
         expect(result.gpuCost).toBeGreaterThanOrEqual(0);
       }
     });
@@ -264,7 +265,7 @@ describe("E2E Generation Pipeline", () => {
       for (const [modelId, model] of Object.entries(AI_MODELS)) {
         for (const [resolution, baseCost] of Object.entries(model.creditCost)) {
           const result = isProfitable(baseCost, modelId, 5, resolution);
-          expect(result.revenue).toBeGreaterThan(0);
+          expect(result.grossRevenue).toBeGreaterThan(0);
         }
       }
     });

@@ -190,20 +190,20 @@ describe("estimateCreditCost", () => {
   });
 
   it("falls back to 480p for unknown resolution", () => {
-    expect(estimateCreditCost("cogvideo-x", "1080p", 5, false)).toBe(3);
+    expect(estimateCreditCost("cogvideo-x", "1080p", 5, false)).toBe(10);
   });
 
   it("calculates correctly for all models", () => {
-    expect(estimateCreditCost("ltx-video", "720p", 5, false)).toBe(8);
+    expect(estimateCreditCost("ltx-video", "720p", 5, false)).toBe(15);
     expect(estimateCreditCost("hunyuan-video", "480p", 5, false)).toBe(12);
     expect(estimateCreditCost("mochi-1", "1080p", 5, false)).toBe(70);
-    expect(estimateCreditCost("cogvideo-x", "480p", 5, false)).toBe(3);
+    expect(estimateCreditCost("cogvideo-x", "480p", 5, false)).toBe(10);
   });
 
   it("rounds up with Math.ceil", () => {
     // wan-2.2 480p at 3s: 20 * (3/5) * 1 = 12
     expect(estimateCreditCost("wan-2.2", "480p", 3, false)).toBe(12);
-    // cogvideo-x 480p at 3s draft: 3 * (3/5) * 0.3 = 0.54 -> ceil = 1
-    expect(estimateCreditCost("cogvideo-x", "480p", 3, true)).toBe(1);
+    // cogvideo-x 480p at 3s draft: 10 * (3/5) * 0.3 = 1.8 -> ceil = 2
+    expect(estimateCreditCost("cogvideo-x", "480p", 3, true)).toBe(2);
   });
 });

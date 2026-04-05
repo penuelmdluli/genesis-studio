@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   estimateGpuCostUsd,
   creditsToRevenue,
+  creditsToRevenueNet,
   getGenerationMargin,
   isProfitable,
   calculateBreakEven,
@@ -11,6 +12,9 @@ import {
   MODEL_GPU_MAP,
   FIXED_COSTS_MONTHLY,
   PLAN_LIMITS,
+  VAT_RATE,
+  PAYMENT_PROCESSOR_FEE,
+  NET_REVENUE_MULTIPLIER,
 } from "./profitability";
 
 describe("profitability", () => {
@@ -31,8 +35,17 @@ describe("profitability", () => {
       expect(MODEL_GPU_MAP["mochi-1"]).toBe("A6000");
     });
 
-    it("has correct fixed costs", () => {
-      expect(FIXED_COSTS_MONTHLY.total).toBe(85);
+    it("has correct fixed costs including all services", () => {
+      expect(FIXED_COSTS_MONTHLY.total).toBe(155);
+      expect(FIXED_COSTS_MONTHLY.resend).toBe(20);
+      expect(FIXED_COSTS_MONTHLY.claude_api).toBe(30);
+    });
+
+    it("has correct tax and fee rates", () => {
+      expect(VAT_RATE).toBe(0.15);
+      expect(PAYMENT_PROCESSOR_FEE).toBe(0.035);
+      // We keep ~83.9% of every rand charged
+      expect(NET_REVENUE_MULTIPLIER).toBeCloseTo(0.839, 2);
     });
   });
 
@@ -72,11 +85,21 @@ describe("profitability", () => {
     });
   });
 
+  describe("creditsToRevenueNet", () => {
+    it("applies VAT and payment processor deduction", () => {
+      const gross = creditsToRevenue(100); // $3.00
+      const net = creditsToRevenueNet(100); // $3.00 × 0.839 = ~$2.52
+      expect(net).toBeLessThan(gross);
+      expect(net).toBeCloseTo(gross * NET_REVENUE_MULTIPLIER, 2);
+    });
+  });
+
   describe("getGenerationMargin", () => {
-    it("calculates correct margin", () => {
-      // 10 credits = $0.30 revenue, $0.06 GPU = 80% margin
+    it("calculates margin using NET revenue (after taxes)", () => {
+      // 10 credits = $0.30 gross, ~$0.252 net, $0.06 GPU
       const margin = getGenerationMargin(10, 0.06);
-      expect(margin).toBe(80);
+      expect(margin).toBeGreaterThan(50); // Should still be profitable
+      expect(margin).toBeLessThan(80);    // But less than gross-only calc
     });
 
     it("returns 0 for 0 credits", () => {
@@ -84,38 +107,47 @@ describe("profitability", () => {
     });
 
     it("handles negative margin", () => {
-      // 1 credit = $0.03 revenue, $0.10 GPU = negative
+      // 1 credit = $0.03 gross, ~$0.025 net, $0.10 GPU = negative
       const margin = getGenerationMargin(1, 0.10);
       expect(margin).toBeLessThan(0);
     });
   });
 
   describe("isProfitable", () => {
-    it("returns profitable for cheap models with good credits", () => {
-      const result = isProfitable(10, "cogvideo-x", 5, "480p");
-      expect(result.profitable).toBe(true);
-      expect(result.margin).toBeGreaterThan(50);
+    it("returns profitable for cheap models with correct pricing", () => {
+      // CogVideoX at 8 credits (new price) should be profitable
+      const result = isProfitable(8, "cogvideo-x", 5, "480p");
+      expect(result.netRevenue).toBeGreaterThan(result.fullCost);
     });
 
-    it("returns correct structure", () => {
+    it("returns correct structure with full cost breakdown", () => {
       const result = isProfitable(40, "wan-2.2", 5, "720p");
       expect(result).toHaveProperty("profitable");
       expect(result).toHaveProperty("margin");
       expect(result).toHaveProperty("gpuCost");
-      expect(result).toHaveProperty("revenue");
-      expect(typeof result.margin).toBe("number");
+      expect(result).toHaveProperty("fullCost");
+      expect(result).toHaveProperty("grossRevenue");
+      expect(result).toHaveProperty("netRevenue");
+      expect(result.fullCost).toBeGreaterThanOrEqual(result.gpuCost);
+      expect(result.netRevenue).toBeLessThan(result.grossRevenue);
+    });
+
+    it("Brain Studio has higher cost due to Claude API", () => {
+      const normal = isProfitable(50, "kling-2.6", 5, "720p", false);
+      const brain = isProfitable(50, "kling-2.6", 5, "720p", true);
+      expect(brain.fullCost).toBeGreaterThan(normal.fullCost);
     });
   });
 
   describe("calculateBreakEven", () => {
-    it("calculates break-even users", () => {
-      const users = calculateBreakEven(24.60, 85, 5);
+    it("calculates break-even users with all costs", () => {
+      const users = calculateBreakEven(24.60, 155, 5);
       expect(users).toBeGreaterThan(0);
-      expect(users).toBeLessThan(20); // Should be around 5
+      expect(users).toBeLessThan(20);
     });
 
-    it("returns Infinity if cost per user exceeds revenue", () => {
-      const users = calculateBreakEven(5, 85, 10);
+    it("returns Infinity if cost per user exceeds net revenue", () => {
+      const users = calculateBreakEven(5, 155, 10);
       expect(users).toBe(Infinity);
     });
   });

@@ -33,7 +33,7 @@ vi.mock("@/lib/constants", () => ({
     "ltx-video": {
       id: "ltx-video",
       name: "LTX Video",
-      creditCost: { "480p": 5, "720p": 8 },
+      creditCost: { "480p": 8, "720p": 15 },
     },
     "wan-2.1-turbo": {
       id: "wan-2.1-turbo",
@@ -48,7 +48,7 @@ vi.mock("@/lib/constants", () => ({
     "cogvideo-x": {
       id: "cogvideo-x",
       name: "CogVideo X",
-      creditCost: { "480p": 3 },
+      creditCost: { "480p": 10 },
     },
   },
   BUILT_IN_AUDIO_TRACKS: [
@@ -259,12 +259,12 @@ describe("Planner", () => {
 
       // Planning: 2
       // Scene 1: wan-2.2 @ 720p = 40, dur=5 => multiplier=1 => 40
-      // Scene 2: ltx-video @ 720p = 8, dur=5 => multiplier=1 => 8
-      // Scene 3: cogvideo-x @ 480p = 3, dur=5 => multiplier=1 => 3
+      // Scene 2: ltx-video @ 720p = 15, dur=5 => multiplier=1 => 15
+      // Scene 3: cogvideo-x @ 480p = 10, dur=5 => multiplier=1 => 10
       // MMAudio: all 3 scenes are silent (no hasAudio) => 3 * 2 = 6
       // Assembly: 5
-      // Total: 2 + 40 + 8 + 3 + 6 + 5 = 64
-      expect(credits).toBe(64);
+      // Total: 2 + 40 + 15 + 10 + 6 + 5 = 78
+      expect(credits).toBe(78);
     });
 
     it("applies duration multiplier for scenes longer than 5 seconds", () => {
@@ -275,11 +275,11 @@ describe("Planner", () => {
       const credits = calculateBrainCredits(plan, input);
 
       // Planning: 2
-      // Scene: ltx-video @ 720p = 8, dur=10 => multiplier=2 => ceil(16) = 16
+      // Scene: ltx-video @ 720p = 15, dur=10 => multiplier=2 => ceil(30) = 30
       // MMAudio: 1 silent scene => 1 * 2 = 2
       // Assembly: 5
-      // Total: 2 + 16 + 2 + 5 = 25
-      expect(credits).toBe(25);
+      // Total: 2 + 30 + 2 + 5 = 39
+      expect(credits).toBe(39);
     });
 
     it("adds voiceover, music, and caption fees", () => {

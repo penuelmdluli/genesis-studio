@@ -49,10 +49,12 @@ export async function POST(req: NextRequest) {
     const sceneId = sceneRow.id as string;
 
     // Update scene based on status
-    if (status === "COMPLETED" && output?.video_url) {
+    // Hub endpoints return video URL as 'result', others as 'video_url'
+    const videoUrl = output?.result || output?.video_url;
+    if (status === "COMPLETED" && videoUrl) {
       await updateProductionScene(sceneId, {
         status: "completed",
-        output_video_url: output.video_url,
+        output_video_url: videoUrl,
         gpu_time: body.executionTime || body.gpu_time || 0,
         progress: 100,
       });

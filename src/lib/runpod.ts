@@ -40,7 +40,9 @@ interface RunPodStatusResponse {
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "CANCELLED";
   output?: {
     video_url?: string;
+    result?: string; // Hub endpoints return video URL as 'result'
     thumbnail_url?: string;
+    cost?: number;
   };
   error?: string;
   executionTime?: number;

@@ -170,10 +170,12 @@ export async function GET(req: NextRequest) {
           try {
             const { getRunPodJobStatus } = await import("@/lib/runpod");
             const rpStatus = await getRunPodJobStatus(sceneModelId, scene.runpodJobId);
-            if (rpStatus.status === "COMPLETED" && rpStatus.output?.video_url) {
+            // Hub endpoints return video URL as 'result', others as 'video_url'
+            const rpVideoUrl = rpStatus.output?.result || rpStatus.output?.video_url;
+            if (rpStatus.status === "COMPLETED" && rpVideoUrl) {
               await updateProductionScene(scene.id, {
                 status: "completed",
-                output_video_url: rpStatus.output.video_url,
+                output_video_url: rpVideoUrl,
                 progress: 100,
               });
               scene.status = "completed" as typeof scene.status;

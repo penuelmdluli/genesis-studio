@@ -75,20 +75,27 @@ export function ChatBot() {
       {isOpen && (
         <div className={cn(
           "fixed z-50 rounded-2xl bg-[#0f0f17] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-fade-in-scale",
-          // Mobile: full width bottom sheet style
-          "inset-x-2 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] top-20 md:inset-auto",
+          // Mobile: fullscreen
+          "inset-0 rounded-none md:inset-auto md:rounded-2xl",
           // Desktop: floating panel
           "md:bottom-24 md:right-6 md:w-[360px] md:h-[480px] md:top-auto md:left-auto"
         )}>
           {/* Header */}
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 shrink-0">
+          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 shrink-0 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
               <span className="text-sm text-white font-bold">G</span>
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-white">Genesis Assistant</p>
               <p className="text-[10px] text-emerald-400">Powered by Claude AI</p>
             </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors md:hidden"
+              aria-label="Close chat"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Messages */}
@@ -123,7 +130,7 @@ export function ChatBot() {
           </div>
 
           {/* Input */}
-          <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
+          <div className="px-3 py-3 border-t border-white/[0.06] shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
             <div className="flex gap-2">
               <input
                 ref={inputRef}

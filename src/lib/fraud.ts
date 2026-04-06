@@ -26,6 +26,8 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   "generate:paid": { windowMs: 600_000, maxRequests: 20 },
   // API prompt enhance: 30 per 10 minutes
   "enhance:all": { windowMs: 600_000, maxRequests: 30 },
+  // Chat bot: 20 messages per hour
+  "chat:user": { windowMs: 3_600_000, maxRequests: 20 },
   // Account creation: 3 per hour per IP
   "signup:ip": { windowMs: 3_600_000, maxRequests: 3 },
 };

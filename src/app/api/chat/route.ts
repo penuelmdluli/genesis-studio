@@ -1,4 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { checkRateLimit } from "@/lib/fraud";
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -28,14 +31,39 @@ CREDIT COSTS (5 seconds):
 - Captions: 2 credits/min | Voiceover: 3 credits/30s
 - Thumbnails: 1-2 credits | Upscale: 5 credits/5s
 
-Be friendly, concise, and helpful. If you don't know account-specific details, direct users to Settings.`;
+Be friendly, concise, and helpful. Keep responses SHORT (2-3 sentences). If you don't know account-specific details, direct users to Settings.`;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { message } = await req.json();
 
-    if (!message || typeof message !== "string" || message.length > 2000) {
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
       return NextResponse.json({ error: "Invalid message" }, { status: 400 });
+    }
+
+    if (message.length > 2000) {
+      return NextResponse.json({ error: "Message too long (max 2000 characters)" }, { status: 400 });
+    }
+
+    // Rate limit: 20 messages per hour per user
+    const rateCheck = checkRateLimit(userId, "chat:user");
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        reply: `You've reached the chat limit (20 messages/hour). Try again in ${Math.ceil((rateCheck.resetAt - Date.now()) / 60_000)} minutes, or email hello@genesis-studio.app for help.`,
+      });
+    }
+
+    // Daily budget check
+    const budgetCheck = checkBudget("claude:chat");
+    if (!budgetCheck.allowed) {
+      return NextResponse.json({
+        reply: "The AI assistant is taking a break right now. For help, email hello@genesis-studio.app or check our docs at /docs.",
+      });
     }
 
     if (!ANTHROPIC_API_KEY) {
@@ -52,12 +80,14 @@ export async function POST(req: Request) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 500,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: message }],
+        messages: [{ role: "user", content: message.trim() }],
       }),
     });
+
+    recordApiCall("claude:chat");
 
     if (!res.ok) {
       console.error("[chat] Anthropic API error:", res.status);

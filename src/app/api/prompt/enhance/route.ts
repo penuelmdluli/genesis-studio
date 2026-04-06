@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { checkRateLimit } from "@/lib/fraud";
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const SYSTEM_PROMPT = `You are a cinematic video prompt enhancer. Your job is to take a user's basic video generation prompt and transform it into a richly detailed, cinematic prompt optimized for AI video generation.
 
@@ -14,6 +16,24 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit: 30 per 10 minutes
+  const rateCheck = checkRateLimit(userId, "enhance:all");
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Try again in a few minutes." },
+      { status: 429 }
+    );
+  }
+
+  // Daily budget check
+  const budgetCheck = checkBudget("claude:enhance");
+  if (!budgetCheck.allowed) {
+    return NextResponse.json(
+      { error: "Prompt enhancement is temporarily unavailable. Please try again later." },
+      { status: 503 }
+    );
   }
 
   try {
@@ -72,6 +92,8 @@ export async function POST(req: NextRequest) {
         ],
       }),
     });
+
+    recordApiCall("claude:enhance");
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);

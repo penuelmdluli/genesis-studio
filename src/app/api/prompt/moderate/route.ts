@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -37,8 +38,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (!ANTHROPIC_API_KEY) {
-      console.error("ANTHROPIC_API_KEY is not configured");
       // Fail open so generation isn't blocked
+      return NextResponse.json({ safe: true });
+    }
+
+    // Daily budget check — fail open if exceeded
+    const budgetCheck = checkBudget("claude:moderate");
+    if (!budgetCheck.allowed) {
       return NextResponse.json({ safe: true });
     }
 
@@ -61,6 +67,8 @@ export async function POST(req: NextRequest) {
         ],
       }),
     });
+
+    recordApiCall("claude:moderate");
 
     if (!response.ok) {
       console.error(

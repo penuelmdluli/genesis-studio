@@ -83,7 +83,6 @@ export default function EditPage() {
       "Video editing is being prepared. This feature requires FFmpeg processing — coming in the next update!",
       "info"
     );
-    console.log("[EDIT] Export config:", editConfig);
   };
 
   return (

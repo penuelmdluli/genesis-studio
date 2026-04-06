@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { grantSubscriptionCredits, addCreditPackCredits } from "@/lib/credits";
 import { updateUserPlan } from "@/lib/db";
 import { PlanId } from "@/types";
+import { handleFailedPayment, recoverDunningRecord } from "@/lib/dunning";
 import Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
@@ -123,6 +124,9 @@ export async function POST(req: NextRequest) {
           // Skip — initial subscription credits already granted by checkout.session.completed
           console.log(`[STRIPE] Skipping invoice.paid for initial subscription (user ${user.id})`);
         }
+
+        // Recover dunning record if payment succeeds after a previous failure
+        recoverDunningRecord(invoice.id).catch(() => {});
         break;
       }
 
@@ -170,6 +174,29 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+
+      case "invoice.payment_failed": {
+        // Dunning: handle failed payment
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        const { data: user } = await supabase
+          .from("users")
+          .select("id, email, name")
+          .eq("stripe_customer_id", customerId)
+          .single();
+
+        if (user) {
+          handleFailedPayment({
+            stripeCustomerId: customerId,
+            invoiceId: invoice.id,
+            userId: user.id,
+            userEmail: user.email || "",
+            userName: user.name || "Creator",
+          }).catch((err) => console.error("[STRIPE] Dunning record failed:", err));
+        }
+        break;
+      }
+
     }
   } catch (error) {
     console.error("Stripe webhook error:", error);

@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/cleanup-storage",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/dunning",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/retention",
+      "schedule": "0 10 * * 1"
     }
   ]
 }

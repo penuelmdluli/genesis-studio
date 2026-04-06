@@ -9,6 +9,8 @@ import { estimateCreditCost } from "@/lib/utils";
 import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
+import { checkRateLimit } from "@/lib/fraud";
+import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +22,16 @@ export async function POST(req: NextRequest) {
     const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Rate limiting
+    const rateCategory = user.plan === "free" ? "generate:free" : "generate:paid";
+    const rateCheck = checkRateLimit(user.id, rateCategory);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait before generating again.", resetAt: rateCheck.resetAt },
+        { status: 429 }
+      );
     }
 
     const rawBody = await req.json();
@@ -181,6 +193,9 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Track provider success
+      recordProviderSuccess(model.provider === "fal" ? "fal" : "runpod");
+
       return NextResponse.json({
         jobId: job.id,
         status: "queued",
@@ -190,6 +205,11 @@ export async function POST(req: NextRequest) {
     } catch (gpuError) {
       console.error("GPU submission error:", gpuError);
 
+      // Track provider failure
+      const provider = model.provider === "fal" ? "fal" : "runpod";
+      const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
+      recordProviderFailure(provider as "fal" | "runpod", errorMsg);
+
       const { refundCredits } = await import("@/lib/credits");
       await refundCredits(
         user.id,
@@ -197,8 +217,6 @@ export async function POST(req: NextRequest) {
         job.id,
         "GPU submission failed — automatic refund"
       );
-
-      const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
 
       await updateJobStatus(job.id, {
         status: "failed",

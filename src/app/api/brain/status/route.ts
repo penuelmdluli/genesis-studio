@@ -10,6 +10,7 @@ import {
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { ModelId } from "@/types";
+import { AI_MODELS } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,27 +40,62 @@ export async function GET(req: NextRequest) {
     // Get scene statuses
     const scenes = await getProductionScenes(productionId);
 
-    // Poll FAL scenes that are still processing (FAL uses polling, not webhooks)
+    // Poll scenes that are still processing
+    // FAL models: poll FAL API directly (FAL uses polling, not webhooks)
+    // RunPod models: also poll RunPod API as webhook fallback
     if (production.status === "generating") {
       const supabase = createSupabaseAdmin();
       for (const scene of scenes) {
         if (scene.status !== "processing" || !scene.runpodJobId) continue;
 
-        // Check if this is a FAL scene
+        // Detect provider from model config (not DB column which may not exist)
         const { data: sceneRow } = await supabase
           .from("production_scenes")
-          .select("provider, model_id")
+          .select("model_id")
           .eq("id", scene.id)
           .single();
 
-        if (sceneRow?.provider !== "fal") continue;
+        const sceneModelId = (sceneRow?.model_id || scene.modelId) as ModelId;
+        const modelConfig = AI_MODELS[sceneModelId];
+        const isFalScene = modelConfig?.provider === "fal";
 
-        const modelId = sceneRow.model_id as ModelId;
+        if (!isFalScene) {
+          // RunPod model — poll RunPod as webhook fallback
+          try {
+            const { getRunPodJobStatus } = await import("@/lib/runpod");
+            const rpStatus = await getRunPodJobStatus(sceneModelId, scene.runpodJobId);
+
+            if (rpStatus.status === "COMPLETED" && rpStatus.output?.video_url) {
+              await updateProductionScene(scene.id, {
+                status: "completed",
+                output_video_url: rpStatus.output.video_url,
+                progress: 100,
+              });
+              scene.status = "completed" as typeof scene.status;
+              scene.outputVideoUrl = rpStatus.output.video_url;
+              console.log(`[BRAIN STATUS] RunPod scene ${scene.id} completed (poll fallback)`);
+            } else if (rpStatus.status === "FAILED") {
+              await updateProductionScene(scene.id, {
+                status: "failed",
+                error_message: rpStatus.error || "RunPod generation failed",
+              });
+              scene.status = "failed" as typeof scene.status;
+            } else if (rpStatus.status === "IN_PROGRESS") {
+              await updateProductionScene(scene.id, { progress: 50 });
+              scene.progress = 50;
+            }
+          } catch (err) {
+            console.warn(`[BRAIN STATUS] RunPod poll error for scene ${scene.id}:`, err);
+          }
+          continue;
+        }
+
+        // FAL model — poll FAL API
         try {
-          const falStatus = await getFalJobStatus(modelId, scene.runpodJobId);
+          const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
 
           if (falStatus.status === "COMPLETED") {
-            const result = await getFalJobResult(modelId, scene.runpodJobId);
+            const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
             await updateProductionScene(scene.id, {
               status: "completed",
               output_video_url: result.videoUrl,
@@ -82,18 +118,46 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Check if all scenes are now done — trigger assembly for FAL-only productions
+      // Stuck production timeout — if generating for 30+ minutes, mark failed
+      const startedAt = production.startedAt ? new Date(production.startedAt).getTime() : 0;
+      const elapsedMs = startedAt ? Date.now() - startedAt : 0;
+      const STUCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      if (elapsedMs > STUCK_TIMEOUT_MS) {
+        const stuckScenes = scenes.filter((s) => s.status === "processing" || s.status === "queued");
+        if (stuckScenes.length > 0) {
+          console.error(`[BRAIN STATUS] Production ${productionId} stuck for ${Math.round(elapsedMs / 60000)}min — marking failed`);
+          for (const s of stuckScenes) {
+            await updateProductionScene(s.id, {
+              status: "failed",
+              error_message: "Generation timed out after 30 minutes",
+            });
+            s.status = "failed" as typeof s.status;
+          }
+        }
+      }
+
+      // Check if all scenes are now done — trigger assembly
       const allDone = scenes.every((s) => s.status === "completed" || s.status === "failed");
       const anyCompleted = scenes.some((s) => s.status === "completed");
-      if (allDone && anyCompleted && production.status === "generating") {
-        await updateProduction(productionId, { status: "assembling", progress: 70 });
-        production.status = "assembling" as typeof production.status;
+      if (allDone && production.status === "generating") {
+        if (anyCompleted) {
+          // At least some scenes completed — move to assembly
+          await updateProduction(productionId, { status: "assembling", progress: 70 });
+          production.status = "assembling" as typeof production.status;
 
-        // Import and call assembly directly
-        const { triggerBrainAssembly } = await import("@/lib/genesis-brain/assembly");
-        triggerBrainAssembly(productionId, scenes).catch((err: unknown) => {
-          console.error(`[BRAIN STATUS] Assembly trigger failed:`, err);
-        });
+          const { triggerBrainAssembly } = await import("@/lib/genesis-brain/assembly");
+          triggerBrainAssembly(productionId, scenes).catch((err: unknown) => {
+            console.error(`[BRAIN STATUS] Assembly trigger failed:`, err);
+          });
+        } else {
+          // All scenes failed — mark production as failed
+          await updateProduction(productionId, {
+            status: "failed",
+            progress: 0,
+            error_message: "All scenes failed to generate",
+          });
+          production.status = "failed" as typeof production.status;
+        }
       }
     }
 

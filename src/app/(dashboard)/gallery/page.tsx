@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -539,9 +539,23 @@ function VideoCard({
   onDownload: (e: React.MouseEvent, url: string, title: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // IntersectionObserver — only load video when near viewport (200px ahead)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { rootMargin: "200px", threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -563,6 +577,7 @@ function VideoCard({
 
   return (
     <motion.div
+      ref={containerRef}
       className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ${
         isDeleting ? "opacity-50 pointer-events-none" : ""
       }`}
@@ -578,21 +593,37 @@ function VideoCard({
     >
       {/* Video container — always aspect-video for uniform grid */}
       <div className="aspect-video bg-[#0D0D14] relative overflow-hidden">
-        {/* Loading shimmer while video metadata loads */}
-        {video.url && !videoLoaded && (
+        {/* Poster thumbnail — loads instantly, blurs out when video plays */}
+        {video.thumbnailUrl && (
+          <img
+            src={video.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 z-[2] ${
+              videoLoaded && isHovered ? "opacity-0 scale-105 blur-sm" : "opacity-100"
+            }`}
+          />
+        )}
+
+        {/* Shimmer skeleton while no thumbnail and video not loaded */}
+        {!video.thumbnailUrl && !videoLoaded && (
           <div className="absolute inset-0 z-[5]">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-900/15 via-[#0D0D14] to-fuchsia-900/10" />
             <div className="absolute inset-0 overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[shimmer_2s_infinite]" />
             </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 rounded-full border-2 border-transparent border-t-violet-500/60 animate-spin" />
-            </div>
           </div>
         )}
 
-        {/* Video element — always mounted for instant playback */}
-        {video.url ? (
+        {/* Loading spinner on hover while video loads */}
+        {isVisible && isHovered && !videoLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center z-[6]">
+            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-violet-500 animate-spin" />
+          </div>
+        )}
+
+        {/* Video element — only mounted when near viewport (saves bandwidth) */}
+        {isVisible && video.url ? (
           <video
             ref={videoRef}
             src={`${video.url}#t=0.5`}
@@ -602,14 +633,14 @@ function VideoCard({
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="none"
             onLoadedData={() => setVideoLoaded(true)}
           />
-        ) : (
+        ) : !isVisible && !video.thumbnailUrl ? (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">
             <Film className="w-8 h-8 text-zinc-800" />
           </div>
-        )}
+        ) : null}
 
         {/* Bottom gradient — always visible */}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />

@@ -161,7 +161,11 @@ export default function MotionControlPage() {
   const uploadFileToR2 = async (file: File, purpose: "video" | "image") =>
     uploadFile(file, purpose);
 
+  const generateLockRef = useRef(false);
+
   const handleGenerate = async () => {
+    if (generateLockRef.current || isGenerating) return;
+    generateLockRef.current = true;
     setError(null);
 
     if (!motionVideo && !selectedEffect) {
@@ -240,6 +244,7 @@ export default function MotionControlPage() {
       toast("Network error.", "error");
     } finally {
       setIsGenerating(false);
+      generateLockRef.current = false;
     }
   };
 
@@ -804,19 +809,10 @@ export default function MotionControlPage() {
                 <Button
                   onClick={handleGenerate}
                   disabled={!canGenerate || isGenerating}
+                  loading={isGenerating}
                   className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-violet-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  {isGenerating ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Generating...
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4" />
-                      Generate Motion
-                    </div>
-                  )}
+                  {isGenerating ? "Generating..." : <><Zap className="w-4 h-4" /> Generate Motion</>}
                 </Button>
 
                 {!hasEnoughCredits && !user?.isOwner && (
@@ -844,6 +840,7 @@ export default function MotionControlPage() {
           <Button
             onClick={handleGenerate}
             disabled={!canGenerate || isGenerating}
+            loading={isGenerating}
             className="flex-1 max-w-[200px] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white"
           >
             {isGenerating ? "Generating..." : (

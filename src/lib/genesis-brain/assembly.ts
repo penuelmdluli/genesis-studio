@@ -122,7 +122,9 @@ export async function triggerBrainAssembly(
     });
     sceneUrlMap["final"] = assembledUrl;
 
-    const finalThumbnail = completedScenes[0].outputVideoUrl!.replace(/\.mp4$/, "_thumb.jpg");
+    // Use first scene URL as thumbnail (video player shows first frame)
+    // Don't construct a _thumb.jpg URL — RunPod/FAL don't generate those
+    const finalThumbnail = completedScenes[0].outputVideoUrl || undefined;
 
     await updateProduction(productionId, {
       status: "completed",
@@ -146,7 +148,7 @@ export async function triggerBrainAssembly(
         jobId: `brain-${productionId}`,
         title: production!.concept || "Brain Studio Production",
         url: assembledUrl,
-        thumbnailUrl: finalThumbnail,
+        thumbnailUrl: finalThumbnail || "",
         modelId: "wan-2.2" as ModelId,
         prompt: production!.concept || "",
         resolution: "720p",

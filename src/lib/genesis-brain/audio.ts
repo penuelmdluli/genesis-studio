@@ -479,65 +479,53 @@ export async function assembleScenes(
   }
 
   try {
-    console.log(`[BRAIN ASSEMBLY] Assembling ${sceneVideoUrls.length} scenes via FAL FFmpeg`);
+    console.log(`[BRAIN ASSEMBLY] Merging ${sceneVideoUrls.length} scenes via FAL merge-videos`);
 
-    // Build FFmpeg filter for concatenation
-    const inputs: Array<{ url: string; type: "video" | "audio" }> = [];
-
-    // Add all scene videos
-    for (const url of sceneVideoUrls) {
-      inputs.push({ url, type: "video" });
-    }
-
-    // Build concat filter
-    const videoInputs = sceneVideoUrls.map((_, i) => `[${i}:v]`).join("");
-    let filterComplex = `${videoInputs}concat=n=${sceneVideoUrls.length}:v=1:a=0[outv]`;
-    let mapOutputs = ["-map", "[outv]"];
-
-    // If scenes have audio tracks, concat those too
-    const hasAudio = audioLayers?.sceneAudioUrls && audioLayers.sceneAudioUrls.length > 0;
-
-    // Add voiceover/music as additional inputs if present
-    let nextInputIdx = sceneVideoUrls.length;
-    const audioMixInputs: string[] = [];
-
-    if (audioLayers?.voiceoverUrl) {
-      inputs.push({ url: audioLayers.voiceoverUrl, type: "audio" });
-      audioMixInputs.push(`[${nextInputIdx}:a]`);
-      nextInputIdx++;
-    }
-
-    if (audioLayers?.musicUrl) {
-      inputs.push({ url: audioLayers.musicUrl, type: "audio" });
-      audioMixInputs.push(`[${nextInputIdx}:a]`);
-      nextInputIdx++;
-    }
-
-    // Mix audio layers if present
-    if (audioMixInputs.length > 0) {
-      const mixCount = audioMixInputs.length;
-      filterComplex += `;${audioMixInputs.join("")}amix=inputs=${mixCount}:duration=longest[outa]`;
-      mapOutputs = ["-map", "[outv]", "-map", "[outa]"];
-    }
-
-    const result = await fal.subscribe("fal-ai/ffmpeg-api/compose-videos", {
+    // Step 1: Merge all scene videos into one using FAL merge-videos endpoint
+    const mergeResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-videos", {
       input: {
-        inputs,
-        filter_complex: filterComplex,
-        output_args: [...mapOutputs, "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k"],
+        video_urls: sceneVideoUrls,
       },
       logs: false,
     });
 
-    const data = result.data as Record<string, unknown>;
-    const output = data?.output as { url: string } | undefined;
+    const mergeData = mergeResult.data as Record<string, unknown>;
+    const mergedVideo = mergeData?.video as { url: string } | undefined;
 
-    if (!output?.url) {
-      throw new Error("FFmpeg assembly returned no output URL");
+    if (!mergedVideo?.url) {
+      throw new Error("merge-videos returned no output URL");
     }
 
-    console.log(`[BRAIN ASSEMBLY] Assembly complete: ${output.url}`);
-    return { videoUrl: output.url, duration: 0 };
+    console.log(`[BRAIN ASSEMBLY] Videos merged: ${mergedVideo.url}`);
+    let finalUrl = mergedVideo.url;
+
+    // Step 2: Mix in voiceover/music if present
+    const audioUrl = audioLayers?.voiceoverUrl || audioLayers?.musicUrl;
+    if (audioUrl) {
+      try {
+        console.log(`[BRAIN ASSEMBLY] Mixing audio layer onto merged video`);
+        const mixResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-audio-video", {
+          input: {
+            video_url: finalUrl,
+            audio_url: audioUrl,
+          },
+          logs: false,
+        });
+
+        const mixData = mixResult.data as Record<string, unknown>;
+        const mixedVideo = mixData?.video as { url: string } | undefined;
+
+        if (mixedVideo?.url) {
+          finalUrl = mixedVideo.url;
+          console.log(`[BRAIN ASSEMBLY] Audio mixed: ${finalUrl}`);
+        }
+      } catch (audioErr) {
+        console.warn("[BRAIN ASSEMBLY] Audio mixing failed, using video without audio layer:", audioErr);
+      }
+    }
+
+    console.log(`[BRAIN ASSEMBLY] Assembly complete: ${finalUrl}`);
+    return { videoUrl: finalUrl, duration: 0 };
   } catch (err) {
     console.error("[BRAIN ASSEMBLY] FFmpeg assembly failed:", err);
     // Fallback: return first scene
@@ -561,30 +549,20 @@ export async function mergeAudioOntoVideo(
   try {
     console.log("[BRAIN AUDIO] Merging MMAudio onto silent video");
 
-    const result = await fal.subscribe("fal-ai/ffmpeg-api/compose-videos", {
+    const result = await fal.subscribe("fal-ai/ffmpeg-api/merge-audio-video", {
       input: {
-        inputs: [
-          { url: videoUrl, type: "video" },
-          { url: audioUrl, type: "audio" },
-        ],
-        output_args: [
-          "-map", "0:v",
-          "-map", "1:a",
-          "-c:v", "copy",
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-shortest",
-        ],
+        video_url: videoUrl,
+        audio_url: audioUrl,
       },
       logs: false,
     });
 
     const data = result.data as Record<string, unknown>;
-    const output = data?.output as { url: string } | undefined;
+    const video = data?.video as { url: string } | undefined;
 
-    if (output?.url) {
+    if (video?.url) {
       console.log("[BRAIN AUDIO] Audio merge complete");
-      return output.url;
+      return video.url;
     }
     return videoUrl;
   } catch (err) {

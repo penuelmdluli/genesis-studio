@@ -115,6 +115,7 @@ export default function LandingPage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [heroVideos, setHeroVideos] = useState<string[]>([]);
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false);
 
   // Community feed
   const [feedTab, setFeedTab] = useState<FeedTab>("trending");
@@ -205,7 +206,7 @@ export default function LandingPage() {
       ======================================== */}
       <section className="relative h-screen w-full overflow-hidden">
         {/* Video layers for crossfade — only mount active + next for performance */}
-        {heroVideos.length > 0 ? heroVideos.map((src, i) => {
+        {heroVideos.length > 0 && !heroVideoFailed ? heroVideos.map((src, i) => {
           const isActive = i === heroIndex;
           const isNext = i === (heroIndex + 1) % heroVideos.length;
           if (!isActive && !isNext) return null;
@@ -218,9 +219,11 @@ export default function LandingPage() {
               muted
               loop
               playsInline
+              crossOrigin="anonymous"
               preload={isActive ? "auto" : "metadata"}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1500 ease-in-out"
               style={{ opacity: isActive ? 1 : 0 }}
+              onError={() => setHeroVideoFailed(true)}
             />
           );
         }) : (

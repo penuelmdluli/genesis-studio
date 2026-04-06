@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
         );
       }
       return NextResponse.json(
-        { error: "Video Upscaler coming soon" },
+        { error: "Video Upscaler is temporarily unavailable. Please try again later." },
         { status: 503 }
       );
     }
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         );
       }
       return NextResponse.json(
-        { error: "Video Upscaler coming soon" },
+        { error: "Video Upscaler is temporarily unavailable. Please try again later." },
         { status: 503 }
       );
     }

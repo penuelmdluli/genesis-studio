@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const runpodEndpoint = process.env.RUNPOD_ENDPOINT_THUMBNAILS;
     if (!runpodEndpoint) {
       return NextResponse.json(
-        { error: "AI Thumbnails coming soon" },
+        { error: "AI Thumbnails is temporarily unavailable. Please try again later." },
         { status: 503 }
       );
     }

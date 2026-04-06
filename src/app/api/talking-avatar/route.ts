@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         );
       }
       return NextResponse.json(
-        { error: "Talking Avatar coming soon — credits refunded" },
+        { error: "Talking Avatar is temporarily unavailable. Credits have been refunded." },
         { status: 503 }
       );
     }

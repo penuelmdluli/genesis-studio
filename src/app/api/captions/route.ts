@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const captionsEndpoint = process.env.RUNPOD_ENDPOINT_CAPTIONS;
     if (!captionsEndpoint) {
       return NextResponse.json(
-        { error: "Auto Captions coming soon" },
+        { error: "Auto Captions is temporarily unavailable. Please try again later." },
         { status: 503 }
       );
     }

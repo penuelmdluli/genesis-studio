@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { CreditPurchaseModal } from "@/components/credit-purchase-modal";
 import { LowCreditBanner } from "@/components/low-credit-banner";
+import { OnboardingTour } from "@/components/onboarding/tour";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
@@ -196,6 +197,7 @@ export default function DashboardLayout({
           sidebarOpen && "md:ml-64"
         )}
       >
+        <OnboardingTour />
         <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}
         <div className="px-4 pt-16 pb-6 md:p-6 max-w-7xl mx-auto">{children}</div>

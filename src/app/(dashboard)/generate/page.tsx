@@ -27,6 +27,7 @@ import { estimateCreditCost } from "@/lib/utils";
 import { CreditUpsell, useUpsellContext } from "@/components/ui/credit-upsell";
 import { ModelId, GenerationType, VideoFormat } from "@/types";
 import { uploadFile } from "@/lib/upload-client";
+import { PROMPT_SUGGESTIONS, PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate } from "@/lib/prompt-templates";
 import {
   Sparkles,
   Zap,
@@ -47,6 +48,9 @@ import {
   X,
   Info,
   Pause,
+  Loader2,
+  LayoutTemplate,
+  AlertTriangle,
 } from "lucide-react";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
@@ -66,6 +70,10 @@ export default function GeneratePage() {
   const [audioGenreFilter, setAudioGenreFilter] = useState<string>("All");
   const musicPreviewRef = useRef<HTMLAudioElement | null>(null);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState<string>("All");
+  const [moderationWarning, setModerationWarning] = useState<string | null>(null);
 
   const handlePreviewTrack = useCallback((trackId: string, trackUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -133,6 +141,39 @@ export default function GeneratePage() {
     }
   };
 
+  const handleEnhancePrompt = async () => {
+    if (isEnhancing || !form.prompt.trim()) return;
+    setIsEnhancing(true);
+    try {
+      const res = await fetch("/api/prompt/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: form.prompt, type: form.type }),
+      });
+      if (res.ok) {
+        const { enhanced } = await res.json();
+        setFormField("prompt", enhanced);
+        toast("Prompt enhanced!", "success");
+      } else {
+        toast("Enhancement failed. Try again.", "error");
+      }
+    } catch {
+      toast("Enhancement failed.", "error");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleApplyTemplate = (template: PromptTemplate) => {
+    let prompt = template.template;
+    for (const ph of template.placeholders) {
+      prompt = prompt.replace(`{${ph.key}}`, ph.example);
+    }
+    setFormField("prompt", prompt);
+    setShowTemplates(false);
+    toast(`Template "${template.name}" applied!`, "success");
+  };
+
   const handleGenerate = async () => {
     // Double-click protection: ref is synchronous, prevents race window
     if (generateLockRef.current) return;
@@ -175,6 +216,28 @@ export default function GeneratePage() {
     }
 
     setIsGenerating(true);
+    setModerationWarning(null);
+
+    // Content moderation check
+    try {
+      const modRes = await fetch("/api/prompt/moderate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmedPrompt }),
+      });
+      if (modRes.ok) {
+        const modData = await modRes.json();
+        if (!modData.safe) {
+          setModerationWarning(modData.reason || "This prompt contains content that violates our guidelines.");
+          setError("Prompt blocked by content moderation. Please modify your prompt.");
+          setIsGenerating(false);
+          generateLockRef.current = false;
+          return;
+        }
+      }
+    } catch {
+      // Moderation failed — continue (fail open)
+    }
     try {
       // Upload input image to R2 if present (for i2v mode)
       let inputImageUrl: string | undefined;
@@ -331,22 +394,108 @@ export default function GeneratePage() {
           {/* Prompt */}
           <Card glow>
             <CardContent className="p-4 space-y-3">
-              <label className="text-sm font-medium text-zinc-300">Prompt</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-zinc-300">Prompt</label>
+                <button
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                >
+                  <LayoutTemplate className="w-3 h-3" /> Templates
+                </button>
+              </div>
               <Textarea
                 placeholder="Describe your video... e.g., 'A majestic eagle soaring over snow-capped mountains at golden hour, cinematic 4K'"
                 value={form.prompt}
-                onChange={(e) => setFormField("prompt", e.target.value)}
+                onChange={(e) => { setFormField("prompt", e.target.value); setModerationWarning(null); }}
                 rows={4}
                 className="text-base"
               />
+
+              {/* Prompt Suggestions — shown when prompt is empty */}
+              {!form.prompt.trim() && (
+                <div className="space-y-2">
+                  <span className="text-xs text-zinc-500">Try a suggestion:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PROMPT_SUGGESTIONS.slice(0, 6).map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setFormField("prompt", s)}
+                        className="px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all line-clamp-1 max-w-[250px] text-left"
+                      >
+                        {s.length > 60 ? s.slice(0, 60) + "..." : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Moderation Warning */}
+              {moderationWarning && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/[0.08] border border-red-500/20">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-300">{moderationWarning}</p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">{form.prompt.length} characters</span>
-                <Button variant="ghost" size="sm" className="text-xs text-violet-400 hover:text-violet-300">
-                  <Wand2 className="w-3 h-3" /> Enhance with AI
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-violet-400 hover:text-violet-300"
+                  onClick={handleEnhancePrompt}
+                  disabled={isEnhancing || !form.prompt.trim()}
+                >
+                  {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                  {isEnhancing ? "Enhancing..." : "Enhance with AI"}
                 </Button>
               </div>
             </CardContent>
           </Card>
+
+          {/* Template Browser */}
+          {showTemplates && (
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-zinc-300">Prompt Templates</label>
+                  <button onClick={() => setShowTemplates(false)} className="p-1 hover:bg-white/[0.06] rounded-lg">
+                    <X className="w-4 h-4 text-zinc-500" />
+                  </button>
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {TEMPLATE_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setTemplateCategory(cat)}
+                      className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
+                        templateCategory === cat
+                          ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                          : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                  {PROMPT_TEMPLATES.filter((t) => templateCategory === "All" || t.category === templateCategory).map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleApplyTemplate(t)}
+                      className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">{t.icon}</span>
+                        <span className="text-sm font-medium text-zinc-300">{t.name}</span>
+                      </div>
+                      <p className="text-xs text-zinc-500 line-clamp-2">{t.template}</p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Image Upload (for I2V) */}
           {form.type === "i2v" && (

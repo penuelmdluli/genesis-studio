@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatBot } from "@/components/chat/chatbot";
 import { CookieConsent } from "@/components/ui/cookie-consent";
+import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -54,6 +55,12 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Genesis Studio",
+  },
 };
 
 export default function RootLayout({
@@ -76,10 +83,15 @@ export default function RootLayout({
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
       >
+        <head>
+          <meta name="theme-color" content="#7c3aed" />
+          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        </head>
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
           <CookieConsent />
+          <RegisterServiceWorker />
           <Analytics />
           <SpeedInsights />
         </body>

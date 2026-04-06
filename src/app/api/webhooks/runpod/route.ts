@@ -174,13 +174,71 @@ export async function POST(req: NextRequest) {
         }
       }
     } else if (status === "FAILED") {
+      // Auto-retry: attempt with a fallback model before refunding
+      const retryCount = job.retry_count || 0;
+      const MAX_RETRIES = 1;
+
+      if (retryCount < MAX_RETRIES) {
+        // Find a fallback model of the same type
+        const { AI_MODELS } = await import("@/lib/constants");
+        const currentModel = AI_MODELS[job.model_id as keyof typeof AI_MODELS];
+        const fallbackModels = Object.values(AI_MODELS).filter(
+          (m) => m.id !== job.model_id && m.types.includes(job.type) && !m.comingSoon && m.provider !== "fal"
+        );
+
+        if (fallbackModels.length > 0) {
+          const fallback = fallbackModels[0];
+          console.log(`[RETRY] Job ${job.id} failed on ${job.model_id}, retrying with ${fallback.id}`);
+
+          try {
+            const { submitRunPodJob, buildRunPodInput } = await import("@/lib/runpod");
+            const runpodInput = buildRunPodInput({
+              modelId: fallback.id,
+              type: job.type,
+              prompt: job.prompt,
+              negativePrompt: job.negative_prompt,
+              inputImageUrl: job.input_image_url,
+              inputVideoUrl: job.input_video_url,
+              resolution: job.resolution,
+              duration: job.duration,
+              fps: job.fps,
+              seed: job.seed ? job.seed + 1 : undefined,
+              guidanceScale: job.guidance_scale,
+              numInferenceSteps: job.num_inference_steps,
+              isDraft: job.is_draft,
+              aspectRatio: job.aspect_ratio,
+            });
+
+            const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+            const webhookUrl = `${appUrl}/api/webhooks/runpod`;
+            const retryJob = await submitRunPodJob(fallback.id, runpodInput, webhookUrl, job.type);
+
+            await supabase
+              .from("generation_jobs")
+              .update({
+                model_id: fallback.id,
+                runpod_job_id: retryJob.id,
+                status: "queued",
+                retry_count: retryCount + 1,
+                error_message: `Retrying with ${fallback.name} (original: ${job.model_id} failed)`,
+              })
+              .eq("id", job.id);
+
+            return NextResponse.json({ received: true, retried: true });
+          } catch (retryErr) {
+            console.error("[RETRY] Fallback submission failed:", retryErr);
+            // Fall through to refund
+          }
+        }
+      }
+
+      // No retry possible or retry exhausted — refund
       await updateJobStatus(job.id, {
         status: "failed",
         errorMessage: jobError || "Generation failed on GPU",
         completedAt: new Date().toISOString(),
       });
 
-      // Refund credits on failure
       await refundCredits(
         job.user_id,
         job.credits_cost,

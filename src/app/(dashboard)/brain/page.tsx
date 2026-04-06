@@ -122,8 +122,8 @@ export default function BrainStudioPage() {
         if (cancelled || !productions?.length) return;
 
         const latest = productions[0];
-        // Only restore if still active
-        if (!["planning", "generating", "assembling", "review"].includes(latest.status)) return;
+        // Only restore if active or recently completed
+        if (!["planning", "generating", "assembling", "review", "completed"].includes(latest.status)) return;
 
         // Fetch full status with plan and scenes
         const statusRes = await fetch(`/api/brain/status?id=${latest.id}`);
@@ -814,9 +814,9 @@ export default function BrainStudioPage() {
           <div className="space-y-4">
             <Card className="glass-strong overflow-hidden">
               <CardContent className="p-0">
-                {outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0] ? (
+                {outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0] ? (
                   <VideoPlayer
-                    src={outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0]}
+                    src={outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0]}
                     poster={thumbnailUrl || undefined}
                     title={plan?.title || concept.slice(0, 50)}
                     autoPlay
@@ -835,7 +835,7 @@ export default function BrainStudioPage() {
               <Button
                 variant="primary"
                 onClick={async () => {
-                  const videoUrl = outputVideoUrls?.[aspectRatio] || Object.values(outputVideoUrls || {})[0];
+                  const videoUrl = outputVideoUrls?.["final"] || outputVideoUrls?.[aspectRatio] || Object.values(outputVideoUrls || {})[0];
                   if (!videoUrl) return;
                   try {
                     const res = await fetch(videoUrl);

@@ -8,6 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
+import { ComingSoonGate } from "@/components/ui/coming-soon";
 import {
   MessageCircle,
   Upload,
@@ -271,6 +272,7 @@ export default function TalkingAvatarPage() {
   };
 
   return (
+    <ComingSoonGate featureId="talking-avatar" featureName="Talking Avatar">
     <PageTransition className="space-y-6">
       {/* Header */}
       <div>
@@ -636,5 +638,6 @@ export default function TalkingAvatarPage() {
         </Card>
       )}
     </PageTransition>
+    </ComingSoonGate>
   );
 }

@@ -10,12 +10,14 @@ import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { STORAGE_LIMITS } from "@/lib/profitability";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight } from "lucide-react";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useStore();
   const { toast } = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [videoCount, setVideoCount] = useState(0);
   const [notifications, setNotifications] = useState({
     generationComplete: true,
@@ -41,6 +43,46 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Billing portal error:", err);
       toast("Failed to open billing portal", "error");
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/user/export");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `genesis-studio-export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("Data exported successfully", "success");
+    } catch {
+      toast("Failed to export data", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/user/delete-account", { method: "POST" });
+      if (!res.ok) throw new Error("Deletion failed");
+      toast("Account deleted. Signing out...", "success");
+      setShowDeleteModal(false);
+      // Redirect to home after short delay
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 2000);
+    } catch {
+      toast("Failed to delete account. Please try again.", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -223,6 +265,32 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Data & Privacy */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center">
+              <Download className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            Data &amp; Privacy
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-zinc-200">Export Your Data</p>
+              <p className="text-xs text-zinc-500">
+                Download all your data as a JSON file (POPIA/GDPR).
+              </p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={handleExportData} disabled={isExporting}>
+              {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              {isExporting ? "Exporting..." : "Export"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Danger Zone */}
       <Card className="border-red-500/15">
         <CardHeader>
@@ -266,8 +334,9 @@ export default function SettingsPage() {
             <Button variant="secondary" size="sm" onClick={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
-            <Button variant="danger" size="sm">
-              <Trash2 className="w-3 h-3" /> Delete My Account
+            <Button variant="danger" size="sm" onClick={handleDeleteAccount} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {isDeleting ? "Deleting..." : "Delete My Account"}
             </Button>
           </div>
         </div>

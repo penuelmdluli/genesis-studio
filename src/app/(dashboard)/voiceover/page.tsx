@@ -8,6 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
+import { ComingSoonGate } from "@/components/ui/coming-soon";
 import { Mic, Play, Square, Download, Zap, Loader2 } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
@@ -152,6 +153,7 @@ export default function VoiceoverPage() {
   };
 
   return (
+    <ComingSoonGate featureId="voiceover" featureName="AI Voiceover">
     <PageTransition>
       <div className="min-h-screen bg-[#0A0A0F] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl space-y-8">
@@ -377,5 +379,6 @@ export default function VoiceoverPage() {
         </div>
       </div>
     </PageTransition>
+    </ComingSoonGate>
   );
 }

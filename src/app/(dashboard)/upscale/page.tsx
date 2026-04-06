@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { PageTransition } from "@/components/ui/motion";
+import { ComingSoonGate } from "@/components/ui/coming-soon";
 import { ArrowUpCircle, Upload, Zap, Play } from "lucide-react";
 
 const PLAN_ORDER = ["free", "creator", "pro", "studio"] as const;
@@ -257,6 +258,7 @@ export default function UpscalePage() {
   };
 
   return (
+    <ComingSoonGate featureId="video-upscale" featureName="Video Upscaler">
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
@@ -609,5 +611,6 @@ export default function UpscalePage() {
         </div>
       </div>
     </PageTransition>
+    </ComingSoonGate>
   );
 }

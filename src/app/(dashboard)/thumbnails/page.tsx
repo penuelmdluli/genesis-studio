@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { ComingSoonGate } from "@/components/ui/coming-soon";
 import {
   ImageIcon,
   Download,
@@ -146,6 +147,7 @@ export default function ThumbnailsPage() {
   };
 
   return (
+    <ComingSoonGate featureId="thumbnails" featureName="AI Thumbnails">
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">AI Thumbnails</h1>
@@ -439,5 +441,6 @@ export default function ThumbnailsPage() {
         </Card>
       )}
     </PageTransition>
+    </ComingSoonGate>
   );
 }

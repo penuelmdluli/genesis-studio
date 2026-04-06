@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatBot } from "@/components/chat/chatbot";
+import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -78,6 +79,7 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
+          <CookieConsent />
           <Analytics />
           <SpeedInsights />
         </body>

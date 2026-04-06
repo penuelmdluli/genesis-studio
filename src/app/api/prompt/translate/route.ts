@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { checkRateLimit } from "@/lib/fraud";
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 
@@ -27,6 +29,24 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: 30 per 10 minutes
+    const rateCheck = checkRateLimit(userId, "translate:all");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again in a few minutes." },
+        { status: 429 }
+      );
+    }
+
+    // Daily budget guard
+    const budgetCheck = checkBudget("claude:translate");
+    if (!budgetCheck.allowed) {
+      return NextResponse.json(
+        { error: "Translation is temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
     }
 
     const { prompt, sourceLanguage = "auto" } = await req.json();
@@ -63,6 +83,8 @@ export async function POST(req: NextRequest) {
       console.error("[TRANSLATE] Anthropic API error:", await res.text());
       return NextResponse.json({ error: "Translation failed" }, { status: 503 });
     }
+
+    recordApiCall("claude:translate");
 
     const data = await res.json();
     const translated = data.content?.[0]?.text?.trim() || prompt;

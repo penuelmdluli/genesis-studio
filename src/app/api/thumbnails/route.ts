@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
     }
 
     const numImages = count && [1, 2, 4].includes(count) ? count : 1;
-    const creditsCost = numImages <= 2 ? 1 : 2;
+    // FLUX Pro costs ~$0.04/image → need ~7 credits ($0.17) for 4x markup per image
+    const creditsCost = numImages <= 2 ? 5 : 10;
 
     if (!FAL_API_KEY) {
       return NextResponse.json(

@@ -41,11 +41,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate credits: 2 per minute, minimum 2
-    // For URL-based submissions, estimate 1 minute minimum; actual duration
-    // would be determined server-side by the transcription worker
+    // Calculate credits: 10 per minute, minimum 10
+    // Whisper GPU costs ~$0.05/min → 10 credits ($0.24) = 4.8x markup
     const estimatedMinutes = 1;
-    const creditCost = Math.max(estimatedMinutes * 2, 2);
+    const creditCost = Math.max(estimatedMinutes * 10, 10);
 
     const ownerAccount = isOwnerClerkId(clerkId);
 

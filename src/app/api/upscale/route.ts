@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Calculate credit cost: 5 credits per 5 seconds of video
-    const creditsCost = Math.ceil((videoDuration || 5) / 5) * 5;
+    // Calculate credit cost: 20 credits per 5 seconds of video
+    // Creative Upscaler costs ~$0.10/frame → 20 credits ($0.48) = 4.8x markup
+    const creditsCost = Math.ceil((videoDuration || 5) / 5) * 20;
 
     // Deduct credits (skip for owners)
     if (!ownerAccount) {

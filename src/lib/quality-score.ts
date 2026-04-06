@@ -4,6 +4,8 @@
  * If quality is below threshold, suggests a retry with a different seed.
  */
 
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 interface QualityResult {
@@ -23,6 +25,12 @@ export async function scoreVideoQuality(
 ): Promise<QualityResult> {
   if (!ANTHROPIC_API_KEY) {
     return { score: 7, issues: [] }; // Default to passing if no API key
+  }
+
+  // Budget guard — skip quality scoring if daily budget exhausted
+  const budgetCheck = checkBudget("claude:quality");
+  if (!budgetCheck.allowed) {
+    return { score: 7, issues: [] }; // Fail open — don't block generation
   }
 
   try {
@@ -59,6 +67,8 @@ Respond ONLY with JSON (no markdown): { "score": number, "issues": ["issue1"], "
         ],
       }),
     });
+
+    recordApiCall("claude:quality");
 
     if (!response.ok) {
       return { score: 7, issues: [] };

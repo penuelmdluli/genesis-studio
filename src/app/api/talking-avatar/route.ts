@@ -65,9 +65,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Calculate credit cost: 15 credits per 10 seconds
+    // Calculate credit cost: 120 credits per 10 seconds
+    // Uses Kling 2.6 Pro (~$0.065/sec) → 10s = $0.65 → 120 credits ($2.88) = 4.4x markup
     const effectiveDuration = duration || 10;
-    const creditsCost = Math.ceil(effectiveDuration / 10) * 15;
+    const creditsCost = Math.ceil(effectiveDuration / 10) * 120;
 
     // Deduct credits (owners skip)
     if (!ownerAccount) {

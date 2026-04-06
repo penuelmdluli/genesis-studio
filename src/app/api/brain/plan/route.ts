@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
-import { isOwnerClerkId } from "@/lib/credits";
+import { isOwnerClerkId, deductCredits, getCreditBalance } from "@/lib/credits";
 import { planProduction, calculateBrainCredits, estimateBrainCredits } from "@/lib/genesis-brain/planner";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
 import { createProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
+import { checkBudget, recordApiCall } from "@/lib/api-budget";
+import { checkRateLimit } from "@/lib/fraud";
 import { BrainInput } from "@/types";
+
+const PLANNING_FEE_CREDITS = 5; // Claude Sonnet is expensive — charge upfront
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +32,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Rate limit: 10 plans per hour
+    const rateCheck = checkRateLimit(clerkId, "brain:plan");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many plan requests. Try again in a few minutes." },
+        { status: 429 }
+      );
+    }
+
+    // Budget guard: Claude Sonnet is expensive
+    const budgetCheck = checkBudget("claude:brain");
+    if (!budgetCheck.allowed) {
+      return NextResponse.json(
+        { error: "Brain Studio planning is temporarily unavailable. Try again later." },
+        { status: 503 }
+      );
+    }
+
     const body: BrainInput = await req.json();
 
     // Validate input
@@ -38,11 +60,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Duration must be between 15 and 120 seconds" }, { status: 400 });
     }
 
+    // Charge planning fee upfront (Claude Sonnet costs ~$0.01-0.03 per plan)
+    if (!ownerAccount) {
+      const balance = await getCreditBalance(user.id);
+      if (balance < PLANNING_FEE_CREDITS) {
+        return NextResponse.json(
+          { error: `Insufficient credits. Planning requires ${PLANNING_FEE_CREDITS} credits.`, required: PLANNING_FEE_CREDITS, balance },
+          { status: 402 }
+        );
+      }
+      await deductCredits(user.id, PLANNING_FEE_CREDITS, `brain-plan-${Date.now()}`, "Brain Studio AI planning fee");
+    }
+
     // Create initial production record
     const production = await createProduction(user.id, body);
 
     // Generate plan with Claude
     let plan = await planProduction(body);
+    recordApiCall("claude:brain");
 
     // Apply consistency engine
     plan = consistencyEngine.applyAll(plan, body.brandKit);

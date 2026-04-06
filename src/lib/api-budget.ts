@@ -34,6 +34,9 @@ const DAILY_BUDGETS: Record<string, number> = {
   "claude:chat": 500,      // $5/day for chatbot
   "claude:enhance": 300,   // $3/day for prompt enhancement
   "claude:moderate": 200,   // $2/day for moderation
+  "claude:brain": 1000,    // $10/day for Brain Studio planning (Sonnet is expensive)
+  "claude:translate": 200,  // $2/day for translations
+  "claude:quality": 300,    // $3/day for quality scoring
 };
 
 // Estimated cost per call in cents (based on model + typical usage)
@@ -43,6 +46,10 @@ const COST_ESTIMATES: Record<string, number> = {
   "claude:moderate": 0.05,  // ~0.05 cents per moderate call
   // Claude Sonnet (chatbot): ~$0.003 per call
   "claude:chat": 0.3,      // ~0.3 cents per chat call
+  // Claude Sonnet (Brain planning): ~$0.01-0.03 per plan (4096 max_tokens)
+  "claude:brain": 3.0,     // ~3 cents per brain plan call
+  "claude:translate": 0.1,  // ~0.1 cents per translation
+  "claude:quality": 0.1,   // ~0.1 cents per quality score
 };
 
 /**

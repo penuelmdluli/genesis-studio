@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 // Sample phrases per language for voice previews
@@ -33,6 +34,11 @@ const CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 export async function GET(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const voiceId = req.nextUrl.searchParams.get("voiceId");
     if (!voiceId || !VOICE_MAP[voiceId]) {
       return NextResponse.json({ error: "Invalid voiceId" }, { status: 400 });

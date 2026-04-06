@@ -34,6 +34,7 @@ import {
 import { uploadFile } from "@/lib/upload-client";
 import { Switch } from "@/components/ui/switch";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { HelpTip } from "@/components/ui/tooltip";
 
 type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
@@ -307,7 +308,7 @@ export default function MotionControlPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Video className="w-4 h-4 text-violet-400" />
-                Motion Source
+                Motion Source <HelpTip text="Choose a fun effect or upload your own motion reference video to control camera movement." side="right" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">

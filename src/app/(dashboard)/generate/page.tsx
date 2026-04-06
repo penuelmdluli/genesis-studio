@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip, HelpTip } from "@/components/ui/tooltip";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
@@ -756,7 +756,7 @@ export default function GeneratePage() {
               {showAdvanced && (
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/[0.06]">
                   <div>
-                    <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Seed</label>
+                    <label className="text-xs text-zinc-400 mb-1.5 font-medium flex items-center gap-1">Seed <HelpTip text="Same seed + prompt = same result. Leave empty for random." side="top" /></label>
                     <Input
                       type="number"
                       placeholder="Random"
@@ -767,7 +767,7 @@ export default function GeneratePage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Guidance Scale</label>
+                    <label className="text-xs text-zinc-400 mb-1.5 font-medium flex items-center gap-1">Guidance Scale <HelpTip text="How closely to follow your prompt. Higher = more literal, lower = more creative." side="top" /></label>
                     <Input
                       type="number"
                       step="0.5"
@@ -778,7 +778,7 @@ export default function GeneratePage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Inference Steps</label>
+                    <label className="text-xs text-zinc-400 mb-1.5 font-medium flex items-center gap-1">Inference Steps <HelpTip text="More steps = higher quality but slower. Default works well for most prompts." side="top" /></label>
                     <Input
                       type="number"
                       min="5"
@@ -925,8 +925,9 @@ export default function GeneratePage() {
           {/* Negative Prompt */}
           <Card>
             <CardContent className="p-4 space-y-2">
-              <label className="text-sm font-medium text-zinc-300">
+              <label className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
                 Negative Prompt <span className="text-zinc-600 text-xs">(optional)</span>
+                <HelpTip text="Describe what you DON'T want. Helps avoid common artifacts like blur, distortion, or watermarks." side="top" />
               </label>
               <Textarea
                 placeholder="What to avoid... e.g., 'blurry, low quality, distorted, watermark'"

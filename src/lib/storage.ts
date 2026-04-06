@@ -149,6 +149,31 @@ export function audioStorageKey(userId: string, jobId: string): string {
   return `audio/${userId}/${jobId}.mp3`;
 }
 
+/**
+ * Download a video from an external URL and persist it to R2.
+ * Returns the permanent API URL: /api/explore/video/{key}
+ * Used to prevent FAL/RunPod URL expiration.
+ */
+export async function persistExternalVideo(
+  externalUrl: string,
+  storageKey: string
+): Promise<string> {
+  const res = await fetch(externalUrl);
+  if (!res.ok) {
+    throw new Error(`Failed to download video: ${res.status} ${res.statusText}`);
+  }
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length < 5000) {
+    throw new Error(`Downloaded video too small: ${buffer.length} bytes`);
+  }
+  await uploadVideo(storageKey, buffer);
+  return storageKey;
+}
+
+export function exploreVideoStorageKey(exploreId: string): string {
+  return `explore/${exploreId}.mp4`;
+}
+
 // Generic upload for any file type (used by server-side proxy upload)
 export async function uploadToR2(
   key: string,

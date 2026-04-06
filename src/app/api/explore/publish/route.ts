@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         prompt,
         model_id: modelId,
-        video_url: sourceVideo.video_url || sourceVideo.output_url,
+        video_url: sourceVideo.url || sourceVideo.video_url || sourceVideo.output_url,
         thumbnail_url: sourceVideo.thumbnail_url,
         duration: duration || sourceVideo.duration,
         resolution: resolution || sourceVideo.resolution,

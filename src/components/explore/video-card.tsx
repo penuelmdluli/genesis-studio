@@ -82,6 +82,7 @@ export function ExploreVideoCard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   const isVertical = video.resolution?.includes("9:16") || video.resolution?.includes("768x1344");
 
@@ -176,7 +177,7 @@ export function ExploreVideoCard({
         {/* Thumbnail / Video area */}
         <div className={cn("relative w-full overflow-hidden", isVertical ? "aspect-[9/16]" : "aspect-video")}>
           {/* Lazy video — plays on hover when visible */}
-          {isVisible && (
+          {isVisible && !videoError && (
             <video
               ref={videoRef}
               src={`${video.videoUrl}#t=0.5`}
@@ -186,16 +187,21 @@ export function ExploreVideoCard({
               playsInline
               preload="metadata"
               className="absolute inset-0 w-full h-full object-cover"
+              onError={() => setVideoError(true)}
             />
           )}
-          {/* Poster fallback when not visible */}
-          {!isVisible && video.thumbnailUrl && (
+          {/* Poster fallback when not visible or video failed */}
+          {(!isVisible || videoError) && video.thumbnailUrl && (
             <img
               src={video.thumbnailUrl}
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
               loading="lazy"
             />
+          )}
+          {/* Shimmer when no thumbnail and no video */}
+          {!video.thumbnailUrl && (!isVisible || videoError) && (
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/20" />
           )}
 
           {/* Gradient overlay at bottom */}

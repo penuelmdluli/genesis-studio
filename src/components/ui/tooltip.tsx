@@ -2,6 +2,7 @@
 
 import { useState, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
 
 interface TooltipProps {
   content: string;
@@ -40,5 +41,25 @@ export function Tooltip({ content, children, side = "top", className }: TooltipP
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * HelpTip — small info icon with hover tooltip.
+ * Use on complex features to explain what they do.
+ */
+export function HelpTip({
+  text,
+  side = "top",
+  className,
+}: {
+  text: string;
+  side?: "top" | "bottom" | "left" | "right";
+  className?: string;
+}) {
+  return (
+    <Tooltip content={text} side={side} className={cn("max-w-[200px] whitespace-normal", className)}>
+      <Info className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 transition-colors cursor-help shrink-0" />
+    </Tooltip>
   );
 }

@@ -8,6 +8,7 @@ import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { refundCredits } from "@/lib/credits";
 import { sendVideoReadyEmail } from "@/lib/email";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
+import { autoPublishToExplore } from "@/lib/auto-publish";
 import { ModelId, GenerationType } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 import { createSupabaseAdmin } from "@/lib/supabase";
@@ -175,6 +176,23 @@ export async function GET(
                 console.error("[JOB STATUS] Video-ready email failed:", err)
               );
             }
+
+            // Auto-publish to Explore feed (fire and forget)
+            autoPublishToExplore({
+              jobId: job.id,
+              userId: job.user_id,
+              prompt: job.prompt,
+              modelId: job.model_id,
+              videoUrl: videoApiUrl,
+              thumbnailUrl: "",
+              duration: job.duration,
+              resolution: job.resolution,
+              hasAudio: !!job.audio_url || !!job.audio_track_id,
+              type: job.type === "motion" ? "motion" : "standard",
+              userPlan: user?.plan,
+              creatorName: user?.name || "Genesis Creator",
+              creatorAvatarUrl: user?.avatar_url,
+            }).catch((err) => console.error("[JOB STATUS] Auto-publish failed:", err));
 
             return NextResponse.json({
               id: job.id,

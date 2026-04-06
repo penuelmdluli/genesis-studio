@@ -6,6 +6,8 @@
 
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { brandVideo, getPlanTier } from "@/lib/branding";
+import { persistExternalVideo, exploreVideoStorageKey } from "@/lib/storage";
+import { randomUUID } from "crypto";
 
 interface AutoPublishParams {
   jobId: string;
@@ -28,6 +30,9 @@ interface AutoPublishParams {
  *
  * - Free tier: auto-publish with full branding (watermark + prompt overlay + outro)
  * - Paid tier: NOT auto-published (user can opt-in from Gallery)
+ *
+ * After branding, the video is downloaded and persisted to R2 permanent storage
+ * to prevent FAL URL expiration (FAL URLs expire after ~7 days).
  *
  * This is called from the webhook handler when a job completes.
  * It should always be fire-and-forget — failures here must never
@@ -55,6 +60,21 @@ export async function autoPublishToExplore(
       creatorName: params.creatorName,
     });
 
+    // Persist branded video to R2 permanent storage
+    // FAL branded URLs expire after ~7 days — this makes them permanent
+    const exploreId = randomUUID();
+    const storageKey = exploreVideoStorageKey(exploreId);
+    let permanentUrl = brandedUrl; // fallback to branded URL if persist fails
+
+    try {
+      await persistExternalVideo(brandedUrl, storageKey);
+      permanentUrl = `/api/explore/video/${exploreId}`;
+      console.log(`[AUTO-PUBLISH] Persisted to R2: ${storageKey}`);
+    } catch (persistErr) {
+      console.error("[AUTO-PUBLISH] R2 persist failed, using branded URL:", persistErr);
+      // Fall through with branded URL — better than no publish at all
+    }
+
     const supabase = createSupabaseAdmin();
 
     // Check if already published (prevent duplicates from webhook retries)
@@ -69,13 +89,14 @@ export async function autoPublishToExplore(
       return;
     }
 
-    // Publish to explore feed
+    // Publish to explore feed with permanent URL
     const { error } = await supabase.from("explore_videos").insert({
+      id: exploreId,
       source_video_id: params.jobId,
       user_id: params.userId,
       prompt: params.prompt,
       model_id: params.modelId,
-      video_url: brandedUrl,
+      video_url: permanentUrl,
       thumbnail_url: params.thumbnailUrl || null,
       duration: params.duration || null,
       resolution: params.resolution || null,

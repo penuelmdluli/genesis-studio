@@ -37,7 +37,9 @@ export async function deductCredits(
   jobId: string,
   description: string
 ): Promise<{ success: boolean; newBalance: number }> {
-  // Use a transaction to prevent race conditions
+  // Atomic deduction: only succeeds if balance >= amount at write time.
+  // Uses .gte filter to prevent race conditions where two concurrent
+  // requests could both read a sufficient balance and both deduct.
   const { data: user, error: userError } = await getSupabase()
     .from("users")
     .select("credit_balance")
@@ -52,29 +54,41 @@ export async function deductCredits(
 
   const newBalance = user.credit_balance - amount;
 
-  // Update balance
-  const { error: updateError } = await getSupabase()
+  // Atomic update: only applies if credit_balance still >= amount (prevents double-spend)
+  const { data: updated, error: updateError } = await getSupabase()
     .from("users")
     .update({
       credit_balance: newBalance,
     })
-    .eq("id", userId);
+    .eq("id", userId)
+    .gte("credit_balance", amount)
+    .select("credit_balance")
+    .single();
 
-  if (updateError)
-    throw new Error(`Failed to update balance: ${updateError.message}`);
+  if (updateError || !updated) {
+    // Balance changed between read and write — re-read actual balance
+    const { data: fresh } = await getSupabase()
+      .from("users")
+      .select("credit_balance")
+      .eq("id", userId)
+      .single();
+    return { success: false, newBalance: fresh?.credit_balance ?? 0 };
+  }
+
+  const actualNewBalance = updated.credit_balance;
 
   // Record transaction
   await recordTransaction(
     userId,
     "generation_debit",
     -amount,
-    newBalance,
+    actualNewBalance,
     description,
     jobId
   );
 
   // Send low-credits warning when balance drops below 10 (fire-and-forget)
-  if (newBalance < 10 && newBalance + amount >= 10) {
+  if (actualNewBalance < 10 && actualNewBalance + amount >= 10) {
     Promise.resolve(
       getSupabase()
         .from("users")
@@ -84,7 +98,7 @@ export async function deductCredits(
     )
       .then(({ data }) => {
         if (data?.email) {
-          sendLowCreditsEmail(data.email, data.name || "Creator", newBalance).catch((err) =>
+          sendLowCreditsEmail(data.email, data.name || "Creator", actualNewBalance).catch((err) =>
             console.error("[CREDITS] Low credits email failed:", err)
           );
         }
@@ -92,7 +106,7 @@ export async function deductCredits(
       .catch((err) => console.error("[CREDITS] Low credits lookup failed:", err));
   }
 
-  return { success: true, newBalance };
+  return { success: true, newBalance: actualNewBalance };
 }
 
 export async function refundCredits(

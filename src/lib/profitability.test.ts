@@ -22,7 +22,7 @@ import {
 describe("profitability", () => {
   describe("constants", () => {
     it("has correct credit value", () => {
-      expect(CREDIT_VALUE_USD).toBe(0.03);
+      expect(CREDIT_VALUE_USD).toBe(0.024);
     });
 
     it("has GPU rates for all GPU types", () => {
@@ -79,7 +79,7 @@ describe("profitability", () => {
 
   describe("creditsToRevenue", () => {
     it("converts credits to USD", () => {
-      expect(creditsToRevenue(100)).toBe(3); // 100 × $0.03
+      expect(creditsToRevenue(100)).toBe(2.4); // 100 × $0.024
     });
 
     it("returns 0 for 0 credits", () => {
@@ -89,8 +89,8 @@ describe("profitability", () => {
 
   describe("creditsToRevenueNet", () => {
     it("applies VAT and payment processor deduction", () => {
-      const gross = creditsToRevenue(100); // $3.00
-      const net = creditsToRevenueNet(100); // $3.00 × 0.839 = ~$2.52
+      const gross = creditsToRevenue(100); // $2.40
+      const net = creditsToRevenueNet(100); // $2.40 × 0.839 = ~$2.01
       expect(net).toBeLessThan(gross);
       expect(net).toBeCloseTo(gross * NET_REVENUE_MULTIPLIER, 2);
     });
@@ -98,7 +98,7 @@ describe("profitability", () => {
 
   describe("getGenerationMargin", () => {
     it("calculates margin using NET revenue (after taxes)", () => {
-      // 10 credits = $0.30 gross, ~$0.252 net, $0.06 GPU
+      // 10 credits = $0.24 gross, ~$0.201 net, $0.06 GPU
       const margin = getGenerationMargin(10, 0.06);
       expect(margin).toBeGreaterThan(50); // Should still be profitable
       expect(margin).toBeLessThan(80);    // But less than gross-only calc
@@ -109,7 +109,7 @@ describe("profitability", () => {
     });
 
     it("handles negative margin", () => {
-      // 1 credit = $0.03 gross, ~$0.025 net, $0.10 GPU = negative
+      // 1 credit = $0.024 gross, ~$0.020 net, $0.10 GPU = negative
       const margin = getGenerationMargin(1, 0.10);
       expect(margin).toBeLessThan(0);
     });
@@ -117,8 +117,8 @@ describe("profitability", () => {
 
   describe("isProfitable", () => {
     it("returns profitable for cheap models with correct pricing", () => {
-      // CogVideoX at 8 credits (new price) should be profitable
-      const result = isProfitable(8, "cogvideo-x", 5, "480p");
+      // CogVideoX at 15 credits should be profitable (net revenue > full cost)
+      const result = isProfitable(15, "cogvideo-x", 5, "480p");
       expect(result.netRevenue).toBeGreaterThan(result.fullCost);
     });
 

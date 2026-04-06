@@ -200,8 +200,8 @@ describe("E2E Generation Pipeline", () => {
     });
 
     it("credit packs have better rate than subscription", () => {
-      // Pack-500: $12 for 500 = $0.024/credit
-      // Creator: $15 for 500 = $0.03/credit
+      // Pack-500: $10 for 500 = $0.02/credit
+      // Creator: $12 for 500 = $0.024/credit
       const pack500 = CREDIT_PACKS.find((p) => p.id === "pack-500")!;
       const creatorPlan = PLANS.find((p) => p.id === "creator")!;
       const packRate = pack500.price / pack500.credits;

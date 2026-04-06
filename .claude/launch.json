@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "genesis-dev",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "--turbopack", "--port", "3001"],
-      "port": 3001
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     }
   ]
 }

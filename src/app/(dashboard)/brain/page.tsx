@@ -324,7 +324,7 @@ export default function BrainStudioPage() {
               </p>
               <a href="/pricing">
                 <Button className="shadow-lg shadow-violet-600/20">
-                  <Sparkles className="w-4 h-4" /> Upgrade to Creator — $15/mo
+                  <Sparkles className="w-4 h-4" /> Upgrade to Creator — $12/mo
                 </Button>
               </a>
             </CardContent>

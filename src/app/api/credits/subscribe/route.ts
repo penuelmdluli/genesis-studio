@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+    const webhookBaseUrl = process.env.APP_URL || appUrl;
 
     // --- SA payment providers (Yoco, PayFast, Paystack) ---
     if (providerName && providerName !== "stripe") {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
         },
         successUrl: `${appUrl}/dashboard?success=true`,
         cancelUrl: `${appUrl}/pricing?cancelled=true`,
-        notifyUrl: `${appUrl}/api/webhooks/${paymentProvider.name}`,
+        notifyUrl: `${webhookBaseUrl}/api/webhooks/${paymentProvider.name}`,
       });
 
       return NextResponse.json({ url: checkout.redirectUrl });
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
           },
           successUrl: `${appUrl}/dashboard?success=true`,
           cancelUrl: `${appUrl}/pricing?cancelled=true`,
-          notifyUrl: `${appUrl}/api/webhooks/${defaultProvider.name}`,
+          notifyUrl: `${webhookBaseUrl}/api/webhooks/${defaultProvider.name}`,
         });
 
         return NextResponse.json({ url: checkout.redirectUrl });

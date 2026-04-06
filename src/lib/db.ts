@@ -68,7 +68,7 @@ export async function updateUserPlan(
     free: 50,
     creator: 500,
     pro: 2000,
-    studio: 99999,
+    studio: 8000,
   };
 
   const { error } = await getSupabase()

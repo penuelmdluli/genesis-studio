@@ -87,7 +87,7 @@ export function ChatBot() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Genesis Assistant</p>
-              <p className="text-[10px] text-emerald-400">Powered by Claude AI</p>
+              <p className="text-[10px] text-emerald-400">Online — here to help</p>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -101,8 +101,24 @@ export function ChatBot() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
             {/* Welcome */}
-            <div className="bg-white/[0.04] rounded-xl p-3 text-sm text-white/80 mr-6">
-              Hey! I know everything about Genesis Studio. Ask me about features, pricing, prompts, or which model to use. How can I help?
+            <div className="bg-white/[0.04] rounded-xl p-3 text-sm text-white/80 mr-6 space-y-2">
+              <p>Hey there! I&apos;m your Genesis Studio assistant. I can help you:</p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[
+                  { label: "Create a video", q: "How do I create my first video?" },
+                  { label: "Best model?", q: "Which model gives the best quality?" },
+                  { label: "Pricing", q: "What plan should I get?" },
+                  { label: "Prompt tips", q: "Give me tips for writing great prompts" },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    onClick={() => { setInput(chip.q); }}
+                    className="px-2.5 py-1 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium transition-colors"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {messages.map((msg, i) => (

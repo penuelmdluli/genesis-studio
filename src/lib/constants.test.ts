@@ -73,9 +73,9 @@ describe("PLANS", () => {
     expect(free?.credits).toBe(50);
   });
 
-  it("studio plan has 10000 credits", () => {
+  it("studio plan has 8000 credits", () => {
     const studio = PLANS.find((p) => p.id === "studio");
-    expect(studio?.credits).toBe(10000);
+    expect(studio?.credits).toBe(8000);
   });
 
   it("pro plan is marked as popular", () => {

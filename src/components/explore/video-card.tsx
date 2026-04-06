@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import {
@@ -80,8 +80,33 @@ export function ExploreVideoCard({
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   const isVertical = video.resolution?.includes("9:16") || video.resolution?.includes("768x1344");
+
+  // IntersectionObserver: only load/play video when card is in viewport
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { rootMargin: "200px", threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Play/pause based on hover + visibility
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    if (isVisible && isHovered) {
+      vid.play().catch(() => {});
+    } else {
+      vid.pause();
+    }
+  }, [isVisible, isHovered]);
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -136,7 +161,7 @@ export function ExploreVideoCard({
   })();
 
   return (
-    <div className={cn("group/card flex flex-col gap-2", className)}>
+    <div ref={cardRef} className={cn("group/card flex flex-col gap-2", className)}>
       {/* Video card */}
       <div
         className={cn(
@@ -150,17 +175,28 @@ export function ExploreVideoCard({
       >
         {/* Thumbnail / Video area */}
         <div className={cn("relative w-full overflow-hidden", isVertical ? "aspect-[9/16]" : "aspect-video")}>
-          {/* Always-playing video — autoPlay, muted, loop, playsInline */}
-          <video
-            ref={videoRef}
-            src={video.videoUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          {/* Lazy video — plays on hover when visible */}
+          {isVisible && (
+            <video
+              ref={videoRef}
+              src={`${video.videoUrl}#t=0.5`}
+              poster={video.thumbnailUrl || undefined}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+          {/* Poster fallback when not visible */}
+          {!isVisible && video.thumbnailUrl && (
+            <img
+              src={video.thumbnailUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
+          )}
 
           {/* Gradient overlay at bottom */}
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />

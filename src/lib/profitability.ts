@@ -44,8 +44,8 @@ export const FAL_API_COSTS: Record<string, number> = {
 // ~2K input + 2K output tokens per plan = ~$0.08-0.12 per Brain call
 export const CLAUDE_API_COST_PER_BRAIN = 0.10;
 
-// Credit value in USD (based on Creator plan: 500 credits / $15)
-export const CREDIT_VALUE_USD = 0.03;
+// Credit value in USD (based on Creator plan: 500 credits / $12)
+export const CREDIT_VALUE_USD = 0.024;
 
 // ============================================
 // TAX & PAYMENT PROCESSING — deducted from revenue
@@ -230,7 +230,7 @@ export const PLAN_LIMITS = {
   studio: {
     maxGenerationsPerDay: 500,
     maxConcurrentJobs: 10,
-    maxCreditsPerMonth: 10000,
+    maxCreditsPerMonth: 8000,
     maxCreditPerGeneration: 1000,
   },
 } as const;

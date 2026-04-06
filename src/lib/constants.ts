@@ -112,7 +112,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "Hollywood-grade video with native audio — dialogue, sound effects, ambient sound. Best audio+video sync.",
     maxResolution: "1080p",
     avgGenerationTime: 120,
-    creditCost: { "720p": 50, "1080p": 80 },
+    creditCost: { "720p": 100, "1080p": 150 },
     gpuRequirement: "Managed (FAL.AI)",
     license: "Commercial",
     provider: "fal",
@@ -130,7 +130,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "Latest Kling — multi-shot narrative, native audio, best character consistency.",
     maxResolution: "1080p",
     avgGenerationTime: 150,
-    creditCost: { "720p": 70, "1080p": 100 },
+    creditCost: { "720p": 250, "1080p": 350 },
     gpuRequirement: "Managed (FAL.AI)",
     license: "Commercial",
     provider: "fal",
@@ -148,7 +148,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "Google's best — perfect lip sync, environmental audio, cinematic quality.",
     maxResolution: "1080p",
     avgGenerationTime: 180,
-    creditCost: { "720p": 100, "1080p": 150 },
+    creditCost: { "720p": 400, "1080p": 600 },
     gpuRequirement: "Managed (FAL.AI)",
     license: "Commercial",
     provider: "fal",
@@ -165,7 +165,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "Multi-scene narrative videos. Great motion quality at lower cost.",
     maxResolution: "1080p",
     avgGenerationTime: 90,
-    creditCost: { "720p": 35, "1080p": 50 },
+    creditCost: { "720p": 80, "1080p": 120 },
     gpuRequirement: "Managed (FAL.AI)",
     license: "Commercial",
     provider: "fal",
@@ -197,8 +197,8 @@ export const PLANS: Plan[] = [
   {
     id: "creator",
     name: "Creator",
-    price: 15,
-    priceZAR: 275,
+    price: 12,
+    priceZAR: 220,
     credits: 500,
     maxResolution: "1080p",
     features: [
@@ -218,8 +218,8 @@ export const PLANS: Plan[] = [
   {
     id: "pro",
     name: "Pro",
-    price: 39,
-    priceZAR: 720,
+    price: 29,
+    priceZAR: 535,
     credits: 2000,
     maxResolution: "4k",
     popular: true,
@@ -241,12 +241,12 @@ export const PLANS: Plan[] = [
   {
     id: "studio",
     name: "Studio",
-    price: 99,
-    priceZAR: 1825,
-    credits: 10000,
+    price: 79,
+    priceZAR: 1460,
+    credits: 8000,
     maxResolution: "4k",
     features: [
-      "10,000 credits/month",
+      "8,000 credits/month",
       "4K output",
       "Everything in Pro, highest limits",
       "Voice Cloning",
@@ -263,29 +263,29 @@ export const PLANS: Plan[] = [
 
 // --- Credit Packs ---
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "pack-500", credits: 500, price: 12, priceZAR: 220 },
-  { id: "pack-2000", credits: 2000, price: 40, priceZAR: 740 },
-  { id: "pack-10000", credits: 10000, price: 150, priceZAR: 2775 },
+  { id: "pack-500", credits: 500, price: 10, priceZAR: 185 },
+  { id: "pack-2000", credits: 2000, price: 35, priceZAR: 650 },
+  { id: "pack-10000", credits: 10000, price: 130, priceZAR: 2400 },
 ];
 
 // --- Annual Plan Pricing (20% discount) ---
 export const ANNUAL_PLANS: Record<string, { monthlyPrice: number; annualPrice: number; savings: number; stripePriceId?: string }> = {
   creator: {
-    monthlyPrice: 15,
-    annualPrice: 144, // $12/mo billed annually
-    savings: 36,
+    monthlyPrice: 12,
+    annualPrice: 115, // $9.60/mo billed annually
+    savings: 29,
     stripePriceId: process.env.STRIPE_CREATOR_ANNUAL_PRICE_ID,
   },
   pro: {
-    monthlyPrice: 39,
-    annualPrice: 374, // $31.17/mo billed annually
-    savings: 94,
+    monthlyPrice: 29,
+    annualPrice: 278, // $23.20/mo billed annually
+    savings: 70,
     stripePriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
   },
   studio: {
-    monthlyPrice: 99,
-    annualPrice: 948, // $79/mo billed annually
-    savings: 240,
+    monthlyPrice: 79,
+    annualPrice: 758, // $63.20/mo billed annually
+    savings: 190,
     stripePriceId: process.env.STRIPE_STUDIO_ANNUAL_PRICE_ID,
   },
 };

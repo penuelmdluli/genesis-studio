@@ -134,8 +134,26 @@ function getDefaultVoice(language: string): string {
 
 // ---- MUSIC SELECTION / GENERATION ----
 
+const FAL_STABLE_AUDIO = "fal-ai/stable-audio";
+
 /**
- * Select or generate background music
+ * Build a music generation prompt from mood, tempo, and genre
+ */
+function buildMusicPrompt(mood: string, tempo: "slow" | "medium" | "fast", genre?: string): string {
+  const tempoDesc = { slow: "slow, gentle", medium: "moderate tempo", fast: "upbeat, energetic" };
+  const parts = [
+    genre || "cinematic",
+    `${tempoDesc[tempo]} background music`,
+    mood ? `${mood} mood` : "",
+    "instrumental, no vocals, royalty-free, high quality production",
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
+/**
+ * Generate or select background music.
+ * Strategy: Use FAL.AI stable-audio for AI-generated music (best quality).
+ * Falls back to built-in tracks if FAL is unavailable.
  */
 export async function selectMusic(
   mood: string,
@@ -143,14 +161,53 @@ export async function selectMusic(
   duration: number,
   genre?: string
 ): Promise<AudioResult> {
-  // Strategy: Match from built-in royalty-free library first
-  // If no match, use generic ambient track
+  // --- Primary: AI-generated music via FAL stable-audio ---
+  const falKey = process.env.FAL_KEY;
+  if (falKey) {
+    try {
+      const prompt = buildMusicPrompt(mood, tempo, genre);
+      console.log(`[BRAIN AUDIO] Generating AI music: "${prompt}" (${duration}s)`);
 
+      const result = await fal.subscribe(FAL_STABLE_AUDIO, {
+        input: {
+          prompt,
+          seconds_total: Math.min(duration, 47), // stable-audio max ~47s
+          steps: 100,
+        },
+        logs: false,
+      });
+
+      const data = result.data as Record<string, unknown>;
+      const audioFile = data?.audio_file as { url: string } | undefined;
+
+      if (audioFile?.url) {
+        console.log(`[BRAIN AUDIO] AI music generated: ${audioFile.url}`);
+        return {
+          type: "music",
+          url: audioFile.url,
+          duration: Math.min(duration, 47),
+          metadata: {
+            source: "ai-generated",
+            model: FAL_STABLE_AUDIO,
+            prompt,
+            mood,
+            tempo,
+            genre: genre || "cinematic",
+            needsTrim: false,
+            targetDuration: duration,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn("[BRAIN AUDIO] AI music generation failed, falling back to library:", err);
+    }
+  }
+
+  // --- Fallback: Match from built-in library ---
   const moodLower = mood.toLowerCase();
   const tempoMap = { slow: [60, 90], medium: [90, 130], fast: [130, 180] };
   const [minBpm, maxBpm] = tempoMap[tempo] || [90, 130];
 
-  // Find best matching track from library
   let bestTrack = BUILT_IN_AUDIO_TRACKS.find((t) => {
     const genreMatch = !genre || t.genre.toLowerCase().includes(genre.toLowerCase());
     const moodMatch = moodLower.split(" ").some((word) =>
@@ -160,14 +217,12 @@ export async function selectMusic(
     return (genreMatch || moodMatch) && bpmMatch;
   });
 
-  // Fallback: pick by genre alone
   if (!bestTrack) {
     bestTrack = BUILT_IN_AUDIO_TRACKS.find((t) =>
       t.genre.toLowerCase().includes(tempo === "slow" ? "ambient" : tempo === "fast" ? "electronic" : "cinematic")
     );
   }
 
-  // Final fallback: first available track
   if (!bestTrack && BUILT_IN_AUDIO_TRACKS.length > 0) {
     bestTrack = BUILT_IN_AUDIO_TRACKS[0];
   }
@@ -178,6 +233,7 @@ export async function selectMusic(
       url: bestTrack.url,
       duration: bestTrack.duration,
       metadata: {
+        source: "built-in",
         trackName: bestTrack.name,
         genre: bestTrack.genre,
         bpm: bestTrack.bpm,

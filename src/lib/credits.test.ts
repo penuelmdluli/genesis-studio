@@ -102,7 +102,16 @@ describe("deductCredits", () => {
       }),
       insert: vi.fn().mockResolvedValue({ error: null }),
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
+        eq: vi.fn().mockReturnValue({
+          gte: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { credit_balance: 400 },
+                error: null,
+              }),
+            }),
+          }),
+        }),
       }),
     });
 

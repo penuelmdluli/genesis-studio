@@ -9,6 +9,7 @@ import { OnboardingTour } from "@/components/onboarding/tour";
 import { WhatsNewBell } from "@/components/ui/whats-new-bell";
 import { LoadSheddingBanner } from "@/components/ui/load-shedding-banner";
 import { DataSaverToggle } from "@/components/ui/data-saver-toggle";
+import { NotificationCenter } from "@/components/ui/notification-center";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
@@ -74,8 +75,9 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo } = useStore();
+  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification } = useStore();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const completedJobsRef = useRef<Set<string>>(new Set());
 
   // Fetch active jobs and poll for updates
   const pollActiveJobs = useCallback(async () => {
@@ -105,13 +107,44 @@ export default function DashboardLayout({
               errorMessage: jobData.errorMessage || undefined,
             });
 
-            // If job just completed, refresh videos
+            // If job just completed, refresh videos + notify user
             if (jobData.status === "completed" && jobData.outputVideoUrl) {
               const videosRes = await fetch("/api/videos");
               if (videosRes.ok) {
                 const videosData = await videosRes.json();
                 setVideos((videosData.videos || []).map(mapVideo));
               }
+
+              // Fire notification only once per job
+              if (!completedJobsRef.current.has(job.id)) {
+                completedJobsRef.current.add(job.id);
+                const label = job.prompt?.slice(0, 60) || "Your creation";
+                addNotification({
+                  type: "success",
+                  title: "Your video is ready!",
+                  message: `"${label}${(job.prompt?.length || 0) > 60 ? "..." : ""}" has finished rendering. View it in your gallery.`,
+                  link: "/gallery",
+                });
+
+                // Browser notification (if permission granted)
+                if (typeof window !== "undefined" && Notification.permission === "granted") {
+                  new Notification("Genesis Studio", {
+                    body: `Your video is ready! "${label}"`,
+                    icon: "/icon-192.png",
+                  });
+                }
+              }
+            }
+
+            // Notify on failure too
+            if (jobData.status === "failed" && !completedJobsRef.current.has(job.id)) {
+              completedJobsRef.current.add(job.id);
+              addNotification({
+                type: "error",
+                title: "Generation failed",
+                message: jobData.errorMessage || "Something went wrong. Your credits have been refunded.",
+                link: "/generate",
+              });
             }
           }
         } catch {
@@ -179,6 +212,11 @@ export default function DashboardLayout({
     }
     loadData();
 
+    // Request browser notification permission
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
@@ -204,9 +242,10 @@ export default function DashboardLayout({
         <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}
         <div className="px-3 pt-14 pb-6 sm:px-4 md:px-6 md:pt-6 max-w-7xl mx-auto">
-          {/* Top bar: What's New + Data Saver */}
+          {/* Top bar: Notifications + What's New + Data Saver */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-3 sm:mb-4">
             <DataSaverToggle />
+            <NotificationCenter />
             <WhatsNewBell />
           </div>
           <LoadSheddingBanner />

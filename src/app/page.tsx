@@ -204,20 +204,26 @@ export default function LandingPage() {
           SECTION 1: HERO — Full-screen video bg
       ======================================== */}
       <section className="relative h-screen w-full overflow-hidden">
-        {/* Video layers for crossfade — pulled from featured explore_videos */}
-        {heroVideos.length > 0 ? heroVideos.map((src, i) => (
-          <video
-            key={src}
-            ref={(el) => { heroVideoRefs.current[i] = el; }}
-            src={src}
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1500 ease-in-out"
-            style={{ opacity: i === heroIndex ? 1 : 0 }}
-          />
-        )) : (
+        {/* Video layers for crossfade — only mount active + next for performance */}
+        {heroVideos.length > 0 ? heroVideos.map((src, i) => {
+          const isActive = i === heroIndex;
+          const isNext = i === (heroIndex + 1) % heroVideos.length;
+          if (!isActive && !isNext) return null;
+          return (
+            <video
+              key={src}
+              ref={(el) => { heroVideoRefs.current[i] = el; }}
+              src={src}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload={isActive ? "auto" : "metadata"}
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1500 ease-in-out"
+              style={{ opacity: isActive ? 1 : 0 }}
+            />
+          );
+        }) : (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-[#0A0A0F] to-blue-900/30" />
         )}
 

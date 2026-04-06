@@ -8,6 +8,32 @@ import { PlanId } from "@/types";
 import { handleFailedPayment, recoverDunningRecord } from "@/lib/dunning";
 import Stripe from "stripe";
 
+/** Idempotency guard — returns true if this Stripe event was already processed. */
+async function isStripeEventProcessed(eventId: string): Promise<boolean> {
+  const supabase = createSupabaseAdmin();
+  const { data } = await supabase
+    .from("webhook_events")
+    .select("id")
+    .eq("reference", eventId)
+    .eq("provider", "stripe")
+    .maybeSingle();
+  return !!data;
+}
+
+async function recordStripeEvent(eventId: string, eventType: string, userId: string): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  await supabase.from("webhook_events").insert({
+    reference: eventId,
+    provider: "stripe",
+    event: eventType,
+    user_id: userId,
+    metadata: { eventType },
+    processed_at: new Date().toISOString(),
+  }).then(({ error }) => {
+    if (error) console.error("[STRIPE] Failed to record webhook event:", error.message);
+  });
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature")!;
@@ -23,6 +49,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  // --- Idempotency: skip if this exact Stripe event was already processed ---
+  if (await isStripeEventProcessed(event.id)) {
+    console.log(`[STRIPE] Duplicate event skipped: ${event.id} (${event.type})`);
+    return NextResponse.json({ received: true });
   }
 
   const supabase = createSupabaseAdmin();
@@ -61,7 +93,7 @@ export async function POST(req: NextRequest) {
             free: 50,
             creator: 500,
             pro: 2000,
-            studio: 10000,
+            studio: 8000,
           };
 
           await updateUserPlan(
@@ -72,6 +104,7 @@ export async function POST(req: NextRequest) {
           );
 
           await grantSubscriptionCredits(user.id, creditAmounts[plan]);
+          await recordStripeEvent(event.id, "checkout.subscription", user.id);
 
           // Send plan upgrade email
           if (user.email) {
@@ -96,6 +129,7 @@ export async function POST(req: NextRequest) {
               packCredits[priceId],
               `${packCredits[priceId]} credit pack`
             );
+            await recordStripeEvent(event.id, "checkout.credit_pack", user.id);
           }
         }
         break;
@@ -121,11 +155,12 @@ export async function POST(req: NextRequest) {
             free: 50,
             creator: 500,
             pro: 2000,
-            studio: 10000,
+            studio: 8000,
           };
           const credits = creditAmounts[user.plan] || 0;
           if (credits > 0) {
             await grantSubscriptionCredits(user.id, credits);
+            await recordStripeEvent(event.id, "invoice.renewal", user.id);
             console.log(`[STRIPE] Granted ${credits} monthly credits to user ${user.id} (${user.plan} plan renewal)`);
           }
         } else if (user && invoice.billing_reason === "subscription_create") {

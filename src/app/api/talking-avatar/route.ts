@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserByClerkId } from "@/lib/db";
+import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
 import { fal } from "@fal-ai/client";
@@ -107,6 +107,22 @@ export async function POST(req: NextRequest) {
         ? `A person talking and expressing: "${text.slice(0, 200)}". Natural head movement, lip sync, expressive facial gestures.`
         : "A person talking naturally with expressive facial movement and gestures, lip syncing to audio.";
 
+      // Create a job record in the database for polling
+      const job = await createJob({
+        userId: user.id,
+        type: "i2v",
+        modelId: "kling-2.6",
+        prompt: avatarPrompt,
+        inputImageUrl: imageUrl,
+        inputVideoUrl: audioUrl,
+        resolution: "720p",
+        duration: effectiveDuration,
+        fps: 30,
+        isDraft: false,
+        creditsCost,
+        aspectRatio: "landscape",
+      });
+
       // Submit to FAL.AI Kling i2v with the face image
       const result = await fal.queue.submit(FAL_AVATAR_MODEL, {
         input: {
@@ -118,10 +134,13 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const jobId = result.request_id;
+      // Store the FAL request ID on the job for polling
+      await updateJobStatus(job.id, {
+        runpodJobId: result.request_id,
+      });
 
       return NextResponse.json({
-        jobId: `fal:${FAL_AVATAR_MODEL}:${jobId}`,
+        jobId: job.id,
         creditsCost,
         estimatedTime: Math.ceil(effectiveDuration / 10) * 60,
       });

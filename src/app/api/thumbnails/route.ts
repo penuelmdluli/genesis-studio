@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       : trimmedPrompt;
 
     try {
-      const falRes = await fetch("https://queue.fal.run/fal-ai/flux-pro/v1.1", {
+      const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
         method: "POST",
         headers: {
           "Authorization": `Key ${FAL_API_KEY}`,
@@ -118,11 +118,27 @@ export async function POST(req: NextRequest) {
       }
 
       const result = await falRes.json();
+      const imageUrls = result.images?.map((img: { url: string }) => img.url) || [];
+
+      // Convert FAL URLs to base64 data URIs server-side
+      const base64Images = await Promise.all(
+        imageUrls.map(async (url: string) => {
+          try {
+            const imgRes = await fetch(url);
+            if (!imgRes.ok) return url;
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+            return `data:${contentType};base64,${buffer.toString("base64")}`;
+          } catch {
+            return url;
+          }
+        })
+      );
 
       return NextResponse.json({
         jobId: `thumb-${Date.now()}`,
         creditsCost,
-        images: result.images?.map((img: { url: string }) => img.url) || [],
+        images: base64Images,
       });
     } catch (gpuError) {
       console.error("Thumbnail generation error:", gpuError);

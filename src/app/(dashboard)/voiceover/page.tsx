@@ -9,7 +9,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
-import { Mic, Play, Square, Download, Zap, Loader2 } from "lucide-react";
+import { Mic, Play, Square, Download, Zap, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "\u{1F1FA}\u{1F1F8}",
@@ -47,6 +47,7 @@ export default function VoiceoverPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const generateLockRef = useRef(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
@@ -59,27 +60,39 @@ export default function VoiceoverPage() {
     if (previewingVoice === voiceId && previewAudioRef.current) {
       previewAudioRef.current.pause();
       previewAudioRef.current.currentTime = 0;
+      previewAudioRef.current = null;
       setPreviewingVoice(null);
+      setLoadingPreview(null);
       return;
     }
 
-    // Stop any current preview
+    // Stop any current preview — clear callbacks to prevent stale playback
     if (previewAudioRef.current) {
+      previewAudioRef.current.oncanplaythrough = null;
+      previewAudioRef.current.onended = null;
+      previewAudioRef.current.onerror = null;
       previewAudioRef.current.pause();
       previewAudioRef.current.currentTime = 0;
     }
 
     setLoadingPreview(voiceId);
+    setPreviewingVoice(null);
     const audio = new Audio(`/api/voiceover/preview?voiceId=${voiceId}`);
     previewAudioRef.current = audio;
 
     audio.oncanplaythrough = () => {
+      // Only play if this audio is still the active one (prevents race conditions)
+      if (previewAudioRef.current !== audio) return;
       setLoadingPreview(null);
       setPreviewingVoice(voiceId);
       audio.play();
     };
-    audio.onended = () => setPreviewingVoice(null);
+    audio.onended = () => {
+      if (previewAudioRef.current !== audio) return;
+      setPreviewingVoice(null);
+    };
     audio.onerror = () => {
+      if (previewAudioRef.current !== audio) return;
       setLoadingPreview(null);
       setPreviewingVoice(null);
     };
@@ -110,6 +123,7 @@ export default function VoiceoverPage() {
     setIsGenerating(true);
     setAudioUrl(null);
     setJobId(null);
+    setGenerationError(null);
 
     try {
       const selectedVoice = VOICE_OPTIONS.find((v) => v.id === selectedVoiceId);
@@ -127,7 +141,9 @@ export default function VoiceoverPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast(data.error || "Generation failed", "error");
+        const msg = data.error || "Generation failed. Please try again.";
+        setGenerationError(msg);
+        toast(msg, "error");
         return;
       }
 
@@ -145,6 +161,7 @@ export default function VoiceoverPage() {
         toast("Processing... Your voiceover is being generated.", "success");
       }
     } catch {
+      setGenerationError("Network error. Please check your connection and try again.");
       toast("Something went wrong. Please try again.", "error");
     } finally {
       setIsGenerating(false);
@@ -154,8 +171,8 @@ export default function VoiceoverPage() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-[#0A0A0F] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl space-y-8">
+      <div className="bg-[#0A0A0F] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl space-y-5">
           {/* Header */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -215,14 +232,14 @@ export default function VoiceoverPage() {
               <CardTitle className="text-lg text-zinc-100">Voice</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {VOICE_OPTIONS.map((voice) => {
                   const isSelected = selectedVoiceId === voice.id;
                   return (
                     <button
                       key={voice.id}
                       onClick={() => setSelectedVoiceId(voice.id)}
-                      className={`group relative flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all ${
+                      className={`group relative flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all ${
                         isSelected
                           ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/30"
                           : "border-zinc-700 bg-zinc-800/40 hover:border-zinc-600 hover:bg-zinc-800/70"
@@ -335,6 +352,29 @@ export default function VoiceoverPage() {
               </p>
             )}
           </div>
+
+          {/* Error State */}
+          {generationError && !isGenerating && !audioUrl && (
+            <Card className="border-red-500/20 bg-red-500/5">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-300 font-medium">Generation Failed</p>
+                    <p className="text-sm text-zinc-400 mt-1">{generationError}</p>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={!canGenerate}
+                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Audio Player */}
           {audioUrl && (

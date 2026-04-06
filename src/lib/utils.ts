@@ -60,7 +60,8 @@ export function estimateCreditCost(
   modelId: string,
   resolution: string,
   duration: number,
-  isDraft: boolean
+  isDraft: boolean,
+  enableAudio?: boolean
 ): number {
   // Import AI_MODELS dynamically to avoid circular deps — use inline require
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -84,6 +85,7 @@ export function estimateCreditCost(
 
   const durationMultiplier = duration / 5; // normalized to 5s base
   const draftDiscount = isDraft ? 0.3 : 1;
+  const audioSurcharge = enableAudio ? 1.3 : 1; // +30% for live sound
 
-  return Math.ceil(baseCost * durationMultiplier * draftDiscount);
+  return Math.ceil(baseCost * durationMultiplier * draftDiscount * audioSurcharge);
 }

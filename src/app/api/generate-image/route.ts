@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
     };
     const size = sizeMap[aspectRatio] || sizeMap.landscape;
 
-    // Submit to FAL.AI FLUX Pro
-    const falRes = await fetch("https://queue.fal.run/fal-ai/flux-pro/v1.1", {
+    // Submit to FAL.AI FLUX Pro (synchronous endpoint, not queue)
+    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
       method: "POST",
       headers: {
         "Authorization": `Key ${FAL_API_KEY}`,
@@ -90,8 +90,33 @@ export async function POST(req: NextRequest) {
 
     const result = await falRes.json();
 
+    const imageUrls = result.images?.map((img: { url: string }) => img.url) || [];
+    if (imageUrls.length === 0) {
+      console.error("[IMAGE-GEN] No images in response:", JSON.stringify(result).slice(0, 500));
+      if (!ownerAccount) {
+        const { refundCredits } = await import("@/lib/credits");
+        await refundCredits(user.id, CREDIT_COST, "", "Image generation returned no images — automatic refund");
+      }
+      return NextResponse.json({ error: "No images generated. Credits refunded." }, { status: 503 });
+    }
+
+    // Convert FAL URLs to base64 data URIs server-side to avoid CDN/CORS issues
+    const base64Images = await Promise.all(
+      imageUrls.map(async (url: string) => {
+        try {
+          const imgRes = await fetch(url);
+          if (!imgRes.ok) return url; // fallback to URL if fetch fails
+          const buffer = Buffer.from(await imgRes.arrayBuffer());
+          const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+          return `data:${contentType};base64,${buffer.toString("base64")}`;
+        } catch {
+          return url; // fallback to URL
+        }
+      })
+    );
+
     return NextResponse.json({
-      images: result.images?.map((img: { url: string }) => img.url) || [],
+      images: base64Images,
       prompt: prompt.trim(),
       creditsCost: CREDIT_COST,
     });

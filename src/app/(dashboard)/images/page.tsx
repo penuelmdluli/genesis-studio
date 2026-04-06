@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,8 @@ import {
   Square,
   RectangleHorizontal,
   RectangleVertical,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 type AspectRatioOption = "landscape" | "portrait" | "square";
@@ -37,6 +39,72 @@ const IMAGE_SUGGESTIONS = [
   "Abstract art with flowing purple and gold gradients, silk-like texture",
 ];
 
+function ImageCard({ url, index, onDownload }: { url: string; index: number; onDownload: (url: string, index: number) => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleRetry = () => {
+    setError(false);
+    setLoaded(false);
+    setRetryCount((c) => c + 1);
+  };
+
+  const imgSrc = retryCount > 0 ? `${url}${url.includes("?") ? "&" : "?"}retry=${retryCount}` : url;
+
+  return (
+    <div className="relative group rounded-xl overflow-hidden border border-white/[0.06] bg-zinc-900/50">
+      {/* Loading skeleton */}
+      {!loaded && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+            <span className="text-xs text-zinc-500">Loading image...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10">
+          <div className="flex flex-col items-center gap-3 p-4 text-center">
+            <AlertCircle className="w-8 h-8 text-amber-400" />
+            <p className="text-sm text-zinc-400">Image failed to load</p>
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      <img
+        src={imgSrc}
+        alt={`Generated image ${index + 1}`}
+        className={`w-full aspect-square object-cover transition-opacity duration-300 ${loaded && !error ? "opacity-100" : "opacity-0"}`}
+        onLoad={() => { setLoaded(true); setError(false); }}
+        onError={() => { setError(true); setLoaded(false); }}
+        crossOrigin="anonymous"
+      />
+
+      {/* Download overlay */}
+      {loaded && !error && (
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <button
+            onClick={() => onDownload(url, index)}
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <Download className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ImagesPage() {
   const { user, updateCreditBalance } = useStore();
   const { toast } = useToast();
@@ -45,6 +113,8 @@ export default function ImagesPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const generateLockRef = useRef(false);
 
   const creditCost = 10;
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
@@ -68,9 +138,11 @@ export default function ImagesPage() {
   };
 
   const handleGenerate = async () => {
-    if (!prompt.trim() || isGenerating) return;
+    if (!prompt.trim() || isGenerating || generateLockRef.current) return;
+    generateLockRef.current = true;
     setIsGenerating(true);
     setImages([]);
+    setGenerationError(null);
 
     try {
       const res = await fetch("/api/generate-image", {
@@ -80,32 +152,53 @@ export default function ImagesPage() {
       });
 
       const data = await res.json();
-      if (res.ok) {
-        setImages(data.images || []);
+      if (res.ok && data.images?.length > 0) {
+        setImages(data.images);
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        toast(`Generated ${data.images?.length || 0} images!`, "success");
+        toast(`Generated ${data.images.length} images!`, "success");
+      } else if (res.ok && (!data.images || data.images.length === 0)) {
+        setGenerationError("No images were generated. Your credits have been refunded.");
+        toast("No images generated. Credits refunded.", "error");
       } else {
+        setGenerationError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");
       }
     } catch {
+      setGenerationError("Network error. Please check your connection and try again.");
       toast("Network error. Please try again.", "error");
     } finally {
       setIsGenerating(false);
+      generateLockRef.current = false;
     }
   };
 
   const handleDownload = async (url: string, index: number) => {
     try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `genesis-image-${index + 1}.jpg`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      if (url.startsWith("data:")) {
+        // Base64 data URI — download directly
+        const res = await fetch(url);
+        const blob = await res.blob();
+        triggerDownload(blob, index);
+      } else {
+        // URL — proxy download through our API
+        const res = await fetch("/api/proxy-image?url=" + encodeURIComponent(url));
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        triggerDownload(blob, index);
+      }
     } catch {
-      toast("Download failed", "error");
+      window.open(url, "_blank");
+      toast("Opening image in new tab for manual download", "info");
     }
+  };
+
+  const triggerDownload = (blob: Blob, index: number) => {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `genesis-image-${index + 1}.jpg`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast("Image downloaded!", "success");
   };
 
   return (
@@ -193,24 +286,66 @@ export default function ImagesPage() {
             </CardContent>
           </Card>
 
+          {/* Generating state */}
+          {isGenerating && (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full bg-violet-600/20 flex items-center justify-center">
+                      <Sparkles className="w-8 h-8 text-violet-400 animate-pulse" />
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-medium text-white">Generating your images...</p>
+                    <p className="text-sm text-zinc-500 mt-1">This usually takes 10-15 seconds</p>
+                  </div>
+                  {/* Skeleton grid */}
+                  <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="aspect-square rounded-xl bg-zinc-800/50 animate-pulse border border-white/[0.04]" />
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Generation error */}
+          {generationError && !isGenerating && images.length === 0 && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-300 font-medium">Generation Failed</p>
+                    <p className="text-sm text-zinc-400 mt-1">{generationError}</p>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !prompt.trim()}
+                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Generated Images */}
-          {images.length > 0 && (
+          {images.length > 0 && !isGenerating && (
             <Card>
               <CardContent className="p-4">
-                <label className="text-sm font-medium text-zinc-300 block mb-3">Generated Images</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium text-zinc-300">Generated Images</label>
+                  <span className="text-xs text-zinc-500">{images.length} images — hover to download</span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {images.map((url, i) => (
-                    <div key={i} className="relative group rounded-xl overflow-hidden border border-white/[0.06]">
-                      <img src={url} alt={`Generated ${i + 1}`} className="w-full aspect-square object-cover" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button
-                          onClick={() => handleDownload(url, i)}
-                          className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-                        >
-                          <Download className="w-5 h-5 text-white" />
-                        </button>
-                      </div>
-                    </div>
+                    <ImageCard key={i} url={url} index={i} onDownload={handleDownload} />
                   ))}
                 </div>
               </CardContent>

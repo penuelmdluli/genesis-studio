@@ -75,7 +75,7 @@ function wrap(content: string): string {
         ${content}
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #71717a;">
           <p>Genesis Studio — AI Video Creation Platform</p>
-          <p><a href="${APP_URL}" style="color: #8b5cf6;">genesis-studio.app</a></p>
+          <p><a href="${APP_URL}" style="color: #8b5cf6;">Genesis Studio</a></p>
         </div>
       </div>
     </div>

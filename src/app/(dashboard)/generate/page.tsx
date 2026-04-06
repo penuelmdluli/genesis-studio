@@ -112,8 +112,13 @@ export default function GeneratePage() {
 
   const modelId = availableModels.includes(form.modelId) ? form.modelId : availableModels[0];
   const currentModel = AI_MODELS[modelId];
-  const creditCost = estimateCreditCost(modelId, form.resolution, form.duration, form.isDraft);
+  const modelSupportsAudio = !!currentModel?.hasAudio;
+  const effectiveAudio = form.enableLiveSound && modelSupportsAudio;
+  const creditCost = estimateCreditCost(modelId, form.resolution, form.duration, form.isDraft, effectiveAudio);
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
+
+  // "Ready to generate" — all required info is provided
+  const isReadyToGenerate = form.prompt.trim().length >= 5 && (form.type !== "i2v" || !!form.inputImage);
 
   const resolutionSource = isReel ? REEL_RESOLUTIONS : RESOLUTIONS;
   const durationSource = isReel ? REEL_DURATIONS : DURATIONS;
@@ -308,7 +313,7 @@ export default function GeneratePage() {
           isDraft: form.isDraft,
           aspectRatio: form.aspectRatio,
           audioTrackId: form.audioTrackId || undefined,
-          enableAudio: currentModel?.hasAudio || false,
+          enableAudio: effectiveAudio,
         }),
       });
 
@@ -787,6 +792,38 @@ export default function GeneratePage() {
             </CardContent>
           </Card>
 
+          {/* Live Sound Toggle — only for models with native audio */}
+          {modelSupportsAudio && (
+            <Card className={form.enableLiveSound ? "border-yellow-500/20 bg-yellow-500/[0.03]" : ""}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${form.enableLiveSound ? "bg-yellow-500/20" : "bg-white/[0.04]"}`}>
+                      <Volume2 className={`w-5 h-5 ${form.enableLiveSound ? "text-yellow-400" : "text-zinc-500"}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-zinc-200">Live Sound</span>
+                        {form.enableLiveSound && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded-full">
+                            +30%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Sound effects, dialogue, and ambient audio
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={form.enableLiveSound}
+                    onCheckedChange={(v) => setFormField("enableLiveSound", v)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Audio / Sound */}
           <Card>
             <CardContent className="p-4 space-y-3">
@@ -937,6 +974,16 @@ export default function GeneratePage() {
                   </div>
                 )}
 
+                {effectiveAudio && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">Live Sound</span>
+                    <span className="text-yellow-400 flex items-center gap-1 text-xs font-semibold">
+                      <Volume2 className="w-3 h-3" />
+                      Enabled (+30%)
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Est. Time</span>
                   <span className="text-zinc-200">
@@ -945,54 +992,67 @@ export default function GeneratePage() {
                 </div>
               </div>
 
-              <div className="border-t border-white/[0.06] pt-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-zinc-300">Cost</span>
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-violet-400" />
-                    <span className="text-xl font-bold text-violet-300">{creditCost}</span>
-                    <span className="text-xs text-zinc-500">credits</span>
+              {/* Cost section — only shown when ready to generate */}
+              {isReadyToGenerate ? (
+                <>
+                  <div className="border-t border-white/[0.06] pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-zinc-300">Cost</span>
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-violet-400" />
+                        <span className="text-xl font-bold text-violet-300">{creditCost}</span>
+                        <span className="text-xs text-zinc-500">credits</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-1.5">
+                      <span className="text-xs text-zinc-500">Your balance</span>
+                      <span className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
+                        {`${user?.creditBalance?.toLocaleString() ?? 50} credits`}
+                      </span>
+                    </div>
                   </div>
+
+                  <Button
+                    className="w-full shadow-lg shadow-violet-600/20"
+                    size="lg"
+                    disabled={!form.prompt.trim() || isGenerating || isLoading}
+                    loading={isGenerating}
+                    onClick={handleGenerate}
+                  >
+                    {isGenerating ? (
+                      "Generating..."
+                    ) : isLoading ? (
+                      "Loading..."
+                    ) : !hasEnoughCredits ? (
+                      "Not enough credits"
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" /> Generate {isReel ? "Reel" : "Video"}
+                      </>
+                    )}
+                  </Button>
+
+                  {error && (
+                    <p className="text-xs text-center text-red-400 mt-2">
+                      {error}
+                    </p>
+                  )}
+
+                  {!isLoading && !hasEnoughCredits && !error && (
+                    <p className="text-xs text-center text-red-400">
+                      You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
+                      <button onClick={() => setCreditPurchaseOpen(true)} className="underline hover:text-red-300 transition-colors">Buy credits</button>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="border-t border-white/[0.06] pt-4 text-center">
+                  <p className="text-xs text-zinc-500">
+                    {form.type === "i2v" && !form.inputImage
+                      ? "Add a prompt and upload an image to see the cost"
+                      : "Add a prompt to see the cost"}
+                  </p>
                 </div>
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-xs text-zinc-500">Your balance</span>
-                  <span className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
-                    {`${user?.creditBalance?.toLocaleString() ?? 50} credits`}
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                className="w-full shadow-lg shadow-violet-600/20"
-                size="lg"
-                disabled={!form.prompt.trim() || isGenerating || isLoading}
-                loading={isGenerating}
-                onClick={handleGenerate}
-              >
-                {isGenerating ? (
-                  "Generating..."
-                ) : isLoading ? (
-                  "Loading..."
-                ) : !hasEnoughCredits ? (
-                  "Not enough credits"
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" /> Generate {isReel ? "Reel" : "Video"}
-                  </>
-                )}
-              </Button>
-
-              {error && (
-                <p className="text-xs text-center text-red-400 mt-2">
-                  {error}
-                </p>
-              )}
-
-              {!isLoading && !hasEnoughCredits && !error && (
-                <p className="text-xs text-center text-red-400">
-                  You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
-                  <button onClick={() => setCreditPurchaseOpen(true)} className="underline hover:text-red-300 transition-colors">Buy credits</button>
-                </p>
               )}
             </CardContent>
           </Card>
@@ -1006,33 +1066,44 @@ export default function GeneratePage() {
 
       {/* Mobile: Fixed Generate button at bottom */}
       <MobileActionBar>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
-            <span className="text-sm font-bold text-violet-300">{creditCost}</span>
-            <span className="text-xs text-zinc-500">credits</span>
-          </div>
-          <Button
-            className="flex-1 max-w-[200px] shadow-lg shadow-violet-600/20"
-            disabled={!form.prompt.trim() || isGenerating || isLoading}
-            loading={isGenerating}
-            onClick={handleGenerate}
-          >
-            {isGenerating ? (
-              "Generating..."
-            ) : isLoading ? (
-              "Loading..."
-            ) : !hasEnoughCredits ? (
-              "No credits"
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" /> Generate
-              </>
+        {isReadyToGenerate ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+                <span className="text-sm font-bold text-violet-300">{creditCost}</span>
+                <span className="text-xs text-zinc-500">credits</span>
+                {effectiveAudio && (
+                  <Volume2 className="w-3 h-3 text-yellow-400 shrink-0" />
+                )}
+              </div>
+              <Button
+                className="flex-1 max-w-[200px] shadow-lg shadow-violet-600/20"
+                disabled={!form.prompt.trim() || isGenerating || isLoading}
+                loading={isGenerating}
+                onClick={handleGenerate}
+              >
+                {isGenerating ? (
+                  "Generating..."
+                ) : isLoading ? (
+                  "Loading..."
+                ) : !hasEnoughCredits ? (
+                  "No credits"
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" /> Generate
+                  </>
+                )}
+              </Button>
+            </div>
+            {error && (
+              <p className="text-xs text-center text-red-400 mt-1.5">{error}</p>
             )}
-          </Button>
-        </div>
-        {error && (
-          <p className="text-xs text-center text-red-400 mt-1.5">{error}</p>
+          </>
+        ) : (
+          <p className="text-xs text-center text-zinc-500 py-2">
+            Fill in your prompt to generate
+          </p>
         )}
       </MobileActionBar>
 

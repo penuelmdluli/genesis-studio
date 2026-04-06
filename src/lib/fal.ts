@@ -111,14 +111,17 @@ export async function submitFalJob(params: {
 // Poll FAL.AI job status
 export async function getFalJobStatus(
   modelId: ModelId,
-  requestId: string
+  requestId: string,
+  jobType?: string
 ): Promise<{
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   progress?: number;
   error?: string;
 }> {
   const model = AI_MODELS[modelId];
-  const falModelId = model?.falModelId;
+  const falModelId = jobType === "i2v" && model?.falModelIdI2V
+    ? model.falModelIdI2V
+    : model?.falModelId;
   if (!falModelId) {
     throw new Error(`No FAL.AI model ID for ${modelId}`);
   }
@@ -142,10 +145,13 @@ export async function getFalJobStatus(
 // Get completed FAL.AI job result
 export async function getFalJobResult(
   modelId: ModelId,
-  requestId: string
+  requestId: string,
+  jobType?: string
 ): Promise<{ videoUrl: string; hasAudio: boolean }> {
   const model = AI_MODELS[modelId];
-  const falModelId = model?.falModelId;
+  const falModelId = jobType === "i2v" && model?.falModelIdI2V
+    ? model.falModelIdI2V
+    : model?.falModelId;
   if (!falModelId) {
     throw new Error(`No FAL.AI model ID for ${modelId}`);
   }

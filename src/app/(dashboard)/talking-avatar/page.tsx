@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,23 +79,38 @@ export default function TalkingAvatarPage() {
     if (previewingVoice === vid && previewAudioRef.current) {
       previewAudioRef.current.pause();
       previewAudioRef.current.currentTime = 0;
+      previewAudioRef.current = null;
       setPreviewingVoice(null);
+      setLoadingPreview(null);
       return;
     }
+    // Stop current preview — clear callbacks to prevent stale playback
     if (previewAudioRef.current) {
+      previewAudioRef.current.oncanplaythrough = null;
+      previewAudioRef.current.onended = null;
+      previewAudioRef.current.onerror = null;
       previewAudioRef.current.pause();
       previewAudioRef.current.currentTime = 0;
     }
     setLoadingPreview(vid);
+    setPreviewingVoice(null);
     const audio = new Audio(`/api/voiceover/preview?voiceId=${vid}`);
     previewAudioRef.current = audio;
     audio.oncanplaythrough = () => {
+      if (previewAudioRef.current !== audio) return;
       setLoadingPreview(null);
       setPreviewingVoice(vid);
       audio.play();
     };
-    audio.onended = () => setPreviewingVoice(null);
-    audio.onerror = () => { setLoadingPreview(null); setPreviewingVoice(null); };
+    audio.onended = () => {
+      if (previewAudioRef.current !== audio) return;
+      setPreviewingVoice(null);
+    };
+    audio.onerror = () => {
+      if (previewAudioRef.current !== audio) return;
+      setLoadingPreview(null);
+      setPreviewingVoice(null);
+    };
     audio.load();
   }, [previewingVoice]);
 
@@ -246,6 +261,49 @@ export default function TalkingAvatarPage() {
       generateLockRef.current = false;
     }
   };
+
+  // --- Poll for job completion ---
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!jobId || resultVideoUrl) return;
+
+    // Start polling every 5 seconds
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.status === "completed" && data.outputVideoUrl) {
+          setResultVideoUrl(data.outputVideoUrl);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          toast("Talking avatar is ready!", "success");
+        } else if (data.status === "failed") {
+          setError(data.errorMessage || "Generation failed. Credits have been refunded.");
+          setJobId(null);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          toast("Generation failed. Credits refunded.", "error");
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    }, 5000);
+
+    // Timeout after 10 minutes
+    const timeout = setTimeout(() => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (!resultVideoUrl) {
+        setError("Generation timed out. Please check your gallery later or try again.");
+        setJobId(null);
+      }
+    }, 600000);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      clearTimeout(timeout);
+    };
+  }, [jobId, resultVideoUrl, toast]);
 
   // --- Drag & Drop ---
 
@@ -606,7 +664,7 @@ export default function TalkingAvatarPage() {
       </div>
 
       {/* Result */}
-      {jobId && (
+      {(jobId || resultVideoUrl) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -614,22 +672,33 @@ export default function TalkingAvatarPage() {
               Result
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {resultVideoUrl ? (
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
-                <video
-                  src={resultVideoUrl}
-                  className="w-full max-h-[480px] object-contain"
-                  controls
-                  autoPlay
-                />
-              </div>
+              <>
+                <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                  <video
+                    src={resultVideoUrl}
+                    className="w-full max-h-[480px] object-contain"
+                    controls
+                    autoPlay
+                    onError={() => setError("Failed to load the generated video. It may still be processing — check your gallery.")}
+                  />
+                </div>
+                <a
+                  href={resultVideoUrl}
+                  download={`talking-avatar-${jobId || "video"}.mp4`}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 text-sm font-medium transition-colors border border-violet-500/20"
+                >
+                  <Upload className="w-4 h-4 rotate-180" />
+                  Download Video
+                </a>
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center h-48 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mb-3" />
-                <p className="text-sm text-zinc-400">Generating your talking avatar...</p>
-                <p className="text-[11px] text-zinc-600 mt-1">
-                  Job ID: {jobId} — This may take 1-3 minutes
+                <div className="w-10 h-10 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mb-3" />
+                <p className="text-sm text-zinc-300 font-medium">Generating your talking avatar...</p>
+                <p className="text-[11px] text-zinc-600 mt-1.5">
+                  This may take 1-3 minutes — you can leave this page
                 </p>
               </div>
             )}

@@ -20,6 +20,7 @@ describe("useStore", () => {
         isDraft: false,
         videoFormat: "standard",
         aspectRatio: "landscape",
+        enableLiveSound: false,
       },
       activeJobs: [],
       videos: [],

@@ -36,6 +36,17 @@ interface GenerateFormState {
   aspectRatio: AspectRatio;
   audioTrackId?: string;
   customAudio?: File;
+  enableLiveSound: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  type: "success" | "error" | "info" | "promo";
+  title: string;
+  message: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
 }
 
 interface StoreState {
@@ -64,6 +75,13 @@ interface StoreState {
   addVideo: (video: Video) => void;
   removeVideo: (videoId: string) => void;
 
+  // Notifications
+  notifications: AppNotification[];
+  addNotification: (notification: Omit<AppNotification, "id" | "read" | "createdAt">) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+
   // UI
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -86,6 +104,7 @@ const defaultForm: GenerateFormState = {
   isDraft: false,
   videoFormat: "standard",
   aspectRatio: "landscape",
+  enableLiveSound: false,
 };
 
 export const useStore = create<StoreState>((set) => ({
@@ -124,6 +143,32 @@ export const useStore = create<StoreState>((set) => ({
     set((state) => ({
       videos: state.videos.filter((v) => v.id !== videoId),
     })),
+
+  // Notifications
+  notifications: [],
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [
+        {
+          ...notification,
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          read: false,
+          createdAt: new Date().toISOString(),
+        },
+        ...state.notifications,
+      ].slice(0, 50), // Keep max 50
+    })),
+  markNotificationRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      ),
+    })),
+  markAllNotificationsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+    })),
+  clearNotifications: () => set({ notifications: [] }),
 
   // UI
   sidebarOpen: true,

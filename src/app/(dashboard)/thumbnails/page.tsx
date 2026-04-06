@@ -38,7 +38,7 @@ type VariationCount = (typeof VARIATION_OPTIONS)[number];
 
 interface GeneratedImage {
   id: string;
-  base64: string;
+  url: string;
 }
 
 export default function ThumbnailsPage() {
@@ -120,7 +120,7 @@ export default function ThumbnailsPage() {
           setGeneratedImages(
             data.images.map((img: string, i: number) => ({
               id: `thumb-${Date.now()}-${i}`,
-              base64: img,
+              url: img,
             }))
           );
         }
@@ -137,13 +137,29 @@ export default function ThumbnailsPage() {
     }
   };
 
-  const handleDownload = (image: GeneratedImage, index: number) => {
-    const link = document.createElement("a");
-    link.href = `data:image/png;base64,${image.base64}`;
-    link.download = `thumbnail-${size}-${index + 1}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (image: GeneratedImage, index: number) => {
+    try {
+      if (image.url.startsWith("data:")) {
+        // Base64 data URI — download directly
+        const link = document.createElement("a");
+        link.href = image.url;
+        link.download = `thumbnail-${size}-${index + 1}.jpg`;
+        link.click();
+      } else {
+        // URL — proxy download
+        const res = await fetch("/api/proxy-image?url=" + encodeURIComponent(image.url));
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `thumbnail-${size}-${index + 1}.jpg`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+    } catch {
+      window.open(image.url, "_blank");
+      toast("Opening image in new tab for download", "info");
+    }
   };
 
   return (
@@ -402,9 +418,10 @@ export default function ThumbnailsPage() {
                 <CardContent className="p-3 space-y-3">
                   <div className="relative rounded-lg overflow-hidden border border-white/[0.06] bg-[#0D0D14]">
                     <img
-                      src={`data:image/png;base64,${image.base64}`}
+                      src={image.url}
                       alt={`Generated thumbnail ${index + 1}`}
                       className="w-full h-auto object-contain"
+                      crossOrigin="anonymous"
                     />
                   </div>
                   <Button

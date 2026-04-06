@@ -211,7 +211,7 @@ export default function UpscalePage() {
       updateCreditBalance((user?.creditBalance ?? 0) - data.creditsCost);
       toast("Upscaling started! This may take a few minutes.", "success");
 
-      // Simulate progress polling (in production, poll /api/jobs/:id/status)
+      // Simulate progress while polling for completion
       const progressInterval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 95) {
@@ -223,23 +223,32 @@ export default function UpscalePage() {
       }, 2000);
 
       // Poll for completion
+      const pollStartTime = Date.now();
       const pollInterval = setInterval(async () => {
+        // Timeout after 10 minutes
+        if (Date.now() - pollStartTime > 600000) {
+          clearInterval(progressInterval);
+          clearInterval(pollInterval);
+          setIsProcessing(false);
+          setError("Upscaling timed out. Please check your gallery later or try again.");
+          return;
+        }
         try {
-          const statusRes = await fetch(`/api/jobs/${data.jobId}/status`);
+          const statusRes = await fetch(`/api/jobs/${data.jobId}`);
           if (statusRes.ok) {
             const statusData = await statusRes.json();
-            if (statusData.status === "completed" && statusData.outputUrl) {
+            if (statusData.status === "completed" && statusData.outputVideoUrl) {
               clearInterval(progressInterval);
               clearInterval(pollInterval);
               setProgress(100);
-              setResultUrl(statusData.outputUrl);
+              setResultUrl(statusData.outputVideoUrl);
               setIsProcessing(false);
               toast("Video upscaled successfully!", "success");
             } else if (statusData.status === "failed") {
               clearInterval(progressInterval);
               clearInterval(pollInterval);
               setIsProcessing(false);
-              setError("Upscaling failed. Credits have been refunded.");
+              setError(statusData.errorMessage || "Upscaling failed. Credits have been refunded.");
               toast("Upscaling failed. Credits refunded.", "error");
             }
           }

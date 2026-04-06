@@ -6,6 +6,7 @@ import { getRunPodJobStatus } from "@/lib/runpod";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
 import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { refundCredits } from "@/lib/credits";
+import { sendVideoReadyEmail } from "@/lib/email";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId, GenerationType } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
@@ -83,6 +84,13 @@ export async function GET(
               completedAt: new Date().toISOString(),
             });
 
+            // Send video-ready email (fire and forget)
+            if (user?.email) {
+              sendVideoReadyEmail(user.email, user.name || "Creator", videoId).catch((err) =>
+                console.error("[JOB STATUS] Video-ready email failed:", err)
+              );
+            }
+
             return NextResponse.json({
               id: job.id, status: "completed", progress: 100,
               outputVideoUrl: videoApiUrl, modelId: job.model_id,
@@ -112,14 +120,16 @@ export async function GET(
         if (!isFalMotion && isFal) {
           const falStatus = await getFalJobStatus(
             job.model_id as ModelId,
-            job.runpod_job_id
+            job.runpod_job_id,
+            job.type
           );
 
           if (falStatus.status === "COMPLETED") {
             // Get the result
             const falResult = await getFalJobResult(
               job.model_id as ModelId,
-              job.runpod_job_id
+              job.runpod_job_id,
+              job.type
             );
 
             // Download and upload to R2
@@ -158,6 +168,13 @@ export async function GET(
               outputVideoUrl: videoApiUrl,
               completedAt: new Date().toISOString(),
             });
+
+            // Send video-ready email (fire and forget)
+            if (user?.email) {
+              sendVideoReadyEmail(user.email, user.name || "Creator", videoId).catch((err) =>
+                console.error("[JOB STATUS] Video-ready email failed:", err)
+              );
+            }
 
             return NextResponse.json({
               id: job.id,
@@ -331,6 +348,13 @@ export async function GET(
             gpuTime: runpodStatus.executionTime,
             completedAt: new Date().toISOString(),
           });
+
+          // Send video-ready email (fire and forget)
+          if (user?.email) {
+            sendVideoReadyEmail(user.email, user.name || "Creator", videoId).catch((err) =>
+              console.error("[JOB STATUS] Video-ready email failed:", err)
+            );
+          }
 
           return NextResponse.json({
             id: job.id,

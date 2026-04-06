@@ -75,6 +75,7 @@ export default function GalleryPage() {
     e.stopPropagation();
     try {
       const res = await fetch(url);
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -86,7 +87,9 @@ export default function GalleryPage() {
       URL.revokeObjectURL(blobUrl);
       toast("Download started", "success");
     } catch {
-      toast("Download failed", "error");
+      // Fallback: open in new tab for manual download
+      window.open(url, "_blank");
+      toast("Opening video in new tab for download", "info");
     }
   };
 

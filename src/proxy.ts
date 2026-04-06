@@ -10,6 +10,11 @@ const isProtectedRoute = createRouteMatcher([
   "/admin(.*)",
   "/motion-control(.*)",
   "/pricing(.*)",
+  "/voiceover(.*)",
+  "/talking-avatar(.*)",
+  "/thumbnails(.*)",
+  "/upscale(.*)",
+  "/captions(.*)",
 ]);
 
 const handler = clerkMiddleware(async (auth, req) => {

@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatBot } from "@/components/chat/chatbot";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app"),
   title: {
     default: "Genesis Studio | AI Video Generation Platform",
     template: "%s | Genesis Studio",
@@ -75,6 +78,8 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
+          <Analytics />
+          <SpeedInsights />
         </body>
       </html>
     </ClerkProvider>

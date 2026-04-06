@@ -215,7 +215,7 @@ export default function AdminPage() {
               <Badge variant="red">ADMIN</Badge>
               <span className="text-xs text-zinc-500">Owner Dashboard</span>
             </div>
-            <h1 className="text-3xl font-bold gradient-text">Platform Analytics</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Platform Analytics</h1>
             <p className="text-zinc-500 mt-1">Real-time metrics and management</p>
           </div>
           <Button
@@ -251,7 +251,7 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <div className="space-y-6">
             {/* Stat Cards */}
-            <StaggerGroup className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <StaggerGroup className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               {overviewCards.map((card) => (
                 <StaggerItem key={card.label}>
                   <Card className="glass-strong hover:border-white/[0.12] transition-colors">

@@ -167,7 +167,7 @@ export default function PricingPage() {
                   <div className="mt-3">
                     {billingCycle === "annual" && ANNUAL_PLANS[plan.id] ? (
                       <>
-                        <span className="text-4xl font-extrabold text-zinc-100">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-zinc-100">
                           {currencySymbol}{currency === "ZAR" && plan.priceZAR
                             ? Math.round((plan.priceZAR * 12 * 0.8) / 12)
                             : Math.round(ANNUAL_PLANS[plan.id].annualPrice / 12)}
@@ -181,7 +181,7 @@ export default function PricingPage() {
                       </>
                     ) : (
                       <>
-                        <span className="text-4xl font-extrabold text-zinc-100">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-zinc-100">
                           {formatPrice(plan.price, plan.priceZAR)}
                         </span>
                         <span className="text-sm text-zinc-500">/mo</span>
@@ -239,7 +239,7 @@ export default function PricingPage() {
                   <Zap className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-zinc-100">
+                  <div className="text-2xl sm:text-3xl font-bold text-zinc-100">
                     {pack.credits.toLocaleString()}
                   </div>
                   <div className="text-xs text-zinc-500 mt-0.5">credits</div>

@@ -249,30 +249,32 @@ export default function MotionControlPage() {
     <PageTransition className="space-y-6">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-600/20">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-600/20 shrink-0">
             <Move className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-100">Motion Control</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">
-              Apply motion effects or transfer reference video motion onto any character
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold text-zinc-100">Motion Control</h1>
+              <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] sm:text-xs shrink-0">
+                Kling AI
+              </Badge>
+            </div>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+              Apply motion effects or transfer reference motion onto any character
             </p>
           </div>
-          <Badge className="ml-auto bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs">
-            Powered by Kling AI
-          </Badge>
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
           {[
-            { num: 1, label: "Motion / Effect", done: !!(motionVideo || selectedEffect) },
+            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect) },
             { num: 2, label: "Character", done: !!characterImage },
             { num: 3, label: "Generate", done: false },
           ].map((step, i) => (
-            <div key={step.num} className="flex items-center gap-2">
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            <div key={step.num} className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium transition-all ${
                 step.done
                   ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
                   : "bg-white/[0.03] text-zinc-600 border border-white/[0.06]"
@@ -286,7 +288,7 @@ export default function MotionControlPage() {
                 )}
                 {step.label}
               </div>
-              {i < 2 && <div className={`w-6 h-px ${step.done ? "bg-violet-500/40" : "bg-white/[0.06]"}`} />}
+              {i < 2 && <div className={`w-4 sm:w-6 h-px ${step.done ? "bg-violet-500/40" : "bg-white/[0.06]"}`} />}
             </div>
           ))}
         </div>
@@ -307,21 +309,21 @@ export default function MotionControlPage() {
               {/* Tabs: Fun Effects / Upload / History */}
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 {([
-                  { key: "effects" as const, label: "Fun Effects", icon: Sparkles },
-                  { key: "upload" as const, label: "Upload Video", icon: Upload },
+                  { key: "effects" as const, label: "Effects", icon: Sparkles },
+                  { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "history" as const, label: "History", icon: Clock },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setMotionTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
                       motionTab === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
                         : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
-                    <tab.icon className="w-3.5 h-3.5" />
-                    {tab.label}
+                    <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>

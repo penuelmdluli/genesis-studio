@@ -283,16 +283,16 @@ export default function BrainStudioPage() {
     <PageTransition>
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="violet" className="animate-pulse-glow">
                 <Brain className="w-3 h-3 mr-1" /> AI DIRECTOR
               </Badge>
               <Badge variant="default">NEW</Badge>
             </div>
-            <h1 className="text-3xl font-bold gradient-text">Brain Studio</h1>
-            <p className="text-zinc-500 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Brain Studio</h1>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
               Type one concept. Get a finished multi-scene video.
             </p>
           </div>
@@ -300,6 +300,7 @@ export default function BrainStudioPage() {
             <Button
               variant="ghost"
               size="sm"
+              className="shrink-0"
               onClick={() => {
                 setBrainState("input");
                 setPlan(null);
@@ -307,7 +308,7 @@ export default function BrainStudioPage() {
                 setError(null);
               }}
             >
-              <Plus className="w-4 h-4 mr-1" /> New Production
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Production</span><span className="sm:hidden">New</span>
             </Button>
           )}
         </div>
@@ -347,16 +348,16 @@ export default function BrainStudioPage() {
                     className="min-h-[120px] text-base"
                     maxLength={5000}
                   />
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-zinc-600">{concept.length}/5000</span>
+                  <div className="flex items-start justify-between mt-2 gap-2">
+                    <span className="text-xs text-zinc-600 shrink-0 pt-1">{concept.length}/5000</span>
                     <div className="flex gap-1 flex-wrap justify-end">
-                      {EXAMPLE_CONCEPTS.map((ex, i) => (
+                      {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (
                         <button
                           key={i}
                           onClick={() => setConcept(ex)}
-                          className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[180px]"
+                          className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[140px] sm:max-w-[180px]"
                         >
-                          {ex.slice(0, 40)}...
+                          {ex.slice(0, 35)}...
                         </button>
                       ))}
                     </div>
@@ -449,25 +450,26 @@ export default function BrainStudioPage() {
                 </div>
 
                 {/* Toggles */}
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                   {[
-                    { key: "voiceover", icon: Mic, label: "Voiceover", state: voiceover, setter: setVoiceover, credits: 3 },
-                    { key: "music", icon: Music, label: "Music", state: music, setter: setMusic, credits: 2 },
-                    { key: "captions", icon: Subtitles, label: "Captions", state: captions, setter: setCaptions, credits: 1 },
+                    { key: "voiceover", icon: Mic, label: "Voice", fullLabel: "Voiceover", state: voiceover, setter: setVoiceover, credits: 3 },
+                    { key: "music", icon: Music, label: "Music", fullLabel: "Music", state: music, setter: setMusic, credits: 2 },
+                    { key: "captions", icon: Subtitles, label: "Caps", fullLabel: "Captions", state: captions, setter: setCaptions, credits: 1 },
                   ].map((toggle) => (
                     <button
                       key={toggle.key}
                       onClick={() => toggle.setter(!toggle.state)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                         toggle.state
                           ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
                           : "bg-white/[0.03] border border-white/[0.06] text-zinc-500"
                       }`}
                     >
-                      <toggle.icon className="w-4 h-4" />
-                      {toggle.label}
-                      {toggle.state && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                      <span className="text-[10px] text-zinc-600">+{toggle.credits}cr</span>
+                      <toggle.icon className="w-4 h-4 shrink-0" />
+                      <span className="sm:hidden">{toggle.label}</span>
+                      <span className="hidden sm:inline">{toggle.fullLabel}</span>
+                      {toggle.state && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                      <span className="text-[10px] text-zinc-600 hidden sm:inline">+{toggle.credits}cr</span>
                     </button>
                   ))}
                 </div>
@@ -496,13 +498,13 @@ export default function BrainStudioPage() {
 
             {/* Generate Button */}
             <Card className="glass-strong">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4">
                     <div className="flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-violet-400" />
-                      <span className="text-sm text-zinc-400">Estimated cost:</span>
-                      <span className="text-lg font-bold text-violet-300">~{estimatedCredits}</span>
+                      <span className="text-xs sm:text-sm text-zinc-400">Est:</span>
+                      <span className="text-base sm:text-lg font-bold text-violet-300">~{estimatedCredits}</span>
                       <span className="text-xs text-zinc-500">credits</span>
                     </div>
                     <span className="text-xs text-zinc-600">|</span>
@@ -515,10 +517,11 @@ export default function BrainStudioPage() {
                     onClick={handlePlan}
                     disabled={concept.length < 10 || isPlanning}
                     loading={isPlanning}
-                    className="shadow-lg shadow-violet-600/20 px-8"
+                    className="shadow-lg shadow-violet-600/20 w-full sm:w-auto sm:px-8"
                   >
                     <Brain className="w-5 h-5" />
-                    Generate Production Plan
+                    <span className="sm:hidden">Generate Plan</span>
+                    <span className="hidden sm:inline">Generate Production Plan</span>
                   </Button>
                 </div>
               </CardContent>
@@ -559,16 +562,16 @@ export default function BrainStudioPage() {
         {brainState === "review" && plan && (
           <div className="space-y-4">
             <Card className="glass-strong">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{plan.title}</CardTitle>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    {plan.scenes.length} scenes | {plan.totalDuration}s total | {plan.overallStyle} style
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setBrainState("input")}>
-                    <Edit3 className="w-4 h-4" /> Edit Concept
+              <CardHeader>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm sm:text-base truncate">{plan.title}</CardTitle>
+                    <p className="text-[11px] sm:text-xs text-zinc-500 mt-1">
+                      {plan.scenes.length} scenes | {plan.totalDuration}s | {plan.overallStyle}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setBrainState("input")}>
+                    <Edit3 className="w-4 h-4" /> <span className="hidden sm:inline">Edit Concept</span><span className="sm:hidden">Edit</span>
                   </Button>
                 </div>
               </CardHeader>
@@ -579,30 +582,30 @@ export default function BrainStudioPage() {
               {plan.scenes.map((scene, i) => (
                 <StaggerItem key={i}>
                   <Card className="glass-strong hover:border-white/[0.12] transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-start gap-2 sm:gap-4">
                         {/* Scene number */}
-                        <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center text-violet-300 font-bold text-sm shrink-0">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-violet-500/15 flex items-center justify-center text-violet-300 font-bold text-xs sm:text-sm shrink-0">
                           {scene.sceneNumber}
                         </div>
 
-                        <div className="flex-1 min-w-0 space-y-3">
-                          {/* Description */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-zinc-200 truncate">{scene.description}</span>
-                            <Badge variant="default" className="text-[10px] shrink-0">{scene.modelId}</Badge>
-                            <Badge variant="violet" className="text-[10px] shrink-0">{scene.duration}s</Badge>
+                        <div className="flex-1 min-w-0 space-y-2 sm:space-y-3">
+                          {/* Description + badges */}
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-medium text-zinc-200 truncate">{scene.description}</span>
+                            <Badge variant="default" className="text-[9px] sm:text-[10px] shrink-0">{scene.modelId}</Badge>
+                            <Badge variant="violet" className="text-[9px] sm:text-[10px] shrink-0">{scene.duration}s</Badge>
                           </div>
 
                           {/* Prompt (editable) */}
                           <Textarea
                             value={scene.prompt}
                             onChange={(e) => handleEditScene(i, "prompt", e.target.value)}
-                            className="min-h-[60px] text-xs"
+                            className="min-h-[50px] sm:min-h-[60px] text-xs"
                           />
 
                           {/* Controls row */}
-                          <div className="flex flex-wrap gap-2">
+                          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                             <Select
                               value={scene.modelId}
                               onChange={(v) => handleEditScene(i, "modelId", v)}
@@ -669,12 +672,12 @@ export default function BrainStudioPage() {
 
             {/* Produce Button */}
             <Card className="glass-strong">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4">
                     <div className="flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-violet-400" />
-                      <span className="text-lg font-bold text-violet-300">{totalCredits}</span>
+                      <span className="text-base sm:text-lg font-bold text-violet-300">{totalCredits}</span>
                       <span className="text-xs text-zinc-500">credits</span>
                     </div>
                     <span className="text-xs text-zinc-500">
@@ -686,7 +689,7 @@ export default function BrainStudioPage() {
                     onClick={handleProduce}
                     disabled={isProducing}
                     loading={isProducing}
-                    className="shadow-lg shadow-violet-600/20 px-8"
+                    className="shadow-lg shadow-violet-600/20 w-full sm:w-auto sm:px-8"
                   >
                     <Clapperboard className="w-5 h-5" />
                     Produce Video ({totalCredits} credits)
@@ -765,7 +768,7 @@ export default function BrainStudioPage() {
             </Card>
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
               <Button
                 variant="primary"
                 onClick={async () => {

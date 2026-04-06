@@ -164,7 +164,7 @@ export default function VoiceoverPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/20">
                 <Mic className="h-5 w-5 text-violet-400" />
               </div>
-              <h1 className="text-3xl font-bold text-white">AI Voiceover</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">AI Voiceover</h1>
             </div>
             <p className="text-zinc-400">
               Generate professional voiceovers from text using AI voices.

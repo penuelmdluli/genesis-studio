@@ -88,13 +88,13 @@ export default function CollectionsPage() {
 
   return (
     <PageTransition className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
-            <FolderOpen className="w-6 h-6 text-violet-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 flex items-center gap-2">
+            <FolderOpen className="w-5 sm:w-6 h-5 sm:h-6 text-violet-400" />
             Collections
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
             Organize your videos into folders and collections.
           </p>
         </div>

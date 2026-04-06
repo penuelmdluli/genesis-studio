@@ -7,7 +7,7 @@ type Rating = "great" | "okay" | "bad";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     const { userId: clerkId } = await auth();
@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { id: videoId } = await params;
+    const { videoId } = await params;
     const { rating } = await req.json();
 
     if (!["great", "okay", "bad"].includes(rating)) {

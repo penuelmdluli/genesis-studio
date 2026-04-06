@@ -229,7 +229,7 @@ export default function GalleryPage() {
                           {job.status === "processing" ? "Generating..." : "In Queue"}
                         </Badge>
                         <span className="text-[11px] text-zinc-600">
-                          {job.modelId || "AI Model"} &middot; {job.duration || 5}s
+                          AI Video &middot; {job.duration || 5}s
                         </span>
                       </div>
                     </div>
@@ -669,11 +669,11 @@ function VideoCard({
           )}
         </div>
 
-        {/* Model badge — top left */}
-        {video.modelId && (
+        {/* Resolution badge — top left */}
+        {video.resolution && (
           <div className={`absolute top-2 left-2 z-20 transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"}`}>
-            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-black/50 text-white/70 backdrop-blur-sm capitalize">
-              {video.modelId}
+            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-black/50 text-white/70 backdrop-blur-sm uppercase">
+              {video.resolution}
             </span>
           </div>
         )}

@@ -39,7 +39,7 @@ type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
-// Kling motion control supports 5s or 10s
+// Motion control supports 5s or 10s
 const MOTION_DURATIONS = [5, 10];
 
 export default function MotionControlPage() {
@@ -256,8 +256,8 @@ export default function MotionControlPage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold text-zinc-100">Motion Control</h1>
-              <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] sm:text-xs shrink-0">
-                Kling AI
+              <Badge className="bg-violet-500/15 text-violet-300 border border-violet-500/30 text-[10px] sm:text-xs shrink-0">
+                AI Powered
               </Badge>
             </div>
             <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
@@ -553,29 +553,29 @@ export default function MotionControlPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Model & Quality */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Model</label>
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value as MotionModel)}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
-                  >
-                    <option value="kling-v3">Kling V3 (Latest)</option>
-                    <option value="kling-v2.6">Kling V2.6</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Quality</label>
-                  <select
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value as MotionQuality)}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
-                  >
-                    <option value="standard">Standard</option>
-                    <option value="pro">Pro (Higher Quality)</option>
-                  </select>
+              {/* Quality */}
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1.5">Quality</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: "standard" as const, label: "Standard", desc: "Fast & balanced" },
+                    { value: "pro" as const, label: "Pro", desc: "Higher fidelity" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setQuality(opt.value)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        quality === opt.value
+                          ? "border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20"
+                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
+                      }`}
+                    >
+                      <div className={`text-sm font-medium ${quality === opt.value ? "text-violet-300" : "text-zinc-300"}`}>
+                        {opt.label}
+                      </div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{opt.desc}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -739,9 +739,9 @@ export default function MotionControlPage() {
                     <span className="text-zinc-300">Motion Control</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Engine</span>
+                    <span className="text-zinc-500">Quality</span>
                     <span className="text-zinc-300">
-                      {model === "kling-v3" ? "Kling V3" : "Kling V2.6"} {quality === "pro" ? "Pro" : "Standard"}
+                      {quality === "pro" ? "Pro" : "Standard"}
                     </span>
                   </div>
                   <div className="flex justify-between">

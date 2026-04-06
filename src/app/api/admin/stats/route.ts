@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { isOwnerClerkId } from "@/lib/credits";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { getProviderHealthStatus } from "@/lib/vendor-failover";
+import { getBudgetSummary } from "@/lib/api-budget";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,6 +25,14 @@ export async function GET(req: NextRequest) {
       jobStatusResult,
       recentUsersResult,
       dailyJobsResult,
+      // New: credit & subscription data
+      recentTransactionsResult,
+      lowBalanceUsersResult,
+      topSpendersResult,
+      packPurchasesResult,
+      refundsResult,
+      failedJobsRecentResult,
+      subscriptionUsersResult,
     ] = await Promise.all([
       // Total users
       supabase.from("users").select("*", { count: "exact", head: true }),
@@ -56,6 +66,64 @@ export async function GET(req: NextRequest) {
         .from("generation_jobs")
         .select("created_at, status, credits_cost, model_id")
         .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+
+      // --- New queries ---
+
+      // Recent credit transactions (last 50)
+      supabase
+        .from("credit_transactions")
+        .select("id, user_id, type, amount, balance, description, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50),
+
+      // Users with low credit balance (< 20 credits, non-free plans)
+      supabase
+        .from("users")
+        .select("id, email, name, plan, credit_balance, monthly_credits_used, monthly_credits_limit")
+        .lt("credit_balance", 20)
+        .neq("plan", "free")
+        .order("credit_balance", { ascending: true })
+        .limit(20),
+
+      // Top spenders (last 30 days) — users who consumed most credits
+      supabase
+        .from("credit_transactions")
+        .select("user_id, amount")
+        .eq("type", "generation_debit")
+        .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+
+      // Credit pack purchases (last 30 days)
+      supabase
+        .from("credit_transactions")
+        .select("id, user_id, amount, description, created_at")
+        .eq("type", "pack_purchase")
+        .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false }),
+
+      // Refunds (last 7 days)
+      supabase
+        .from("credit_transactions")
+        .select("id, user_id, amount, description, created_at")
+        .eq("type", "generation_refund")
+        .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false }),
+
+      // Failed jobs (last 24h) — for issues monitoring
+      supabase
+        .from("generation_jobs")
+        .select("id, user_id, model_id, error_message, credits_cost, created_at")
+        .eq("status", "failed")
+        .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(30),
+
+      // Paid subscribers — users with non-free plans
+      supabase
+        .from("users")
+        .select("id, email, name, plan, credit_balance, monthly_credits_used, monthly_credits_limit, stripe_customer_id, created_at")
+        .neq("plan", "free")
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
 
     // Calculate plan distribution
@@ -99,6 +167,42 @@ export async function GET(req: NextRequest) {
     // Revenue estimate (total credits spent * $0.03 per credit)
     const estimatedRevenue = totalCreditsSpent * 0.03;
 
+    // --- New: Top spenders aggregation ---
+    const spenderMap = new Map<string, number>();
+    (topSpendersResult.data || []).forEach((t: { user_id: string; amount: number }) => {
+      spenderMap.set(t.user_id, (spenderMap.get(t.user_id) || 0) + Math.abs(t.amount));
+    });
+    const topSpenders = Array.from(spenderMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([userId, totalSpent]) => ({ userId, totalSpent }));
+
+    // --- New: Credit flow summary (last 7 days) ---
+    const recentTxns = recentTransactionsResult.data || [];
+    const creditFlow = {
+      totalDebits: 0,
+      totalRefunds: 0,
+      totalGrants: 0,
+      totalPurchases: 0,
+    };
+    recentTxns.forEach((t: { type: string; amount: number }) => {
+      if (t.type === "generation_debit") creditFlow.totalDebits += Math.abs(t.amount);
+      if (t.type === "generation_refund") creditFlow.totalRefunds += Math.abs(t.amount);
+      if (t.type === "subscription_grant") creditFlow.totalGrants += Math.abs(t.amount);
+      if (t.type === "pack_purchase") creditFlow.totalPurchases += Math.abs(t.amount);
+    });
+
+    // --- New: Subscription revenue estimate ---
+    const paidUsers = subscriptionUsersResult.data || [];
+    const planPrices: Record<string, number> = { creator: 15, pro: 39, studio: 99 };
+    const monthlyRecurring = paidUsers.reduce((sum: number, u: { plan: string }) => {
+      return sum + (planPrices[u.plan] || 0);
+    }, 0);
+
+    // Provider health + API budgets
+    const providerHealth = getProviderHealthStatus();
+    const apiBudgets = getBudgetSummary();
+
     return NextResponse.json({
       overview: {
         totalUsers: usersResult.count || 0,
@@ -107,6 +211,8 @@ export async function GET(req: NextRequest) {
         totalCreditsSpent,
         estimatedRevenue: Math.round(estimatedRevenue * 100) / 100,
         avgGpuTime: Math.round(avgGpuTime * 10) / 10,
+        monthlyRecurring,
+        paidSubscribers: paidUsers.length,
       },
       planDistribution: planDist,
       jobStatusDistribution: jobStatusDist,
@@ -114,6 +220,17 @@ export async function GET(req: NextRequest) {
       dailyStats,
       recentJobs: recentJobsResult.data || [],
       recentUsers: recentUsersResult.data || [],
+      // New data
+      creditFlow,
+      recentTransactions: recentTxns,
+      lowBalanceUsers: lowBalanceUsersResult.data || [],
+      topSpenders,
+      packPurchases: packPurchasesResult.data || [],
+      refunds: refundsResult.data || [],
+      failedJobsRecent: failedJobsRecentResult.data || [],
+      subscribers: paidUsers,
+      providerHealth,
+      apiBudgets,
     });
   } catch (error) {
     console.error("Admin stats error:", error);

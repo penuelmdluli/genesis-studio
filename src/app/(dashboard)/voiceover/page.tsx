@@ -8,7 +8,6 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
-import { ComingSoonGate } from "@/components/ui/coming-soon";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { Mic, Play, Square, Download, Zap, Loader2 } from "lucide-react";
 
@@ -154,7 +153,6 @@ export default function VoiceoverPage() {
   };
 
   return (
-    <ComingSoonGate featureId="voiceover" featureName="AI Voiceover">
     <PageTransition>
       <div className="min-h-screen bg-[#0A0A0F] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl space-y-8">
@@ -407,6 +405,5 @@ export default function VoiceoverPage() {
       {/* Spacer for mobile action bar */}
       <div className="h-20 lg:hidden" />
     </PageTransition>
-    </ComingSoonGate>
   );
 }

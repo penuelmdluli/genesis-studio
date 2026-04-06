@@ -27,6 +27,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate file size (client reports expected size)
+    const fileSize = body.fileSize as number | undefined;
+    if (fileSize) {
+      const isVideo = contentType.startsWith("video/");
+      const isAudio = contentType.startsWith("audio/");
+      const maxSize = isVideo ? 500 * 1024 * 1024 : isAudio ? 50 * 1024 * 1024 : 20 * 1024 * 1024; // 500MB video, 50MB audio, 20MB image
+      if (fileSize > maxSize) {
+        const limitMB = Math.round(maxSize / (1024 * 1024));
+        return NextResponse.json(
+          { error: `File too large. Maximum size is ${limitMB}MB for ${isVideo ? "videos" : isAudio ? "audio" : "images"}.` },
+          { status: 413 }
+        );
+      }
+    }
+
     // Validate file type
     const allowedTypes = [
       "image/jpeg", "image/png", "image/webp",

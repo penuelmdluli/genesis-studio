@@ -30,6 +30,12 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   "chat:user": { windowMs: 3_600_000, maxRequests: 20 },
   // Account creation: 3 per hour per IP
   "signup:ip": { windowMs: 3_600_000, maxRequests: 3 },
+  // Feature endpoints: 10 per 10 minutes
+  "feature:free": { windowMs: 600_000, maxRequests: 5 },
+  "feature:paid": { windowMs: 600_000, maxRequests: 15 },
+  // Image generation: 10 per 10 minutes
+  "image:free": { windowMs: 600_000, maxRequests: 5 },
+  "image:paid": { windowMs: 600_000, maxRequests: 20 },
 };
 
 /**

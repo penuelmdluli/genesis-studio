@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
+import { checkRateLimit } from "@/lib/fraud";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +14,13 @@ export async function POST(req: NextRequest) {
     const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Rate limiting
+    const rateCategory = user.plan === "free" ? "feature:free" : "feature:paid";
+    const rateCheck = checkRateLimit(user.id, rateCategory);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded. Please wait before trying again.", resetAt: rateCheck.resetAt }, { status: 429 });
     }
 
     const body = await req.json();

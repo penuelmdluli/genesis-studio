@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",
           },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.io https://*.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://img.clerk.com https://*.clerk.accounts.dev; media-src 'self' blob: https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.io https://api.stripe.com https://*.fal.run https://queue.fal.run https://api.runpod.ai https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://*.clerk.accounts.dev https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;",
+          },
         ],
       },
       {

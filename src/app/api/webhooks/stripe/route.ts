@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { grantSubscriptionCredits, addCreditPackCredits } from "@/lib/credits";
+import { sendPlanUpgradeEmail } from "@/lib/email";
 import { updateUserPlan } from "@/lib/db";
 import { PlanId } from "@/types";
 import { handleFailedPayment, recoverDunningRecord } from "@/lib/dunning";
@@ -71,6 +72,13 @@ export async function POST(req: NextRequest) {
           );
 
           await grantSubscriptionCredits(user.id, creditAmounts[plan]);
+
+          // Send plan upgrade email
+          if (user.email) {
+            sendPlanUpgradeEmail(user.email, user.name || "Creator", plan).catch((err) =>
+              console.error("[STRIPE] Failed to send plan upgrade email:", err)
+            );
+          }
         } else if (session.mode === "payment") {
           // One-time credit pack purchase
           const packCredits: Record<string, number> = {
@@ -152,6 +160,13 @@ export async function POST(req: NextRequest) {
           if (newPlan && newPlan !== updatedUser.plan) {
             await updateUserPlan(updatedUser.id, newPlan, updatedCustomerId, updatedSub.id);
             console.log(`[STRIPE] Plan changed: user ${updatedUser.id} ${updatedUser.plan} → ${newPlan}`);
+
+            // Send plan change email
+            if (updatedUser.email) {
+              sendPlanUpgradeEmail(updatedUser.email, updatedUser.name || "Creator", newPlan).catch((err) =>
+                console.error("[STRIPE] Failed to send plan change email:", err)
+              );
+            }
           }
         }
         break;

@@ -5,6 +5,7 @@ import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { uploadAudio, audioStorageKey } from "@/lib/storage";
 import { randomUUID } from "crypto";
+import { checkRateLimit } from "@/lib/fraud";
 
 const MIN_TEXT_LENGTH = 10;
 const MAX_TEXT_LENGTH = 5000;
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
     const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Rate limiting
+    const rateCategory = user.plan === "free" ? "feature:free" : "feature:paid";
+    const rateCheck = checkRateLimit(user.id, rateCategory);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded. Please wait before trying again.", resetAt: rateCheck.resetAt }, { status: 429 });
     }
 
     const body = await req.json();

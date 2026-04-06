@@ -11,7 +11,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { STORAGE_LIMITS } from "@/lib/profitability";
 import { Switch } from "@/components/ui/switch";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, Loader2 } from "lucide-react";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, Loader2, History } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useStore();
@@ -20,6 +20,9 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [videoCount, setVideoCount] = useState(0);
+  const [creditHistory, setCreditHistory] = useState<{ id: string; type: string; amount: number; description: string; created_at: string }[]>([]);
+  const [creditHistoryLoading, setCreditHistoryLoading] = useState(false);
+  const [creditHistoryLoaded, setCreditHistoryLoaded] = useState(false);
   const [notifications, setNotifications] = useState({
     generationComplete: true,
     lowCredits: true,
@@ -33,6 +36,23 @@ export default function SettingsPage() {
       .then((data) => setVideoCount(data.videos?.length || 0))
       .catch(() => {});
   }, []);
+
+  const loadCreditHistory = async () => {
+    if (creditHistoryLoaded) return;
+    setCreditHistoryLoading(true);
+    try {
+      const res = await fetch("/api/user/credit-history?limit=20");
+      if (res.ok) {
+        const data = await res.json();
+        setCreditHistory(data.transactions || []);
+        setCreditHistoryLoaded(true);
+      }
+    } catch {
+      toast("Failed to load credit history", "error");
+    } finally {
+      setCreditHistoryLoading(false);
+    }
+  };
 
   const handleManageBilling = async () => {
     try {
@@ -164,6 +184,46 @@ export default function SettingsPage() {
               {user?.creditBalance?.toLocaleString() || 50} credits
             </span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Credit History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center">
+              <History className="w-3.5 h-3.5 text-violet-400" />
+            </div>
+            Credit History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!creditHistoryLoaded ? (
+            <Button variant="secondary" size="sm" onClick={loadCreditHistory} disabled={creditHistoryLoading} className="w-full">
+              {creditHistoryLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <History className="w-3 h-3 mr-1.5" />}
+              {creditHistoryLoading ? "Loading..." : "View Credit History"}
+            </Button>
+          ) : creditHistory.length === 0 ? (
+            <p className="text-sm text-zinc-500 text-center py-4">No credit transactions yet.</p>
+          ) : (
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {creditHistory.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-white/[0.02] transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-300 truncate">{tx.description || tx.type}</p>
+                    <p className="text-xs text-zinc-600">
+                      {new Date(tx.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums ml-3 ${
+                    tx.amount > 0 ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {tx.amount > 0 ? "+" : ""}{tx.amount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

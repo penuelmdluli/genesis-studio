@@ -55,7 +55,7 @@ const baseNavItems: NavItem[] = [
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", comingSoon: true },
   // --- AUDIO ---
   { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio", badge: "NEW" },
-  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", comingSoon: true },
+  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
   // --- IMAGE ---
   { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
   { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "NEW" },

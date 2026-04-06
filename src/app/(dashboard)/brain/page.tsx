@@ -348,19 +348,19 @@ export default function BrainStudioPage() {
                     className="min-h-[120px] text-base"
                     maxLength={5000}
                   />
-                  <div className="flex items-start justify-between mt-2 gap-2">
-                    <span className="text-xs text-zinc-600 shrink-0 pt-1">{concept.length}/5000</span>
-                    <div className="flex gap-1 flex-wrap justify-end">
-                      {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setConcept(ex)}
-                          className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[140px] sm:max-w-[180px]"
-                        >
-                          {ex.slice(0, 35)}...
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-zinc-600">{concept.length}/5000</span>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap mt-2">
+                    {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setConcept(ex)}
+                        className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[200px]"
+                      >
+                        {ex.slice(0, 40)}...
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -369,35 +369,35 @@ export default function BrainStudioPage() {
                   {/* Style */}
                   <div>
                     <label className="text-xs text-zinc-500 font-medium mb-2 block">Style</label>
-                    <div className="grid grid-cols-5 gap-1">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
                       {STYLES.slice(0, 5).map((s) => (
                         <button
                           key={s.value}
                           onClick={() => setStyle(s.value)}
-                          className={`p-2 rounded-lg text-center text-xs transition-all ${
+                          className={`p-2 rounded-lg text-center text-[10px] sm:text-xs transition-all overflow-hidden ${
                             style === s.value
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
                               : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
                           }`}
                         >
-                          <div className="text-lg mb-0.5">{s.emoji}</div>
-                          {s.label}
+                          <div className="text-base sm:text-lg mb-0.5">{s.emoji}</div>
+                          <span className="truncate block">{s.label}</span>
                         </button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-5 gap-1 mt-1">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 mt-1">
                       {STYLES.slice(5).map((s) => (
                         <button
                           key={s.value}
                           onClick={() => setStyle(s.value)}
-                          className={`p-2 rounded-lg text-center text-xs transition-all ${
+                          className={`p-2 rounded-lg text-center text-[10px] sm:text-xs transition-all overflow-hidden ${
                             style === s.value
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
                               : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
                           }`}
                         >
-                          <div className="text-lg mb-0.5">{s.emoji}</div>
-                          {s.label}
+                          <div className="text-base sm:text-lg mb-0.5">{s.emoji}</div>
+                          <span className="truncate block">{s.label}</span>
                         </button>
                       ))}
                     </div>
@@ -591,10 +591,11 @@ export default function BrainStudioPage() {
 
                         <div className="flex-1 min-w-0 space-y-2 sm:space-y-3">
                           {/* Description + badges */}
-                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                            <span className="text-xs sm:text-sm font-medium text-zinc-200 truncate">{scene.description}</span>
-                            <Badge variant="default" className="text-[9px] sm:text-[10px] shrink-0">{scene.modelId}</Badge>
-                            <Badge variant="violet" className="text-[9px] sm:text-[10px] shrink-0">{scene.duration}s</Badge>
+                          <div>
+                            <p className="text-xs sm:text-sm font-medium text-zinc-200 truncate mb-1">{scene.description}</p>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant="violet" className="text-[9px] sm:text-[10px] shrink-0">{scene.duration}s</Badge>
+                            </div>
                           </div>
 
                           {/* Prompt (editable) */}
@@ -605,7 +606,7 @@ export default function BrainStudioPage() {
                           />
 
                           {/* Controls row */}
-                          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+                          <div className="grid grid-cols-1 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                             <Select
                               value={scene.modelId}
                               onChange={(v) => handleEditScene(i, "modelId", v)}
@@ -663,8 +664,8 @@ export default function BrainStudioPage() {
                     onChange={(e) => setPlan({ ...plan, voiceoverScript: e.target.value })}
                     className="min-h-[80px]"
                   />
-                  <p className="text-xs text-zinc-600 mt-1">
-                    {plan.voiceoverScript.split(/\s+/).length} words | ~{Math.ceil(plan.voiceoverScript.split(/\s+/).length / 150 * 60)}s speaking time
+                  <p className="text-xs text-zinc-600 mt-1 truncate">
+                    {plan.voiceoverScript.split(/\s+/).length} words &middot; ~{Math.ceil(plan.voiceoverScript.split(/\s+/).length / 150 * 60)}s speaking time
                   </p>
                 </CardContent>
               </Card>

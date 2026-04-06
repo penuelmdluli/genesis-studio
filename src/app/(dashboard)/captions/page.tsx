@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
-import { ComingSoonGate } from "@/components/ui/coming-soon";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   Captions,
@@ -283,7 +282,6 @@ export default function CaptionsPage() {
   };
 
   return (
-    <ComingSoonGate featureId="captions" featureName="Auto Captions">
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Auto Captions</h1>
@@ -661,6 +659,5 @@ export default function CaptionsPage() {
       {/* Spacer for mobile action bar */}
       <div className="h-20 lg:hidden" />
     </PageTransition>
-    </ComingSoonGate>
   );
 }

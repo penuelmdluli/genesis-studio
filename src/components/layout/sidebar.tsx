@@ -50,12 +50,12 @@ const baseNavItems: NavItem[] = [
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "NEW" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "NEW" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
-  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "NEW" },
+  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", comingSoon: true },
   // --- ENHANCE ---
-  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
+  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", comingSoon: true },
   // --- AUDIO ---
   { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio", badge: "NEW" },
-  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
+  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", comingSoon: true },
   // --- IMAGE ---
   { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
   { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "NEW" },
@@ -266,6 +266,22 @@ export function Sidebar() {
                     {item.section}
                   </div>
                 )}
+                {item.comingSoon ? (
+                  <div
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 cursor-default group relative"
+                    title={`${item.label} — Coming Soon`}
+                  >
+                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-700" />
+                    {(sidebarOpen || mobileMenuOpen) && (
+                      <span className="truncate flex-1">{item.label}</span>
+                    )}
+                    {(sidebarOpen || mobileMenuOpen) && (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none bg-zinc-800 text-zinc-500">
+                        <Lock className="w-2.5 h-2.5" /> Soon
+                      </span>
+                    )}
+                  </div>
+                ) : (
                 <Link
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
@@ -298,6 +314,7 @@ export function Sidebar() {
                     )
                   )}
                 </Link>
+                )}
               </div>
             );
           })}

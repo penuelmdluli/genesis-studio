@@ -145,7 +145,7 @@ export default function PricingPage() {
       </div>
 
       {/* Plans */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {PLANS.map((plan) => {
           const isCurrentPlan = user?.plan === plan.id;
           const style = planStyles[plan.id] || planStyles.free;

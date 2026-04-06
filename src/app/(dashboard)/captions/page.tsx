@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { ComingSoonGate } from "@/components/ui/coming-soon";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   Captions,
   Upload,
@@ -170,8 +172,8 @@ export default function CaptionsPage() {
         formData.append("purpose", "video");
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         if (!uploadRes.ok) throw new Error("Upload failed");
-        const { downloadUrl } = await uploadRes.json();
-        targetUrl = downloadUrl;
+        const { publicUrl } = await uploadRes.json();
+        targetUrl = publicUrl;
       } catch {
         setError("Failed to upload video. Please try again.");
         generateLockRef.current = false;
@@ -281,6 +283,7 @@ export default function CaptionsPage() {
   };
 
   return (
+    <ComingSoonGate featureId="captions" featureName="Auto Captions">
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Auto Captions</h1>
@@ -516,8 +519,8 @@ export default function CaptionsPage() {
           )}
         </div>
 
-        {/* Right Column: Summary & Generate */}
-        <div className="space-y-4">
+        {/* Right Column: Summary & Generate — hidden on mobile, shown as sticky card on desktop */}
+        <div className="hidden lg:block space-y-4">
           <Card glow className="sticky top-6">
             <CardHeader>
               <CardTitle className="text-base">Caption Summary</CardTitle>
@@ -632,6 +635,32 @@ export default function CaptionsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!canGenerate}
+          loading={isProcessing}
+          onClick={handleGenerate}
+        >
+          {isProcessing ? (
+            "Generating Captions..."
+          ) : isLoading ? (
+            "Loading..."
+          ) : !hasEnoughCredits && videoDuration ? (
+            "Not enough credits"
+          ) : (
+            <>
+              <Captions className="w-4 h-4" /> Generate Captions
+            </>
+          )}
+        </Button>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
+    </ComingSoonGate>
   );
 }

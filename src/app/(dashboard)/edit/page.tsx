@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   Scissors,
   Merge,
@@ -256,8 +257,8 @@ export default function EditPage() {
           </Card>
         </div>
 
-        {/* Video Gallery Picker */}
-        <div className="space-y-2">
+        {/* Video Gallery Picker — hidden on mobile, shown on desktop */}
+        <div className="hidden lg:block space-y-2">
           <h3 className="text-sm font-medium text-zinc-300 px-1">Your Videos</h3>
           <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
             {videos.length === 0 ? (
@@ -291,6 +292,20 @@ export default function EditPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile: Fixed Export button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!selectedVideoId}
+          onClick={handleExport}
+        >
+          <Download className="w-4 h-4" /> Export Edited Video
+        </Button>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
   );
 }

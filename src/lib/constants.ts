@@ -659,7 +659,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "audio",
     creditCost: "3 credits / 30s",
     minPlan: "free",
-    endpointEnvKey: "RUNPOD_ENDPOINT_VOICEOVER",
+    endpointEnvKey: "", // Uses Edge TTS — no external endpoint required
   },
   {
     id: "captions",
@@ -716,7 +716,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "image",
     creditCost: "2 credits / 4 images",
     minPlan: "free",
-    endpointEnvKey: "RUNPOD_ENDPOINT_THUMBNAILS",
+    endpointEnvKey: "FAL_KEY", // Switched from RunPod SDXL to FAL.AI FLUX Pro
   },
   {
     id: "character-designer",

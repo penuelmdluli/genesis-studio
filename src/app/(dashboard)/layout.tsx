@@ -203,9 +203,9 @@ export default function DashboardLayout({
         <OnboardingTour />
         <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}
-        <div className="px-4 pt-16 pb-6 md:p-6 max-w-7xl mx-auto">
+        <div className="px-3 pt-14 pb-6 sm:px-4 md:px-6 md:pt-6 max-w-7xl mx-auto">
           {/* Top bar: What's New + Data Saver */}
-          <div className="flex items-center justify-end gap-2 mb-4">
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-3 sm:mb-4">
             <DataSaverToggle />
             <WhatsNewBell />
           </div>

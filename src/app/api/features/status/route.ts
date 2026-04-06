@@ -10,7 +10,12 @@ export async function GET() {
 
   for (const feature of FEATURES) {
     const envKey = feature.endpointEnvKey;
-    const endpointValue = envKey ? process.env[envKey] : undefined;
+    // No endpoint key means the feature doesn't depend on an external service
+    if (!envKey) {
+      status[feature.id] = true;
+      continue;
+    }
+    const endpointValue = process.env[envKey];
     status[feature.id] = !!endpointValue && endpointValue.length > 0;
   }
 

@@ -51,11 +51,12 @@ export function ChatBot() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button — above action bar on mobile */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full",
+          "fixed z-50 w-14 h-14 rounded-full",
+          "right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 md:right-6",
           "bg-gradient-to-br from-violet-600 to-blue-600",
           "shadow-2xl shadow-violet-500/30",
           "flex items-center justify-center",
@@ -72,7 +73,13 @@ export function ChatBot() {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[360px] h-[480px] rounded-2xl bg-[#0f0f17] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-fade-in-scale">
+        <div className={cn(
+          "fixed z-50 rounded-2xl bg-[#0f0f17] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-fade-in-scale",
+          // Mobile: full width bottom sheet style
+          "inset-x-2 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] top-20 md:inset-auto",
+          // Desktop: floating panel
+          "md:bottom-24 md:right-6 md:w-[360px] md:h-[480px] md:top-auto md:left-auto"
+        )}>
           {/* Header */}
           <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 shrink-0">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">

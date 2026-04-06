@@ -7,6 +7,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { PageTransition } from "@/components/ui/motion";
 import { ComingSoonGate } from "@/components/ui/coming-soon";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { ArrowUpCircle, Upload, Zap, Play } from "lucide-react";
 
 const PLAN_ORDER = ["free", "creator", "pro", "studio"] as const;
@@ -178,8 +179,8 @@ export default function UpscalePage() {
           throw new Error("Failed to upload video");
         }
 
-        const { downloadUrl } = await uploadRes.json();
-        videoUrl = downloadUrl;
+        const { publicUrl } = await uploadRes.json();
+        videoUrl = publicUrl;
       } else if (selectedGalleryVideo) {
         videoUrl = selectedGalleryVideo.url;
       } else {
@@ -476,8 +477,8 @@ export default function UpscalePage() {
           )}
         </div>
 
-        {/* Right Column: Summary & Action */}
-        <div className="space-y-4">
+        {/* Right Column: Summary & Action — hidden on mobile, shown as sticky card on desktop */}
+        <div className="hidden lg:block space-y-4">
           <Card glow className="sticky top-6">
             <CardHeader>
               <CardTitle className="text-base">Upscale Summary</CardTitle>
@@ -610,6 +611,33 @@ export default function UpscalePage() {
           </Card>
         </div>
       </div>
+
+      {/* Mobile: Fixed Upscale button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!hasVideo || isProcessing || !canUpscale1080 || !user}
+          loading={isProcessing}
+          onClick={handleUpscale}
+        >
+          {isProcessing ? (
+            "Upscaling..."
+          ) : !user ? (
+            "Loading..."
+          ) : !canUpscale1080 ? (
+            "Creator+ Plan Required"
+          ) : !hasEnoughCredits ? (
+            "Not enough credits"
+          ) : (
+            <>
+              <ArrowUpCircle className="w-4 h-4" /> Upscale Video
+            </>
+          )}
+        </Button>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
     </ComingSoonGate>
   );

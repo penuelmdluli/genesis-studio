@@ -558,7 +558,31 @@ input[type="range"]::-moz-range-thumb {
   body {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Fixed bottom elements respect notch */
+  #toast-container {
+    bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Mobile-first image centering */
+.mobile-img-contain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-img-contain img,
+.mobile-img-contain video {
+  object-fit: contain;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mobile bottom padding for pages with action bar */
+@media (max-width: 767px) {
+  .has-action-bar {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -571,4 +595,24 @@ input[type="range"]::-moz-range-thumb {
   table {
     font-size: 0.8125rem;
   }
+
+  /* Prevent horizontal overflow on mobile */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Full-width inputs on mobile */
+  input, textarea, select {
+    max-width: 100%;
+  }
+}
+
+/* Bottom sheet slide-up animation */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }

@@ -32,6 +32,8 @@ import {
   type FunEffect,
 } from "@/lib/motion-control";
 import { uploadFile } from "@/lib/upload-client";
+import { Switch } from "@/components/ui/switch";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 
 type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
@@ -345,7 +347,7 @@ export default function MotionControlPage() {
                   </div>
 
                   {/* Effects Grid */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-2.5 max-h-[320px] sm:max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
                     {filteredEffects.map((effect) => {
                       const isSelected = selectedEffect === effect.id;
                       return (
@@ -603,32 +605,21 @@ export default function MotionControlPage() {
               </div>
 
               {/* Audio Toggle */}
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                <button
-                  onClick={() => setEnableAudio(!enableAudio)}
-                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                    enableAudio ? "bg-violet-500" : "bg-zinc-700"
-                  }`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                    enableAudio ? "translate-x-5.5 left-0.5" : "left-0.5"
-                  }`} style={{ transform: enableAudio ? "translateX(20px)" : "translateX(0)" }} />
-                </button>
-                <div className="flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                <div className="flex items-center gap-2 mb-1">
                   {enableAudio ? (
                     <Volume2 className="w-4 h-4 text-violet-400" />
                   ) : (
                     <VolumeX className="w-4 h-4 text-zinc-500" />
                   )}
-                  <div>
-                    <div className="text-xs font-medium text-zinc-300">
-                      {enableAudio ? "Audio Enabled" : "No Audio"}
-                    </div>
-                    <div className="text-[10px] text-zinc-600">
-                      Generate native audio with the video
-                    </div>
-                  </div>
                 </div>
+                <Switch
+                  checked={enableAudio}
+                  onCheckedChange={setEnableAudio}
+                  label={enableAudio ? "Audio Enabled" : "No Audio"}
+                  description="Generate native audio with the video"
+                  size="sm"
+                />
               </div>
 
               {/* Advanced Settings */}
@@ -663,8 +654,8 @@ export default function MotionControlPage() {
           </Card>
         </div>
 
-        {/* Right Column: Summary & Generate */}
-        <div className="lg:col-span-1">
+        {/* Right Column: Summary & Generate — hidden on mobile */}
+        <div className="hidden lg:block lg:col-span-1">
           <div className="sticky top-6 space-y-4">
             {/* Preview Card */}
             <Card className="overflow-hidden">
@@ -839,6 +830,29 @@ export default function MotionControlPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="text-sm font-bold text-violet-300">{creditCost}</span>
+            <span className="text-xs text-zinc-500">credits</span>
+          </div>
+          <Button
+            onClick={handleGenerate}
+            disabled={!canGenerate || isGenerating}
+            className="flex-1 max-w-[200px] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white"
+          >
+            {isGenerating ? "Generating..." : (
+              <><Zap className="w-4 h-4" /> Generate</>
+            )}
+          </Button>
+        </div>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
   );
 }

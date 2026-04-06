@@ -8,6 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { ComingSoonGate } from "@/components/ui/coming-soon";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   ImageIcon,
   Download,
@@ -279,8 +280,8 @@ export default function ThumbnailsPage() {
           </Card>
         </div>
 
-        {/* Right Column: Summary & Generate */}
-        <div className="space-y-4">
+        {/* Right Column: Summary & Generate — hidden on mobile, shown as sticky card on desktop */}
+        <div className="hidden lg:block space-y-4">
           <Card glow className="sticky top-6">
             <CardHeader>
               <CardTitle className="text-base">Generation Summary</CardTitle>
@@ -424,6 +425,28 @@ export default function ThumbnailsPage() {
         </div>
       )}
 
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!prompt.trim() || isGenerating || isLoading || !hasEnoughCredits}
+          loading={isGenerating}
+          onClick={handleGenerate}
+        >
+          {isGenerating ? (
+            "Generating..."
+          ) : isLoading ? (
+            "Loading..."
+          ) : !hasEnoughCredits ? (
+            "Not enough credits"
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4" /> Generate Thumbnails
+            </>
+          )}
+        </Button>
+      </MobileActionBar>
+
       {/* Processing State */}
       {isGenerating && (
         <Card>
@@ -440,6 +463,9 @@ export default function ThumbnailsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
     </ComingSoonGate>
   );

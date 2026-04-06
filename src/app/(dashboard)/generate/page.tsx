@@ -29,6 +29,8 @@ import { ModelId, GenerationType, VideoFormat } from "@/types";
 import { uploadFile } from "@/lib/upload-client";
 import { PROMPT_SUGGESTIONS, PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate } from "@/lib/prompt-templates";
 import { PLATFORM_PRESETS, PLATFORM_NAMES } from "@/lib/platform-presets";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { Switch } from "@/components/ui/switch";
 import {
   Sparkles,
   Zap,
@@ -528,7 +530,7 @@ export default function GeneratePage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-zinc-500">{form.prompt.length} characters</span>
                 <div className="flex items-center gap-1">
                   <Button
@@ -539,7 +541,7 @@ export default function GeneratePage() {
                     disabled={isTranslating || !form.prompt.trim()}
                   >
                     {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
-                    {isTranslating ? "Translating..." : "Translate"}
+                    <span className="hidden sm:inline">{isTranslating ? "Translating..." : "Translate"}</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -549,7 +551,7 @@ export default function GeneratePage() {
                     disabled={isEnhancing || !form.prompt.trim()}
                   >
                     {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                    {isEnhancing ? "Enhancing..." : "Enhance with AI"}
+                    <span className="hidden sm:inline">{isEnhancing ? "Enhancing..." : "Enhance"}</span>
                   </Button>
                 </div>
               </div>
@@ -699,7 +701,7 @@ export default function GeneratePage() {
           {/* Parameters */}
           <Card>
             <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
                 <div>
                   <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Resolution</label>
                   <Select
@@ -727,24 +729,13 @@ export default function GeneratePage() {
               </div>
 
               {/* Draft Mode Toggle */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
-                <div>
-                  <div className="text-sm font-medium text-amber-300">Draft Mode</div>
-                  <div className="text-xs text-zinc-500">Fast preview, 70% cheaper. Refine later.</div>
-                </div>
-                <button
-                  onClick={() => setFormField("isDraft", !form.isDraft)}
-                  className={`w-11 h-6 rounded-full transition-colors duration-200 relative ${
-                    form.isDraft ? "bg-amber-500" : "bg-white/[0.1]"
-                  }`}
-                  role="switch"
-                  aria-checked={form.isDraft}
-                >
-                  <div
-                    className="w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-transform duration-200"
-                    style={{ transform: form.isDraft ? "translateX(22px)" : "translateX(2px)" }}
-                  />
-                </button>
+              <div className="p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
+                <Switch
+                  checked={form.isDraft}
+                  onCheckedChange={(v) => setFormField("isDraft", v)}
+                  label="Draft Mode"
+                  description="Fast preview, 70% cheaper. Refine later."
+                />
               </div>
 
               {/* Advanced Settings */}
@@ -758,7 +749,7 @@ export default function GeneratePage() {
               </button>
 
               {showAdvanced && (
-                <div className="grid grid-cols-3 gap-4 pt-3 border-t border-white/[0.06]">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/[0.06]">
                   <div>
                     <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Seed</label>
                     <Input
@@ -910,8 +901,8 @@ export default function GeneratePage() {
           </Card>
         </div>
 
-        {/* Right Column: Summary & Generate */}
-        <div className="space-y-4">
+        {/* Right Column: Summary & Generate — hidden on mobile, shown as sticky card on desktop */}
+        <div className="hidden lg:block space-y-4">
           <Card glow className="sticky top-6">
             <CardHeader>
               <CardTitle className="text-base">Generation Summary</CardTitle>
@@ -1012,6 +1003,41 @@ export default function GeneratePage() {
           )}
         </div>
       </div>
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="text-sm font-bold text-violet-300">{creditCost}</span>
+            <span className="text-xs text-zinc-500">credits</span>
+          </div>
+          <Button
+            className="flex-1 max-w-[200px] shadow-lg shadow-violet-600/20"
+            disabled={!form.prompt.trim() || isGenerating || isLoading}
+            loading={isGenerating}
+            onClick={handleGenerate}
+          >
+            {isGenerating ? (
+              "Generating..."
+            ) : isLoading ? (
+              "Loading..."
+            ) : !hasEnoughCredits ? (
+              "No credits"
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" /> Generate
+              </>
+            )}
+          </Button>
+        </div>
+        {error && (
+          <p className="text-xs text-center text-red-400 mt-1.5">{error}</p>
+        )}
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
   );
 }

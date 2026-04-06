@@ -9,6 +9,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { ComingSoonGate } from "@/components/ui/coming-soon";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { Mic, Play, Square, Download, Zap, Loader2 } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
@@ -378,6 +379,33 @@ export default function VoiceoverPage() {
           )}
         </div>
       </div>
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!canGenerate || isLoading}
+          loading={isGenerating}
+          onClick={handleGenerate}
+        >
+          {isGenerating ? (
+            "Generating Voiceover..."
+          ) : (
+            <>
+              <Zap className="w-4 h-4" />
+              Generate Voiceover
+              {charCount >= 10 && (
+                <span className="ml-1 text-sm text-violet-200">
+                  ({creditCost} credits)
+                </span>
+              )}
+            </>
+          )}
+        </Button>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
     </ComingSoonGate>
   );

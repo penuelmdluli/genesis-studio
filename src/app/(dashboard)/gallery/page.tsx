@@ -128,8 +128,8 @@ export default function GalleryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <Input
               placeholder="Search videos..."
@@ -139,56 +139,58 @@ export default function GalleryPage() {
             />
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-1 rounded-lg border border-white/[0.06] p-0.5 bg-white/[0.02]">
-            {(
-              [
-                { key: "all", label: "All" },
-                { key: "standard", label: "Standard" },
-                { key: "reel", label: "Reels" },
-                { key: "audio", label: "With Audio" },
-              ] as const
-            ).map((f) => (
+          <div className="flex items-center gap-2">
+            {/* Filters — scrollable on mobile */}
+            <div className="flex items-center gap-1 rounded-lg border border-white/[0.06] p-0.5 bg-white/[0.02] overflow-x-auto flex-1 sm:flex-none">
+              {(
+                [
+                  { key: "all", label: "All" },
+                  { key: "standard", label: "Standard" },
+                  { key: "reel", label: "Reels" },
+                  { key: "audio", label: "Audio" },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilterFormat(f.key)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                    filterFormat === f.key
+                      ? "bg-violet-500/15 text-violet-300 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort */}
+            <button
+              onClick={() => {
+                const order: SortKey[] = ["newest", "oldest", "name"];
+                setSortBy(order[(order.indexOf(sortBy) + 1) % order.length]);
+              }}
+              className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
+              title={`Sort: ${sortBy}`}
+            >
+              <ArrowUpDown className="w-4 h-4" />
+            </button>
+
+            {/* View mode — hidden on small mobile */}
+            <div className="hidden sm:flex rounded-lg border border-white/[0.06] overflow-hidden bg-white/[0.02]">
               <button
-                key={f.key}
-                onClick={() => setFilterFormat(f.key)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                  filterFormat === f.key
-                    ? "bg-violet-500/15 text-violet-300 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
+                onClick={() => setViewMode("grid")}
+                className={`p-2 transition-colors ${viewMode === "grid" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
               >
-                {f.label}
+                <Grid3x3 className="w-4 h-4" />
               </button>
-            ))}
-          </div>
-
-          {/* Sort */}
-          <button
-            onClick={() => {
-              const order: SortKey[] = ["newest", "oldest", "name"];
-              setSortBy(order[(order.indexOf(sortBy) + 1) % order.length]);
-            }}
-            className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 transition-colors"
-            title={`Sort: ${sortBy}`}
-          >
-            <ArrowUpDown className="w-4 h-4" />
-          </button>
-
-          {/* View mode */}
-          <div className="flex rounded-lg border border-white/[0.06] overflow-hidden bg-white/[0.02]">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-2 transition-colors ${viewMode === "grid" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              <Grid3x3 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-2 transition-colors ${viewMode === "list" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 transition-colors ${viewMode === "list" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -330,11 +332,11 @@ export default function GalleryPage() {
                 <p className="text-sm font-medium text-zinc-200 truncate">{video.title}</p>
                 <p className="text-xs text-zinc-500 truncate mt-0.5">{video.prompt}</p>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                {video.aspectRatio === "portrait" && <Badge variant="cyan" className="text-[10px]">Reel</Badge>}
-                {video.audioUrl && <Badge variant="violet" className="text-[10px]"><Volume2 className="w-2.5 h-2.5 mr-1" />Audio</Badge>}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <span className="hidden sm:inline-flex">{video.aspectRatio === "portrait" && <Badge variant="cyan" className="text-[10px]">Reel</Badge>}</span>
+                <span className="hidden sm:inline-flex">{video.audioUrl && <Badge variant="violet" className="text-[10px]"><Volume2 className="w-2.5 h-2.5 mr-1" />Audio</Badge>}</span>
                 <Badge className="text-[10px]">{video.resolution}</Badge>
-                <span className="text-xs text-zinc-600">{formatRelativeTime(video.createdAt)}</span>
+                <span className="text-xs text-zinc-600 hidden sm:inline">{formatRelativeTime(video.createdAt)}</span>
                 <button
                   className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
                   onClick={(e) => handleDownload(e, video.url, video.title)}
@@ -350,11 +352,11 @@ export default function GalleryPage() {
       {/* ====== Premium Video Player Modal ====== */}
       {currentVideo && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-8 animate-fade-in"
           onClick={() => setSelectedVideo(null)}
         >
           <motion.div
-            className="relative w-full max-w-5xl"
+            className="relative w-full max-w-5xl max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-0"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
@@ -363,7 +365,7 @@ export default function GalleryPage() {
             {/* Close button */}
             <button
               onClick={() => setSelectedVideo(null)}
-              className="absolute -top-12 right-0 p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+              className="absolute top-0 right-0 sm:-top-12 sm:right-0 z-20 p-2 text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/10 bg-black/50 sm:bg-transparent"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -312,7 +312,7 @@ export default function DashboardPage() {
             <h2 className="text-lg font-bold text-zinc-100">Recommended for You</h2>
           </div>
         </div>
-        <StaggerGroup fast className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StaggerGroup fast className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           {recommended.map((item) => {
             const c = colorMap[item.color] || colorMap.violet;
             return (

@@ -10,6 +10,7 @@ import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { STORAGE_LIMITS } from "@/lib/profitability";
+import { Switch } from "@/components/ui/switch";
 import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -111,14 +112,14 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Name</label>
               <Input value={user?.name || ""} readOnly className="bg-white/[0.02] cursor-default" />
             </div>
             <div>
               <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Email</label>
-              <Input value={user?.email || ""} readOnly className="bg-white/[0.02] cursor-default" />
+              <Input value={user?.email || ""} readOnly className="bg-white/[0.02] cursor-default truncate" />
             </div>
           </div>
           <p className="text-xs text-zinc-500 flex items-center gap-1">
@@ -139,7 +140,7 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-200">
@@ -153,7 +154,7 @@ export default function SettingsPage() {
                 {user?.monthlyCreditsLimit?.toLocaleString() || 50} credits/month
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={handleManageBilling}>
+            <Button variant="secondary" size="sm" onClick={handleManageBilling} className="w-full sm:w-auto">
               Manage Billing
             </Button>
           </div>
@@ -241,25 +242,13 @@ export default function SettingsPage() {
             { key: "lowCredits" as const, label: "Low credits", desc: "Alert when credits drop below 10" },
             { key: "productUpdates" as const, label: "Product updates", desc: "New features and model releases" },
           ]).map((item) => (
-            <div key={item.key} className="flex items-center justify-between py-3 px-1">
-              <div>
-                <p className="text-sm text-zinc-200">{item.label}</p>
-                <p className="text-xs text-zinc-500">{item.desc}</p>
-              </div>
-              <button
-                onClick={() => toggleNotification(item.key)}
-                className={`w-10 h-[22px] rounded-full transition-colors duration-200 relative ${
-                  notifications[item.key] ? "bg-violet-500" : "bg-white/[0.1]"
-                }`}
-                role="switch"
-                aria-checked={notifications[item.key]}
-                aria-label={item.label}
-              >
-                <div
-                  className="w-[18px] h-[18px] rounded-full bg-white shadow-sm absolute top-[2px] transition-transform duration-200"
-                  style={{ transform: notifications[item.key] ? "translateX(20px)" : "translateX(2px)" }}
-                />
-              </button>
+            <div key={item.key} className="py-3 px-1">
+              <Switch
+                checked={notifications[item.key]}
+                onCheckedChange={() => toggleNotification(item.key)}
+                label={item.label}
+                description={item.desc}
+              />
             </div>
           ))}
         </CardContent>
@@ -276,14 +265,14 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm text-zinc-200">Export Your Data</p>
               <p className="text-xs text-zinc-500">
                 Download all your data as a JSON file (POPIA/GDPR).
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={handleExportData} disabled={isExporting}>
+            <Button variant="secondary" size="sm" onClick={handleExportData} disabled={isExporting} className="w-full sm:w-auto">
               {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
               {isExporting ? "Exporting..." : "Export"}
             </Button>
@@ -302,14 +291,14 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm text-zinc-200">Delete Account</p>
               <p className="text-xs text-zinc-500">
                 Permanently delete your account and all data. This cannot be undone.
               </p>
             </div>
-            <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}>
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)} className="w-full sm:w-auto">
               <Trash2 className="w-3 h-3" /> Delete
             </Button>
           </div>

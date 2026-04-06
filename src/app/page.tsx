@@ -226,15 +226,15 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-transparent to-transparent" />
 
         {/* Center content */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
+        <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 sm:px-6 text-center">
           <MotionSection>
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
               <span className="gradient-text-hero">Create videos that feel real.</span>
             </h1>
           </MotionSection>
 
           <MotionSection delay={0.1}>
-            <p className="text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto mb-8 leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto mb-6 sm:mb-8 leading-relaxed">
               AI video with native audio — dialogue, sound effects,
               <br className="hidden sm:block" />
               lip sync, motion control. Hollywood quality.
@@ -242,34 +242,34 @@ export default function LandingPage() {
           </MotionSection>
 
           <MotionSection delay={0.2}>
-            <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
-              <Link href="/sign-up">
-                <Button size="lg" className="text-base px-8 py-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 w-full sm:w-auto px-4 sm:px-0">
+              <Link href="/sign-up" className="w-full sm:w-auto">
+                <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
                   Start Free — 50 Credits
                 </Button>
               </Link>
-              <Link href="#community">
-                <Button variant="outline" size="lg" className="text-base px-8 py-4">
+              <Link href="#community" className="w-full sm:w-auto">
+                <Button variant="outline" size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Play className="w-5 h-5" />
                   Watch Demo
                 </Button>
               </Link>
             </div>
-            <p className="text-sm text-zinc-500">
+            <p className="text-xs sm:text-sm text-zinc-500">
               No credit card required &bull; First video in 60 seconds
             </p>
           </MotionSection>
 
           {/* Stats */}
-          <MotionSection delay={0.4} className="mt-12">
-            <div className="flex items-center gap-8 text-sm text-zinc-400">
+          <MotionSection delay={0.4} className="mt-8 sm:mt-12">
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm text-zinc-400">
               <span className="flex items-center gap-2">
                 <AnimatedCounter value={12000} suffix="+" className="font-semibold text-white" />
                 <span>videos created</span>
               </span>
               <span className="hidden sm:inline text-zinc-600">|</span>
-              <span className="hidden sm:flex items-center gap-2">
+              <span className="flex items-center gap-2">
                 <AnimatedCounter value={2000} suffix="+" className="font-semibold text-white" />
                 <span>creators</span>
               </span>
@@ -300,7 +300,7 @@ export default function LandingPage() {
           </MotionSection>
 
           {/* Filter tabs */}
-          <MotionSection delay={0.1} className="flex justify-center gap-3 mb-10">
+          <MotionSection delay={0.1} className="flex justify-center gap-2 sm:gap-3 mb-8 sm:mb-10 overflow-x-auto px-2">
             {feedTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -319,7 +319,7 @@ export default function LandingPage() {
 
           {/* Video grid */}
           {feedLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="aspect-video rounded-xl bg-white/[0.06]" />
@@ -338,7 +338,7 @@ export default function LandingPage() {
               </Link>
             </div>
           ) : (
-            <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StaggerGroup className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {feedVideos.map((video) => (
                 <StaggerItem key={video.id}>
                   <ExploreVideoCard
@@ -561,7 +561,7 @@ export default function LandingPage() {
       ======================================== */}
       <section className="py-24 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="rounded-3xl bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-12 md:p-16 text-center">
+          <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-8 sm:p-12 md:p-16 text-center">
             <MotionSection>
               <h2 className="text-3xl md:text-5xl font-bold mb-6">
                 Your first video is free.{" "}

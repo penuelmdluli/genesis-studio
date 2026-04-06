@@ -7,12 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   Sparkles,
   Image as ImageIcon,
   Download,
   Loader2,
   Wand2,
+  Zap,
   Square,
   RectangleHorizontal,
   RectangleVertical,
@@ -216,8 +218,8 @@ export default function ImagesPage() {
           )}
         </div>
 
-        {/* Sidebar */}
-        <div>
+        {/* Sidebar — hidden on mobile */}
+        <div className="hidden lg:block">
           <Card glow className="sticky top-6">
             <CardContent className="p-4 space-y-4">
               <div className="space-y-2 text-sm">
@@ -264,6 +266,30 @@ export default function ImagesPage() {
           </Card>
         </div>
       </div>
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="text-sm font-bold text-violet-300">{creditCost}</span>
+            <span className="text-xs text-zinc-500">credits</span>
+          </div>
+          <Button
+            className="flex-1 max-w-[200px] shadow-lg shadow-violet-600/20"
+            disabled={!prompt.trim() || isGenerating || !hasEnoughCredits}
+            loading={isGenerating}
+            onClick={handleGenerate}
+          >
+            {isGenerating ? "Generating..." : (
+              <><Sparkles className="w-4 h-4" /> Generate</>
+            )}
+          </Button>
+        </div>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
   );
 }

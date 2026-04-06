@@ -9,6 +9,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { ComingSoonGate } from "@/components/ui/coming-soon";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   MessageCircle,
   Upload,
@@ -161,8 +162,8 @@ export default function TalkingAvatarPage() {
       const err = await uploadRes.json();
       throw new Error(err.error || "Failed to upload file");
     }
-    const { downloadUrl } = await uploadRes.json();
-    return downloadUrl;
+    const { publicUrl } = await uploadRes.json();
+    return publicUrl;
   };
 
   // --- Generate ---
@@ -487,8 +488,8 @@ export default function TalkingAvatarPage() {
           </Card>
         </div>
 
-        {/* Right Column: Settings & Generate */}
-        <div className="space-y-4">
+        {/* Right Column: Settings & Generate — hidden on mobile, shown on desktop */}
+        <div className="hidden lg:block space-y-4">
           {/* Duration */}
           <Card>
             <CardHeader>
@@ -637,6 +638,31 @@ export default function TalkingAvatarPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Mobile: Fixed Generate button at bottom */}
+      <MobileActionBar>
+        <Button
+          className="w-full shadow-lg shadow-violet-600/20"
+          disabled={!canGenerate || isGenerating}
+          loading={isGenerating}
+          onClick={handleGenerate}
+        >
+          {isGenerating ? (
+            "Generating..."
+          ) : !isPlanAllowed ? (
+            <>
+              <Lock className="w-4 h-4" /> Pro plan required
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" /> Generate Avatar
+            </>
+          )}
+        </Button>
+      </MobileActionBar>
+
+      {/* Spacer for mobile action bar */}
+      <div className="h-20 lg:hidden" />
     </PageTransition>
     </ComingSoonGate>
   );

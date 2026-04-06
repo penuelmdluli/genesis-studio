@@ -3,10 +3,12 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 
+const FAL_API_KEY = process.env.FAL_KEY || "";
+
 const SIZE_MAP: Record<string, { width: number; height: number }> = {
   youtube: { width: 1280, height: 720 },
-  instagram: { width: 1080, height: 1080 },
-  tiktok: { width: 1080, height: 1920 },
+  instagram: { width: 1088, height: 1088 },
+  tiktok: { width: 768, height: 1360 },
 };
 
 export async function POST(req: NextRequest) {
@@ -29,7 +31,6 @@ export async function POST(req: NextRequest) {
       count?: number;
     };
 
-    // Validate prompt
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
         { error: "Prompt is required" },
@@ -50,7 +51,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate size
     const dimensions = SIZE_MAP[size || "youtube"];
     if (!dimensions) {
       return NextResponse.json(
@@ -59,22 +59,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate count
     const numImages = count && [1, 2, 4].includes(count) ? count : 1;
-
-    // Calculate credits: 1 credit for 1-2 images, 2 credits for 4
     const creditsCost = numImages <= 2 ? 1 : 2;
 
-    // Check if RunPod endpoint is configured
-    const runpodEndpoint = process.env.RUNPOD_ENDPOINT_THUMBNAILS;
-    if (!runpodEndpoint) {
+    if (!FAL_API_KEY) {
       return NextResponse.json(
         { error: "AI Thumbnails is temporarily unavailable. Please try again later." },
         { status: 503 }
       );
     }
 
-    // Deduct credits (skip for owner accounts)
     const ownerAccount = isOwnerClerkId(clerkId);
     if (!ownerAccount) {
       const { success, newBalance } = await deductCredits(
@@ -96,51 +90,43 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build the prompt with style prefix
     const styledPrompt = style
       ? `${style} style: ${trimmedPrompt}`
       : trimmedPrompt;
 
-    // Submit to RunPod (SDXL-turbo)
     try {
-      const runpodApiKey = process.env.RUNPOD_API_KEY;
-      if (!runpodApiKey) {
-        throw new Error("RunPod API key not configured");
-      }
-
-      const response = await fetch(`https://api.runpod.ai/v2/${runpodEndpoint}/runsync`, {
+      const falRes = await fetch("https://queue.fal.run/fal-ai/flux-pro/v1.1", {
         method: "POST",
         headers: {
+          "Authorization": `Key ${FAL_API_KEY}`,
           "Content-Type": "application/json",
-          Authorization: `Bearer ${runpodApiKey}`,
         },
         body: JSON.stringify({
-          input: {
-            prompt: styledPrompt,
-            width: dimensions.width,
-            height: dimensions.height,
-            num_images: numImages,
-            steps: 4,
-          },
+          prompt: styledPrompt,
+          image_size: dimensions,
+          num_images: numImages,
+          enable_safety_checker: true,
+          output_format: "jpeg",
+          num_inference_steps: 28,
+          guidance_scale: 3.5,
         }),
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`RunPod request failed (${response.status}): ${errText}`);
+      if (!falRes.ok) {
+        const errText = await falRes.text();
+        throw new Error(`FAL request failed (${falRes.status}): ${errText}`);
       }
 
-      const result = await response.json();
+      const result = await falRes.json();
 
       return NextResponse.json({
-        jobId: result.id || `thumb-${Date.now()}`,
+        jobId: `thumb-${Date.now()}`,
         creditsCost,
-        images: result.output?.images || [],
+        images: result.images?.map((img: { url: string }) => img.url) || [],
       });
     } catch (gpuError) {
-      console.error("Thumbnail GPU submission error:", gpuError);
+      console.error("Thumbnail generation error:", gpuError);
 
-      // Refund credits on failure
       if (!ownerAccount) {
         await refundCredits(
           user.id,
@@ -151,9 +137,7 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json(
-        {
-          error: "Thumbnail generation failed. Credits refunded.",
-        },
+        { error: "Thumbnail generation failed. Credits refunded." },
         { status: 503 }
       );
     }

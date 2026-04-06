@@ -14,8 +14,9 @@ import {
   assembleScenes,
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { createVideo } from "@/lib/db";
 import { AI_MODELS } from "@/lib/constants";
-import { ModelId, SoundDesign } from "@/types";
+import { ModelId, SoundDesign, AspectRatio } from "@/types";
 
 /**
  * CINEMATIC ASSEMBLY PIPELINE
@@ -121,13 +122,43 @@ export async function triggerBrainAssembly(
     });
     sceneUrlMap["final"] = assembledUrl;
 
+    const finalThumbnail = completedScenes[0].outputVideoUrl!.replace(/\.mp4$/, "_thumb.jpg");
+
     await updateProduction(productionId, {
       status: "completed",
       output_video_urls: JSON.stringify(sceneUrlMap),
-      thumbnail_url: completedScenes[0].outputVideoUrl!.replace(/\.mp4$/, "_thumb.jpg"),
+      thumbnail_url: finalThumbnail,
       progress: 100,
       completed_at: new Date().toISOString(),
     });
+
+    // Create a Video record so the production shows in Gallery
+    try {
+      const totalDuration = completedScenes.reduce((sum, s) => {
+        const sceneDef = plan?.scenes?.find(
+          (sd: { sceneNumber: number }) => sd.sceneNumber === s.sceneNumber
+        );
+        return sum + (sceneDef?.duration || 5);
+      }, 0);
+
+      await createVideo({
+        userId: production!.userId,
+        jobId: `brain-${productionId}`,
+        title: production!.concept || "Brain Studio Production",
+        url: assembledUrl,
+        thumbnailUrl: finalThumbnail,
+        modelId: "wan-2.2" as ModelId,
+        prompt: production!.concept || "",
+        resolution: "720p",
+        duration: totalDuration,
+        fps: 24,
+        fileSize: 0,
+        aspectRatio: (production!.aspectRatio || "landscape") as AspectRatio,
+      });
+      console.log(`[BRAIN ASSEMBLY] Video record created for Gallery`);
+    } catch (videoErr) {
+      console.error(`[BRAIN ASSEMBLY] Failed to create Video record (Gallery):`, videoErr);
+    }
 
     console.log(
       `[BRAIN ASSEMBLY] Production ${productionId} COMPLETE — ${completedScenes.length} scenes assembled with audio`

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { prompt, type } = body as {
       prompt: string;
-      type: "t2v" | "i2v" | "v2v";
+      type: "t2v" | "i2v" | "v2v" | "image";
     };
 
     if (!prompt || typeof prompt !== "string") {
@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!type || !["t2v", "i2v", "v2v"].includes(type)) {
+    if (!type || !["t2v", "i2v", "v2v", "image"].includes(type)) {
       return NextResponse.json(
-        { error: "Invalid type. Must be t2v, i2v, or v2v" },
+        { error: "Invalid type. Must be t2v, i2v, v2v, or image" },
         { status: 400 }
       );
     }
@@ -67,11 +67,13 @@ export async function POST(req: NextRequest) {
     }
 
     const typeContext =
-      type === "t2v"
-        ? "text-to-video generation"
-        : type === "i2v"
-          ? "image-to-video generation"
-          : "video-to-video generation";
+      type === "image"
+        ? "AI image generation"
+        : type === "t2v"
+          ? "text-to-video generation"
+          : type === "i2v"
+            ? "image-to-video generation"
+            : "video-to-video generation";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

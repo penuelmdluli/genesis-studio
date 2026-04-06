@@ -109,6 +109,58 @@ export default function BrainStudioPage() {
   // Loading states
   const [isPlanning, setIsPlanning] = useState(false);
   const [isProducing, setIsProducing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore in-progress production on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/brain/history?limit=1");
+        if (!res.ok || cancelled) return;
+        const { productions } = await res.json();
+        if (cancelled || !productions?.length) return;
+
+        const latest = productions[0];
+        // Only restore if still active
+        if (!["planning", "generating", "assembling", "review"].includes(latest.status)) return;
+
+        // Fetch full status with plan and scenes
+        const statusRes = await fetch(`/api/brain/status?id=${latest.id}`);
+        if (!statusRes.ok || cancelled) return;
+        const data = await statusRes.json();
+
+        setProductionId(data.id);
+        setConcept(data.concept || "");
+        setStyle(data.style || "cinematic");
+        setTargetDuration(data.targetDuration || 30);
+        setTotalCredits(data.totalCredits || 0);
+        setProgress(data.progress || 0);
+        setSceneStatuses(data.scenes || []);
+
+        if (data.plan) setPlan(data.plan);
+        if (data.outputVideoUrls) setOutputVideoUrls(data.outputVideoUrls);
+        if (data.thumbnailUrl) setThumbnailUrl(data.thumbnailUrl);
+
+        if (data.status === "completed") {
+          setBrainState("completed");
+        } else if (data.status === "failed") {
+          setBrainState("failed");
+          setError(data.errorMessage || "Production failed");
+        } else if (data.status === "review" || data.status === "planning") {
+          setBrainState("review");
+        } else {
+          // generating or assembling — resume polling
+          setBrainState("producing");
+        }
+      } catch {
+        // Silent — just start fresh
+      } finally {
+        if (!cancelled) setIsRestoring(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Poll for production status
   const pollStatus = useCallback(async () => {
@@ -313,8 +365,18 @@ export default function BrainStudioPage() {
           )}
         </div>
 
+        {/* Restoring in-progress production */}
+        {isRestoring && (
+          <Card className="border-violet-500/30 bg-violet-500/5">
+            <CardContent className="flex items-center justify-center gap-3 py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+              <span className="text-zinc-400">Checking for in-progress productions...</span>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Locked State */}
-        {isLocked && (
+        {!isRestoring && isLocked && (
           <Card className="border-violet-500/20 bg-gradient-to-br from-violet-500/[0.06] to-transparent">
             <CardContent className="p-8 text-center">
               <Brain className="w-16 h-16 text-violet-400/50 mx-auto mb-4" />
@@ -332,7 +394,7 @@ export default function BrainStudioPage() {
         )}
 
         {/* ═══ STATE 1: INPUT ═══ */}
-        {!isLocked && brainState === "input" && (
+        {!isRestoring && !isLocked && brainState === "input" && (
           <div className="space-y-6">
             <Card className="glass-strong">
               <CardContent className="p-6 space-y-6">

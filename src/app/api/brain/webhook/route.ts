@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // Verify webhook secret (required in production)
     const webhookSecret = process.env.RUNPOD_WEBHOOK_SECRET;
     const providedSecret = req.headers.get("x-webhook-secret");
-    if (webhookSecret && providedSecret !== webhookSecret) {
+    if (!webhookSecret || providedSecret !== webhookSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -16,7 +16,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(req: Request) {
   // Verify authorization
   const authHeader = req.headers.get("authorization");
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

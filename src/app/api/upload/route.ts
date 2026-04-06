@@ -40,8 +40,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Sanitize filename - only allow safe characters
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
+
     // Build storage path
-    const ext = filename.split(".").pop() || "bin";
+    const ext = safeFilename.split(".").pop() || "bin";
     const prefix = purpose === "video" ? "videos" : purpose === "audio" ? "audio" : "images";
     const path = `${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 

@@ -17,7 +17,7 @@ const R2 = new S3Client({
 });
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
-const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",");
+const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",").filter(s => s.trim());
 
 /**
  * GET /api/admin/video-health

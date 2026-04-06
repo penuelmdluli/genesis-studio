@@ -4,7 +4,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { refundCredits } from "@/lib/credits";
 import { checkVideoHealth } from "@/lib/video-health";
 
-const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",");
+const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",").filter(s => s.trim());
 
 /**
  * POST /api/admin/refund-broken

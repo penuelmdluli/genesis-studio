@@ -11,7 +11,7 @@ function getSupabase() {
 
 /** Check if a user is an owner (skips credit deduction, costs still tracked). */
 export function isOwnerClerkId(clerkId: string): boolean {
-  const ownerIds = process.env.OWNER_CLERK_IDS?.split(",").map((s) => s.trim()) ?? [];
+  const ownerIds = process.env.OWNER_CLERK_IDS?.split(",").filter(s => s.trim()).map((s) => s.trim()) ?? [];
   return ownerIds.includes(clerkId);
 }
 

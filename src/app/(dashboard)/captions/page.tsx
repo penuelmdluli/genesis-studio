@@ -340,7 +340,7 @@ export default function CaptionsPage() {
                 <div className="space-y-2">
                   <input
                     type="url"
-                    placeholder="https://example.com/video.mp4"
+                    placeholder="Paste your video URL here"
                     value={videoUrl}
                     onChange={(e) => handleUrlChange(e.target.value)}
                     className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200"

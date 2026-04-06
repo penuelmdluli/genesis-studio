@@ -634,14 +634,10 @@ export default function TalkingAvatarPage() {
           <Button
             onClick={handleGenerate}
             disabled={!canGenerate || isGenerating}
+            loading={isGenerating}
             className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:from-violet-500 hover:to-fuchsia-400 text-white font-medium rounded-xl shadow-lg shadow-violet-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
           >
-            {isGenerating ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating...
-              </span>
-            ) : !isPlanAllowed ? (
+            {!isPlanAllowed ? (
               <span className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
                 Pro plan required

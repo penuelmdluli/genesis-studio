@@ -325,24 +325,18 @@ export default function VoiceoverPage() {
             <Button
               onClick={handleGenerate}
               disabled={!canGenerate || isLoading}
+              loading={isGenerating}
               className="h-14 w-full max-w-md rounded-xl bg-violet-600 text-base font-semibold text-white transition-all hover:bg-violet-500 disabled:opacity-50 sm:w-auto sm:min-w-[280px]"
             >
-              {isGenerating ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Generating Voiceover...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  Generate Voiceover
-                  {charCount >= 10 && (
-                    <span className="ml-1 text-sm text-violet-200">
-                      ({creditCost} credits)
-                    </span>
-                  )}
-                </span>
-              )}
+              <span className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Generate Voiceover
+                {charCount >= 10 && (
+                  <span className="ml-1 text-sm text-violet-200">
+                    ({creditCost} credits)
+                  </span>
+                )}
+              </span>
             </Button>
 
             {!hasEnoughCredits && charCount >= 10 && (

@@ -8,6 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { GenerationOrb } from "@/components/ui/lazy-video";
 import {
   Sparkles,
   Image as ImageIcon,
@@ -290,23 +291,15 @@ export default function ImagesPage() {
           {isGenerating && (
             <Card>
               <CardContent className="p-8">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-full bg-violet-600/20 flex items-center justify-center">
-                      <Sparkles className="w-8 h-8 text-violet-400 animate-pulse" />
-                    </div>
-                    <div className="absolute inset-0 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-medium text-white">Generating your images...</p>
-                    <p className="text-sm text-zinc-500 mt-1">This usually takes 10-15 seconds</p>
-                  </div>
-                  {/* Skeleton grid */}
-                  <div className="grid grid-cols-2 gap-3 w-full mt-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="aspect-square rounded-xl bg-zinc-800/50 animate-pulse border border-white/[0.04]" />
-                    ))}
-                  </div>
+                <GenerationOrb
+                  text="Generating your images..."
+                  eta="~10-15 seconds"
+                />
+                {/* Skeleton grid */}
+                <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="aspect-square rounded-xl bg-zinc-800/50 animate-pulse border border-white/[0.04]" />
+                  ))}
                 </div>
               </CardContent>
             </Card>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getUserByClerkId, createUser } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function GET() {
   try {
@@ -19,12 +20,22 @@ export async function GET() {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
+      const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "User";
+
       user = await createUser({
         clerkId,
-        email: clerkUser.emailAddresses[0]?.emailAddress || "",
-        name: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "User",
+        email,
+        name,
         avatarUrl: clerkUser.imageUrl,
       });
+
+      // Send welcome email (fire-and-forget)
+      if (email) {
+        sendWelcomeEmail(email, name).catch((err) =>
+          console.error("[USER] Welcome email failed:", err)
+        );
+      }
     }
 
     return NextResponse.json({

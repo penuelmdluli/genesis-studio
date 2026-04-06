@@ -4,6 +4,7 @@ import { updateJobStatus, createVideo } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey, verifyR2Upload } from "@/lib/storage";
 import { autoPublishToExplore } from "@/lib/auto-publish";
+import { sendVideoReadyEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -158,6 +159,20 @@ export async function POST(req: NextRequest) {
       }).catch((err) =>
         console.error("[WEBHOOK] Auto-publish failed:", err)
       );
+
+      // Send video-ready email (fire-and-forget)
+      if (user) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("email, name")
+          .eq("id", job.user_id)
+          .single();
+        if (userData?.email) {
+          sendVideoReadyEmail(userData.email, userData.name || "Creator", videoId).catch((err) =>
+            console.error("[WEBHOOK] Video-ready email failed:", err)
+          );
+        }
+      }
     } else if (status === "FAILED") {
       await updateJobStatus(job.id, {
         status: "failed",

@@ -4,6 +4,7 @@
 
 import { createSupabaseAdmin } from "./supabase";
 import { CreditTransactionType } from "@/types";
+import { sendLowCreditsEmail } from "./email";
 
 function getSupabase() {
   return createSupabaseAdmin();
@@ -71,6 +72,25 @@ export async function deductCredits(
     description,
     jobId
   );
+
+  // Send low-credits warning when balance drops below 10 (fire-and-forget)
+  if (newBalance < 10 && newBalance + amount >= 10) {
+    Promise.resolve(
+      getSupabase()
+        .from("users")
+        .select("email, name")
+        .eq("id", userId)
+        .single()
+    )
+      .then(({ data }) => {
+        if (data?.email) {
+          sendLowCreditsEmail(data.email, data.name || "Creator", newBalance).catch((err) =>
+            console.error("[CREDITS] Low credits email failed:", err)
+          );
+        }
+      })
+      .catch((err) => console.error("[CREDITS] Low credits lookup failed:", err));
+  }
 
   return { success: true, newBalance };
 }

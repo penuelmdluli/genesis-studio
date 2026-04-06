@@ -8,7 +8,6 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
-import { ComingSoonGate } from "@/components/ui/coming-soon";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import {
   MessageCircle,
@@ -273,7 +272,6 @@ export default function TalkingAvatarPage() {
   };
 
   return (
-    <ComingSoonGate featureId="talking-avatar" featureName="Talking Avatar">
     <PageTransition className="space-y-6">
       {/* Header */}
       <div>
@@ -664,6 +662,5 @@ export default function TalkingAvatarPage() {
       {/* Spacer for mobile action bar */}
       <div className="h-20 lg:hidden" />
     </PageTransition>
-    </ComingSoonGate>
   );
 }

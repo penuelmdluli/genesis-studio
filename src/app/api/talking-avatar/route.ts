@@ -3,6 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
+import { fal } from "@fal-ai/client";
+
+fal.config({ credentials: process.env.FAL_KEY || "" });
+
+const FAL_AVATAR_MODEL = "fal-ai/kling-video/v2.6/pro/image-to-video";
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,13 +53,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Plan check: must be pro, studio, or owner
+    // Plan check: must be creator+, or owner
     const ownerAccount = isOwnerClerkId(clerkId);
     if (!ownerAccount) {
-      const allowedPlans = ["pro", "studio"];
+      const allowedPlans = ["creator", "pro", "studio"];
       if (!allowedPlans.includes(user.plan)) {
         return NextResponse.json(
-          { error: "Talking Avatar requires a Pro or Studio plan" },
+          { error: "Talking Avatar requires a Creator or higher plan" },
           { status: 403 }
         );
       }
@@ -85,17 +90,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Submit to RunPod
-    const endpointUrl = process.env.RUNPOD_ENDPOINT_TALKING_AVATAR;
-    if (!endpointUrl) {
-      // Refund if endpoint not configured
+    // Check FAL key
+    if (!process.env.FAL_KEY) {
       if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditsCost,
-          "",
-          "Talking Avatar endpoint not configured — automatic refund"
-        );
+        await refundCredits(user.id, creditsCost, "", "Talking Avatar service not configured — automatic refund");
       }
       return NextResponse.json(
         { error: "Talking Avatar is temporarily unavailable. Credits have been refunded." },
@@ -104,39 +102,31 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const runpodResponse = await fetch(`https://api.runpod.ai/v2/${endpointUrl}/runsync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RUNPOD_API_KEY}`,
+      // Build a talking-head prompt from the text/audio input
+      const avatarPrompt = text
+        ? `A person talking and expressing: "${text.slice(0, 200)}". Natural head movement, lip sync, expressive facial gestures.`
+        : "A person talking naturally with expressive facial movement and gestures, lip syncing to audio.";
+
+      // Submit to FAL.AI Kling i2v with the face image
+      const result = await fal.queue.submit(FAL_AVATAR_MODEL, {
+        input: {
+          prompt: avatarPrompt,
+          image_url: imageUrl,
+          duration: String(Math.min(effectiveDuration, 10)),
+          aspect_ratio: "16:9",
+          native_audio: true,
         },
-        body: JSON.stringify({
-          input: {
-            image_url: imageUrl,
-            text: text || undefined,
-            audio_url: audioUrl || undefined,
-            voice_id: voiceId || undefined,
-            duration: effectiveDuration,
-            language: language || "en",
-          },
-        }),
       });
 
-      if (!runpodResponse.ok) {
-        const errText = await runpodResponse.text();
-        throw new Error(`RunPod error ${runpodResponse.status}: ${errText}`);
-      }
-
-      const runpodData = await runpodResponse.json();
-      const jobId = runpodData.id || runpodData.jobId || crypto.randomUUID();
+      const jobId = result.request_id;
 
       return NextResponse.json({
-        jobId,
+        jobId: `fal:${FAL_AVATAR_MODEL}:${jobId}`,
         creditsCost,
-        estimatedTime: Math.ceil(effectiveDuration / 10) * 30, // ~30s processing per 10s of video
+        estimatedTime: Math.ceil(effectiveDuration / 10) * 60,
       });
     } catch (gpuError) {
-      console.error("Talking Avatar GPU error:", gpuError);
+      console.error("Talking Avatar FAL error:", gpuError);
 
       // Refund credits on failure
       if (!ownerAccount) {
@@ -144,14 +134,12 @@ export async function POST(req: NextRequest) {
           user.id,
           creditsCost,
           "",
-          "Talking Avatar GPU submission failed — automatic refund"
+          "Talking Avatar submission failed — automatic refund"
         );
       }
 
       return NextResponse.json(
-        {
-          error: "GPU submission failed. Credits refunded.",
-        },
+        { error: "Submission failed. Credits refunded." },
         { status: 503 }
       );
     }

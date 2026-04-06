@@ -3,6 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
+import { fal } from "@fal-ai/client";
+
+fal.config({ credentials: process.env.FAL_KEY || "" });
+
+const FAL_UPSCALE_MODEL = "fal-ai/creative-upscaler";
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,7 +89,7 @@ export async function POST(req: NextRequest) {
       const { success, newBalance } = await deductCredits(
         user.id,
         creditsCost,
-        "", // job ID will be assigned by RunPod
+        "",
         `Video upscale: ${targetResolution}${frameInterpolation && frameInterpolation !== "none" ? ` + ${frameInterpolation}` : ""}`
       );
 
@@ -100,34 +105,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check if RunPod endpoint is configured
-    const endpointUrl = process.env.RUNPOD_ENDPOINT_UPSCALE;
-    if (!endpointUrl) {
-      // Refund credits since we can't process
+    // Check FAL key
+    if (!process.env.FAL_KEY) {
       if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditsCost,
-          "",
-          "Refund: Video Upscaler endpoint not configured"
-        );
-      }
-      return NextResponse.json(
-        { error: "Video Upscaler is temporarily unavailable. Please try again later." },
-        { status: 503 }
-      );
-    }
-
-    // Submit to RunPod
-    const runpodApiKey = process.env.RUNPOD_API_KEY;
-    if (!runpodApiKey) {
-      if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditsCost,
-          "",
-          "Refund: RunPod API key not configured"
-        );
+        await refundCredits(user.id, creditsCost, "", "Refund: Video Upscaler not configured");
       }
       return NextResponse.json(
         { error: "Video Upscaler is temporarily unavailable. Please try again later." },
@@ -138,46 +119,27 @@ export async function POST(req: NextRequest) {
     let jobId: string;
 
     try {
-      const appUrl =
-        process.env.APP_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3000";
-      const webhookUrl = `${appUrl}/api/webhooks/runpod`;
+      // Determine scale factor based on target resolution
+      const scale = targetResolution === "4k" ? 4 : 2;
 
-      const runpodRes = await fetch(`https://api.runpod.ai/v2/${endpointUrl}/run`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${runpodApiKey}`,
+      // Submit to FAL.AI upscaler
+      const result = await fal.queue.submit(FAL_UPSCALE_MODEL, {
+        input: {
+          image_url: videoUrl,
+          scale,
+          creativity: 0.3,
+          detail: 1,
+          shape_preservation: 0.5,
         },
-        body: JSON.stringify({
-          input: {
-            video_url: videoUrl,
-            target_resolution: targetResolution,
-            frame_interpolation: frameInterpolation || "none",
-          },
-          webhook: webhookUrl,
-        }),
       });
 
-      if (!runpodRes.ok) {
-        const errText = await runpodRes.text();
-        throw new Error(`RunPod error: ${runpodRes.status} ${errText}`);
-      }
-
-      const runpodData = await runpodRes.json();
-      jobId = runpodData.id;
+      jobId = `fal:${FAL_UPSCALE_MODEL}:${result.request_id}`;
     } catch (err) {
-      console.error("[UPSCALE] RunPod submission failed:", err);
+      console.error("[UPSCALE] FAL submission failed:", err);
 
       // Refund credits on failure
       if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditsCost,
-          "",
-          "Refund: Upscale job submission failed"
-        );
+        await refundCredits(user.id, creditsCost, "", "Refund: Upscale job submission failed");
       }
 
       return NextResponse.json(

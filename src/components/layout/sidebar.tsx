@@ -48,17 +48,17 @@ const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   // --- CREATE ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "NEW" },
-  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "NEW" },
+  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "HOT" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
-  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", comingSoon: true },
+  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "HOT" },
   // --- ENHANCE ---
-  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", comingSoon: true },
+  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
   // --- AUDIO ---
   { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio", badge: "NEW" },
   { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
   // --- IMAGE ---
   { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
-  { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "NEW" },
+  { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "HOT" },
   // --- EDIT ---
   { href: "/edit", label: "Video Editor", icon: Scissors, section: "Edit", badge: "NEW" },
   // --- MANAGE ---

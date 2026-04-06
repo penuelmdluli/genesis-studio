@@ -28,6 +28,7 @@ import { CreditUpsell, useUpsellContext } from "@/components/ui/credit-upsell";
 import { ModelId, GenerationType, VideoFormat } from "@/types";
 import { uploadFile } from "@/lib/upload-client";
 import { PROMPT_SUGGESTIONS, PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate } from "@/lib/prompt-templates";
+import { PLATFORM_PRESETS, PLATFORM_NAMES } from "@/lib/platform-presets";
 import {
   Sparkles,
   Zap,
@@ -51,6 +52,8 @@ import {
   Loader2,
   LayoutTemplate,
   AlertTriangle,
+  Globe,
+  Languages,
 } from "lucide-react";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
@@ -74,6 +77,9 @@ export default function GeneratePage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateCategory, setTemplateCategory] = useState<string>("All");
   const [moderationWarning, setModerationWarning] = useState<string | null>(null);
+  const [showPresets, setShowPresets] = useState(false);
+  const [presetPlatform, setPresetPlatform] = useState<string>("All");
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const handlePreviewTrack = useCallback((trackId: string, trackUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -172,6 +178,39 @@ export default function GeneratePage() {
     setFormField("prompt", prompt);
     setShowTemplates(false);
     toast(`Template "${template.name}" applied!`, "success");
+  };
+
+  const handleTranslatePrompt = async () => {
+    if (isTranslating || !form.prompt.trim()) return;
+    setIsTranslating(true);
+    try {
+      const res = await fetch("/api/prompt/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: form.prompt, sourceLanguage: "auto" }),
+      });
+      if (res.ok) {
+        const { translated } = await res.json();
+        setFormField("prompt", translated);
+        toast("Prompt translated to English!", "success");
+      } else {
+        toast("Translation failed.", "error");
+      }
+    } catch {
+      toast("Translation failed.", "error");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleApplyPreset = (preset: typeof PLATFORM_PRESETS[0]) => {
+    setFormField("videoFormat", preset.videoFormat);
+    setFormField("aspectRatio", preset.aspectRatio);
+    setFormField("resolution", preset.resolution);
+    setFormField("duration", preset.duration);
+    setFormField("fps", preset.fps);
+    setShowPresets(false);
+    toast(`${preset.name} preset applied!`, "success");
   };
 
   const handleGenerate = async () => {
@@ -391,6 +430,58 @@ export default function GeneratePage() {
             </CardContent>
           </Card>
 
+          {/* Platform Presets */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-violet-400" />
+                  Platform Presets
+                </label>
+                <button
+                  onClick={() => setShowPresets(!showPresets)}
+                  className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                >
+                  {showPresets ? "Hide" : "Show presets"}
+                </button>
+              </div>
+              {showPresets && (
+                <div className="space-y-2">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {["All", ...PLATFORM_NAMES].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setPresetPlatform(p)}
+                        className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
+                          presetPlatform === p
+                            ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                            : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {PLATFORM_PRESETS.filter((p) => presetPlatform === "All" || p.platform === presetPlatform).map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => handleApplyPreset(preset)}
+                        className="p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">{preset.icon}</span>
+                          <span className="text-xs font-medium text-zinc-300">{preset.name}</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 line-clamp-2">{preset.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Prompt */}
           <Card glow>
             <CardContent className="p-4 space-y-3">
@@ -439,16 +530,28 @@ export default function GeneratePage() {
 
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">{form.prompt.length} characters</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-violet-400 hover:text-violet-300"
-                  onClick={handleEnhancePrompt}
-                  disabled={isEnhancing || !form.prompt.trim()}
-                >
-                  {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                  {isEnhancing ? "Enhancing..." : "Enhance with AI"}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-cyan-400 hover:text-cyan-300"
+                    onClick={handleTranslatePrompt}
+                    disabled={isTranslating || !form.prompt.trim()}
+                  >
+                    {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+                    {isTranslating ? "Translating..." : "Translate"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-violet-400 hover:text-violet-300"
+                    onClick={handleEnhancePrompt}
+                    disabled={isEnhancing || !form.prompt.trim()}
+                  >
+                    {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    {isEnhancing ? "Enhancing..." : "Enhance with AI"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

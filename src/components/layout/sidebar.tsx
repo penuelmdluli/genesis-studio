@@ -28,6 +28,10 @@ import {
   Lock,
   Plus,
   ArrowUpRight,
+  Scissors,
+  FolderOpen,
+  Image,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
@@ -54,8 +58,12 @@ const baseNavItems: NavItem[] = [
   { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
   // --- IMAGE ---
   { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
+  { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "NEW" },
+  // --- EDIT ---
+  { href: "/edit", label: "Video Editor", icon: Scissors, section: "Edit", badge: "NEW" },
   // --- MANAGE ---
   { href: "/gallery", label: "Gallery", icon: Film, section: "Manage" },
+  { href: "/collections", label: "Collections", icon: FolderOpen, section: "Manage" },
   { href: "/api-keys", label: "API Keys", icon: Key, section: "Manage" },
   { href: "/pricing", label: "Pricing", icon: CreditCard, section: "Manage" },
   { href: "/settings", label: "Settings", icon: Settings, section: "Manage" },
@@ -227,6 +235,7 @@ export function Sidebar() {
                 <button
                   onClick={() => useStore.getState().setCreditPurchaseOpen(true)}
                   className="w-7 h-7 rounded-lg bg-violet-600 hover:bg-violet-500 flex items-center justify-center mt-2 mx-auto transition-colors"
+                  aria-label="Buy credits"
                 >
                   <Plus className="w-3.5 h-3.5 text-white" />
                 </button>
@@ -244,7 +253,7 @@ export function Sidebar() {
         })()}
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
+        <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item, idx) => {
             const isActive = pathname === item.href;
             const prevItem = navItems[idx - 1];
@@ -259,8 +268,9 @@ export function Sidebar() {
                 )}
                 <Link
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative focus-visible:ring-2 focus-visible:ring-violet-500/50 focus-visible:outline-none",
                     isActive
                       ? "bg-violet-500/15 text-violet-300"
                       : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"

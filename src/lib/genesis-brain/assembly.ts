@@ -201,7 +201,21 @@ async function pollMMAudioPhase(
       job.status = "COMPLETED";
       job.audioUrl = audioData?.url || "";
       updated = true;
-      console.log(`[ASSEMBLY] MMAudio completed for scene ${sceneId}`);
+
+      // If MMAudio returned no audio URL, fall back to silent video immediately
+      if (!job.audioUrl) {
+        const idx = state.sceneOrder[sceneId];
+        if (idx !== undefined) {
+          const scenes = await getProductionScenes(productionId);
+          const scene = scenes.find(s => s.id === sceneId);
+          if (scene?.outputVideoUrl) {
+            state.processedSceneUrls[idx] = scene.outputVideoUrl;
+          }
+        }
+        console.warn(`[ASSEMBLY] MMAudio completed but no audio URL for scene ${sceneId}, using silent`);
+      } else {
+        console.log(`[ASSEMBLY] MMAudio completed for scene ${sceneId}: ${job.audioUrl}`);
+      }
     } else if (result.status === "FAILED") {
       job.status = "FAILED";
       updated = true;
@@ -228,6 +242,7 @@ async function pollMMAudioPhase(
 
     for (const [sceneId, job] of Object.entries(state.mmaudioJobs)) {
       if (job.status === "COMPLETED" && job.audioUrl) {
+        // Has audio — submit merge job
         const scene = scenes.find(s => s.id === sceneId);
         if (scene?.outputVideoUrl) {
           try {
@@ -245,8 +260,15 @@ async function pollMMAudioPhase(
             if (idx !== undefined) state.processedSceneUrls[idx] = scene.outputVideoUrl;
           }
         }
-      } else if (job.status === "FAILED") {
-        // Already handled above — silent video fallback
+      } else {
+        // MMAudio failed or returned no audio — ensure silent fallback is set
+        const idx = state.sceneOrder[sceneId];
+        if (idx !== undefined && !state.processedSceneUrls[idx]) {
+          const scene = scenes.find(s => s.id === sceneId);
+          if (scene?.outputVideoUrl) {
+            state.processedSceneUrls[idx] = scene.outputVideoUrl;
+          }
+        }
       }
     }
 

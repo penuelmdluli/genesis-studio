@@ -226,116 +226,13 @@ export async function executeProduction(
     // Step 3: Create scene records
     const scenes = await createProductionScenes(productionId, enhancedPlan);
 
-    // Step 4: Generate audio assets in parallel
-    const audioPromises: Promise<{ type: string; url: string; metadata?: Record<string, unknown> }>[] = [];
-
-    // Extract voiceover script — Claude may store it as:
-    // plan.voiceoverScript (string) OR plan.voiceover.script (array of {text})
-    // We pick whichever source gives the LONGEST narration to ensure full video coverage
-    let voiceoverScript = enhancedPlan.voiceoverScript || "";
-    if (input.voiceover) {
-      // Try plan.voiceover.script (alternative Claude format)
-      const planAny = enhancedPlan as unknown as Record<string, unknown>;
-      const voBlock = planAny.voiceover as { script?: Array<{ text?: string }> | string; enabled?: boolean } | undefined;
-      if (voBlock?.script) {
-        let altScript = "";
-        if (typeof voBlock.script === "string") {
-          altScript = voBlock.script;
-        } else if (Array.isArray(voBlock.script)) {
-          altScript = voBlock.script.map((s) => (typeof s === "string" ? s : s.text || "")).join(" ");
-        }
-        if (altScript.length > voiceoverScript.length) voiceoverScript = altScript;
-      }
-      // Also try combining per-scene voiceoverLine entries (often more detailed)
-      const sceneLines = enhancedPlan.scenes
-        .map((s) => s.voiceoverLine)
-        .filter(Boolean)
-        .join(" ");
-      // Use the LONGER of voiceoverScript vs combined scene lines
-      // This ensures we get the most comprehensive narration
-      if (sceneLines.length > voiceoverScript.length) {
-        console.log(`[BRAIN] Using per-scene voiceover lines (${sceneLines.split(" ").length} words) over voiceoverScript (${voiceoverScript.split(" ").length} words)`);
-        voiceoverScript = sceneLines;
-      }
-    }
-
-    // Per-scene voiceover: generate separate TTS clips placed at each scene's timestamp
-    // This ensures narration covers the ENTIRE video, not just the first few seconds
-    let perSceneVoiceoverClips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number; actualAudioDurationMs: number }> = [];
-    let sceneAudioDurations: Record<number, number> = {};
-
-    if (input.voiceover) {
-      const scenesWithVO = enhancedPlan.scenes.filter((s) => s.voiceoverLine?.trim());
-      if (scenesWithVO.length > 0) {
-        console.log(`[BRAIN] Generating per-scene voiceover for ${scenesWithVO.length} scenes...`);
-        audioPromises.push(
-          generatePerSceneVoiceover(
-            enhancedPlan.scenes,
-            input.voiceoverLanguage || "en-US",
-            input.voiceoverVoice
-          ).then((result) => {
-            perSceneVoiceoverClips = result.clips;
-            sceneAudioDurations = result.sceneAudioDurations;
-            // Return the full combined voiceover as fallback URL
-            return {
-              type: "voiceover",
-              url: result.fullUrl,
-              duration: result.fullDuration,
-              metadata: {
-                perSceneClips: result.clips.map((c) => ({
-                  url: c.url,
-                  startMs: c.startMs,
-                  durationMs: c.durationMs,
-                  sceneNumber: c.sceneNumber,
-                })),
-                sceneAudioDurations,
-              },
-            };
-          })
-        );
-      } else if (voiceoverScript) {
-        // Fallback: single voiceover from combined script
-        console.log(`[BRAIN] Voiceover script (single): "${voiceoverScript.slice(0, 80)}..."`);
-        audioPromises.push(
-          generateVoiceover(
-            voiceoverScript,
-            input.voiceoverLanguage || "en-US",
-            input.voiceoverVoice,
-            enhancedPlan.voiceoverTimings
-          )
-        );
-      } else {
-        console.warn("[BRAIN] Voiceover requested but no script found in plan");
-      }
-    }
-
-    if (input.music) {
-      audioPromises.push(
-        selectMusic(
-          enhancedPlan.musicMood,
-          enhancedPlan.musicTempo,
-          enhancedPlan.totalDuration
-        )
-      );
-    }
-
-    // Step 4b: Hollywood Sound Design — generate ambient, SFX, foley for each scene
-    let sceneSoundAssets: SceneSoundAssets[] = [];
-    if (input.soundEffects) {
-      console.log(`[BRAIN] Generating Hollywood Sound Design for ${enhancedPlan.scenes.length} scenes...`);
-      try {
-        sceneSoundAssets = await generateAllSceneSounds(enhancedPlan.scenes, userId);
-        console.log(`[BRAIN] Sound Design complete: ${sceneSoundAssets.length} scenes with sound assets`);
-      } catch (sfxErr) {
-        console.error(`[BRAIN] Sound Design failed (non-fatal):`, sfxErr);
-        // Continue without sound effects — video still gets MMAudio/native audio
-      }
-    }
-
-    // Step 5: Submit all scenes — route to FAL (Hollywood) or RunPod based on model provider
+    // Step 4: Submit all scenes FIRST (fast — just API calls, ~2-3s total)
+    // This MUST happen before slow audio generation so scenes start rendering
+    // even if the after() callback dies during TTS/music gen.
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const webhookUrl = `${appUrl}/api/brain/webhook`;
 
+    console.log(`[BRAIN] Submitting ${scenes.length} scenes to generation APIs...`);
     const sceneSubmissions = scenes.map(async (scene, i) => {
       const sceneDef = enhancedPlan.scenes[i];
       if (!sceneDef) return;
@@ -354,7 +251,6 @@ export async function executeProduction(
 
       try {
         if (isFalModel) {
-          // --- FAL.AI Hollywood models (Kling, Veo, Seedance) ---
           const falResult = await submitFalJob({
             modelId: sceneDef.modelId,
             type: "t2v",
@@ -367,11 +263,10 @@ export async function executeProduction(
 
           await updateProductionScene(scene.id, {
             status: "processing",
-            runpod_job_id: falResult.request_id, // Store FAL request_id in same field
+            runpod_job_id: falResult.request_id,
             progress: 10,
           });
 
-          // Store provider info for webhook/polling to know which API to check
           const supabase = createSupabaseAdmin();
           await supabase
             .from("production_scenes")
@@ -380,9 +275,7 @@ export async function executeProduction(
               model_has_audio: model?.hasAudio ?? false,
             })
             .eq("id", scene.id);
-
         } else {
-          // --- RunPod models (Wan 2.2, LTX, Hunyuan, etc.) ---
           const runpodInput = buildRunPodInput({
             modelId: sceneDef.modelId,
             type: "t2v",
@@ -414,10 +307,109 @@ export async function executeProduction(
       }
     });
 
-    // Wait for submissions
+    // Wait for ALL scene submissions before moving to audio
     await Promise.allSettled(sceneSubmissions);
+    console.log(`[BRAIN] All ${scenes.length} scenes submitted. Starting audio generation...`);
+    await updateProduction(productionId, { progress: 20 });
 
-    // Update audio URLs
+    // Step 5: Generate audio assets (slow — TTS, music, SFX)
+    // If after() dies here, scenes are already submitted and will complete.
+    // Audio can be generated separately or skipped; video still works.
+    const audioPromises: Promise<{ type: string; url: string; metadata?: Record<string, unknown> }>[] = [];
+
+    // Extract voiceover script
+    let voiceoverScript = enhancedPlan.voiceoverScript || "";
+    if (input.voiceover) {
+      const planAny = enhancedPlan as unknown as Record<string, unknown>;
+      const voBlock = planAny.voiceover as { script?: Array<{ text?: string }> | string; enabled?: boolean } | undefined;
+      if (voBlock?.script) {
+        let altScript = "";
+        if (typeof voBlock.script === "string") {
+          altScript = voBlock.script;
+        } else if (Array.isArray(voBlock.script)) {
+          altScript = voBlock.script.map((s) => (typeof s === "string" ? s : s.text || "")).join(" ");
+        }
+        if (altScript.length > voiceoverScript.length) voiceoverScript = altScript;
+      }
+      const sceneLines = enhancedPlan.scenes
+        .map((s) => s.voiceoverLine)
+        .filter(Boolean)
+        .join(" ");
+      if (sceneLines.length > voiceoverScript.length) {
+        console.log(`[BRAIN] Using per-scene voiceover lines (${sceneLines.split(" ").length} words) over voiceoverScript (${voiceoverScript.split(" ").length} words)`);
+        voiceoverScript = sceneLines;
+      }
+    }
+
+    let perSceneVoiceoverClips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number; actualAudioDurationMs: number }> = [];
+    let sceneAudioDurations: Record<number, number> = {};
+
+    if (input.voiceover) {
+      const scenesWithVO = enhancedPlan.scenes.filter((s) => s.voiceoverLine?.trim());
+      if (scenesWithVO.length > 0) {
+        console.log(`[BRAIN] Generating per-scene voiceover for ${scenesWithVO.length} scenes...`);
+        audioPromises.push(
+          generatePerSceneVoiceover(
+            enhancedPlan.scenes,
+            input.voiceoverLanguage || "en-US",
+            input.voiceoverVoice
+          ).then((result) => {
+            perSceneVoiceoverClips = result.clips;
+            sceneAudioDurations = result.sceneAudioDurations;
+            return {
+              type: "voiceover",
+              url: result.fullUrl,
+              duration: result.fullDuration,
+              metadata: {
+                perSceneClips: result.clips.map((c) => ({
+                  url: c.url,
+                  startMs: c.startMs,
+                  durationMs: c.durationMs,
+                  sceneNumber: c.sceneNumber,
+                })),
+                sceneAudioDurations,
+              },
+            };
+          })
+        );
+      } else if (voiceoverScript) {
+        console.log(`[BRAIN] Voiceover script (single): "${voiceoverScript.slice(0, 80)}..."`);
+        audioPromises.push(
+          generateVoiceover(
+            voiceoverScript,
+            input.voiceoverLanguage || "en-US",
+            input.voiceoverVoice,
+            enhancedPlan.voiceoverTimings
+          )
+        );
+      } else {
+        console.warn("[BRAIN] Voiceover requested but no script found in plan");
+      }
+    }
+
+    if (input.music) {
+      audioPromises.push(
+        selectMusic(
+          enhancedPlan.musicMood,
+          enhancedPlan.musicTempo,
+          enhancedPlan.totalDuration
+        )
+      );
+    }
+
+    // Step 5b: Hollywood Sound Design — generate ambient, SFX, foley for each scene
+    let sceneSoundAssets: SceneSoundAssets[] = [];
+    if (input.soundEffects) {
+      console.log(`[BRAIN] Generating Hollywood Sound Design for ${enhancedPlan.scenes.length} scenes...`);
+      try {
+        sceneSoundAssets = await generateAllSceneSounds(enhancedPlan.scenes, userId);
+        console.log(`[BRAIN] Sound Design complete: ${sceneSoundAssets.length} scenes with sound assets`);
+      } catch (sfxErr) {
+        console.error(`[BRAIN] Sound Design failed (non-fatal):`, sfxErr);
+      }
+    }
+
+    // Wait for audio generation
     const audioResults = await Promise.allSettled(audioPromises);
     for (const result of audioResults) {
       if (result.status === "fulfilled") {
@@ -427,20 +419,16 @@ export async function executeProduction(
             console.log(`[BRAIN] Voiceover generated: ${audio.url.slice(0, 60)}...`);
             await updateProduction(productionId, { voiceover_url: audio.url });
           }
-          // Store per-scene clips metadata + audio durations for assembly
           const clips = audio.metadata?.perSceneClips as Array<{ url: string; startMs: number; durationMs: number }> | undefined;
           const audioDurations = audio.metadata?.sceneAudioDurations as Record<number, number> | undefined;
           if (clips && clips.length > 0) {
             console.log(`[BRAIN] Per-scene voiceover clips: ${clips.length} saved`);
-            // Determine the default transition from the plan
             const defaultTransition = enhancedPlan.scenes[0]?.transitionOut || "crossfade";
-            // Store clips + audio durations + transition type + sound assets in assembly_state
             const assemblyPreState: Record<string, unknown> = {
               voiceoverClips: clips,
               sceneAudioDurations: audioDurations || {},
               transitionType: defaultTransition,
             };
-            // Include sound design assets if generated
             if (sceneSoundAssets.length > 0) {
               assemblyPreState.soundAssets = sceneSoundAssets;
               console.log(`[BRAIN] Sound assets stored: ${sceneSoundAssets.length} scenes`);
@@ -462,13 +450,12 @@ export async function executeProduction(
       }
     }
 
-    // Generate captions (uses the extracted voiceoverScript)
+    // Generate captions
     if (input.captions && voiceoverScript) {
       const captionResult = generateCaptions(
         voiceoverScript,
         enhancedPlan.voiceoverTimings || []
       );
-      // Store SRT content as the captions URL (it's actually the content)
       await updateProduction(productionId, {
         captions_url: JSON.stringify(captionResult.metadata),
       });

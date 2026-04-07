@@ -123,13 +123,13 @@ export async function POST(req: NextRequest) {
       log(`FAL extract-frame response keys: ${JSON.stringify(Object.keys(frameResult || {}))}`);
       log(`FAL extract-frame response: ${JSON.stringify(frameResult).slice(0, 500)}`);
 
-      // Try multiple response shapes
+      // FAL client wraps response in { data: ... }
+      const responseData = frameResult?.data || frameResult;
       const frameUrl =
-        frameResult?.images?.[0]?.url ||
-        frameResult?.image?.url ||
-        frameResult?.frame?.url ||
-        frameResult?.url ||
-        (typeof frameResult?.images?.[0] === "string" ? frameResult.images[0] : null);
+        responseData?.images?.[0]?.url ||
+        responseData?.image?.url ||
+        responseData?.frame?.url ||
+        responseData?.url;
 
       if (frameUrl) {
         log(`Frame extracted: ${frameUrl}`);
@@ -165,8 +165,9 @@ export async function POST(req: NextRequest) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           }) as any;
 
-          log(`Metadata response keys: ${JSON.stringify(Object.keys(metaResult || {}))}`);
-          const startFrameUrl = metaResult?.start_frame_url || metaResult?.end_frame_url;
+          const metaData = metaResult?.data || metaResult;
+          log(`Metadata response keys: ${JSON.stringify(Object.keys(metaData || {}))}`);
+          const startFrameUrl = metaData?.start_frame_url || metaData?.end_frame_url;
           if (startFrameUrl) {
             log(`Got frame from metadata: ${startFrameUrl}`);
             const frameRes = await fetch(startFrameUrl);

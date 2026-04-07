@@ -484,7 +484,7 @@ export interface CharacterDefinition {
 
 // Assembly state machine — tracks async FAL jobs during assembly
 export interface AssemblyState {
-  phase: "mmaudio" | "merge_audio" | "concat" | "compose_audio" | "mix_final" | "normalize" | "done";
+  phase: "mmaudio" | "merge_audio" | "speed_adjust" | "concat" | "compose_audio" | "mix_final" | "normalize" | "done";
   // Per-scene MMAudio jobs: sceneId -> FAL request_id
   mmaudioJobs: Record<string, { requestId: string; status: string; audioUrl?: string }>;
   // Per-scene merge-audio-video jobs: sceneId -> FAL request_id
@@ -504,13 +504,15 @@ export interface AssemblyState {
   // Scenes that have native audio (skip MMAudio)
   nativeAudioScenes: string[];
   // Per-scene voiceover clips from orchestration (placed at scene timestamps in compose)
-  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>;
+  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number; sceneNumber?: number }>;
   // Per-scene actual audio durations in ms (from TTS generation, used for alignment)
   sceneAudioDurations?: Record<number, number>;
   // Word-level subtitle data from Whisper transcription
   subtitleData?: Array<{ start: number; end: number; text: string; sceneNumber?: number }>;
   // Scene transition type from plan (used during concat)
   transitionType?: string;
+  // Per-scene speed adjustment jobs (stretch/compress video to match voiceover duration)
+  speedAdjustJobs?: Record<string, { requestId: string; status: string; adjustedUrl?: string }>;
   // Per-scene sound design assets (ambient, SFX, foley URLs with timing)
   soundAssets?: Array<SceneSoundAssets>;
 }

@@ -15,6 +15,7 @@ import {
   submitMergeAudioVideoJob,
   submitMergeVideosJob,
   submitComposeVideoJob,
+  submitSpeedAdjustJob,
   submitLoudnormJob,
   getMediaDuration,
   checkFalQueueStatus,
@@ -193,6 +194,9 @@ export async function pollAssembly(productionId: string): Promise<void> {
       case "merge_audio":
         updated = await pollMergeAudioPhase(productionId, state);
         break;
+      case "speed_adjust":
+        updated = await pollSpeedAdjustPhase(productionId, state);
+        break;
       case "concat":
         updated = await pollConcatPhase(productionId, state, production);
         break;
@@ -317,7 +321,13 @@ async function pollMMAudioPhase(
       }
     }
 
-    state.phase = needsMerge ? "merge_audio" : "concat";
+    if (needsMerge) {
+      state.phase = "merge_audio";
+    } else if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
+      state.phase = "speed_adjust";
+    } else {
+      state.phase = "concat";
+    }
     await updateProduction(productionId, { progress: 78 });
     console.log(`[ASSEMBLY] MMAudio phase done → ${state.phase}`);
   }
@@ -377,15 +387,205 @@ async function pollMergeAudioPhase(
     }
   }
 
-  // All merge jobs done → move to concat
+  // All merge jobs done → speed-adjust scenes to match voiceover, then concat
   if (!anyPending && updated) {
-    state.phase = "concat";
-    await updateProduction(productionId, { progress: 84 });
-    console.log(`[ASSEMBLY] Merge phase done → concat`);
+    if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
+      state.phase = "speed_adjust";
+      await updateProduction(productionId, { progress: 84 });
+      console.log(`[ASSEMBLY] Merge phase done → speed_adjust (voiceover-driven alignment)`);
+    } else {
+      state.phase = "concat";
+      await updateProduction(productionId, { progress: 84 });
+      console.log(`[ASSEMBLY] Merge phase done → concat (no voiceover durations, skipping speed adjust)`);
+    }
   }
 
   return updated;
 }
+
+// ---- PHASE 2.5: SPEED ADJUST — Stretch/compress each scene to match voiceover ----
+
+/**
+ * For each scene: compare video duration vs voiceover duration.
+ * If they differ, submit a compose job to speed-adjust the video.
+ * This ensures visuals perfectly align with narration — voiceover is the spine.
+ */
+async function pollSpeedAdjustPhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  const audioDurations = state.sceneAudioDurations;
+  if (!audioDurations || Object.keys(audioDurations).length === 0) {
+    state.phase = "concat";
+    return true;
+  }
+
+  // Initialize speed adjust jobs if not yet started
+  if (!state.speedAdjustJobs) {
+    state.speedAdjustJobs = {};
+    const scenes = await getProductionScenes(productionId);
+    const completedScenes = scenes
+      .filter((s) => s.status === "completed")
+      .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+    let anySubmitted = false;
+
+    for (let i = 0; i < completedScenes.length; i++) {
+      const scene = completedScenes[i];
+      const voiceoverDurationMs = audioDurations[scene.sceneNumber];
+      const videoUrl = state.processedSceneUrls[i];
+
+      if (!voiceoverDurationMs || !videoUrl) {
+        // No voiceover for this scene — keep original speed
+        console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: no voiceover, keeping original speed`);
+        continue;
+      }
+
+      // Get actual video duration
+      const videoDurationSec = await getMediaDuration(videoUrl);
+      if (videoDurationSec <= 0) {
+        console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: can't measure duration, keeping original`);
+        continue;
+      }
+
+      const videoDurationMs = videoDurationSec * 1000;
+      const ratio = voiceoverDurationMs / videoDurationMs;
+
+      // Only adjust if mismatch is significant (>15% off)
+      if (ratio >= 0.85 && ratio <= 1.15) {
+        console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: ratio ${ratio.toFixed(2)} — close enough, skipping`);
+        continue;
+      }
+
+      // Clamp speed to reasonable range (0.5x to 2.5x)
+      const clampedTargetMs = Math.max(videoDurationMs * 0.4, Math.min(videoDurationMs * 2.5, voiceoverDurationMs));
+
+      try {
+        const { requestId } = await submitSpeedAdjustJob(videoUrl, clampedTargetMs);
+        state.speedAdjustJobs[scene.id] = { requestId, status: "IN_QUEUE" };
+        anySubmitted = true;
+        const speedFactor = (videoDurationMs / clampedTargetMs).toFixed(2);
+        const action = clampedTargetMs > videoDurationMs ? "slow-motion" : "speed-up";
+        console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: ${action} ${speedFactor}x (${(videoDurationMs/1000).toFixed(1)}s → ${(clampedTargetMs/1000).toFixed(1)}s to match VO)`);
+      } catch (err) {
+        console.warn(`[ASSEMBLY] Speed adjust failed for scene ${scene.sceneNumber}:`, err);
+      }
+    }
+
+    if (!anySubmitted) {
+      // No adjustments needed — skip to concat
+      state.phase = "concat";
+      console.log(`[ASSEMBLY] Speed adjust: no adjustments needed → concat`);
+      return true;
+    }
+
+    await updateProduction(productionId, { progress: 86 });
+    return true;
+  }
+
+  // Poll speed adjust jobs
+  let anyPending = false;
+  let updated = false;
+
+  const scenes = await getProductionScenes(productionId);
+  const completedScenes = scenes
+    .filter((s) => s.status === "completed")
+    .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+  for (const [sceneId, job] of Object.entries(state.speedAdjustJobs)) {
+    if (job.status === "COMPLETED" || job.status === "FAILED") continue;
+
+    try {
+      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", job.requestId);
+
+      if (result.status === "COMPLETED") {
+        try {
+          const data = await getFalQueueResult("fal-ai/ffmpeg-api", job.requestId);
+          const videoUrl = (data?.video_url as string) || (data?.video as { url: string })?.url || "";
+          job.status = "COMPLETED";
+          job.adjustedUrl = videoUrl;
+          updated = true;
+
+          // Replace processedSceneUrl with the speed-adjusted version
+          const idx = state.sceneOrder[sceneId];
+          if (idx !== undefined && videoUrl) {
+            state.processedSceneUrls[idx] = videoUrl;
+            const scene = completedScenes.find((s) => s.id === sceneId);
+            console.log(`[ASSEMBLY] Scene ${scene?.sceneNumber || "?"}: speed-adjusted ✓`);
+          }
+        } catch (resultErr) {
+          console.warn(`[ASSEMBLY] Speed adjust result failed for ${sceneId}:`, resultErr);
+          job.status = "FAILED";
+          updated = true;
+        }
+      } else if (result.status === "FAILED") {
+        job.status = "FAILED";
+        updated = true;
+        console.warn(`[ASSEMBLY] Speed adjust failed for ${sceneId}, keeping original speed`);
+      } else {
+        anyPending = true;
+      }
+    } catch (pollErr) {
+      console.warn(`[ASSEMBLY] Speed adjust poll error for ${sceneId}:`, pollErr);
+      job.status = "FAILED";
+      updated = true;
+    }
+  }
+
+  if (!anyPending && updated) {
+    // Recalculate voiceover timestamps to match adjusted video durations
+    recalculateVoiceoverTimestamps(state, completedScenes);
+    state.phase = "concat";
+    await updateProduction(productionId, { progress: 88 });
+    console.log(`[ASSEMBLY] Speed adjust done → concat (voiceover timestamps recalculated)`);
+  }
+
+  return updated;
+}
+
+/**
+ * Recalculate voiceover clip startMs based on actual scene durations (post speed-adjust).
+ * This ensures voiceover clips are placed at exact scene boundaries in the final compose.
+ */
+function recalculateVoiceoverTimestamps(
+  state: AssemblyState,
+  completedScenes: Array<{ sceneNumber: number; id: string }>
+) {
+  if (!state.voiceoverClips?.length || !state.sceneAudioDurations) return;
+
+  // Build scene durations in order: use voiceover duration (since videos are now speed-matched)
+  const sceneDurations: Record<number, number> = {};
+  for (const scene of completedScenes) {
+    const voDuration = state.sceneAudioDurations[scene.sceneNumber];
+    if (voDuration) {
+      sceneDurations[scene.sceneNumber] = voDuration;
+    }
+  }
+
+  // Calculate cumulative offsets
+  let offset = 0;
+  const sceneOffsets: Record<number, number> = {};
+  const sortedSceneNums = Object.keys(sceneDurations).map(Number).sort((a, b) => a - b);
+  for (const sceneNum of sortedSceneNums) {
+    sceneOffsets[sceneNum] = offset;
+    offset += sceneDurations[sceneNum];
+  }
+
+  // Update voiceover clip startMs
+  for (const clip of state.voiceoverClips) {
+    if (clip.sceneNumber && sceneOffsets[clip.sceneNumber] !== undefined) {
+      const oldStart = clip.startMs;
+      clip.startMs = sceneOffsets[clip.sceneNumber];
+      if (oldStart !== clip.startMs) {
+        console.log(`[ASSEMBLY] VO clip scene ${clip.sceneNumber}: ${(oldStart/1000).toFixed(1)}s → ${(clip.startMs/1000).toFixed(1)}s`);
+      }
+    }
+  }
+
+  console.log(`[ASSEMBLY] Voiceover timestamps recalculated for ${state.voiceoverClips.length} clips`);
+}
+
+// ---- PHASE 3: CONCAT — Join all scenes into one video ----
 
 async function pollConcatPhase(
   productionId: string,
@@ -612,13 +812,15 @@ function buildSoundDesignClips(
   const plan = production.plan;
   if (!plan?.scenes) return null;
 
-  // Calculate per-scene start offset (cumulative durations)
+  // Calculate per-scene start offset — prefer voiceover-driven durations (post speed-adjust)
   const sceneOffsets: Record<number, number> = {};
   let offsetMs = 0;
   const sortedScenes = [...plan.scenes].sort((a, b) => a.sceneNumber - b.sceneNumber);
   for (const scene of sortedScenes) {
     sceneOffsets[scene.sceneNumber] = offsetMs;
-    offsetMs += scene.duration * 1000;
+    // Use voiceover duration if available (videos are speed-matched to this)
+    const voDuration = state.sceneAudioDurations?.[scene.sceneNumber];
+    offsetMs += voDuration || (scene.duration * 1000);
   }
 
   const ambient: Array<{ url: string; startMs: number; durationMs: number }> = [];

@@ -828,6 +828,36 @@ export async function submitComposeVideoJob(
 }
 
 /**
+ * Speed-adjust a video to match a target duration using compose.
+ * If targetDurationMs > actual duration → video plays in slow motion.
+ * If targetDurationMs < actual duration → video plays faster.
+ * The compose API stretches/compresses the video keyframe to fit the specified duration.
+ *
+ * @param videoUrl - Source video URL
+ * @param targetDurationMs - Desired output duration in milliseconds
+ */
+export async function submitSpeedAdjustJob(
+  videoUrl: string,
+  targetDurationMs: number
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {
+    input: {
+      tracks: [{
+        id: "speed-adjusted",
+        type: "video",
+        keyframes: [{
+          timestamp: 0,
+          duration: targetDurationMs,
+          url: videoUrl,
+        }],
+      }],
+    },
+  });
+  console.log(`[AUDIO] Speed-adjust submitted: ${result.request_id} (target: ${(targetDurationMs / 1000).toFixed(1)}s)`);
+  return { requestId: result.request_id };
+}
+
+/**
  * Get actual media duration in seconds using FAL metadata endpoint.
  * Returns 0 if metadata cannot be retrieved.
  */

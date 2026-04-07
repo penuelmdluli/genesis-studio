@@ -16,9 +16,11 @@ import {
   submitMergeVideosJob,
   submitComposeVideoJob,
   submitLoudnormJob,
+  submitFinalNormJob,
   getMediaDuration,
   checkFalQueueStatus,
   getFalQueueResult,
+  generateWordLevelSubtitles,
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
@@ -27,6 +29,7 @@ import { extractThumbnailFromUrl, extractAndUploadThumbnail } from "@/lib/thumbn
 import { AI_MODELS } from "@/lib/constants";
 import { ModelId, SoundDesign, AspectRatio, AssemblyState, Production } from "@/types";
 import { randomUUID } from "crypto";
+import { fal } from "@fal-ai/client";
 
 // ---- PHASE 1: START ASSEMBLY (called once) ----
 
@@ -74,6 +77,16 @@ export async function startAssembly(
     if (savedVoiceoverClips) {
       state.voiceoverClips = savedVoiceoverClips as AssemblyState["voiceoverClips"];
       console.log(`[ASSEMBLY] Preserved ${(savedVoiceoverClips as Array<unknown>).length} per-scene voiceover clips`);
+    }
+
+    // Carry forward per-scene audio durations and transition type
+    const savedAudioDurations = existingState?.sceneAudioDurations;
+    if (savedAudioDurations) {
+      state.sceneAudioDurations = savedAudioDurations as AssemblyState["sceneAudioDurations"];
+    }
+    const savedTransition = existingState?.transitionType;
+    if (savedTransition) {
+      state.transitionType = savedTransition as string;
     }
 
     let needsMMAudio = false;
@@ -182,6 +195,9 @@ export async function pollAssembly(productionId: string): Promise<void> {
         break;
       case "mix_final":
         updated = await pollMixFinalPhase(productionId, state, production);
+        break;
+      case "normalize":
+        updated = await pollNormalizePhase(productionId, state);
         break;
       case "done":
         // Already complete — finalize
@@ -384,28 +400,93 @@ async function pollConcatPhase(
       state.concatJob = { requestId: "skip", status: "COMPLETED", videoUrl: validUrls[0] };
       console.log(`[ASSEMBLY] Single scene — skipping concat`);
     } else {
-      try {
-        const { requestId } = await submitMergeVideosJob(validUrls);
-        state.concatJob = { requestId, status: "IN_QUEUE" };
-        console.log(`[ASSEMBLY] Concat submitted: ${requestId} (${validUrls.length} scenes)`);
-      } catch (err) {
-        console.error(`[ASSEMBLY] Concat submit failed:`, err);
-        // Fallback: use first scene
-        state.concatJob = { requestId: "skip", status: "COMPLETED", videoUrl: validUrls[0] };
+      // Determine transition type from plan
+      const transition = state.transitionType || "cut";
+      const useCrossfade = transition === "crossfade" || transition === "fade_black";
+
+      if (useCrossfade && validUrls.length > 1) {
+        // CROSSFADE: Use compose API with overlapping video keyframes
+        // Get actual scene durations for proper timing
+        try {
+          const sceneDurations: number[] = [];
+          for (const url of validUrls) {
+            const dur = await getMediaDuration(url);
+            sceneDurations.push(dur > 0 ? dur : 5); // Default 5s if metadata fails
+          }
+
+          const crossfadeDurationSec = 0.5; // 0.5s overlap between scenes
+          const crossfadeDurationMs = crossfadeDurationSec * 1000;
+
+          // Build compose keyframes with overlapping timestamps for crossfade effect
+          const videoKeyframes: Array<{ timestamp: number; duration: number; url: string }> = [];
+          let currentTimestamp = 0;
+
+          for (let i = 0; i < validUrls.length; i++) {
+            const sceneDurMs = sceneDurations[i] * 1000;
+            videoKeyframes.push({
+              timestamp: currentTimestamp,
+              duration: sceneDurMs,
+              url: validUrls[i],
+            });
+            // Next scene starts slightly before this one ends (overlap = crossfade)
+            currentTimestamp += sceneDurMs - (i < validUrls.length - 1 ? crossfadeDurationMs : 0);
+          }
+
+          const totalDurMs = currentTimestamp;
+          const tracks = [{
+            id: "video-crossfade",
+            type: "video",
+            keyframes: videoKeyframes,
+          }];
+
+          const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {
+            input: { tracks },
+          });
+
+          state.concatJob = { requestId: result.request_id, status: "IN_QUEUE" };
+          console.log(`[ASSEMBLY] Crossfade concat submitted: ${result.request_id} (${validUrls.length} scenes, ${crossfadeDurationSec}s overlap)`);
+        } catch (err) {
+          console.warn(`[ASSEMBLY] Crossfade failed, falling back to hard cut:`, err);
+          // Fallback to standard merge
+          const { requestId } = await submitMergeVideosJob(validUrls);
+          state.concatJob = { requestId, status: "IN_QUEUE" };
+        }
+      } else {
+        // HARD CUT: Standard merge-videos concatenation
+        try {
+          const { requestId } = await submitMergeVideosJob(validUrls);
+          state.concatJob = { requestId, status: "IN_QUEUE" };
+          console.log(`[ASSEMBLY] Concat submitted: ${requestId} (${validUrls.length} scenes, hard cut)`);
+        } catch (err) {
+          console.error(`[ASSEMBLY] Concat submit failed:`, err);
+          state.concatJob = { requestId: "skip", status: "COMPLETED", videoUrl: validUrls[0] };
+        }
       }
     }
     return true;
   }
 
-  // Poll concat job
+  // Poll concat job — check both compose and merge-videos endpoints
   if (state.concatJob.status !== "COMPLETED" && state.concatJob.status !== "FAILED") {
-    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
+    // Try compose endpoint first (crossfade), then merge-videos (hard cut)
+    let result = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.concatJob.requestId);
+    if (result.status === "FAILED") {
+      // May be a merge-videos job instead
+      result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
+    }
 
     if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
-      const video = data?.video as { url: string } | undefined;
+      // Try both result formats
+      let data: Record<string, unknown>;
+      try {
+        data = await getFalQueueResult("fal-ai/ffmpeg-api", state.concatJob.requestId);
+      } catch {
+        data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
+      }
+      const videoUrl = (data?.video_url as string) ||
+                       (data?.video as { url: string })?.url || "";
       state.concatJob.status = "COMPLETED";
-      state.concatJob.videoUrl = video?.url || state.processedSceneUrls[0];
+      state.concatJob.videoUrl = videoUrl || state.processedSceneUrls[0];
       console.log(`[ASSEMBLY] Concat completed: ${state.concatJob.videoUrl}`);
     } else if (result.status === "FAILED") {
       state.concatJob.status = "FAILED";
@@ -418,13 +499,15 @@ async function pollConcatPhase(
 
   // Concat done — check if we need audio mixing
   const hasVoiceover = !!production.voiceoverUrl;
+  const hasPerSceneVO = (state.voiceoverClips?.length || 0) > 0;
   const hasMusic = !!production.musicUrl;
+  const hasAnyVoiceover = hasVoiceover || hasPerSceneVO;
 
-  if ((hasVoiceover || hasMusic) && state.concatJob.videoUrl) {
-    if (hasVoiceover && hasMusic) {
-      // Both voiceover + music → compose them into one audio track first
+  if ((hasAnyVoiceover || hasMusic) && state.concatJob.videoUrl) {
+    if (hasAnyVoiceover && hasMusic) {
+      // Both voiceover + music → lower music volume first via loudnorm
       state.phase = "compose_audio";
-      console.log(`[ASSEMBLY] Concat done → compose_audio (voiceover + music)`);
+      console.log(`[ASSEMBLY] Concat done → compose_audio (${hasPerSceneVO ? "per-scene VO" : "voiceover"} + music)`);
     } else {
       // Only one audio layer → merge directly onto video
       state.phase = "mix_final";
@@ -458,10 +541,11 @@ async function pollComposeAudioPhase(
     }
 
     try {
-      // Lower music to -24 LUFS so it's clearly behind voiceover (-14 LUFS default)
-      const { requestId } = await submitLoudnormJob(musicUrl, -24);
+      // Lower music to -28 LUFS — well below voiceover (-14 LUFS)
+      // This ensures narration/dialogue is ALWAYS clearly audible above the music
+      const { requestId } = await submitLoudnormJob(musicUrl, -28);
       state.composeAudioJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Loudnorm submitted for music: ${requestId} (target: -24 LUFS)`);
+      console.log(`[ASSEMBLY] Loudnorm submitted for music: ${requestId} (target: -28 LUFS — background level)`);
     } catch (err) {
       console.warn(`[ASSEMBLY] Loudnorm submit failed, using original music volume:`, err);
       // Still proceed to mix_final — music will be at original volume
@@ -621,9 +705,95 @@ async function pollMixFinalPhase(
     }
   }
 
+  // After audio mixing, normalize the final output for consistent volume
+  state.phase = "normalize";
+  await updateProduction(productionId, { progress: 96 });
+  console.log(`[ASSEMBLY] Mix-final done → normalize (final audio normalization)`);
+  return true;
+}
+
+// ---- PHASE 7: NORMALIZE — Final audio normalization for broadcast quality ----
+
+async function pollNormalizePhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  // Normalize the entire final video's audio to -16 LUFS (broadcast standard).
+  // This prevents sudden volume jumps between scenes and ensures consistent playback.
+
+  // Determine the video URL to normalize (from mix_final or concat)
+  const videoToNormalize = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;
+
+  if (!videoToNormalize) {
+    state.phase = "done";
+    return true;
+  }
+
+  if (!state.normalizeJob) {
+    try {
+      const { requestId } = await submitFinalNormJob(videoToNormalize);
+      state.normalizeJob = { requestId, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Final normalization submitted: ${requestId} (target: -16 LUFS broadcast standard)`);
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Final normalization submit failed, using un-normalized video:`, err);
+      state.phase = "done";
+    }
+    return true;
+  }
+
+  // Poll normalization job
+  if (state.normalizeJob.status !== "COMPLETED" && state.normalizeJob.status !== "FAILED") {
+    try {
+      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.normalizeJob.requestId);
+
+      if (result.status === "COMPLETED") {
+        try {
+          const data = await getFalQueueResult("fal-ai/ffmpeg-api", state.normalizeJob.requestId);
+          // loudnorm may return video or audio URL depending on input type
+          const videoUrl = (data?.video as { url: string })?.url ||
+                          (data?.video_url as string) ||
+                          (data?.audio as { url: string })?.url ||
+                          "";
+          state.normalizeJob.status = "COMPLETED";
+          state.normalizeJob.videoUrl = videoUrl || videoToNormalize;
+          console.log(`[ASSEMBLY] Final normalization completed: ${state.normalizeJob.videoUrl}`);
+        } catch (resultErr) {
+          console.warn(`[ASSEMBLY] Normalization result retrieval failed:`, resultErr);
+          state.normalizeJob.status = "FAILED";
+          state.normalizeJob.videoUrl = videoToNormalize;
+        }
+      } else if (result.status === "FAILED") {
+        state.normalizeJob.status = "FAILED";
+        state.normalizeJob.videoUrl = videoToNormalize;
+        console.warn(`[ASSEMBLY] Final normalization failed, using un-normalized video`);
+      } else {
+        return false; // Still in progress
+      }
+    } catch (pollErr) {
+      console.warn(`[ASSEMBLY] Normalization status check failed:`, pollErr);
+      state.normalizeJob.status = "FAILED";
+      state.normalizeJob.videoUrl = videoToNormalize;
+    }
+  }
+
+  // Generate word-level subtitles from voiceover clips (async, non-blocking on assembly)
+  if (state.voiceoverClips?.length && !state.subtitleData) {
+    try {
+      const subtitles = await generateWordLevelSubtitles(
+        state.voiceoverClips.map((c) => ({ ...c, sceneNumber: 0 }))
+      );
+      if (subtitles.length > 0) {
+        state.subtitleData = subtitles;
+        console.log(`[ASSEMBLY] Word-level subtitles generated: ${subtitles.length} entries`);
+      }
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Subtitle generation failed (non-critical):`, err);
+    }
+  }
+
   state.phase = "done";
   await updateProduction(productionId, { progress: 98 });
-  console.log(`[ASSEMBLY] Mix-final done → done`);
+  console.log(`[ASSEMBLY] Normalize done → done`);
   return true;
 }
 
@@ -634,8 +804,8 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video source URL — priority: mix_final > concat > first scene
-  const sourceUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video source URL — priority: normalize > mix_final > concat > first scene
+  const sourceUrl = state.normalizeJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!sourceUrl) {
     await updateProduction(productionId, {
@@ -744,6 +914,30 @@ async function finalizeAssembly(
     }
   }
 
+  // --- STORE SUBTITLE DATA (if generated) ---
+  if (state.subtitleData && state.subtitleData.length > 0) {
+    try {
+      // Convert word-level subtitles to SRT format and store as captions
+      const srtContent = state.subtitleData.map((entry, i) => {
+        const startTime = formatSrtTimestamp(entry.start);
+        const endTime = formatSrtTimestamp(entry.end);
+        return `${i + 1}\n${startTime} --> ${endTime}\n${entry.text}\n`;
+      }).join("\n");
+
+      await updateProduction(productionId, {
+        captions_url: JSON.stringify({
+          srtContent,
+          captionCount: state.subtitleData.length,
+          entries: state.subtitleData,
+          source: "whisper-word-level",
+        }),
+      });
+      console.log(`[ASSEMBLY] ✅ Word-level subtitles saved: ${state.subtitleData.length} entries`);
+    } catch (subtitleErr) {
+      console.warn(`[ASSEMBLY] Failed to save subtitle data:`, subtitleErr);
+    }
+  }
+
   // --- MARK PRODUCTION COMPLETE ---
   await updateProduction(productionId, {
     status: "completed",
@@ -754,6 +948,17 @@ async function finalizeAssembly(
   });
 
   console.log(`[ASSEMBLY] 🎬 Production ${productionId} COMPLETE — Gallery: ${galleryVideoId}, Thumbnail: ${finalThumbnail ? "yes" : "no"}`);
+}
+
+/**
+ * Format seconds to SRT timestamp: HH:MM:SS,mmm
+ */
+function formatSrtTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.round((seconds % 1) * 1000);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")},${ms.toString().padStart(3, "0")}`;
 }
 
 // ---- LEGACY COMPAT (keep old function signature, redirect to new) ----

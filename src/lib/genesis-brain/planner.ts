@@ -49,15 +49,34 @@ RULES:
    - Default to "crossfade" for most cuts
    - Use "cut" for energy and impact
    - Use "fade_black" for time passage
+   - NEVER use the same transition for every scene — vary them for rhythm
 8. Keep total scene duration within 10% of target
-9. If voiceover requested:
+
+9. PACING — This is what separates amateur from professional:
+   - OPENING (Scene 1): Start with a HOOK — the most visually striking or emotionally compelling shot. Short (3-4s).
+   - MIDDLE (Scenes 2-N-1): Build and develop. Vary scene lengths — alternate between short punchy scenes (3-4s) and longer establishing scenes (6-8s). Never make every scene the same length.
+   - CLOSING (Last scene): RESOLVE — the payoff, conclusion, or call-to-action. Medium length (4-6s).
+   - Create RHYTHM by alternating wide/close shots, fast/slow movement, loud/quiet moments.
+   - Each scene's voiceover must describe what is VISIBLE in that scene's video. Never describe something the viewer can't see.
+
+10. If voiceover requested:
    - Write a voiceoverScript that FILLS THE ENTIRE VIDEO DURATION (~2.5 words per second)
    - For a 15s video, write ~37 words. For a 30s video, write ~75 words. For 60s, ~150 words.
    - The narration should flow naturally across ALL scenes, not just describe the first one
    - ALSO set a "voiceoverLine" on EACH scene with that scene's portion of the narration
+   - CRITICAL: Each scene's voiceoverLine MUST match what is visually shown in that scene's video prompt
    - The voiceover should be engaging, descriptive, and match the visual pacing
    - NEVER write a short 1-sentence voiceover — it must narrate the ENTIRE video from start to finish
-10. Text overlays: use sparingly — opening hook, key stats, CTA at end
+   - The voiceoverLine word count for each scene should match the scene duration (~2.5 words/sec)
+
+11. VISUAL CONSISTENCY across all scenes:
+   - ALL scenes must share the same lighting style (pick one: golden hour, studio, natural, dramatic, neon, etc.)
+   - ALL scenes must share the same color temperature (warm, cool, neutral)
+   - ALL scenes must use the same quality keywords (4K, shallow DOF, cinematic, etc.)
+   - Add a "visualStyle" field to the plan with: { lighting, colorTemperature, qualityKeywords, cameraStyle }
+   - This ensures scenes look like they belong in the SAME film, not random clips
+
+12. Text overlays: use sparingly — opening hook, key stats, CTA at end
 
 VALID MODELS: "wan-2.2", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"

@@ -454,7 +454,7 @@ export interface CharacterDefinition {
 
 // Assembly state machine — tracks async FAL jobs during assembly
 export interface AssemblyState {
-  phase: "mmaudio" | "merge_audio" | "concat" | "compose_audio" | "mix_final" | "done";
+  phase: "mmaudio" | "merge_audio" | "concat" | "compose_audio" | "mix_final" | "normalize" | "done";
   // Per-scene MMAudio jobs: sceneId -> FAL request_id
   mmaudioJobs: Record<string, { requestId: string; status: string; audioUrl?: string }>;
   // Per-scene merge-audio-video jobs: sceneId -> FAL request_id
@@ -465,6 +465,8 @@ export interface AssemblyState {
   composeAudioJob?: { requestId: string; status: string; audioUrl?: string };
   // Final merge of combined audio onto video
   mixFinalJob?: { requestId: string; status: string; videoUrl?: string };
+  // Final audio normalization job (loudnorm on the complete output)
+  normalizeJob?: { requestId: string; status: string; videoUrl?: string };
   // Ordered scene URLs ready for concat (populated as merge/skip completes)
   processedSceneUrls: string[];
   // Scene order map: sceneId -> index in processedSceneUrls
@@ -473,6 +475,12 @@ export interface AssemblyState {
   nativeAudioScenes: string[];
   // Per-scene voiceover clips from orchestration (placed at scene timestamps in compose)
   voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>;
+  // Per-scene actual audio durations in ms (from TTS generation, used for alignment)
+  sceneAudioDurations?: Record<number, number>;
+  // Word-level subtitle data from Whisper transcription
+  subtitleData?: Array<{ start: number; end: number; text: string; sceneNumber?: number }>;
+  // Scene transition type from plan (used during concat)
+  transitionType?: string;
 }
 
 export interface Production {

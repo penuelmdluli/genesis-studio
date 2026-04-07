@@ -173,22 +173,34 @@ export async function generatePerSceneVoiceover(
   scenes: Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }>,
   language: string = "en-US",
   voice?: string
-): Promise<{ clips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number }>; fullUrl: string; fullDuration: number }> {
+): Promise<{
+  clips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number; actualAudioDurationMs: number }>;
+  fullUrl: string;
+  fullDuration: number;
+  sceneAudioDurations: Record<number, number>;
+}> {
   const falKey = process.env.FAL_KEY;
   if (!falKey) {
-    return { clips: [], fullUrl: "", fullDuration: 0 };
+    return { clips: [], fullUrl: "", fullDuration: 0, sceneAudioDurations: {} };
   }
 
   const voiceId = voice || getDefaultVoice(language);
   const kokoroEndpoint = KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
   const kokoroVoice = KOKORO_VOICES[voiceId] || "af_heart";
 
-  // Generate TTS for each scene's voiceoverLine in parallel
-  let cumulativeMs = 0;
-  const clipPromises = scenes.map(async (scene) => {
-    const sceneStartMs = cumulativeMs;
-    cumulativeMs += scene.duration * 1000;
+  // Calculate cumulative offsets
+  let offsetMs = 0;
+  const sceneOffsets = scenes.map((s) => {
+    const start = offsetMs;
+    offsetMs += s.duration * 1000;
+    return start;
+  });
 
+  // Track actual TTS audio durations per scene (for alignment)
+  const sceneAudioDurations: Record<number, number> = {};
+
+  // Generate TTS for each scene's voiceoverLine in parallel
+  const clipPromises = scenes.map(async (scene, i) => {
     if (!scene.voiceoverLine || !scene.voiceoverLine.trim()) {
       return null;
     }
@@ -205,13 +217,27 @@ export async function generatePerSceneVoiceover(
 
       const data = result.data as Record<string, unknown>;
       const audioFile = data?.audio as { url: string } | undefined;
+      const reportedDuration = data?.duration as number | undefined;
 
       if (audioFile?.url) {
+        // Get the actual audio duration (prefer reported, fall back to metadata check)
+        let actualDurationMs = reportedDuration ? reportedDuration * 1000 : 0;
+        if (!actualDurationMs) {
+          const metaDur = await getMediaDuration(audioFile.url);
+          actualDurationMs = metaDur > 0 ? metaDur * 1000 : scene.duration * 1000;
+        }
+
+        // Store actual audio duration for this scene
+        sceneAudioDurations[scene.sceneNumber] = actualDurationMs;
+
+        console.log(`[BRAIN AUDIO] Scene ${scene.sceneNumber} TTS: ${(actualDurationMs / 1000).toFixed(1)}s actual vs ${scene.duration}s planned`);
+
         return {
           url: audioFile.url,
-          startMs: sceneStartMs,
+          startMs: sceneOffsets[i],
           durationMs: scene.duration * 1000,
           sceneNumber: scene.sceneNumber,
+          actualAudioDurationMs: actualDurationMs,
         };
       }
     } catch (err) {
@@ -220,17 +246,8 @@ export async function generatePerSceneVoiceover(
     return null;
   });
 
-  // Calculate cumulative offsets before awaiting (need correct values)
-  let offsetMs = 0;
-  const sceneOffsets = scenes.map((s) => {
-    const start = offsetMs;
-    offsetMs += s.duration * 1000;
-    return start;
-  });
-
   const results = await Promise.all(clipPromises);
   const clips = results
-    .map((r, i) => r ? { ...r, startMs: sceneOffsets[i] } : null)
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
   console.log(`[BRAIN AUDIO] Per-scene voiceover: ${clips.length}/${scenes.length} clips generated`);
@@ -260,7 +277,7 @@ export async function generatePerSceneVoiceover(
     }
   }
 
-  return { clips, fullUrl, fullDuration };
+  return { clips, fullUrl, fullDuration, sceneAudioDurations };
 }
 
 /**
@@ -975,3 +992,130 @@ export const SUPPORTED_LANGUAGES = [
   { code: "zu-ZA", name: "Zulu" },
   { code: "af-ZA", name: "Afrikaans" },
 ];
+
+// ---- WHISPER TRANSCRIPTION — Word-level subtitle timing ----
+
+/**
+ * Submit a Whisper transcription job for word-level subtitle timing.
+ * Returns word-level timestamps that can be used for precisely-timed captions.
+ */
+export async function submitWhisperJob(
+  audioUrl: string
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/whisper", {
+    input: {
+      audio_url: audioUrl,
+      task: "transcribe",
+      chunk_level: "segment",
+    },
+  });
+  return { requestId: result.request_id };
+}
+
+/**
+ * Transcribe audio synchronously via Whisper for word-level subtitle timing.
+ * Returns segments with start/end timestamps and text.
+ */
+export async function transcribeForSubtitles(
+  audioUrl: string
+): Promise<Array<{ start: number; end: number; text: string }>> {
+  try {
+    const result = await fal.subscribe("fal-ai/whisper", {
+      input: {
+        audio_url: audioUrl,
+        task: "transcribe",
+        chunk_level: "segment",
+      },
+      logs: false,
+    });
+
+    const data = result.data as Record<string, unknown>;
+    const chunks = data?.chunks as Array<{ timestamp: [number, number]; text: string }> | undefined;
+
+    if (!chunks || chunks.length === 0) {
+      console.warn("[AUDIO] Whisper returned no chunks");
+      return [];
+    }
+
+    const segments = chunks.map((chunk) => ({
+      start: chunk.timestamp[0],
+      end: chunk.timestamp[1],
+      text: chunk.text.trim(),
+    }));
+
+    console.log(`[AUDIO] Whisper transcription: ${segments.length} segments`);
+    return segments;
+  } catch (err) {
+    console.warn("[AUDIO] Whisper transcription failed:", err);
+    return [];
+  }
+}
+
+/**
+ * Generate word-level subtitles from per-scene voiceover clips.
+ * Transcribes each clip and adjusts timestamps to the full video timeline.
+ */
+export async function generateWordLevelSubtitles(
+  clips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number }>,
+): Promise<Array<{ start: number; end: number; text: string; sceneNumber: number }>> {
+  const allSubtitles: Array<{ start: number; end: number; text: string; sceneNumber: number }> = [];
+
+  // Transcribe each clip in parallel
+  const transcriptionPromises = clips.map(async (clip) => {
+    try {
+      const segments = await transcribeForSubtitles(clip.url);
+      // Adjust timestamps to global timeline (clip.startMs is in ms, segments use seconds)
+      const globalOffsetSec = clip.startMs / 1000;
+      return segments.map((seg) => ({
+        start: seg.start + globalOffsetSec,
+        end: seg.end + globalOffsetSec,
+        text: seg.text,
+        sceneNumber: clip.sceneNumber,
+      }));
+    } catch {
+      return [];
+    }
+  });
+
+  const results = await Promise.all(transcriptionPromises);
+  for (const segments of results) {
+    allSubtitles.push(...segments);
+  }
+
+  // Sort by start time
+  allSubtitles.sort((a, b) => a.start - b.start);
+
+  console.log(`[AUDIO] Word-level subtitles: ${allSubtitles.length} entries across ${clips.length} scenes`);
+  return allSubtitles;
+}
+
+// ---- VOICEOVER LOUDNORM — Normalize voiceover clips for consistent volume ----
+
+/**
+ * Submit a loudnorm job for a voiceover clip to bring it to dialogue standard.
+ * Target: -14 LUFS (broadcast dialogue standard — clearly audible above music at -28 LUFS)
+ */
+export async function submitVoiceoverLoudnormJob(
+  audioUrl: string
+): Promise<{ requestId: string }> {
+  return submitLoudnormJob(audioUrl, -14);
+}
+
+/**
+ * Submit a loudnorm job for the final composed video.
+ * Normalizes the entire output so there are no sudden volume jumps between scenes.
+ * Target: -16 LUFS (broadcast standard for mixed content)
+ */
+export async function submitFinalNormJob(
+  videoUrl: string
+): Promise<{ requestId: string }> {
+  // Use loudnorm on the video's audio track
+  // The loudnorm endpoint accepts audio_url — for videos, it extracts the audio track
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/loudnorm", {
+    input: {
+      audio_url: videoUrl,
+      integrated_loudness: -16,
+    },
+  });
+  return { requestId: result.request_id };
+}

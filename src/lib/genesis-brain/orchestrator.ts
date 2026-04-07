@@ -191,8 +191,8 @@ export async function executeProduction(
   input: BrainInput
 ): Promise<void> {
   try {
-    // Step 1: Apply consistency passes
-    const enhancedPlan = consistencyEngine.applyAll(plan, input.brandKit);
+    // Step 1: Apply consistency passes + Claude visual harmonization
+    const enhancedPlan = await consistencyEngine.applyAllWithHarmonization(plan, input.brandKit);
 
     // Step 2: Calculate and deduct credits
     const totalCredits = calculateBrainCredits(enhancedPlan, input);
@@ -260,7 +260,8 @@ export async function executeProduction(
 
     // Per-scene voiceover: generate separate TTS clips placed at each scene's timestamp
     // This ensures narration covers the ENTIRE video, not just the first few seconds
-    let perSceneVoiceoverClips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number }> = [];
+    let perSceneVoiceoverClips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number; actualAudioDurationMs: number }> = [];
+    let sceneAudioDurations: Record<number, number> = {};
 
     if (input.voiceover) {
       const scenesWithVO = enhancedPlan.scenes.filter((s) => s.voiceoverLine?.trim());
@@ -273,6 +274,7 @@ export async function executeProduction(
             input.voiceoverVoice
           ).then((result) => {
             perSceneVoiceoverClips = result.clips;
+            sceneAudioDurations = result.sceneAudioDurations;
             // Return the full combined voiceover as fallback URL
             return {
               type: "voiceover",
@@ -285,6 +287,7 @@ export async function executeProduction(
                   durationMs: c.durationMs,
                   sceneNumber: c.sceneNumber,
                 })),
+                sceneAudioDurations,
               },
             };
           })
@@ -410,15 +413,24 @@ export async function executeProduction(
             console.log(`[BRAIN] Voiceover generated: ${audio.url.slice(0, 60)}...`);
             await updateProduction(productionId, { voiceover_url: audio.url });
           }
-          // Store per-scene clips metadata for assembly to use
+          // Store per-scene clips metadata + audio durations for assembly
           const clips = audio.metadata?.perSceneClips as Array<{ url: string; startMs: number; durationMs: number }> | undefined;
+          const audioDurations = audio.metadata?.sceneAudioDurations as Record<number, number> | undefined;
           if (clips && clips.length > 0) {
             console.log(`[BRAIN] Per-scene voiceover clips: ${clips.length} saved`);
-            // Store clips in assembly_state so pollMixFinalPhase can use them
+            // Determine the default transition from the plan
+            const defaultTransition = enhancedPlan.scenes[0]?.transitionOut || "crossfade";
+            // Store clips + audio durations + transition type in assembly_state
             const supabase = createSupabaseAdmin();
             await supabase
               .from("productions")
-              .update({ assembly_state: JSON.stringify({ voiceoverClips: clips }) })
+              .update({
+                assembly_state: JSON.stringify({
+                  voiceoverClips: clips,
+                  sceneAudioDurations: audioDurations || {},
+                  transitionType: defaultTransition,
+                }),
+              })
               .eq("id", productionId);
           }
         } else if (audio.type === "music" && audio.url) {

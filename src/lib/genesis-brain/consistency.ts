@@ -186,6 +186,120 @@ export class ConsistencyEngine {
   }
 
   /**
+   * Harmonize visual style across all scenes using Claude.
+   * Ensures consistent lighting, color palette, camera style, and quality keywords
+   * so scenes look like they belong in the SAME film.
+   */
+  async harmonizeVisualStyle(plan: ScenePlan): Promise<ScenePlan> {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return plan;
+
+    // Extract the visual style metadata from plan (if the planner provided it)
+    const planAny = plan as unknown as Record<string, unknown>;
+    const visualStyle = planAny.visualStyle as {
+      lighting?: string;
+      colorTemperature?: string;
+      qualityKeywords?: string;
+      cameraStyle?: string;
+    } | undefined;
+
+    // Build the consistency anchor from visual style or derive from plan
+    const lightingStyle = visualStyle?.lighting || this.inferLighting(plan);
+    const colorTemp = visualStyle?.colorTemperature || "warm";
+    const qualityKW = visualStyle?.qualityKeywords || "cinematic, 4K, shallow depth of field";
+    const cameraStyle = visualStyle?.cameraStyle || "cinematic";
+
+    // Build compact scene data for Claude
+    const sceneData = plan.scenes.map((s) => ({
+      n: s.sceneNumber,
+      prompt: s.prompt,
+      camera: s.cameraMovement,
+      duration: s.duration,
+    }));
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 3000,
+          system: `You ensure visual consistency across video scenes for professional film production.
+Given scene prompts, adjust them so they ALL share:
+- Same lighting: "${lightingStyle}"
+- Same color temperature: "${colorTemp}"
+- Same quality keywords: "${qualityKW}"
+- Same camera style: "${cameraStyle}"
+- Consistent color palette: ${plan.colorPalette?.join(", ") || "cinematic tones"}
+
+RULES:
+- DO NOT change what happens in each scene. Keep the action, subject, and composition.
+- Only ADD or ADJUST style keywords for visual consistency.
+- Each prompt must still be unique and specific to its scene.
+- Append the style tokens at the END of each prompt, separated by a comma.
+- Keep prompts under 200 words.
+
+Return a JSON array of objects: [{ "n": 1, "prompt": "enhanced prompt" }, ...]
+No markdown. No explanation. Just the JSON array.`,
+          messages: [{ role: "user", content: JSON.stringify(sceneData) }],
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(`[CONSISTENCY] Claude harmonization failed: ${response.status}`);
+        return plan;
+      }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text || "";
+      let jsonStr = content.trim();
+      if (jsonStr.startsWith("```")) {
+        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+      }
+
+      const harmonized = JSON.parse(jsonStr) as Array<{ n: number; prompt: string }>;
+
+      // Apply harmonized prompts back to scenes
+      plan.scenes = plan.scenes.map((scene) => {
+        const enhanced = harmonized.find((h) => h.n === scene.sceneNumber);
+        if (enhanced?.prompt) {
+          return { ...scene, prompt: enhanced.prompt };
+        }
+        return scene;
+      });
+
+      console.log(`[CONSISTENCY] Visual style harmonized across ${plan.scenes.length} scenes`);
+    } catch (err) {
+      console.warn(`[CONSISTENCY] Visual harmonization failed, using original prompts:`, err);
+    }
+
+    return plan;
+  }
+
+  /**
+   * Infer lighting style from the plan's overall style
+   */
+  private inferLighting(plan: ScenePlan): string {
+    const lightingMap: Record<string, string> = {
+      cinematic: "dramatic sidelight with deep shadows",
+      social: "bright, well-lit, clean lighting",
+      commercial: "professional studio lighting, even and polished",
+      story: "warm natural light, soft and intimate",
+      meme: "bright punchy lighting, high contrast",
+      tutorial: "clean well-lit, neutral and sharp",
+      documentary: "natural available light, realistic",
+      music_video: "stylized colored lighting, creative gels",
+      explainer: "clean soft lighting, minimal shadows",
+      vlog: "natural daylight, slightly warm",
+    };
+    return lightingMap[plan.overallStyle] || "cinematic lighting";
+  }
+
+  /**
    * Apply all consistency passes in order
    */
   applyAll(plan: ScenePlan, brandKit?: BrandKit): ScenePlan {
@@ -199,6 +313,15 @@ export class ConsistencyEngine {
       result = this.enforceBrandKit(result, brandKit);
     }
 
+    return result;
+  }
+
+  /**
+   * Apply all consistency passes including async Claude harmonization
+   */
+  async applyAllWithHarmonization(plan: ScenePlan, brandKit?: BrandKit): Promise<ScenePlan> {
+    let result = this.applyAll(plan, brandKit);
+    result = await this.harmonizeVisualStyle(result);
     return result;
   }
 }

@@ -16,7 +16,6 @@ import {
   submitMergeVideosJob,
   submitComposeVideoJob,
   submitLoudnormJob,
-  submitFinalNormJob,
   getMediaDuration,
   checkFalQueueStatus,
   getFalQueueResult,
@@ -204,7 +203,11 @@ export async function pollAssembly(productionId: string): Promise<void> {
         updated = await pollMixFinalPhase(productionId, state, production);
         break;
       case "normalize":
-        updated = await pollNormalizePhase(productionId, state);
+        // Normalize phase is deprecated — loudnorm strips video stream.
+        // Any in-flight productions stuck here: skip to done immediately.
+        console.log(`[ASSEMBLY] Skipping deprecated normalize phase → done`);
+        state.phase = "done";
+        updated = true;
         break;
       case "done":
         // Already complete — finalize
@@ -696,18 +699,38 @@ async function pollMixFinalPhase(
     // This ensures audio tracks match the actual video length exactly
     let realDurationSec = await getMediaDuration(videoUrl);
     if (realDurationSec <= 0) {
-      // Fallback: calculate from plan durations
+      // Retry once — FAL metadata can be flaky on first call
+      console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
+      realDurationSec = await getMediaDuration(videoUrl);
+    }
+    if (realDurationSec <= 0) {
+      // Fallback: sum ACTUAL scene video durations (not plan durations!)
+      // Plan durations are what we REQUESTED, not what was generated.
+      // Actual videos may be shorter (e.g. 5s clips instead of planned 10s).
+      console.log(`[ASSEMBLY] Metadata failed, measuring individual scene videos...`);
       const freshScenes = await getProductionScenes(productionId);
       const completedScenes = freshScenes
         .filter((s) => s.status === "completed")
         .sort((a, b) => a.sceneNumber - b.sceneNumber);
-      const plan = production.plan;
-      realDurationSec = completedScenes.reduce((sum, s) => {
+      let sumFromScenes = 0;
+      for (let i = 0; i < completedScenes.length; i++) {
+        const sceneUrl = state.processedSceneUrls[i];
+        if (sceneUrl) {
+          const sceneDur = await getMediaDuration(sceneUrl);
+          if (sceneDur > 0) {
+            sumFromScenes += sceneDur;
+            continue;
+          }
+        }
+        // Last resort for this scene: use plan duration
+        const plan = production.plan;
         const sceneDef = plan?.scenes?.find(
-          (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+          (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
         );
-        return sum + (sceneDef?.duration || 5);
-      }, 0);
+        sumFromScenes += sceneDef?.duration || 5;
+      }
+      realDurationSec = sumFromScenes;
+      console.log(`[ASSEMBLY] Duration from scene measurement: ${realDurationSec}s`);
     }
     const totalDurationMs = Math.ceil(realDurationSec * 1000);
     console.log(`[ASSEMBLY] Real video duration: ${realDurationSec}s (${totalDurationMs}ms)`);
@@ -783,78 +806,13 @@ async function pollMixFinalPhase(
     }
   }
 
-  // After audio mixing, normalize the final output for consistent volume
-  state.phase = "normalize";
-  await updateProduction(productionId, { progress: 96 });
-  console.log(`[ASSEMBLY] Mix-final done → normalize (final audio normalization)`);
-  return true;
-}
+  // Skip normalize phase — loudnorm strips the video stream (returns audio-only),
+  // causing black video output. Audio levels are already correct:
+  // - Music normalized to -28 LUFS in compose_audio phase
+  // - Voiceover at natural TTS level (~-14 LUFS)
+  // - Compose mixes them properly
 
-// ---- PHASE 7: NORMALIZE — Final audio normalization for broadcast quality ----
-
-async function pollNormalizePhase(
-  productionId: string,
-  state: AssemblyState
-): Promise<boolean> {
-  // Normalize the entire final video's audio to -16 LUFS (broadcast standard).
-  // This prevents sudden volume jumps between scenes and ensures consistent playback.
-
-  // Determine the video URL to normalize (from mix_final or concat)
-  const videoToNormalize = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;
-
-  if (!videoToNormalize) {
-    state.phase = "done";
-    return true;
-  }
-
-  if (!state.normalizeJob) {
-    try {
-      const { requestId } = await submitFinalNormJob(videoToNormalize);
-      state.normalizeJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Final normalization submitted: ${requestId} (target: -16 LUFS broadcast standard)`);
-    } catch (err) {
-      console.warn(`[ASSEMBLY] Final normalization submit failed, using un-normalized video:`, err);
-      state.phase = "done";
-    }
-    return true;
-  }
-
-  // Poll normalization job
-  if (state.normalizeJob.status !== "COMPLETED" && state.normalizeJob.status !== "FAILED") {
-    try {
-      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.normalizeJob.requestId);
-
-      if (result.status === "COMPLETED") {
-        try {
-          const data = await getFalQueueResult("fal-ai/ffmpeg-api", state.normalizeJob.requestId);
-          // loudnorm may return video or audio URL depending on input type
-          const videoUrl = (data?.video as { url: string })?.url ||
-                          (data?.video_url as string) ||
-                          (data?.audio as { url: string })?.url ||
-                          "";
-          state.normalizeJob.status = "COMPLETED";
-          state.normalizeJob.videoUrl = videoUrl || videoToNormalize;
-          console.log(`[ASSEMBLY] Final normalization completed: ${state.normalizeJob.videoUrl}`);
-        } catch (resultErr) {
-          console.warn(`[ASSEMBLY] Normalization result retrieval failed:`, resultErr);
-          state.normalizeJob.status = "FAILED";
-          state.normalizeJob.videoUrl = videoToNormalize;
-        }
-      } else if (result.status === "FAILED") {
-        state.normalizeJob.status = "FAILED";
-        state.normalizeJob.videoUrl = videoToNormalize;
-        console.warn(`[ASSEMBLY] Final normalization failed, using un-normalized video`);
-      } else {
-        return false; // Still in progress
-      }
-    } catch (pollErr) {
-      console.warn(`[ASSEMBLY] Normalization status check failed:`, pollErr);
-      state.normalizeJob.status = "FAILED";
-      state.normalizeJob.videoUrl = videoToNormalize;
-    }
-  }
-
-  // Generate word-level subtitles from voiceover clips (async, non-blocking on assembly)
+  // Generate word-level subtitles from voiceover clips (if available)
   if (state.voiceoverClips?.length && !state.subtitleData) {
     try {
       const subtitles = await generateWordLevelSubtitles(
@@ -871,9 +829,14 @@ async function pollNormalizePhase(
 
   state.phase = "done";
   await updateProduction(productionId, { progress: 98 });
-  console.log(`[ASSEMBLY] Normalize done → done`);
+  console.log(`[ASSEMBLY] Mix-final done → done (skipping normalize to preserve video stream)`);
   return true;
 }
+
+// NOTE: pollNormalizePhase has been REMOVED.
+// The loudnorm endpoint strips video streams (sends audio_url, gets audio-only back),
+// causing black video output. Audio levels are already correct from compose_audio + compose.
+// Any in-flight productions stuck in "normalize" phase are handled by the switch fallback.
 
 // ---- FINALIZE — Write output + create gallery record ----
 
@@ -882,8 +845,10 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video source URL — priority: normalize > mix_final > concat > first scene
-  const sourceUrl = state.normalizeJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video source URL — priority: mix_final > concat > first scene
+  // NOTE: normalize phase is skipped because loudnorm strips the video stream (returns audio-only).
+  // Do NOT use normalizeJob.videoUrl — it's audio-only and produces black video.
+  const sourceUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!sourceUrl) {
     await updateProduction(productionId, {

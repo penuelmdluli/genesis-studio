@@ -1,11 +1,13 @@
 // ============================================
 // GENESIS BRAIN — Hollywood Sound Design Engine
-// AI Sound Designer + ElevenLabs SFX Generation
+// AI Sound Designer + FAL Stable Audio SFX Generation
 // Layers: Ambient, SFX, Foley per scene
+// Uses FAL stable-audio (free with FAL credits) — no ElevenLabs needed
 // ============================================
 
 import { EnhancedSoundDesign, SceneSoundAssets, SceneDefinition, SoundDesign } from "@/types";
-import { uploadAudio, audioStorageKey } from "@/lib/storage";
+import { uploadAudio } from "@/lib/storage";
+import { fal } from "@fal-ai/client";
 import { randomUUID } from "crypto";
 
 // ---- SOUND DESIGNER — Claude analyzes scenes and creates sound maps ----
@@ -133,65 +135,58 @@ function convertBasicSoundDesign(
   };
 }
 
-// ---- ELEVENLABS SFX GENERATION ----
+// ---- FAL STABLE-AUDIO SFX GENERATION ----
 
 /**
- * Generate a sound effect using ElevenLabs Sound Generation API.
+ * Generate a sound effect using FAL stable-audio (same engine used for music).
  * Returns the URL to the generated audio file (persisted to R2).
+ * No external API keys needed — uses existing FAL_KEY.
  */
 export async function generateSoundEffect(params: {
   description: string;
-  duration: number;   // 0.5-22 seconds
+  duration: number;   // 0.5-47 seconds (stable-audio max ~47s)
   userId?: string;
 }): Promise<{ url: string; durationMs: number }> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
-    throw new Error("ELEVENLABS_API_KEY not configured");
-  }
+  const durationSec = Math.min(Math.max(params.duration, 0.5), 47);
 
-  const durationSec = Math.min(Math.max(params.duration, 0.5), 22);
+  console.log(`[SFX] Generating via stable-audio: "${params.description.slice(0, 50)}..." (${durationSec}s)`);
 
-  console.log(`[SFX] Generating: "${params.description.slice(0, 50)}..." (${durationSec}s)`);
-
-  const response = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
+  const result = await fal.subscribe("fal-ai/stable-audio", {
+    input: {
+      prompt: params.description,
+      seconds_total: durationSec,
+      steps: 50,  // Fewer steps than music (100) — SFX needs less refinement, faster
     },
-    body: JSON.stringify({
-      text: params.description,
-      duration_seconds: durationSec,
-      prompt_influence: 0.5,
-    }),
+    logs: false,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
-    console.error(`[SFX] ElevenLabs error (${response.status}):`, errorText);
-    throw new Error(`ElevenLabs SFX API error: ${response.status}`);
+  const data = result.data as Record<string, unknown>;
+  const audioFile = data?.audio_file as { url: string } | undefined;
+
+  if (!audioFile?.url) {
+    throw new Error("stable-audio returned no audio URL");
   }
 
-  // Response is raw audio bytes (mp3)
-  const audioBuffer = Buffer.from(await response.arrayBuffer());
-
-  if (audioBuffer.length < 100) {
-    throw new Error("ElevenLabs returned empty audio");
-  }
-
-  // Persist to R2 so the URL doesn't expire
+  // Persist to R2 so the URL doesn't expire (FAL URLs are temporary)
   const sfxId = randomUUID();
   const key = `sfx/${params.userId || "system"}/${sfxId}.mp3`;
 
   try {
+    const audioRes = await fetch(audioFile.url);
+    if (!audioRes.ok) throw new Error(`Failed to download SFX: ${audioRes.status}`);
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+
+    if (audioBuffer.length < 100) {
+      throw new Error("stable-audio returned empty audio");
+    }
+
     const persistedUrl = await uploadAudio(key, audioBuffer, "audio/mpeg");
     console.log(`[SFX] Generated and persisted: ${key} (${(audioBuffer.length / 1024).toFixed(1)} KB)`);
     return { url: persistedUrl, durationMs: durationSec * 1000 };
   } catch (uploadErr) {
-    // If R2 upload fails, convert to data URL as fallback (temporary)
-    console.warn(`[SFX] R2 upload failed, using base64 fallback:`, uploadErr);
-    const base64 = audioBuffer.toString("base64");
-    return { url: `data:audio/mpeg;base64,${base64}`, durationMs: durationSec * 1000 };
+    // If R2 upload fails, use the FAL URL directly (temporary but functional)
+    console.warn(`[SFX] R2 persist failed, using FAL URL directly:`, uploadErr);
+    return { url: audioFile.url, durationMs: durationSec * 1000 };
   }
 }
 
@@ -304,7 +299,7 @@ export async function generateAllSceneSounds(
   );
   const designs = await Promise.all(designPromises);
 
-  // Step 2: Generate audio assets for all scenes in parallel (ElevenLabs)
+  // Step 2: Generate audio assets for all scenes in parallel (FAL stable-audio)
   const assetPromises = designs.map((design) =>
     generateSceneSoundAssets(design, userId)
   );

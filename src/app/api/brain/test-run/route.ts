@@ -58,9 +58,9 @@ export async function POST(req: NextRequest) {
       targetDuration: 15,
       style: "cinematic",
       aspectRatio: "landscape",
-      voiceover: false,
-      music: false,
-      captions: false,
+      voiceover: true,
+      music: true,
+      captions: true,
     };
     log(`Concept: "${input.concept.slice(0, 60)}..."`);
 

@@ -12,6 +12,43 @@ import { fal } from "@fal-ai/client";
 // Configure FAL client (may already be configured elsewhere, but safe to call again)
 fal.config({ credentials: process.env.FAL_KEY || "" });
 
+const KOKORO_ENDPOINTS: Record<string, string> = {
+  "en-US": "fal-ai/kokoro/american-english",
+  "en-GB": "fal-ai/kokoro/british-english",
+  "fr-FR": "fal-ai/kokoro/french",
+  "es-ES": "fal-ai/kokoro/spanish",
+  "it-IT": "fal-ai/kokoro/italian",
+  "pt-BR": "fal-ai/kokoro/brazilian-portuguese",
+  "ja-JP": "fal-ai/kokoro/japanese",
+  "zh-CN": "fal-ai/kokoro/mandarin-chinese",
+  "hi-IN": "fal-ai/kokoro/hindi",
+  "ko-KR": "fal-ai/kokoro/korean",
+};
+
+const KOKORO_VOICES: Record<string, string> = {
+  "en-US-GuyNeural": "am_adam",
+  "en-US-JennyNeural": "af_heart",
+  "en-US-AriaNeural": "af_bella",
+  "en-US-DavisNeural": "am_michael",
+  "en-GB-RyanNeural": "bf_emma",
+  "en-GB-SoniaNeural": "bf_isabella",
+  "es-ES-AlvaroNeural": "em_alex",
+  "es-ES-ElviraNeural": "ef_dora",
+  "fr-FR-HenriNeural": "fm_antoine",
+  "fr-FR-DeniseNeural": "ff_sonia",
+  "it-IT-DiegoNeural": "im_nicola",
+  "pt-BR-AntonioNeural": "pm_alex",
+  "ja-JP-KeitaNeural": "jm_takumi",
+  "ko-KR-InJoonNeural": "km_yongmin",
+  "zh-CN-YunxiNeural": "cm_chao",
+  "hi-IN-MadhurNeural": "hm_arjun",
+  "zu-ZA-ThandoNeural": "af_heart", // Fallback to English
+  "zu-ZA-ThembaNeural": "am_adam",
+  "af-ZA-WillemNeural": "am_adam",
+  "af-ZA-AdriNeural": "af_heart",
+  "ar-SA-HamedNeural": "am_adam",
+};
+
 export interface AudioResult {
   type: "voiceover" | "music" | "captions" | "mmaudio" | "sfx";
   url: string;
@@ -29,8 +66,8 @@ export interface CaptionEntry {
 // ---- VOICEOVER GENERATION ----
 
 /**
- * Generate voiceover using Edge TTS (Microsoft) — free, 300+ voices
- * Falls back to a simple audio placeholder if Edge TTS is unavailable
+ * Generate voiceover using FAL Kokoro TTS — high-quality, multi-language
+ * Falls back to custom TTS endpoint if configured, then silent placeholder
  */
 export async function generateVoiceover(
   script: string,
@@ -42,19 +79,52 @@ export async function generateVoiceover(
     throw new Error("Voiceover script cannot be empty");
   }
 
-  // Select voice based on language
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) {
+    console.warn("[BRAIN AUDIO] FAL_KEY not set — skipping voiceover");
+    return { type: "voiceover", url: "", duration: estimateVoiceoverDuration(script), metadata: { skipped: true } };
+  }
+
+  // Resolve Kokoro endpoint and voice
   const voiceId = voice || getDefaultVoice(language);
+  const kokoroEndpoint = KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
+  const kokoroVoice = KOKORO_VOICES[voiceId] || "af_heart";
 
-  // For production: use Edge TTS via RunPod worker or external API
-  // Edge TTS is free and supports 300+ voices in 75+ languages
-  //
-  // API call pattern:
-  // POST to a TTS endpoint (self-hosted or external)
-  // Input: { text, voice, language, rate, pitch }
-  // Output: { audio_url, duration_seconds, word_timestamps }
+  try {
+    console.log(`[BRAIN AUDIO] Generating voiceover via Kokoro TTS: ${kokoroEndpoint} voice=${kokoroVoice}`);
 
+    const result = await fal.subscribe(kokoroEndpoint, {
+      input: {
+        text: script,
+        voice: kokoroVoice,
+      },
+      logs: false,
+    });
+
+    const data = result.data as Record<string, unknown>;
+    const audioFile = data?.audio as { url: string } | undefined;
+
+    if (audioFile?.url) {
+      console.log(`[BRAIN AUDIO] Voiceover generated: ${audioFile.url}`);
+      return {
+        type: "voiceover",
+        url: audioFile.url,
+        duration: (data?.duration as number) || estimateVoiceoverDuration(script),
+        metadata: {
+          voice: kokoroVoice,
+          language,
+          model: kokoroEndpoint,
+        },
+      };
+    }
+
+    console.warn("[BRAIN AUDIO] Kokoro TTS returned no audio URL");
+  } catch (err) {
+    console.error("[BRAIN AUDIO] Kokoro TTS failed:", err);
+  }
+
+  // Fallback: try custom TTS endpoint if configured
   const ttsEndpoint = process.env.TTS_ENDPOINT_URL;
-
   if (ttsEndpoint) {
     try {
       const response = await fetch(ttsEndpoint, {
@@ -76,27 +146,20 @@ export async function generateVoiceover(
           type: "voiceover",
           url: data.audio_url,
           duration: data.duration || estimateVoiceoverDuration(script),
-          metadata: { voice: voiceId, language, wordTimestamps: data.timestamps },
+          metadata: { voice: voiceId, language, source: "custom-tts" },
         };
       }
     } catch (err) {
-      console.warn("[BRAIN AUDIO] TTS endpoint failed, using estimation:", err);
+      console.warn("[BRAIN AUDIO] Custom TTS endpoint also failed:", err);
     }
   }
 
-  // Fallback: return metadata without actual audio (generation happens in assembly worker)
-  // The assembly worker will use its own TTS capabilities
+  // Final fallback — no voiceover available
   return {
     type: "voiceover",
-    url: "", // Will be generated by assembly worker
+    url: "",
     duration: estimateVoiceoverDuration(script),
-    metadata: {
-      script,
-      voice: voiceId,
-      language,
-      timings: timings || [],
-      generateInAssembly: true, // Flag for assembly worker to handle TTS
-    },
+    metadata: { skipped: true, reason: "All TTS engines failed" },
   };
 }
 
@@ -650,10 +713,10 @@ export async function mergeAudioOntoVideo(
 
 export const AVAILABLE_VOICES: Record<string, Array<{ id: string; name: string; gender: string }>> = {
   "en-US": [
-    { id: "en-US-GuyNeural", name: "Guy (Natural)", gender: "male" },
-    { id: "en-US-JennyNeural", name: "Jenny (Natural)", gender: "female" },
-    { id: "en-US-AriaNeural", name: "Aria (Expressive)", gender: "female" },
-    { id: "en-US-DavisNeural", name: "Davis (Deep)", gender: "male" },
+    { id: "en-US-GuyNeural", name: "Adam (Natural)", gender: "male" },
+    { id: "en-US-JennyNeural", name: "Heart (Warm)", gender: "female" },
+    { id: "en-US-AriaNeural", name: "Bella (Expressive)", gender: "female" },
+    { id: "en-US-DavisNeural", name: "Michael (Deep)", gender: "male" },
   ],
   "en-GB": [
     { id: "en-GB-RyanNeural", name: "Ryan", gender: "male" },

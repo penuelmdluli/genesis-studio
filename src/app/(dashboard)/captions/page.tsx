@@ -73,7 +73,7 @@ const CAPTION_STYLES = [
 const CREDITS_PER_MINUTE = 2;
 
 export default function CaptionsPage() {
-  const { user, videos, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
+  const { user, videos, addVideo, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
 
   // Input state
@@ -357,7 +357,25 @@ export default function CaptionsPage() {
               setBurnProgress(100);
               setBurnedVideoUrl(statusData.output.videoUrl);
               setIsBurning(false);
-              toast("Captions burned into video!", "success");
+              toast("Captions burned into video! Saved to gallery.", "success");
+
+              // Add to local gallery store so it appears immediately
+              addVideo({
+                id: statusData.output.savedVideoId || `burn-${Date.now()}`,
+                userId: user?.id || "",
+                jobId: "",
+                title: "Captioned Video",
+                url: statusData.output.videoUrl,
+                thumbnailUrl: statusData.output.videoUrl,
+                modelId: "wan-2.2",
+                prompt: "Auto-captioned video",
+                resolution: "original",
+                duration: videoDuration || 0,
+                fps: 30,
+                fileSize: 0,
+                isPublic: false,
+                createdAt: new Date().toISOString(),
+              });
             } else if (statusData.status === "failed") {
               clearInterval(pollInterval);
               clearInterval(interval);

@@ -117,9 +117,20 @@ export async function POST(req: NextRequest) {
           video_url: topVideoUrlForFal,
           frame_type: "middle", // Middle frame usually looks best
         },
-      }) as { images?: Array<{ url: string }> };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
 
-      const frameUrl = frameResult?.images?.[0]?.url;
+      log(`FAL extract-frame response keys: ${JSON.stringify(Object.keys(frameResult || {}))}`);
+      log(`FAL extract-frame response: ${JSON.stringify(frameResult).slice(0, 500)}`);
+
+      // Try multiple response shapes
+      const frameUrl =
+        frameResult?.images?.[0]?.url ||
+        frameResult?.image?.url ||
+        frameResult?.frame?.url ||
+        frameResult?.url ||
+        (typeof frameResult?.images?.[0] === "string" ? frameResult.images[0] : null);
+
       if (frameUrl) {
         log(`Frame extracted: ${frameUrl}`);
 
@@ -141,7 +152,37 @@ export async function POST(req: NextRequest) {
           log(`Frame download failed: ${frameRes.status}`);
         }
       } else {
-        log("No frame URL returned from FAL");
+        log(`No frame URL found in FAL response`);
+
+        // Alternative: use FAL metadata endpoint which also returns start_frame_url
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const metaResult = await fal.run("fal-ai/ffmpeg-api/metadata", {
+            input: {
+              media_url: topVideoUrlForFal,
+              extract_frames: true,
+            },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }) as any;
+
+          log(`Metadata response keys: ${JSON.stringify(Object.keys(metaResult || {}))}`);
+          const startFrameUrl = metaResult?.start_frame_url || metaResult?.end_frame_url;
+          if (startFrameUrl) {
+            log(`Got frame from metadata: ${startFrameUrl}`);
+            const frameRes = await fetch(startFrameUrl);
+            if (frameRes.ok) {
+              const frameBuffer = Buffer.from(await frameRes.arrayBuffer());
+              const posterKey = "assets/hero-poster.jpg";
+              await uploadToR2(posterKey, frameBuffer, "image/jpeg");
+              posterUrl = `${appUrl}/api/assets/hero-poster`;
+              log(`Poster uploaded via metadata fallback: ${posterUrl}`);
+            }
+          } else {
+            log(`Metadata also returned no frame URL`);
+          }
+        } catch (metaErr) {
+          log(`Metadata fallback failed: ${metaErr instanceof Error ? metaErr.message : metaErr}`);
+        }
       }
     } catch (err) {
       log(`Poster extraction failed: ${err instanceof Error ? err.message : err}`);

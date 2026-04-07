@@ -228,15 +228,41 @@ export async function executeProduction(
     // Step 4: Generate audio assets in parallel
     const audioPromises: Promise<{ type: string; url: string; metadata?: Record<string, unknown> }>[] = [];
 
-    if (input.voiceover && enhancedPlan.voiceoverScript) {
+    // Extract voiceover script — Claude may store it as:
+    // plan.voiceoverScript (string) OR plan.voiceover.script (array of {text})
+    let voiceoverScript = enhancedPlan.voiceoverScript;
+    if (!voiceoverScript && input.voiceover) {
+      const planAny = enhancedPlan as unknown as Record<string, unknown>;
+      const voBlock = planAny.voiceover as { script?: Array<{ text?: string }> | string; enabled?: boolean } | undefined;
+      if (voBlock?.script) {
+        if (typeof voBlock.script === "string") {
+          voiceoverScript = voBlock.script;
+        } else if (Array.isArray(voBlock.script)) {
+          voiceoverScript = voBlock.script.map((s) => (typeof s === "string" ? s : s.text || "")).join(" ");
+        }
+      }
+      // Also try per-scene voiceoverLine
+      if (!voiceoverScript) {
+        const lines = enhancedPlan.scenes
+          .map((s) => s.voiceoverLine)
+          .filter(Boolean)
+          .join(" ");
+        if (lines) voiceoverScript = lines;
+      }
+    }
+
+    if (input.voiceover && voiceoverScript) {
+      console.log(`[BRAIN] Voiceover script: "${voiceoverScript.slice(0, 80)}..."`);
       audioPromises.push(
         generateVoiceover(
-          enhancedPlan.voiceoverScript,
+          voiceoverScript,
           input.voiceoverLanguage || "en-US",
           input.voiceoverVoice,
           enhancedPlan.voiceoverTimings
         )
       );
+    } else if (input.voiceover) {
+      console.warn("[BRAIN] Voiceover requested but no script found in plan");
     }
 
     if (input.music) {
@@ -348,10 +374,10 @@ export async function executeProduction(
       }
     }
 
-    // Generate captions
-    if (input.captions && enhancedPlan.voiceoverScript) {
+    // Generate captions (uses the extracted voiceoverScript)
+    if (input.captions && voiceoverScript) {
       const captionResult = generateCaptions(
-        enhancedPlan.voiceoverScript,
+        voiceoverScript,
         enhancedPlan.voiceoverTimings || []
       );
       // Store SRT content as the captions URL (it's actually the content)

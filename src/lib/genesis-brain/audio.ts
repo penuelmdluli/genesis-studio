@@ -95,8 +95,9 @@ export async function generateVoiceover(
 
     const result = await fal.subscribe(kokoroEndpoint, {
       input: {
-        text: script,
+        prompt: script,
         voice: kokoroVoice,
+        speed: 1,
       },
       logs: false,
     });

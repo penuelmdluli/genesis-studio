@@ -454,23 +454,25 @@ export interface CharacterDefinition {
 
 // Assembly state machine — tracks async FAL jobs during assembly
 export interface AssemblyState {
-  phase: "mmaudio" | "merge_audio" | "concat" | "mix_voiceover" | "mix_music" | "done";
+  phase: "mmaudio" | "merge_audio" | "concat" | "compose_audio" | "mix_final" | "done";
   // Per-scene MMAudio jobs: sceneId -> FAL request_id
   mmaudioJobs: Record<string, { requestId: string; status: string; audioUrl?: string }>;
   // Per-scene merge-audio-video jobs: sceneId -> FAL request_id
   mergeJobs: Record<string, { requestId: string; status: string; mergedUrl?: string }>;
   // Final concatenation job
   concatJob?: { requestId: string; status: string; videoUrl?: string };
-  // Voiceover audio mix job
-  mixVoiceoverJob?: { requestId: string; status: string; videoUrl?: string };
-  // Music audio mix job
-  mixMusicJob?: { requestId: string; status: string; videoUrl?: string };
+  // Compose voiceover + music into single audio track
+  composeAudioJob?: { requestId: string; status: string; audioUrl?: string };
+  // Final merge of combined audio onto video
+  mixFinalJob?: { requestId: string; status: string; videoUrl?: string };
   // Ordered scene URLs ready for concat (populated as merge/skip completes)
   processedSceneUrls: string[];
   // Scene order map: sceneId -> index in processedSceneUrls
   sceneOrder: Record<string, number>;
   // Scenes that have native audio (skip MMAudio)
   nativeAudioScenes: string[];
+  // Per-scene voiceover clips from orchestration (placed at scene timestamps in compose)
+  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>;
 }
 
 export interface Production {

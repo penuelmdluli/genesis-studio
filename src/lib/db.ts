@@ -209,7 +209,7 @@ export async function getUserJobs(
 export async function createVideo(params: {
   id?: string;
   userId: string;
-  jobId: string;
+  jobId?: string | null;
   title: string;
   url: string;
   thumbnailUrl: string;
@@ -225,7 +225,7 @@ export async function createVideo(params: {
 }) {
   const insertData: Record<string, unknown> = {
     user_id: params.userId,
-    job_id: params.jobId,
+    job_id: params.jobId || null,
     title: params.title,
     url: params.url,
     thumbnail_url: params.thumbnailUrl,

@@ -33,8 +33,8 @@ import {
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { user, activeJobs, videos } = useStore();
-  const isLoading = !user;
+  const { user, activeJobs, videos, isInitialized } = useStore();
+  const isLoading = !isInitialized;
 
   const pendingJobs = (activeJobs || []).filter(
     (j) => j.status === "processing" || j.status === "queued"

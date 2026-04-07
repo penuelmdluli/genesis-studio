@@ -50,7 +50,13 @@ RULES:
    - Use "cut" for energy and impact
    - Use "fade_black" for time passage
 8. Keep total scene duration within 10% of target
-9. If voiceover requested: write NATURAL conversational script timed to scenes
+9. If voiceover requested:
+   - Write a voiceoverScript that FILLS THE ENTIRE VIDEO DURATION (~2.5 words per second)
+   - For a 15s video, write ~37 words. For a 30s video, write ~75 words. For 60s, ~150 words.
+   - The narration should flow naturally across ALL scenes, not just describe the first one
+   - ALSO set a "voiceoverLine" on EACH scene with that scene's portion of the narration
+   - The voiceover should be engaging, descriptive, and match the visual pacing
+   - NEVER write a short 1-sentence voiceover — it must narrate the ENTIRE video from start to finish
 10. Text overlays: use sparingly — opening hook, key stats, CTA at end
 
 VALID MODELS: "wan-2.2", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"

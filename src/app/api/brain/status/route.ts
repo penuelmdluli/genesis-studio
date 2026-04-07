@@ -205,6 +205,7 @@ export async function GET(req: NextRequest) {
       gifPreviewUrl: production.gifPreviewUrl,
       voiceoverUrl: production.voiceoverUrl,
       musicUrl: production.musicUrl,
+      captionsUrl: production.captionsUrl,
       errorMessage: production.errorMessage,
       plan: production.plan,
       scenes: scenes.map((s) => ({

@@ -14,15 +14,19 @@ import {
   submitMMAudioJob,
   submitMergeAudioVideoJob,
   submitMergeVideosJob,
-  submitMergeAudioTracksJob,
+  submitComposeVideoJob,
+  submitLoudnormJob,
+  getMediaDuration,
   checkFalQueueStatus,
   getFalQueueResult,
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
-import { extractThumbnailFromUrl } from "@/lib/thumbnails";
+import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
+import { extractThumbnailFromUrl, extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { AI_MODELS } from "@/lib/constants";
 import { ModelId, SoundDesign, AspectRatio, AssemblyState, Production } from "@/types";
+import { randomUUID } from "crypto";
 
 // ---- PHASE 1: START ASSEMBLY (called once) ----
 
@@ -52,6 +56,10 @@ export async function startAssembly(
     const plan = production?.plan;
     const supabase = createSupabaseAdmin();
 
+    // Preserve per-scene voiceover clips from orchestration phase (if any)
+    const existingState = production?.assemblyState as Record<string, unknown> | undefined;
+    const savedVoiceoverClips = existingState?.voiceoverClips;
+
     // Build assembly state
     const state: AssemblyState = {
       phase: "mmaudio",
@@ -61,6 +69,12 @@ export async function startAssembly(
       sceneOrder: {},
       nativeAudioScenes: [],
     };
+
+    // Carry forward voiceover clips from orchestration
+    if (savedVoiceoverClips) {
+      state.voiceoverClips = savedVoiceoverClips as AssemblyState["voiceoverClips"];
+      console.log(`[ASSEMBLY] Preserved ${(savedVoiceoverClips as Array<unknown>).length} per-scene voiceover clips`);
+    }
 
     let needsMMAudio = false;
 
@@ -431,50 +445,60 @@ async function pollComposeAudioPhase(
   state: AssemblyState,
   production: Production
 ): Promise<boolean> {
-  // This phase layers voiceover (100% vol) + music (25% vol) into a single audio track
-  // using fal-ai/ffmpeg-api/compose, so neither gets replaced.
+  // This phase reduces music volume via loudnorm so it sits behind voiceover.
+  // If loudnorm fails, we still pass the original music URL to mix_final.
 
   if (!state.composeAudioJob) {
-    const voiceoverUrl = production.voiceoverUrl;
     const musicUrl = production.musicUrl;
 
-    if (!voiceoverUrl || !musicUrl) {
-      // Shouldn't reach here if routing is correct, but handle gracefully
+    if (!musicUrl) {
+      // No music to process — skip to mix_final
       state.phase = "mix_final";
       return true;
     }
 
     try {
-      const { requestId } = await submitMergeAudioTracksJob(voiceoverUrl, musicUrl);
+      // Lower music to -24 LUFS so it's clearly behind voiceover (-14 LUFS default)
+      const { requestId } = await submitLoudnormJob(musicUrl, -24);
       state.composeAudioJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Compose-audio submitted: ${requestId} (voiceover + music)`);
+      console.log(`[ASSEMBLY] Loudnorm submitted for music: ${requestId} (target: -24 LUFS)`);
     } catch (err) {
-      console.warn(`[ASSEMBLY] Compose-audio submit failed, falling back to voiceover only:`, err);
-      // Fall through to mix_final with just voiceover
+      console.warn(`[ASSEMBLY] Loudnorm submit failed, using original music volume:`, err);
+      // Still proceed to mix_final — music will be at original volume
       state.phase = "mix_final";
     }
     return true;
   }
 
-  // Poll compose job
+  // Poll loudnorm job
   if (state.composeAudioJob.status !== "COMPLETED" && state.composeAudioJob.status !== "FAILED") {
-    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/amix", state.composeAudioJob.requestId);
+    try {
+      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.composeAudioJob.requestId);
 
-    if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/ffmpeg-api/amix", state.composeAudioJob.requestId);
-      const audio = data?.audio as { url: string } | undefined;
-      state.composeAudioJob.status = "COMPLETED";
-      state.composeAudioJob.audioUrl = audio?.url || "";
-      console.log(`[ASSEMBLY] Compose-audio completed: ${state.composeAudioJob.audioUrl}`);
-    } else if (result.status === "FAILED") {
+      if (result.status === "COMPLETED") {
+        try {
+          const data = await getFalQueueResult("fal-ai/ffmpeg-api", state.composeAudioJob.requestId);
+          const audio = data?.audio as { url: string } | undefined;
+          state.composeAudioJob.status = "COMPLETED";
+          state.composeAudioJob.audioUrl = audio?.url || "";
+          console.log(`[ASSEMBLY] Loudnorm completed — quieter music: ${state.composeAudioJob.audioUrl}`);
+        } catch (resultErr) {
+          console.warn(`[ASSEMBLY] Loudnorm result retrieval failed, using original music:`, resultErr);
+          state.composeAudioJob.status = "FAILED";
+        }
+      } else if (result.status === "FAILED") {
+        state.composeAudioJob.status = "FAILED";
+        console.warn(`[ASSEMBLY] Loudnorm failed, using original music volume`);
+      } else {
+        return false; // Still in progress
+      }
+    } catch (pollErr) {
+      console.warn(`[ASSEMBLY] Loudnorm status check failed, using original music:`, pollErr);
       state.composeAudioJob.status = "FAILED";
-      console.warn(`[ASSEMBLY] Compose-audio failed, will use voiceover only in mix_final`);
-    } else {
-      return false; // Still in progress
     }
   }
 
-  // Compose done → merge the combined audio onto the video
+  // Loudnorm done → move to mix_final (compose video + voiceover + music)
   state.phase = "mix_final";
   await updateProduction(productionId, { progress: 94 });
   console.log(`[ASSEMBLY] Compose-audio done → mix_final`);
@@ -486,8 +510,9 @@ async function pollMixFinalPhase(
   state: AssemblyState,
   production: Production
 ): Promise<boolean> {
-  // Merge a single audio track onto the concatenated video.
-  // Audio source priority: composed track > voiceover > music
+  // Use fal-ai/ffmpeg-api/compose to layer video + voiceover + music in one call.
+  // This replaces merge-audio-video which can only add ONE audio track.
+  // compose natively supports multiple audio tracks layered simultaneously.
 
   if (!state.mixFinalJob) {
     const videoUrl = state.concatJob?.videoUrl;
@@ -496,44 +521,103 @@ async function pollMixFinalPhase(
       return true;
     }
 
-    // Pick the best audio track available
-    const audioUrl =
-      state.composeAudioJob?.audioUrl ||  // composed voiceover + music
-      production.voiceoverUrl ||           // voiceover only
-      production.musicUrl;                 // music only
+    const voiceoverUrl = production.voiceoverUrl;
+    // Use loudnorm-processed music if available, else original music
+    const musicUrl = state.composeAudioJob?.audioUrl || production.musicUrl;
 
-    if (!audioUrl) {
+    // Check for per-scene voiceover clips stored during orchestration
+    const voiceoverClips = state.voiceoverClips;
+
+    if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl) {
+      // No audio to add — video is already done
       state.phase = "done";
       return true;
     }
 
+    // Get the REAL concat video duration from FAL metadata (not planned durations)
+    // This ensures audio tracks match the actual video length exactly
+    let realDurationSec = await getMediaDuration(videoUrl);
+    if (realDurationSec <= 0) {
+      // Fallback: calculate from plan durations
+      const freshScenes = await getProductionScenes(productionId);
+      const completedScenes = freshScenes
+        .filter((s) => s.status === "completed")
+        .sort((a, b) => a.sceneNumber - b.sceneNumber);
+      const plan = production.plan;
+      realDurationSec = completedScenes.reduce((sum, s) => {
+        const sceneDef = plan?.scenes?.find(
+          (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+        );
+        return sum + (sceneDef?.duration || 5);
+      }, 0);
+    }
+    const totalDurationMs = Math.ceil(realDurationSec * 1000);
+    console.log(`[ASSEMBLY] Real video duration: ${realDurationSec}s (${totalDurationMs}ms)`);
+
+    // Get music duration so we can loop it if it's shorter than the video
+    let musicDurationMs: number | undefined;
+    if (musicUrl) {
+      const musicDurSec = await getMediaDuration(musicUrl);
+      if (musicDurSec > 0) {
+        musicDurationMs = Math.ceil(musicDurSec * 1000);
+        console.log(`[ASSEMBLY] Music duration: ${musicDurSec}s (${musicDurationMs}ms) — video: ${realDurationSec}s`);
+      }
+    }
+
+    // Always use compose — it preserves video length and layers audio correctly.
+    // merge-audio-video truncates video to audio length which is a bug.
+    // Per-scene voiceover clips are placed at each scene's timestamp for full coverage.
     try {
-      const { requestId } = await submitMergeAudioVideoJob(videoUrl, audioUrl);
+      const { requestId } = await submitComposeVideoJob(
+        videoUrl,
+        voiceoverClips?.length ? undefined : (voiceoverUrl || undefined), // Skip single URL if we have per-scene clips
+        musicUrl || undefined,
+        totalDurationMs,
+        musicDurationMs,
+        voiceoverClips?.length ? voiceoverClips : undefined
+      );
       state.mixFinalJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Mix-final submitted: ${requestId}`);
+      const voDesc = voiceoverClips?.length ? `${voiceoverClips.length} VO clips` : (voiceoverUrl ? "voiceover" : "");
+      const audioDesc = [voDesc, musicUrl ? "music" : ""].filter(Boolean).join(" + ");
+      console.log(`[ASSEMBLY] Compose-final submitted: ${requestId} (video + ${audioDesc}, ${realDurationSec}s)`);
     } catch (err) {
-      console.warn(`[ASSEMBLY] Mix-final submit failed, using video without narration:`, err);
+      console.warn(`[ASSEMBLY] Compose-final failed, using video without audio:`, err);
       state.phase = "done";
     }
     return true;
   }
 
-  // Poll mix-final job
+  // Poll mix-final compose job
   if (state.mixFinalJob.status !== "COMPLETED" && state.mixFinalJob.status !== "FAILED") {
-    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", state.mixFinalJob.requestId);
+    try {
+      const statusResult = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.mixFinalJob.requestId);
 
-    if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", state.mixFinalJob.requestId);
-      const video = data?.video as { url: string } | undefined;
-      state.mixFinalJob.status = "COMPLETED";
-      state.mixFinalJob.videoUrl = video?.url || state.concatJob?.videoUrl;
-      console.log(`[ASSEMBLY] Mix-final completed: ${state.mixFinalJob.videoUrl}`);
-    } else if (result.status === "FAILED") {
+      if (statusResult.status === "COMPLETED") {
+        try {
+          const data = await getFalQueueResult("fal-ai/ffmpeg-api", state.mixFinalJob.requestId);
+          // compose returns video_url at top level
+          const videoUrl = (data?.video_url as string) ||
+                          (data?.video as { url: string })?.url ||
+                          "";
+          state.mixFinalJob.status = "COMPLETED";
+          state.mixFinalJob.videoUrl = videoUrl || state.concatJob?.videoUrl;
+          console.log(`[ASSEMBLY] Compose-final completed: ${state.mixFinalJob.videoUrl}`);
+        } catch (resultErr) {
+          console.warn(`[ASSEMBLY] Compose-final result retrieval failed, using concat video:`, resultErr);
+          state.mixFinalJob.status = "FAILED";
+          state.mixFinalJob.videoUrl = state.concatJob?.videoUrl;
+        }
+      } else if (statusResult.status === "FAILED") {
+        state.mixFinalJob.status = "FAILED";
+        state.mixFinalJob.videoUrl = state.concatJob?.videoUrl;
+        console.warn(`[ASSEMBLY] Compose-final failed, using video without audio overlay`);
+      } else {
+        return false; // Still in progress
+      }
+    } catch (pollErr) {
+      console.warn(`[ASSEMBLY] Compose-final status check failed, using concat video:`, pollErr);
       state.mixFinalJob.status = "FAILED";
-      state.mixFinalJob.videoUrl = state.concatJob?.videoUrl; // fallback to video without narration
-      console.warn(`[ASSEMBLY] Mix-final failed, using video without audio overlay`);
-    } else {
-      return false; // Still in progress
+      state.mixFinalJob.videoUrl = state.concatJob?.videoUrl;
     }
   }
 
@@ -550,10 +634,10 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video URL — priority: mix_final > concat > first scene
-  const finalUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video source URL — priority: mix_final > concat > first scene
+  const sourceUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
-  if (!finalUrl) {
+  if (!sourceUrl) {
     await updateProduction(productionId, {
       status: "failed",
       error_message: "Assembly produced no output video",
@@ -572,17 +656,95 @@ async function finalizeAssembly(
   completedScenes.forEach((s, i) => {
     sceneUrlMap[`scene_${s.sceneNumber}`] = state.processedSceneUrls[i] || s.outputVideoUrl!;
   });
-  sceneUrlMap["final"] = finalUrl;
 
-  // Extract a real thumbnail from the final video
-  const videoId = `brain-${productionId}`;
+  // --- PERSIST FINAL VIDEO TO R2 (FAL URLs expire) ---
+  const videoId = randomUUID();
+  const vKey = videoStorageKey(production.userId, videoId);
+  let videoApiUrl = `/api/videos/${videoId}`;
+  let fileSize = 0;
+
+  try {
+    console.log(`[ASSEMBLY] Downloading final video from FAL to R2: ${sourceUrl.slice(0, 80)}...`);
+    const videoRes = await fetch(sourceUrl);
+    if (!videoRes.ok) {
+      throw new Error(`Failed to download final video: ${videoRes.status}`);
+    }
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+    fileSize = videoBuffer.length;
+    await uploadVideo(vKey, videoBuffer);
+    await verifyR2Upload(vKey);
+    console.log(`[ASSEMBLY] Final video persisted to R2: ${vKey} (${(fileSize / 1024 / 1024).toFixed(1)} MB)`);
+  } catch (storageErr) {
+    console.error(`[ASSEMBLY] R2 upload failed, falling back to FAL URL:`, storageErr);
+    // Fall back to source URL — not ideal but better than losing the video entirely
+    videoApiUrl = sourceUrl;
+  }
+
+  sceneUrlMap["final"] = videoApiUrl;
+
+  // --- EXTRACT THUMBNAIL ---
   let finalThumbnail = "";
   try {
-    finalThumbnail = await extractThumbnailFromUrl(finalUrl, production.userId, videoId);
+    if (videoApiUrl.startsWith("/api/videos/")) {
+      // Video is in R2 — use the R2 key for thumbnail extraction
+      finalThumbnail = await extractAndUploadThumbnail(vKey, production.userId, videoId);
+    } else {
+      // Fallback to URL-based extraction
+      finalThumbnail = await extractThumbnailFromUrl(sourceUrl, production.userId, videoId);
+    }
   } catch {
     console.warn(`[ASSEMBLY] Thumbnail extraction failed, using empty`);
   }
 
+  // --- ALWAYS SAVE TO GALLERY ---
+  const plan = production.plan;
+  const totalDuration = completedScenes.reduce((sum, s) => {
+    const sceneDef = plan?.scenes?.find(
+      (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+    );
+    return sum + (sceneDef?.duration || 5);
+  }, 0);
+
+  // Determine best model ID from scenes
+  const sceneModels = completedScenes.map(s => s.modelId).filter(Boolean);
+  const primaryModel = (sceneModels[0] || "wan-2.2") as ModelId;
+
+  let galleryVideoId = videoId;
+  let retries = 0;
+  const MAX_GALLERY_RETRIES = 2;
+
+  while (retries <= MAX_GALLERY_RETRIES) {
+    try {
+      await createVideo({
+        id: galleryVideoId,
+        userId: production.userId,
+        jobId: null, // Brain productions don't have generation_jobs
+        title: production.concept || "Brain Studio Production",
+        url: videoApiUrl,
+        thumbnailUrl: finalThumbnail,
+        modelId: primaryModel,
+        prompt: production.concept || "",
+        resolution: "720p",
+        duration: totalDuration,
+        fps: 24,
+        fileSize,
+        aspectRatio: (production.aspectRatio || "landscape") as AspectRatio,
+      });
+      console.log(`[ASSEMBLY] ✅ Video saved to Gallery: ${galleryVideoId}`);
+      break;
+    } catch (videoErr) {
+      retries++;
+      if (retries > MAX_GALLERY_RETRIES) {
+        console.error(`[ASSEMBLY] ❌ CRITICAL: Failed to save video to Gallery after ${MAX_GALLERY_RETRIES + 1} attempts:`, videoErr);
+      } else {
+        // Retry with a fresh UUID in case of ID collision
+        galleryVideoId = randomUUID();
+        console.warn(`[ASSEMBLY] Gallery save attempt ${retries} failed, retrying with new ID ${galleryVideoId}:`, videoErr);
+      }
+    }
+  }
+
+  // --- MARK PRODUCTION COMPLETE ---
   await updateProduction(productionId, {
     status: "completed",
     output_video_urls: JSON.stringify(sceneUrlMap),
@@ -591,36 +753,7 @@ async function finalizeAssembly(
     completed_at: new Date().toISOString(),
   });
 
-  // Create Video record for Gallery
-  try {
-    const plan = production.plan;
-    const totalDuration = completedScenes.reduce((sum, s) => {
-      const sceneDef = plan?.scenes?.find(
-        (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
-      );
-      return sum + (sceneDef?.duration || 5);
-    }, 0);
-
-    await createVideo({
-      userId: production.userId,
-      jobId: videoId,
-      title: production.concept || "Brain Studio Production",
-      url: finalUrl,
-      thumbnailUrl: finalThumbnail,
-      modelId: "wan-2.2" as ModelId,
-      prompt: production.concept || "",
-      resolution: "720p",
-      duration: totalDuration,
-      fps: 24,
-      fileSize: 0,
-      aspectRatio: (production.aspectRatio || "landscape") as AspectRatio,
-    });
-    console.log(`[ASSEMBLY] Video record created for Gallery`);
-  } catch (videoErr) {
-    console.error(`[ASSEMBLY] Failed to create Video record:`, videoErr);
-  }
-
-  console.log(`[ASSEMBLY] Production ${productionId} COMPLETE`);
+  console.log(`[ASSEMBLY] 🎬 Production ${productionId} COMPLETE — Gallery: ${galleryVideoId}, Thumbnail: ${finalThumbnail ? "yes" : "no"}`);
 }
 
 // ---- LEGACY COMPAT (keep old function signature, redirect to new) ----

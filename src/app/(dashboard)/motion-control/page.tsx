@@ -44,8 +44,10 @@ type MotionModel = "kling-v3" | "kling-v2.6";
 const MOTION_DURATIONS = [5, 10];
 
 export default function MotionControlPage() {
-  const { user, addJob, updateCreditBalance } = useStore();
+  const { user, addJob, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
+
+  const isLoading = !isInitialized;
 
   // Motion-specific state
   const [motionVideo, setMotionVideo] = useState<File | null>(null);
@@ -72,7 +74,7 @@ export default function MotionControlPage() {
   const motionVideoRef = useRef<HTMLInputElement>(null);
   const characterImageRef = useRef<HTMLInputElement>(null);
 
-  const isLoading = !user;
+  // isLoading already defined from isInitialized above
 
   // Credit cost estimation (matches server-side estimateMotionCost)
   const ratePerSec = quality === "pro" ? 0.14 : 0.07;

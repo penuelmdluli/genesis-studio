@@ -35,7 +35,7 @@ type SortKey = "newest" | "oldest" | "name";
 type FormatFilter = "all" | "standard" | "reel" | "audio";
 
 export default function GalleryPage() {
-  const { videos, activeJobs, removeVideo } = useStore();
+  const { videos, activeJobs, removeVideo, isInitialized } = useStore();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -256,8 +256,17 @@ export default function GalleryPage() {
         </div>
       )}
 
-      {/* Empty State */}
-      {filteredVideos.length === 0 ? (
+      {/* Loading State — show skeleton while data is fetching */}
+      {!isInitialized ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <GenesisLoader size="sm" text="Loading gallery..." />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full mt-6">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="aspect-video rounded-xl bg-white/[0.03] border border-white/[0.06] animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ) : filteredVideos.length === 0 ? (
         <div className="text-center py-24 relative">
           <div className="absolute inset-0 bg-glow-center opacity-20" />
           <div className="relative z-10">

@@ -160,7 +160,9 @@ export async function GET(
     }
 
     // Find the video file in R2 (tries multiple key formats)
-    const found = await findVideoInR2(video.user_id, video.job_id);
+    // For Brain Studio videos, job_id is null — use videoId as R2 key instead
+    const r2LookupId = video.job_id || videoId;
+    const found = await findVideoInR2(video.user_id, r2LookupId);
     if (!found) {
       return NextResponse.json(
         { error: "Video file not found in storage" },

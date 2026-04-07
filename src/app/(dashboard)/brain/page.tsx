@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Modal } from "@/components/ui/modal";
-import { VideoPlayer } from "@/components/ui/video-player";
+import { VideoPlayer, CaptionCue } from "@/components/ui/video-player";
 import { PageTransition, StaggerGroup, StaggerItem, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
@@ -105,6 +105,31 @@ export default function BrainStudioPage() {
   const [error, setError] = useState<string | null>(null);
   const [outputVideoUrls, setOutputVideoUrls] = useState<Record<string, string> | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [captionCues, setCaptionCues] = useState<CaptionCue[]>([]);
+
+  // Parse SRT time "HH:MM:SS,mmm" to seconds
+  const parseSrtTime = (srt: string): number => {
+    const parts = srt.split(/[:,]/);
+    if (parts.length < 4) return 0;
+    return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]) + parseInt(parts[3]) / 1000;
+  };
+
+  // Parse caption metadata from API into CaptionCue[]
+  const parseCaptionsFromMetadata = (captionsUrlStr: string) => {
+    try {
+      const meta = typeof captionsUrlStr === "string" ? JSON.parse(captionsUrlStr) : captionsUrlStr;
+      const entries = meta?.entries as Array<{ startTime: string; endTime: string; text: string }> | undefined;
+      if (!entries || entries.length === 0) return;
+      const cues: CaptionCue[] = entries.map((e) => ({
+        startTime: typeof e.startTime === "number" ? e.startTime : parseSrtTime(e.startTime),
+        endTime: typeof e.endTime === "number" ? e.endTime : parseSrtTime(e.endTime),
+        text: e.text,
+      }));
+      setCaptionCues(cues);
+    } catch {
+      // Invalid caption data — skip silently
+    }
+  };
 
   // Loading states
   const [isPlanning, setIsPlanning] = useState(false);
@@ -141,6 +166,7 @@ export default function BrainStudioPage() {
         if (data.plan) setPlan(data.plan);
         if (data.outputVideoUrls) setOutputVideoUrls(data.outputVideoUrls);
         if (data.thumbnailUrl) setThumbnailUrl(data.thumbnailUrl);
+        if (data.captionsUrl) parseCaptionsFromMetadata(data.captionsUrl);
 
         if (data.status === "completed") {
           setBrainState("completed");
@@ -177,6 +203,7 @@ export default function BrainStudioPage() {
         setBrainState("completed");
         setOutputVideoUrls(data.outputVideoUrls);
         setThumbnailUrl(data.thumbnailUrl);
+        if (data.captionsUrl) parseCaptionsFromMetadata(data.captionsUrl);
         return true; // Stop polling
       } else if (data.status === "failed") {
         setBrainState("failed");
@@ -1016,6 +1043,7 @@ export default function BrainStudioPage() {
                           poster={thumbnailUrl || undefined}
                           title={plan?.title || concept.slice(0, 50)}
                           autoPlay
+                          captions={captionCues.length > 0 ? captionCues : undefined}
                           className={aspectRatio === "portrait" ? "aspect-[9/16] max-h-[70vh] mx-auto" : "aspect-video"}
                         />
                       ) : (

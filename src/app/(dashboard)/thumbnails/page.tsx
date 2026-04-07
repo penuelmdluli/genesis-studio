@@ -43,7 +43,7 @@ interface GeneratedImage {
 }
 
 export default function ThumbnailsPage() {
-  const { user, updateCreditBalance, setCreditPurchaseOpen } = useStore();
+  const { user, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState("");
@@ -55,7 +55,7 @@ export default function ThumbnailsPage() {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const generateLockRef = useRef(false);
 
-  const isLoading = !user;
+  const isLoading = !isInitialized;
   const creditCost = variations <= 2 ? 1 : 2;
   const hasEnoughCredits =
     user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;

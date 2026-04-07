@@ -75,7 +75,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification } = useStore();
+  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification, setInitialized } = useStore();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completedJobsRef = useRef<Set<string>>(new Set());
 
@@ -189,6 +189,7 @@ export default function DashboardLayout({
           activeJobs.push(...(jobs || []).map(mapJob));
         }
         setActiveJobs(activeJobs);
+        setInitialized(true);
 
         // Start polling if there are active jobs
         if (activeJobs.length > 0) {
@@ -208,6 +209,7 @@ export default function DashboardLayout({
         }
       } catch (err) {
         console.error("Failed to load data:", err);
+        setInitialized(true); // Still mark initialized so UI doesn't stay stuck on loading
       }
     }
     loadData();

@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 
+export interface CaptionCue {
+  startTime: number; // seconds
+  endTime: number;   // seconds
+  text: string;
+}
+
 interface VideoPlayerProps {
   src: string;
   poster?: string;
@@ -26,6 +32,7 @@ interface VideoPlayerProps {
   autoPlay?: boolean;
   loop?: boolean;
   duration?: number;
+  captions?: CaptionCue[];
   onEnded?: () => void;
 }
 
@@ -38,6 +45,7 @@ export function VideoPlayer({
   autoPlay = false,
   loop = false,
   duration: fallbackDuration,
+  captions,
   onEnded,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -350,6 +358,23 @@ export function VideoPlayer({
           <GenesisLoader size="lg" />
         </div>
       )}
+
+      {/* Caption overlay */}
+      {captions && captions.length > 0 && (() => {
+        const activeCue = captions.find(
+          (c) => currentTime >= c.startTime && currentTime <= c.endTime
+        );
+        if (!activeCue) return null;
+        return (
+          <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4 pointer-events-none z-[5]">
+            <div className="bg-black/75 backdrop-blur-sm px-4 py-2 rounded-lg max-w-[85%]">
+              <p className="text-white text-sm sm:text-base font-medium text-center leading-snug">
+                {activeCue.text}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Big play button when paused */}
       {!isPlaying && !isLoading && !error && (

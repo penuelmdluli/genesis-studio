@@ -40,8 +40,10 @@ const CROP_PRESETS = [
 ];
 
 export default function EditPage() {
-  const { videos } = useStore();
+  const { videos, isInitialized } = useStore();
   const { toast } = useToast();
+
+  const isLoading = !isInitialized;
   const [mode, setMode] = useState<EditMode>("trim");
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

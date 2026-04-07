@@ -107,8 +107,10 @@ function ImageCard({ url, index, onDownload }: { url: string; index: number; onD
 }
 
 export default function ImagesPage() {
-  const { user, updateCreditBalance } = useStore();
+  const { user, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
+
+  const isLoading = !isInitialized;
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>("landscape");
   const [isGenerating, setIsGenerating] = useState(false);

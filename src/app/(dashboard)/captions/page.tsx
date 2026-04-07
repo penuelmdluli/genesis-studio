@@ -73,7 +73,7 @@ const CAPTION_STYLES = [
 const CREDITS_PER_MINUTE = 2;
 
 export default function CaptionsPage() {
-  const { user, videos, updateCreditBalance, setCreditPurchaseOpen } = useStore();
+  const { user, videos, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
 
   // Input state
@@ -97,7 +97,7 @@ export default function CaptionsPage() {
   // Double-click protection
   const generateLockRef = useRef(false);
 
-  const isLoading = !user;
+  const isLoading = !isInitialized;
 
   // Credit cost calculation
   const durationMinutes = videoDuration ? Math.ceil(videoDuration / 60) : 0;

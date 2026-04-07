@@ -29,8 +29,10 @@ const INTERPOLATION_OPTIONS = [
 ] as { value: string; label: string; minPlan: string; badge?: string }[];
 
 export default function UpscalePage() {
-  const { user, updateCreditBalance, videos, setCreditPurchaseOpen } = useStore();
+  const { user, updateCreditBalance, videos, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
+
+  const isLoading = !isInitialized;
 
   // Upload state
   const [videoFile, setVideoFile] = useState<File | null>(null);

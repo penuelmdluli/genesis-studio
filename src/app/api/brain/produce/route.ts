@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+
+// Brain production needs time for TTS (voiceover), music generation, and scene submissions
+export const maxDuration = 120; // 2 minutes
 import { getUserByClerkId } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getProduction, executeProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
@@ -59,9 +63,20 @@ export async function POST(req: NextRequest) {
       captions: production.captions,
     };
 
-    // Execute in background (non-blocking)
-    executeProduction(productionId, user.id, clerkId, plan, input).catch((err) => {
-      console.error(`[BRAIN] Background execution failed for ${productionId}:`, err);
+    // Use after() to keep the serverless function alive after the response is sent.
+    // Without this, Vercel kills the function immediately after the response,
+    // which terminates audio generation (TTS + music) mid-flight.
+    after(async () => {
+      try {
+        await executeProduction(productionId, user.id, clerkId, plan, input);
+        console.log(`[BRAIN] Production ${productionId} execution completed successfully`);
+      } catch (err) {
+        console.error(`[BRAIN] Production ${productionId} execution failed:`, err);
+        await updateProduction(productionId, {
+          status: "failed",
+          error_message: err instanceof Error ? err.message : "Production execution failed",
+        }).catch(() => {});
+      }
     });
 
     return NextResponse.json({

@@ -71,7 +71,7 @@ const baseNavItems: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen } = useStore();
+  const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen, isInitialized } = useStore();
 
   // Add admin nav item for owners
   const navItems = useMemo(() => {
@@ -151,11 +151,41 @@ export function Sidebar() {
 
         {/* Credit Balance Widget */}
         {(() => {
+          const expanded = sidebarOpen || mobileMenuOpen;
+
+          // Show loading skeleton while data is fetching
+          if (!isInitialized) {
+            return (
+              <div className={cn(
+                "mx-3 mt-3 rounded-xl border bg-white/[0.03] border-white/[0.06] animate-pulse",
+                expanded ? "p-3" : "p-2"
+              )}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-white/[0.06] shrink-0" />
+                  {expanded && (
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 w-12 bg-white/[0.06] rounded" />
+                      <div className="h-4 w-16 bg-white/[0.06] rounded" />
+                    </div>
+                  )}
+                </div>
+                {expanded && (
+                  <>
+                    <div className="h-1 rounded-full bg-white/[0.06] mt-2 mb-2.5" />
+                    <div className="flex gap-1.5">
+                      <div className="flex-1 h-7 bg-white/[0.06] rounded-lg" />
+                      <div className="w-20 h-7 bg-white/[0.06] rounded-lg" />
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          }
+
           const credits = user?.creditBalance ?? 0;
           const limit = user?.monthlyCreditsLimit ?? 50;
           const isLow = credits < 100 && credits > 0;
           const isEmpty = credits <= 0;
-          const expanded = sidebarOpen || mobileMenuOpen;
 
           return (
             <div className={cn(

@@ -65,7 +65,7 @@ const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; d
 ];
 
 export default function GeneratePage() {
-  const { form, setFormField, user, addJob, updateCreditBalance, setCreditPurchaseOpen } = useStore();
+  const { form, setFormField, user, addJob, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -103,7 +103,7 @@ export default function GeneratePage() {
     audio.onerror = () => setPlayingTrackId(null);
   }, [playingTrackId]);
 
-  const isLoading = !user;
+  const isLoading = !isInitialized;
   const isReel = form.videoFormat === "reel";
   const upsellContext = useUpsellContext();
 

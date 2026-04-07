@@ -165,6 +165,105 @@ export async function generateVoiceover(
 }
 
 /**
+ * Generate voiceover clips per-scene, each timed to its scene.
+ * Returns an array of clips with URLs and scene timing info.
+ * This ensures narration is spread across the entire video, not front-loaded.
+ */
+export async function generatePerSceneVoiceover(
+  scenes: Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }>,
+  language: string = "en-US",
+  voice?: string
+): Promise<{ clips: Array<{ url: string; startMs: number; durationMs: number; sceneNumber: number }>; fullUrl: string; fullDuration: number }> {
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) {
+    return { clips: [], fullUrl: "", fullDuration: 0 };
+  }
+
+  const voiceId = voice || getDefaultVoice(language);
+  const kokoroEndpoint = KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
+  const kokoroVoice = KOKORO_VOICES[voiceId] || "af_heart";
+
+  // Generate TTS for each scene's voiceoverLine in parallel
+  let cumulativeMs = 0;
+  const clipPromises = scenes.map(async (scene) => {
+    const sceneStartMs = cumulativeMs;
+    cumulativeMs += scene.duration * 1000;
+
+    if (!scene.voiceoverLine || !scene.voiceoverLine.trim()) {
+      return null;
+    }
+
+    try {
+      const result = await fal.subscribe(kokoroEndpoint, {
+        input: {
+          prompt: scene.voiceoverLine,
+          voice: kokoroVoice,
+          speed: 0.9, // Slightly slower for cinematic pacing
+        },
+        logs: false,
+      });
+
+      const data = result.data as Record<string, unknown>;
+      const audioFile = data?.audio as { url: string } | undefined;
+
+      if (audioFile?.url) {
+        return {
+          url: audioFile.url,
+          startMs: sceneStartMs,
+          durationMs: scene.duration * 1000,
+          sceneNumber: scene.sceneNumber,
+        };
+      }
+    } catch (err) {
+      console.warn(`[BRAIN AUDIO] Per-scene TTS failed for scene ${scene.sceneNumber}:`, err);
+    }
+    return null;
+  });
+
+  // Calculate cumulative offsets before awaiting (need correct values)
+  let offsetMs = 0;
+  const sceneOffsets = scenes.map((s) => {
+    const start = offsetMs;
+    offsetMs += s.duration * 1000;
+    return start;
+  });
+
+  const results = await Promise.all(clipPromises);
+  const clips = results
+    .map((r, i) => r ? { ...r, startMs: sceneOffsets[i] } : null)
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  console.log(`[BRAIN AUDIO] Per-scene voiceover: ${clips.length}/${scenes.length} clips generated`);
+
+  // Also generate the full script as one clip for fallback
+  const fullScript = scenes
+    .map((s) => s.voiceoverLine)
+    .filter(Boolean)
+    .join(". ");
+
+  let fullUrl = "";
+  let fullDuration = 0;
+  if (fullScript) {
+    try {
+      const fullResult = await fal.subscribe(kokoroEndpoint, {
+        input: { prompt: fullScript, voice: kokoroVoice, speed: 0.9 },
+        logs: false,
+      });
+      const fullData = fullResult.data as Record<string, unknown>;
+      const fullAudio = fullData?.audio as { url: string } | undefined;
+      if (fullAudio?.url) {
+        fullUrl = fullAudio.url;
+        fullDuration = (fullData?.duration as number) || estimateVoiceoverDuration(fullScript);
+      }
+    } catch {
+      console.warn("[BRAIN AUDIO] Full voiceover fallback failed");
+    }
+  }
+
+  return { clips, fullUrl, fullDuration };
+}
+
+/**
  * Estimate voiceover duration based on word count
  * Average speaking rate: ~150 words per minute
  */
@@ -585,22 +684,119 @@ export async function getFalQueueResult(
 }
 
 /**
- * Submit a job to merge two audio tracks into one (voiceover + music).
- * Uses merge-audio-video with a silent video workaround, then extracts audio.
- * Alternative: use ffmpeg-api/compose to layer audio tracks.
+ * Submit a compose job that layers video + voiceover + music into a single output.
+ * Uses fal-ai/ffmpeg-api/compose with multiple tracks.
+ * This replaces the broken amix approach — compose natively supports
+ * layering multiple audio tracks on top of a video.
+ *
+ * @param videoUrl - Concatenated scene video
+ * @param voiceoverUrl - Voiceover audio (full volume)
+ * @param musicUrl - Background music (will be at same volume — consider pre-processing with loudnorm)
+ * @param durationMs - Total duration in milliseconds
  */
-export async function submitMergeAudioTracksJob(
-  primaryAudioUrl: string,
-  secondaryAudioUrl: string
+export async function submitComposeVideoJob(
+  videoUrl: string,
+  voiceoverUrl: string | undefined,
+  musicUrl: string | undefined,
+  durationMs: number,
+  musicDurationMs?: number,
+  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>
 ): Promise<{ requestId: string }> {
-  // Use amix endpoint to mix voiceover (weight 1.0) + music (weight 0.25)
-  // This properly layers both audio tracks instead of replacing one with the other
-  const result = await fal.queue.submit("fal-ai/ffmpeg-api/amix", {
+  const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [
+    {
+      id: "video-main",
+      type: "video",
+      keyframes: [{ timestamp: 0, duration: durationMs, url: videoUrl }],
+    },
+  ];
+
+  // Per-scene voiceover clips take priority — each placed at its scene's timestamp
+  if (voiceoverClips && voiceoverClips.length > 0) {
+    tracks.push({
+      id: "audio-voiceover",
+      type: "audio",
+      keyframes: voiceoverClips.map((c) => ({
+        timestamp: c.startMs,
+        duration: c.durationMs,
+        url: c.url,
+      })),
+    });
+    console.log(`[AUDIO] Compose with ${voiceoverClips.length} per-scene voiceover clips`);
+  } else if (voiceoverUrl) {
+    // Fallback: single voiceover track
+    tracks.push({
+      id: "audio-voiceover",
+      type: "audio",
+      keyframes: [{ timestamp: 0, duration: durationMs, url: voiceoverUrl }],
+    });
+  }
+
+  if (musicUrl) {
+    // If we know the music duration and it's shorter than the video,
+    // tile the music with multiple keyframes so it loops seamlessly
+    const musicKFs: Array<{ timestamp: number; duration: number; url: string }> = [];
+    if (musicDurationMs && musicDurationMs > 0 && musicDurationMs < durationMs) {
+      // Loop music by placing consecutive keyframes
+      let offset = 0;
+      while (offset < durationMs) {
+        const remaining = durationMs - offset;
+        const segDuration = Math.min(musicDurationMs, remaining);
+        musicKFs.push({ timestamp: offset, duration: segDuration, url: musicUrl });
+        offset += musicDurationMs;
+      }
+      console.log(`[AUDIO] Music looped: ${musicKFs.length} segments to cover ${durationMs}ms (source: ${musicDurationMs}ms)`);
+    } else {
+      // Music is long enough or unknown duration — single keyframe
+      musicKFs.push({ timestamp: 0, duration: durationMs, url: musicUrl });
+    }
+
+    tracks.push({
+      id: "audio-music",
+      type: "audio",
+      keyframes: musicKFs,
+    });
+  }
+
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {
+    input: { tracks },
+  });
+  return { requestId: result.request_id };
+}
+
+/**
+ * Get actual media duration in seconds using FAL metadata endpoint.
+ * Returns 0 if metadata cannot be retrieved.
+ */
+export async function getMediaDuration(mediaUrl: string): Promise<number> {
+  try {
+    const result = await fal.subscribe("fal-ai/ffmpeg-api/metadata", {
+      input: { media_url: mediaUrl },
+      logs: false,
+    });
+    const data = result.data as Record<string, unknown>;
+    const media = data?.media as { duration?: number } | undefined;
+    return media?.duration || 0;
+  } catch (err) {
+    console.warn("[AUDIO] Failed to get media duration:", err);
+    return 0;
+  }
+}
+
+/**
+ * Reduce audio volume using FAL loudnorm endpoint.
+ * Used to lower background music before composing with voiceover.
+ *
+ * @param audioUrl - Source audio URL
+ * @param targetLufs - Target integrated loudness in LUFS (e.g. -24 for quiet background)
+ */
+export async function submitLoudnormJob(
+  audioUrl: string,
+  targetLufs: number = -24
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/loudnorm", {
     input: {
-      audio_urls: [primaryAudioUrl, secondaryAudioUrl],
-      weights: [1.0, 0.25],
-      duration: "longest",
-      normalize: true,
+      audio_url: audioUrl,
+      integrated_loudness: targetLufs,
     },
   });
   return { requestId: result.request_id };

@@ -46,7 +46,7 @@ function computeCreditCost(duration: number): number {
 }
 
 export default function TalkingAvatarPage() {
-  const { user, updateCreditBalance } = useStore();
+  const { user, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
 
   // Form state
@@ -114,7 +114,7 @@ export default function TalkingAvatarPage() {
     audio.load();
   }, [previewingVoice]);
 
-  const isLoading = !user;
+  const isLoading = !isInitialized;
   const userPlan = user?.plan || "free";
   const isPlanAllowed = userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
   const creditCost = computeCreditCost(duration);

@@ -82,6 +82,10 @@ interface StoreState {
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
 
+  // Data loading
+  isInitialized: boolean;
+  setInitialized: (val: boolean) => void;
+
   // UI
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -169,6 +173,10 @@ export const useStore = create<StoreState>((set) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),
     })),
   clearNotifications: () => set({ notifications: [] }),
+
+  // Data loading
+  isInitialized: false,
+  setInitialized: (val) => set({ isInitialized: val }),
 
   // UI
   sidebarOpen: true,

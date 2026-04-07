@@ -39,7 +39,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function VoiceoverPage() {
-  const { user, updateCreditBalance } = useStore();
+  const { user, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
 
   const [text, setText] = useState("");
@@ -100,7 +100,7 @@ export default function VoiceoverPage() {
     audio.load();
   }, [previewingVoice]);
 
-  const isLoading = !user;
+  const isLoading = !isInitialized;
   const charCount = text.length;
 
   const { durationSeconds, credits: creditCost } = useMemo(

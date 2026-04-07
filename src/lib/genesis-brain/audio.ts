@@ -836,6 +836,25 @@ export async function submitComposeVideoJob(
  * @param videoUrl - Source video URL
  * @param targetDurationMs - Desired output duration in milliseconds
  */
+/**
+ * Trim a video to a specific duration using FAL's trim endpoint.
+ * This is the reliable way to control output length — compose API ignores duration.
+ */
+export async function submitTrimVideoJob(
+  videoUrl: string,
+  endTimeSec: number
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/workflow-utilities/trim-video", {
+    input: {
+      video_url: videoUrl,
+      start_time: 0,
+      end_time: endTimeSec,
+    },
+  });
+  console.log(`[AUDIO] Trim submitted: ${result.request_id} (0 → ${endTimeSec.toFixed(1)}s)`);
+  return { requestId: result.request_id };
+}
+
 export async function submitSpeedAdjustJob(
   videoUrl: string,
   targetDurationMs: number

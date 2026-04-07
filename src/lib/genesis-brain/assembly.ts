@@ -16,6 +16,7 @@ import {
   submitMergeVideosJob,
   submitComposeVideoJob,
   submitSpeedAdjustJob,
+  submitTrimVideoJob,
   submitLoudnormJob,
   getMediaDuration,
   checkFalQueueStatus,
@@ -282,6 +283,9 @@ export async function pollAssembly(productionId: string): Promise<void> {
         break;
       case "mix_final":
         updated = await pollMixFinalPhase(productionId, state, production);
+        break;
+      case "trim_final":
+        updated = await pollTrimFinalPhase(productionId, state);
         break;
       case "normalize":
         // Normalize phase is deprecated — loudnorm strips video stream.
@@ -1127,9 +1131,91 @@ async function pollMixFinalPhase(
     }
   }
 
+  // Check if we need to trim — voiceover determines final duration
+  const totalVOMs = state.sceneAudioDurations
+    ? Object.values(state.sceneAudioDurations).reduce((s, d) => s + d, 0)
+    : 0;
+
+  if (totalVOMs > 0) {
+    state.phase = "trim_final";
+    await updateProduction(productionId, { progress: 96 });
+    console.log(`[ASSEMBLY] Mix-final done → trim_final (will trim to ${(totalVOMs / 1000).toFixed(1)}s + buffer)`);
+  } else {
+    state.phase = "done";
+    await updateProduction(productionId, { progress: 98 });
+    console.log(`[ASSEMBLY] Mix-final done → done (no voiceover, no trim needed)`);
+  }
+  return true;
+}
+
+// ---- PHASE 5.5: TRIM FINAL — Trim output to voiceover duration ----
+
+async function pollTrimFinalPhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  // Calculate target duration from voiceover
+  const totalVOMs = state.sceneAudioDurations
+    ? Object.values(state.sceneAudioDurations).reduce((s, d) => s + d, 0)
+    : 0;
+  const targetSec = (totalVOMs / 1000) + 0.5; // +0.5s buffer for natural ending
+
+  const videoUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;
+
+  if (!videoUrl || targetSec <= 1) {
+    state.phase = "done";
+    return true;
+  }
+
+  // Submit trim job if not yet started
+  if (!state.trimFinalJob) {
+    try {
+      const { requestId } = await submitTrimVideoJob(videoUrl, targetSec);
+      state.trimFinalJob = { requestId, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Trim submitted: ${requestId} (target: ${targetSec.toFixed(1)}s)`);
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Trim submit failed, using untrimmed video:`, err);
+      state.phase = "done";
+    }
+    return true;
+  }
+
+  // Poll trim job
+  if (state.trimFinalJob.status !== "COMPLETED" && state.trimFinalJob.status !== "FAILED") {
+    try {
+      const result = await checkFalQueueStatus(
+        "fal-ai/workflow-utilities/trim-video",
+        state.trimFinalJob.requestId
+      );
+
+      if (result.status === "COMPLETED") {
+        const data = await getFalQueueResult(
+          "fal-ai/workflow-utilities/trim-video",
+          state.trimFinalJob.requestId
+        );
+        const trimmedUrl = (data?.video as { url: string })?.url ||
+                           (data?.video_url as string) || "";
+        state.trimFinalJob.status = "COMPLETED";
+        state.trimFinalJob.videoUrl = trimmedUrl || videoUrl;
+        const trimmedDuration = (data?.trimmed_duration as number) || targetSec;
+        console.log(`[ASSEMBLY] Trim completed: ${trimmedDuration.toFixed(1)}s → ${state.trimFinalJob.videoUrl?.slice(0, 60)}...`);
+      } else if (result.status === "FAILED") {
+        state.trimFinalJob.status = "FAILED";
+        state.trimFinalJob.videoUrl = videoUrl; // Use untrimmed as fallback
+        console.warn(`[ASSEMBLY] Trim failed, using untrimmed video`);
+      } else {
+        return false; // Still in progress
+      }
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Trim poll error, using untrimmed:`, err);
+      state.trimFinalJob.status = "FAILED";
+      state.trimFinalJob.videoUrl = videoUrl;
+    }
+  }
+
   state.phase = "done";
   await updateProduction(productionId, { progress: 98 });
-  console.log(`[ASSEMBLY] Mix-final done → done (skipping normalize to preserve video stream)`);
+  console.log(`[ASSEMBLY] Trim done → done`);
   return true;
 }
 
@@ -1145,10 +1231,8 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video source URL — priority: mix_final > concat > first scene
-  // NOTE: normalize phase is skipped because loudnorm strips the video stream (returns audio-only).
-  // Do NOT use normalizeJob.videoUrl — it's audio-only and produces black video.
-  const sourceUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video source URL — priority: trim > mix_final > concat > first scene
+  const sourceUrl = state.trimFinalJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!sourceUrl) {
     await updateProduction(productionId, {

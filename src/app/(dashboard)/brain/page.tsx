@@ -915,11 +915,6 @@ export default function BrainStudioPage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {model && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500">
-                                {model.name}
-                              </span>
-                            )}
                             {scenePlan?.cameraMovement && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500 hidden sm:inline">
                                 {scenePlan.cameraMovement}

@@ -84,25 +84,25 @@ const capabilities = [
     icon: Volume2,
     title: "Native Audio",
     description: "Dialogue, SFX, lip sync in one generation. No post-production needed.",
-    models: ["Kling 2.6", "Veo 3.1"],
+    models: [],
   },
   {
     icon: Film,
     title: "Motion Control",
     description: "Transfer any dance to any character. Upload reference video, get magic.",
-    models: ["MimicMotion"],
+    models: [],
   },
   {
     icon: Brain,
     title: "Brain Studio",
     description: "Script to multi-scene movie with full audio. One prompt, complete film.",
-    models: ["Kling 3.0", "Veo 3.1"],
+    models: [],
   },
   {
     icon: Zap,
     title: "10+ AI Models",
-    description: "Kling, Veo, Seedance, Wan — all in one place. Each optimized differently.",
-    models: ["Kling", "Veo", "Wan", "Seedance"],
+    description: "Multiple cutting-edge AI engines, all in one place. Each optimized differently.",
+    models: [],
   },
 ];
 
@@ -284,7 +284,7 @@ export default function LandingPage() {
               </span>
               <span className="hidden sm:inline text-zinc-600">|</span>
               <span className="hidden sm:block text-zinc-400">
-                Powered by Kling, Veo, Wan
+                Powered by 10+ AI models
               </span>
             </div>
           </MotionSection>

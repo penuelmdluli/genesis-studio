@@ -281,7 +281,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-zinc-200 truncate font-medium">&ldquo;{job.prompt}&rdquo;</p>
-                        <span className="text-[11px] text-zinc-600">{job.modelId} &middot; {job.duration || 5}s</span>
+                        <span className="text-[11px] text-zinc-600">{job.duration || 5}s</span>
                       </div>
                       <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                         {job.status === "processing" ? "Generating..." : "In Queue"}

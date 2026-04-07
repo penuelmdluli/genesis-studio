@@ -23,7 +23,7 @@ const STEPS = [
   {
     icon: Film,
     title: "Step 2: Pick a Model & Generate",
-    description: "Choose from 10+ AI models — Kling, Veo, Wan, and more. Each produces a different style. Hit Generate!",
+    description: "Choose from 10+ AI engines — each produces a different style. Pick one and hit Generate!",
     action: "Next",
   },
   {

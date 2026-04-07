@@ -299,16 +299,6 @@ export async function GET(req: Request) {
             <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>
               AI Video Generator
             </span>
-            {modelId && (
-              <>
-                <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 15 }}>
-                  |
-                </span>
-                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
-                  {modelId}
-                </span>
-              </>
-            )}
           </div>
         </div>
       </div>

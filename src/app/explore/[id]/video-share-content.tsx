@@ -79,15 +79,7 @@ function InstagramIcon({ className }: { className?: string }) {
 // ─── Constants ────────────────────────────────────────────────
 const BASE_URL = "https://genesis-studio-hazel.vercel.app";
 
-const MODEL_LABELS: Record<string, string> = {
-  "kling-2.6": "Kling 2.6",
-  "kling-2.5": "Kling 2.5",
-  "hunyuan-video": "HunyuanVideo",
-  "wan-2.1": "Wan 2.1",
-  "ltx-video": "LTX Video",
-  "cogvideox-5b": "CogVideoX",
-  "mochi-1": "Mochi 1",
-};
+// Model labels removed — clients don't need to see model names
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -133,7 +125,6 @@ export function VideoShareContent({
   const [recreateModalOpen, setRecreateModalOpen] = useState(false);
 
   const shareUrl = `${BASE_URL}/explore/${video.id}`;
-  const modelLabel = MODEL_LABELS[video.modelId] || video.modelId;
 
   // ── Video controls ─────────────────────────────────────────
   const togglePlay = useCallback(() => {
@@ -409,11 +400,6 @@ export function VideoShareContent({
 
           {/* Metadata row */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Model badge */}
-            <span className="px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 text-xs font-semibold border border-violet-500/20">
-              {modelLabel}
-            </span>
-
             {/* Duration */}
             {video.duration && video.duration > 0 && (
               <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.05] text-zinc-400 text-xs font-medium border border-white/[0.06]">

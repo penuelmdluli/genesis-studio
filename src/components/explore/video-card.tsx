@@ -45,17 +45,6 @@ interface ExploreVideoCardProps {
   className?: string;
 }
 
-// Map model IDs to display names
-const MODEL_LABELS: Record<string, string> = {
-  "kling-2.6": "Kling 2.6",
-  "kling-2.5": "Kling 2.5",
-  "hunyuan-video": "HunyuanVideo",
-  "wan-2.1": "Wan 2.1",
-  "ltx-video": "LTX Video",
-  "cogvideox-5b": "CogVideoX",
-  "mochi-1": "Mochi 1",
-};
-
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -152,8 +141,6 @@ export function ExploreVideoCard({
     onClick?.(video);
   }, [onClick, video]);
 
-  const modelLabel = MODEL_LABELS[video.modelId] || video.modelId;
-
   const typeBadge = (() => {
     if (video.isFeatured) return { label: "FEATURED", icon: Sparkles, color: "bg-amber-500/80 text-amber-100" };
     if (video.type === "motion") return { label: "MOTION", icon: Film, color: "bg-cyan-500/80 text-cyan-100" };
@@ -175,7 +162,7 @@ export function ExploreVideoCard({
         onMouseLeave={handleMouseLeave}
       >
         {/* Thumbnail / Video area */}
-        <div className={cn("relative w-full overflow-hidden", isVertical ? "aspect-[9/16]" : "aspect-video")}>
+        <div className={cn("relative w-full overflow-hidden", isVertical ? "aspect-[9/16]" : "aspect-[4/3]")}>
           {/* Lazy video — plays on hover when visible */}
           {isVisible && !videoError && (
             <video
@@ -205,7 +192,7 @@ export function ExploreVideoCard({
           )}
 
           {/* Gradient overlay at bottom */}
-          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 
           {/* Top-left: Creator info */}
           {video.creatorName && (
@@ -229,11 +216,6 @@ export function ExploreVideoCard({
 
           {/* Top-right: Badges */}
           <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
-            {/* Model badge */}
-            <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-[10px] font-semibold text-white/90 border border-white/10">
-              {modelLabel}
-            </span>
-
             {/* Audio badge */}
             {video.hasAudio && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-600/70 backdrop-blur-sm text-[10px] font-semibold text-white border border-violet-400/20">
@@ -256,17 +238,6 @@ export function ExploreVideoCard({
 
           {/* Bottom overlay content */}
           <div className="absolute inset-x-0 bottom-0 p-3 z-10">
-            {/* Prompt text with typing cursor */}
-            <p className="text-sm text-white/90 font-medium line-clamp-2 leading-snug mb-1 drop-shadow-lg italic">
-              &ldquo;{video.prompt}&rdquo;
-            </p>
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-purple-400 text-[10px] font-medium">
-                Prompt
-              </span>
-              <span className="w-1 h-3 bg-purple-400 animate-pulse rounded-sm" />
-            </div>
-
             {/* Stats row */}
             <div className="flex items-center gap-3 text-[11px] text-white/60">
               <span className="flex items-center gap-1">

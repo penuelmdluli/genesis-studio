@@ -19,9 +19,9 @@ export default function ChangelogPage() {
             <p className="text-xs text-violet-400 font-medium mb-1">April 6, 2026</p>
             <h3 className="text-lg font-semibold text-white mb-2">Launch</h3>
             <ul className="text-sm text-zinc-400 space-y-1 list-disc list-inside">
-              <li>10+ AI video models (Wan 2.2, Kling 2.6/3.0, Veo 3.1, Seedance 1.5)</li>
+              <li>10+ AI video engines for every style and use case</li>
               <li>Native audio generation with dialogue and lip sync</li>
-              <li>Motion Control with MimicMotion</li>
+              <li>Motion Control for dance and gesture transfer</li>
               <li>Brain Studio for multi-scene short films</li>
               <li>Talking Avatar, Auto Captions, AI Voiceover</li>
               <li>Video Upscaler and AI Thumbnails</li>

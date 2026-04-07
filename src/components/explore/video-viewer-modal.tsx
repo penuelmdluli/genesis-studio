@@ -27,19 +27,7 @@ interface VideoViewerModalProps {
   onShare?: (video: ExploreVideo) => void;
 }
 
-const MODEL_LABELS: Record<string, string> = {
-  "kling-2.6": "Kling 2.6 Pro",
-  "kling-3.0": "Kling 3.0 Pro",
-  "veo-3.1": "Veo 3.1",
-  "seedance-1.5": "Seedance 1.5",
-  "wan-2.2": "Wan 2.2",
-  "wan-2.1-turbo": "Wan 2.1 Turbo",
-  "hunyuan-video": "HunyuanVideo",
-  "ltx-video": "LTX Video",
-  "mochi-1": "Mochi 1",
-  "cogvideo-x": "CogVideoX",
-  "mimic-motion": "MimicMotion",
-};
+// Model labels removed — clients don't need to see model names
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -153,8 +141,6 @@ export function VideoViewerModal({
 
   if (!isOpen) return null;
 
-  const modelLabel = MODEL_LABELS[video.modelId] || video.modelId;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
@@ -198,7 +184,7 @@ export function VideoViewerModal({
               &ldquo;{video.prompt}&rdquo;
             </p>
             <p className="text-purple-400 text-xs mt-1.5 font-medium">
-              Made with {modelLabel} &bull; Genesis Studio
+              Made with Genesis Studio
             </p>
           </div>
         </div>
@@ -224,11 +210,8 @@ export function VideoViewerModal({
             </p>
           </div>
 
-          {/* Model info badges */}
+          {/* Info badges */}
           <div className="flex flex-wrap gap-2">
-            <span className="px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.06]">
-              {modelLabel}
-            </span>
             {video.duration && video.duration > 0 && (
               <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.06]">
                 <Clock className="w-3 h-3" />

@@ -310,7 +310,7 @@ export default function ExplorePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Loading skeleton — initial load */}
         {isLoading && videos.length === 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {Array.from({ length: 12 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -348,7 +348,7 @@ export default function ExplorePage() {
 
         {/* Video cards */}
         {videos.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {videos.map((video) => (
               <ExploreVideoCard
                 key={video.id}

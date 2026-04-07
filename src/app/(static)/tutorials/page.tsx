@@ -19,7 +19,7 @@ export default function TutorialsPage() {
             { title: "Your First AI Video", desc: "Generate a video from a text prompt in under 60 seconds.", link: "/generate" },
             { title: "Motion Control Guide", desc: "Transfer dance moves and gestures to any character using a reference video.", link: "/motion-control" },
             { title: "Brain Studio: Short Films", desc: "Write a script and let AI create a multi-scene short film with audio.", link: "/brain" },
-            { title: "Native Audio Videos", desc: "Create videos with dialogue, sound effects, and lip sync using Kling and Veo models.", link: "/generate" },
+            { title: "Native Audio Videos", desc: "Create videos with dialogue, sound effects, and lip sync using our audio-enabled engines.", link: "/generate" },
             { title: "Writing Great Prompts", desc: "Tips for writing prompts that produce cinematic, high-quality video results.", link: "/generate" },
             { title: "Using the API", desc: "Generate videos programmatically with the Genesis Studio REST API.", link: "/docs" },
           ].map((tut) => (

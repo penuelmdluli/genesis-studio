@@ -116,7 +116,7 @@ export default function TalkingAvatarPage() {
 
   const isLoading = !isInitialized;
   const userPlan = user?.plan || "free";
-  const isPlanAllowed = userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
+  const isPlanAllowed = userPlan === "creator" || userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
   const creditCost = computeCreditCost(duration);
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
 
@@ -162,22 +162,14 @@ export default function TalkingAvatarPage() {
     if (audioInputRef.current) audioInputRef.current.value = "";
   };
 
-  // --- Upload to R2 ---
+  // --- Upload to Storage via signed URL (bypasses Vercel 4.5MB limit) ---
 
-  const uploadFileToR2 = async (
+  const uploadFileToStorage = async (
     file: File,
     purpose: "image" | "audio"
   ): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("purpose", purpose);
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-    if (!uploadRes.ok) {
-      const err = await uploadRes.json();
-      throw new Error(err.error || "Failed to upload file");
-    }
-    const { publicUrl } = await uploadRes.json();
-    return publicUrl;
+    const { uploadFile } = await import("@/lib/upload-client");
+    return uploadFile(file, purpose);
   };
 
   // --- Generate ---
@@ -221,11 +213,11 @@ export default function TalkingAvatarPage() {
     try {
       toast("Uploading files...", "info");
 
-      const imageUrl = await uploadFileToR2(faceImage, "image");
+      const imageUrl = await uploadFileToStorage(faceImage, "image");
 
       let audioUrl: string | undefined;
       if (inputMode === "audio" && audioFile) {
-        audioUrl = await uploadFileToR2(audioFile, "audio");
+        audioUrl = await uploadFileToStorage(audioFile, "audio");
       }
 
       toast("Starting avatar generation...", "info");

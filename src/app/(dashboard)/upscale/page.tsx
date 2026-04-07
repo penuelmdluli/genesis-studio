@@ -62,9 +62,9 @@ export default function UpscalePage() {
   const estimatedTime = targetResolution === "4k" ? Math.ceil(videoDuration * 8) : Math.ceil(videoDuration * 4);
 
   const hasVideo = !!videoFile || !!selectedGalleryVideoId;
-  const canUpscale1080 = planAtLeast(userPlan, "creator");
-  const canUpscale4k = planAtLeast(userPlan, "pro");
-  const canInterpolate = planAtLeast(userPlan, "studio");
+  const canUpscale1080 = user?.isOwner || planAtLeast(userPlan, "creator");
+  const canUpscale4k = user?.isOwner || planAtLeast(userPlan, "pro");
+  const canInterpolate = user?.isOwner || planAtLeast(userPlan, "studio");
 
   const selectedGalleryVideo = videos.find((v) => v.id === selectedGalleryVideoId);
 
@@ -167,21 +167,12 @@ export default function UpscalePage() {
     setResultUrl(null);
 
     try {
-      // Determine video URL: if file upload, use presigned upload first
+      // Determine video URL: if file upload, use signed URL upload (bypasses Vercel 4.5MB limit)
       let videoUrl: string;
 
       if (videoFile) {
-        const formData = new FormData();
-        formData.append("file", videoFile);
-        formData.append("purpose", "video");
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-
-        if (!uploadRes.ok) {
-          throw new Error("Failed to upload video");
-        }
-
-        const { publicUrl } = await uploadRes.json();
-        videoUrl = publicUrl;
+        const { uploadFile } = await import("@/lib/upload-client");
+        videoUrl = await uploadFile(videoFile, "video");
       } else if (selectedGalleryVideo) {
         videoUrl = selectedGalleryVideo.url;
       } else {

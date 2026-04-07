@@ -6,6 +6,7 @@ export { planProduction, calculateBrainCredits, estimateBrainCredits } from "./p
 export { ConsistencyEngine, consistencyEngine } from "./consistency";
 export { generateVoiceover, selectMusic, generateCaptions, AVAILABLE_VOICES, SUPPORTED_LANGUAGES } from "./audio";
 export type { AudioResult, CaptionEntry } from "./audio";
+export { generateAllSceneSounds, designSceneSounds, generateSoundEffect, generateSceneSoundAssets } from "./sound-effects";
 export {
   createProduction,
   updateProduction,

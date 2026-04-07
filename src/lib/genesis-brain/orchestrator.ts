@@ -3,10 +3,11 @@
 // Coordinates the entire Brain pipeline
 // ============================================
 
-import { BrainInput, ScenePlan, Production, ProductionScene, ModelId, AssemblyState } from "@/types";
+import { BrainInput, ScenePlan, Production, ProductionScene, ModelId, AssemblyState, SceneSoundAssets } from "@/types";
 import { planProduction, calculateBrainCredits } from "./planner";
 import { consistencyEngine } from "./consistency";
 import { generateVoiceover, generatePerSceneVoiceover, selectMusic, generateCaptions, buildAudioPromptFromSoundDesign } from "./audio";
+import { generateAllSceneSounds } from "./sound-effects";
 import { submitRunPodJob, buildRunPodInput, getRunPodJobStatus } from "@/lib/runpod";
 import { submitFalJob } from "@/lib/fal";
 import { AI_MODELS } from "@/lib/constants";
@@ -318,6 +319,19 @@ export async function executeProduction(
       );
     }
 
+    // Step 4b: Hollywood Sound Design — generate ambient, SFX, foley for each scene
+    let sceneSoundAssets: SceneSoundAssets[] = [];
+    if (input.soundEffects) {
+      console.log(`[BRAIN] Generating Hollywood Sound Design for ${enhancedPlan.scenes.length} scenes...`);
+      try {
+        sceneSoundAssets = await generateAllSceneSounds(enhancedPlan.scenes, userId);
+        console.log(`[BRAIN] Sound Design complete: ${sceneSoundAssets.length} scenes with sound assets`);
+      } catch (sfxErr) {
+        console.error(`[BRAIN] Sound Design failed (non-fatal):`, sfxErr);
+        // Continue without sound effects — video still gets MMAudio/native audio
+      }
+    }
+
     // Step 5: Submit all scenes — route to FAL (Hollywood) or RunPod based on model provider
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const webhookUrl = `${appUrl}/api/brain/webhook`;
@@ -420,17 +434,21 @@ export async function executeProduction(
             console.log(`[BRAIN] Per-scene voiceover clips: ${clips.length} saved`);
             // Determine the default transition from the plan
             const defaultTransition = enhancedPlan.scenes[0]?.transitionOut || "crossfade";
-            // Store clips + audio durations + transition type in assembly_state
+            // Store clips + audio durations + transition type + sound assets in assembly_state
+            const assemblyPreState: Record<string, unknown> = {
+              voiceoverClips: clips,
+              sceneAudioDurations: audioDurations || {},
+              transitionType: defaultTransition,
+            };
+            // Include sound design assets if generated
+            if (sceneSoundAssets.length > 0) {
+              assemblyPreState.soundAssets = sceneSoundAssets;
+              console.log(`[BRAIN] Sound assets stored: ${sceneSoundAssets.length} scenes`);
+            }
             const supabase = createSupabaseAdmin();
             await supabase
               .from("productions")
-              .update({
-                assembly_state: JSON.stringify({
-                  voiceoverClips: clips,
-                  sceneAudioDurations: audioDurations || {},
-                  transitionType: defaultTransition,
-                }),
-              })
+              .update({ assembly_state: JSON.stringify(assemblyPreState) })
               .eq("id", productionId);
           }
         } else if (audio.type === "music" && audio.url) {

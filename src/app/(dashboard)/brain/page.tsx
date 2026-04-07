@@ -49,6 +49,7 @@ import {
   Save,
   History,
   Clapperboard,
+  Volume2,
 } from "lucide-react";
 import { GenesisLoader, GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { VideoStyle, AspectRatio, ScenePlan, SceneDefinition, TransitionType, ModelId } from "@/types";
@@ -95,6 +96,7 @@ export default function BrainStudioPage() {
   const [voiceoverLanguage, setVoiceoverLanguage] = useState("en-US");
   const [music, setMusic] = useState(true);
   const [captions, setCaptions] = useState(true);
+  const [soundEffects, setSoundEffects] = useState(false);
 
   // Production state
   const [productionId, setProductionId] = useState<string | null>(null);
@@ -249,6 +251,7 @@ export default function BrainStudioPage() {
           voiceoverLanguage,
           captions,
           music,
+          soundEffects,
         }),
       });
 
@@ -280,7 +283,7 @@ export default function BrainStudioPage() {
       const res = await fetch("/api/brain/produce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productionId, plan }),
+        body: JSON.stringify({ productionId, plan, soundEffects }),
       });
 
       const data = await res.json();
@@ -353,8 +356,10 @@ export default function BrainStudioPage() {
   };
 
   // Rough credit estimate before planning
-  const estimatedCredits = Math.max(3, Math.ceil(targetDuration / 8)) * 10 + 2 + 3 +
-    (voiceover ? 3 : 0) + (music ? 2 : 0) + (captions ? 1 : 0);
+  const scenesEstimate = Math.max(3, Math.ceil(targetDuration / 8));
+  const estimatedCredits = scenesEstimate * 10 + 2 + 3 +
+    (voiceover ? 3 : 0) + (music ? 2 : 0) + (captions ? 1 : 0) +
+    (soundEffects ? scenesEstimate * 30 : 0);
 
   const isLocked = !user || (!user.isOwner && user.plan === "free");
 
@@ -539,11 +544,12 @@ export default function BrainStudioPage() {
                 </div>
 
                 {/* Toggles */}
-                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                   {[
                     { key: "voiceover", icon: Mic, label: "Voice", fullLabel: "Voiceover", state: voiceover, setter: setVoiceover, credits: 3 },
                     { key: "music", icon: Music, label: "Music", fullLabel: "Music", state: music, setter: setMusic, credits: 2 },
                     { key: "captions", icon: Subtitles, label: "Caps", fullLabel: "Captions", state: captions, setter: setCaptions, credits: 1 },
+                    { key: "soundEffects", icon: Volume2, label: "SFX", fullLabel: "Sound Design", state: soundEffects, setter: setSoundEffects, credits: 30 },
                   ].map((toggle) => (
                     <button
                       key={toggle.key}

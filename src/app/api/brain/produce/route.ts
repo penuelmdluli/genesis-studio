@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { productionId, plan: updatedPlan } = await req.json();
+    const { productionId, plan: updatedPlan, soundEffects: soundEffectsFlag } = await req.json();
     if (!productionId) {
       return NextResponse.json({ error: "productionId required" }, { status: 400 });
     }
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       voiceover: production.voiceover,
       music: production.music,
       captions: production.captions,
+      soundEffects: soundEffectsFlag === true,
     };
 
     // Use after() to keep the serverless function alive after the response is sent.

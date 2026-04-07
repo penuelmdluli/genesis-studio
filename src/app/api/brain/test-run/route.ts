@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       voiceover: true,
       music: true,
       captions: true,
+      soundEffects: false,
     };
     log(`Concept: "${input.concept.slice(0, 60)}..."`);
 

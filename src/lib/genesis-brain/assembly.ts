@@ -89,6 +89,13 @@ export async function startAssembly(
       state.transitionType = savedTransition as string;
     }
 
+    // Carry forward sound design assets (ambient, SFX, foley per scene)
+    const savedSoundAssets = existingState?.soundAssets;
+    if (savedSoundAssets) {
+      state.soundAssets = savedSoundAssets as AssemblyState["soundAssets"];
+      console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
+    }
+
     let needsMMAudio = false;
 
     for (let i = 0; i < completedScenes.length; i++) {
@@ -589,6 +596,70 @@ async function pollComposeAudioPhase(
   return true;
 }
 
+/**
+ * Build sound design clips from per-scene sound assets, placed at correct global timeline offsets.
+ * Returns null if no sound assets exist.
+ */
+function buildSoundDesignClips(
+  state: AssemblyState,
+  production: Production
+): { ambient: Array<{ url: string; startMs: number; durationMs: number }>; sfx: Array<{ url: string; startMs: number; durationMs: number }>; foley: Array<{ url: string; startMs: number; durationMs: number }> } | null {
+  if (!state.soundAssets || state.soundAssets.length === 0) return null;
+
+  const plan = production.plan;
+  if (!plan?.scenes) return null;
+
+  // Calculate per-scene start offset (cumulative durations)
+  const sceneOffsets: Record<number, number> = {};
+  let offsetMs = 0;
+  const sortedScenes = [...plan.scenes].sort((a, b) => a.sceneNumber - b.sceneNumber);
+  for (const scene of sortedScenes) {
+    sceneOffsets[scene.sceneNumber] = offsetMs;
+    offsetMs += scene.duration * 1000;
+  }
+
+  const ambient: Array<{ url: string; startMs: number; durationMs: number }> = [];
+  const sfx: Array<{ url: string; startMs: number; durationMs: number }> = [];
+  const foley: Array<{ url: string; startMs: number; durationMs: number }> = [];
+
+  for (const assets of state.soundAssets) {
+    const sceneStartMs = sceneOffsets[assets.sceneNumber] ?? 0;
+
+    // Ambient — plays at scene start for scene duration
+    if (assets.ambientUrl) {
+      ambient.push({
+        url: assets.ambientUrl,
+        startMs: sceneStartMs,
+        durationMs: assets.ambientDurationMs || (sortedScenes.find(s => s.sceneNumber === assets.sceneNumber)?.duration || 5) * 1000,
+      });
+    }
+
+    // SFX — placed at scene offset + clip timestamp
+    for (const clip of assets.sfxClips) {
+      sfx.push({
+        url: clip.url,
+        startMs: sceneStartMs + clip.timestampMs,
+        durationMs: clip.durationMs,
+      });
+    }
+
+    // Foley — placed at scene offset + clip timestamp
+    for (const clip of assets.foleyClips) {
+      foley.push({
+        url: clip.url,
+        startMs: sceneStartMs + clip.timestampMs,
+        durationMs: clip.durationMs,
+      });
+    }
+  }
+
+  const total = ambient.length + sfx.length + foley.length;
+  if (total === 0) return null;
+
+  console.log(`[ASSEMBLY] Sound design: ${ambient.length} ambient, ${sfx.length} SFX, ${foley.length} foley clips`);
+  return { ambient, sfx, foley };
+}
+
 async function pollMixFinalPhase(
   productionId: string,
   state: AssemblyState,
@@ -612,7 +683,10 @@ async function pollMixFinalPhase(
     // Check for per-scene voiceover clips stored during orchestration
     const voiceoverClips = state.voiceoverClips;
 
-    if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl) {
+    // Build sound design clips from per-scene assets (ambient, SFX, foley)
+    const soundDesignClips = buildSoundDesignClips(state, production);
+
+    if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl && !soundDesignClips) {
       // No audio to add — video is already done
       state.phase = "done";
       return true;
@@ -658,11 +732,15 @@ async function pollMixFinalPhase(
         musicUrl || undefined,
         totalDurationMs,
         musicDurationMs,
-        voiceoverClips?.length ? voiceoverClips : undefined
+        voiceoverClips?.length ? voiceoverClips : undefined,
+        soundDesignClips || undefined
       );
       state.mixFinalJob = { requestId, status: "IN_QUEUE" };
       const voDesc = voiceoverClips?.length ? `${voiceoverClips.length} VO clips` : (voiceoverUrl ? "voiceover" : "");
-      const audioDesc = [voDesc, musicUrl ? "music" : ""].filter(Boolean).join(" + ");
+      const sfxDesc = soundDesignClips
+        ? `${soundDesignClips.ambient.length}amb+${soundDesignClips.sfx.length}sfx+${soundDesignClips.foley.length}foley`
+        : "";
+      const audioDesc = [voDesc, musicUrl ? "music" : "", sfxDesc].filter(Boolean).join(" + ");
       console.log(`[ASSEMBLY] Compose-final submitted: ${requestId} (video + ${audioDesc}, ${realDurationSec}s)`);
     } catch (err) {
       console.warn(`[ASSEMBLY] Compose-final failed, using video without audio:`, err);

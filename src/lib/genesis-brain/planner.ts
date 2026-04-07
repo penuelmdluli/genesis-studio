@@ -297,6 +297,12 @@ export function calculateBrainCredits(plan: ScenePlan, input: BrainInput): numbe
   if (input.music) total += 3; // Music selection/generation
   if (input.captions) total += 2; // Caption generation
 
+  // Hollywood Sound Design: ambient + SFX + foley per scene (ElevenLabs SFX API)
+  if (input.soundEffects) {
+    // ~30 credits per scene: Claude design + ElevenLabs ambient + 2-3 SFX + foley
+    total += plan.scenes.length * 30;
+  }
+
   // MMAudio post-processing for silent models (wan-2.2, ltx-video, etc.)
   const silentScenes = plan.scenes.filter((s) => {
     const m = AI_MODELS[s.modelId];
@@ -330,6 +336,7 @@ export function estimateBrainCredits(input: BrainInput): number {
   if (input.voiceover) total += 5;
   if (input.music) total += 3;
   if (input.captions) total += 2;
+  if (input.soundEffects) total += scenesEstimate * 30; // Hollywood Sound Design
   total += Math.ceil(scenesEstimate * 0.5) * 2; // MMAudio for ~half the scenes
   total += 5; // Assembly (FFmpeg)
   if (input.outputFormats && input.outputFormats.length > 1) {

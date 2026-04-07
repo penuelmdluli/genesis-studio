@@ -371,6 +371,7 @@ export interface BrainInput {
   voiceoverVoice?: string;
   captions: boolean;
   music: boolean;
+  soundEffects: boolean; // Hollywood Sound Design: ambient, SFX, foley per scene
   characterRefs?: string[];
   brandKit?: BrandKit;
   outputFormats?: AspectRatio[];
@@ -421,6 +422,35 @@ export interface SoundDesign {
   ambientDescription: string;
   dialogueLines: Array<{ speaker: string; line: string }>;
   sfxCues: string[];
+}
+
+/** Enhanced sound design with timed SFX layers (for Hollywood Sound Design mode) */
+export interface EnhancedSoundDesign {
+  sceneNumber: number;
+  ambient: {
+    description: string;    // "Heavy rain on window, distant thunder"
+    duration: number;       // Match scene duration
+    loop: boolean;          // Ambient sounds usually loop
+  };
+  sfx: Array<{
+    description: string;    // "Heavy wooden door creaking open"
+    timestamp: number;      // When in the scene (seconds from scene start)
+    duration: number;       // How long the sound lasts
+  }>;
+  foley: Array<{
+    description: string;    // "Leather shoes on hardwood floor, slow steps"
+    timestamp: number;
+    duration: number;
+  }>;
+}
+
+/** Generated audio assets for a scene's sound design */
+export interface SceneSoundAssets {
+  sceneNumber: number;
+  ambientUrl?: string;
+  ambientDurationMs?: number;
+  sfxClips: Array<{ url: string; timestampMs: number; durationMs: number; description: string }>;
+  foleyClips: Array<{ url: string; timestampMs: number; durationMs: number; description: string }>;
 }
 
 export interface TextOverlay {
@@ -481,6 +511,8 @@ export interface AssemblyState {
   subtitleData?: Array<{ start: number; end: number; text: string; sceneNumber?: number }>;
   // Scene transition type from plan (used during concat)
   transitionType?: string;
+  // Per-scene sound design assets (ambient, SFX, foley URLs with timing)
+  soundAssets?: Array<SceneSoundAssets>;
 }
 
 export interface Production {

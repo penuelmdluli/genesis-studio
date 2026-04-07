@@ -717,7 +717,12 @@ export async function submitComposeVideoJob(
   musicUrl: string | undefined,
   durationMs: number,
   musicDurationMs?: number,
-  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>
+  voiceoverClips?: Array<{ url: string; startMs: number; durationMs: number }>,
+  soundDesignClips?: {
+    ambient: Array<{ url: string; startMs: number; durationMs: number }>;
+    sfx: Array<{ url: string; startMs: number; durationMs: number }>;
+    foley: Array<{ url: string; startMs: number; durationMs: number }>;
+  }
 ): Promise<{ requestId: string }> {
   const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [
     {
@@ -772,6 +777,48 @@ export async function submitComposeVideoJob(
       type: "audio",
       keyframes: musicKFs,
     });
+  }
+
+  // Hollywood Sound Design layers — ambient, SFX, foley placed at scene-accurate timestamps
+  if (soundDesignClips) {
+    if (soundDesignClips.ambient.length > 0) {
+      tracks.push({
+        id: "audio-ambient",
+        type: "audio",
+        keyframes: soundDesignClips.ambient.map((c) => ({
+          timestamp: c.startMs,
+          duration: c.durationMs,
+          url: c.url,
+        })),
+      });
+      console.log(`[AUDIO] Compose with ${soundDesignClips.ambient.length} ambient clips`);
+    }
+
+    if (soundDesignClips.sfx.length > 0) {
+      tracks.push({
+        id: "audio-sfx",
+        type: "audio",
+        keyframes: soundDesignClips.sfx.map((c) => ({
+          timestamp: c.startMs,
+          duration: c.durationMs,
+          url: c.url,
+        })),
+      });
+      console.log(`[AUDIO] Compose with ${soundDesignClips.sfx.length} SFX clips`);
+    }
+
+    if (soundDesignClips.foley.length > 0) {
+      tracks.push({
+        id: "audio-foley",
+        type: "audio",
+        keyframes: soundDesignClips.foley.map((c) => ({
+          timestamp: c.startMs,
+          duration: c.durationMs,
+          url: c.url,
+        })),
+      });
+      console.log(`[AUDIO] Compose with ${soundDesignClips.foley.length} foley clips`);
+    }
   }
 
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {

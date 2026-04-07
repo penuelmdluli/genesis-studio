@@ -143,6 +143,7 @@ function makeBrainInput(overrides: Partial<BrainInput> = {}): BrainInput {
     voiceover: false,
     captions: false,
     music: false,
+    soundEffects: false,
     ...overrides,
   };
 }

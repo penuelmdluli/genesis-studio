@@ -3,6 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
+import { fal } from "@fal-ai/client";
+
+// Ensure FAL client is configured
+fal.config({ credentials: process.env.FAL_KEY || "" });
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Rate limit exceeded. Please wait before trying again.", resetAt: rateCheck.resetAt }, { status: 429 });
     }
 
-    const { videoUrl, language, style } = await req.json();
+    const { videoUrl, language } = await req.json();
 
     if (!videoUrl || typeof videoUrl !== "string") {
       return NextResponse.json(
@@ -32,19 +36,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if captions endpoint is configured
-    const captionsEndpoint = process.env.RUNPOD_ENDPOINT_CAPTIONS;
-    if (!captionsEndpoint) {
-      return NextResponse.json(
-        { error: "Auto Captions is temporarily unavailable. Please try again later." },
-        { status: 503 }
-      );
-    }
-
-    // Calculate credits: 10 per minute, minimum 10
-    // Whisper GPU costs ~$0.05/min → 10 credits ($0.24) = 4.8x markup
-    const estimatedMinutes = 1;
-    const creditCost = Math.max(estimatedMinutes * 10, 10);
+    // Calculate credits: 2 per minute, minimum 2
+    const creditCost = 2;
 
     const ownerAccount = isOwnerClerkId(clerkId);
 
@@ -52,8 +45,8 @@ export async function POST(req: NextRequest) {
       const { success, newBalance } = await deductCredits(
         user.id,
         creditCost,
-        "", // no job ID yet
-        `Auto captions: ${language || "en"} / ${style || "tiktok"}`
+        "",
+        `Auto captions: ${language || "en"}`
       );
 
       if (!success) {
@@ -68,45 +61,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Submit to RunPod captions endpoint (direct fetch, not model-based)
+    // Submit to FAL Whisper (same engine as Brain Studio subtitles)
     try {
-      const runpodApiKey = process.env.RUNPOD_API_KEY;
-      if (!runpodApiKey) {
-        throw new Error("RunPod API key not configured");
-      }
-
-      const runpodRes = await fetch(`https://api.runpod.ai/v2/${captionsEndpoint}/run`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${runpodApiKey}`,
+      const result = await fal.queue.submit("fal-ai/whisper", {
+        input: {
+          audio_url: videoUrl,
+          task: "transcribe",
+          chunk_level: "segment",
+          language: language && language !== "auto" ? language : undefined,
         },
-        body: JSON.stringify({
-          input: {
-            audio: videoUrl,
-            model: "large-v3",
-            transcription: "srt",
-            translate: false,
-            language: language || null,
-            word_timestamps: true,
-          },
-        }),
       });
 
-      if (!runpodRes.ok) {
-        const errText = await runpodRes.text();
-        throw new Error(`RunPod request failed: ${runpodRes.status} ${errText}`);
-      }
-
-      const runpodData = await runpodRes.json();
-
       return NextResponse.json({
-        jobId: runpodData.id,
+        jobId: result.request_id,
         status: "processing",
         estimatedTime: 30,
       });
     } catch (gpuError) {
-      console.error("Caption GPU submission error:", gpuError);
+      console.error("Caption FAL submission error:", gpuError);
 
       // Refund credits on submission failure
       if (!ownerAccount) {
@@ -114,12 +86,12 @@ export async function POST(req: NextRequest) {
           user.id,
           creditCost,
           "",
-          "Caption GPU submission failed — automatic refund"
+          "Caption submission failed — automatic refund"
         );
       }
 
       const errorMsg =
-        gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
+        gpuError instanceof Error ? gpuError.message : "Unknown error";
 
       return NextResponse.json(
         { error: `Caption processing failed: ${errorMsg}. Credits refunded.` },

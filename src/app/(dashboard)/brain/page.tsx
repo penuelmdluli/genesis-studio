@@ -22,7 +22,6 @@ import {
   Music,
   Subtitles,
   Play,
-  Square,
   RefreshCw,
   Download,
   Share2,
@@ -308,22 +307,7 @@ export default function BrainStudioPage() {
     }
   };
 
-  const handleCancel = async () => {
-    if (!productionId) return;
-    try {
-      await fetch("/api/brain/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productionId }),
-      });
-      toast("Production cancelled. Credits refunded.", "success");
-      setBrainState("input");
-      setProductionId(null);
-      setPlan(null);
-    } catch {
-      toast("Failed to cancel", "error");
-    }
-  };
+  // Cancel removed — once a production starts, credits are committed and cannot be refunded
 
   const handleEditScene = (sceneIndex: number, field: keyof SceneDefinition, value: unknown) => {
     if (!plan) return;
@@ -839,9 +823,7 @@ export default function BrainStudioPage() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleCancel} className="text-zinc-500 hover:text-red-400 transition-colors">
-                    <Square className="w-3.5 h-3.5" />
-                  </Button>
+                  {/* No cancel — credits committed once production starts */}
                 </div>
 
                 {/* Progress bar */}

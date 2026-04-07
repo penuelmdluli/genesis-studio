@@ -143,16 +143,7 @@ export default function GeneratePage() {
     }
   };
 
-  const handleCancelJob = async (jobId: string) => {
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" });
-      if (res.ok) {
-        toast("Generation cancelled. Credits refunded.", "success");
-      }
-    } catch {
-      toast("Failed to cancel generation.", "error");
-    }
-  };
+  // Cancel removed — once a generation starts, credits are committed and cannot be refunded
 
   const handleEnhancePrompt = async () => {
     if (isEnhancing || !form.prompt.trim()) return;

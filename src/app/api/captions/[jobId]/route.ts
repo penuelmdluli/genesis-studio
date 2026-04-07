@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { fal } from "@fal-ai/client";
+
+// Ensure FAL client is configured
+fal.config({ credentials: process.env.FAL_KEY || "" });
 
 /**
- * Convert Whisper segments to SRT subtitle format.
- * Whisper output: { segments: [{ start: 0.0, end: 2.5, text: "Hello" }, ...] }
+ * Convert FAL Whisper chunks to SRT subtitle format.
+ * FAL Whisper output: { chunks: [{ timestamp: [0.0, 2.5], text: "Hello" }, ...] }
  */
-function segmentsToSrt(
-  segments: Array<{ start: number; end: number; text: string }>
+function chunksToSrt(
+  chunks: Array<{ timestamp: [number, number]; text: string }>
 ): string {
-  return segments
-    .map((seg, i) => {
-      const startTime = formatSrtTime(seg.start);
-      const endTime = formatSrtTime(seg.end);
-      return `${i + 1}\n${startTime} --> ${endTime}\n${seg.text.trim()}\n`;
+  return chunks
+    .map((chunk, i) => {
+      const startTime = formatSrtTime(chunk.timestamp[0]);
+      const endTime = formatSrtTime(chunk.timestamp[1]);
+      return `${i + 1}\n${startTime} --> ${endTime}\n${chunk.text.trim()}\n`;
     })
     .join("\n");
 }
@@ -44,87 +48,74 @@ export async function GET(
 
     const { jobId } = await params;
 
-    const captionsEndpoint = process.env.RUNPOD_ENDPOINT_CAPTIONS;
-    const runpodApiKey = process.env.RUNPOD_API_KEY;
+    // Poll FAL for job status
+    try {
+      const statusResult = await fal.queue.status("fal-ai/whisper", {
+        requestId: jobId,
+        logs: false,
+      });
 
-    if (!captionsEndpoint || !runpodApiKey) {
-      return NextResponse.json(
-        { error: "Captions endpoint not configured" },
-        { status: 503 }
-      );
-    }
+      if (statusResult.status === "COMPLETED") {
+        // Fetch the actual result
+        const result = await fal.queue.result("fal-ai/whisper", {
+          requestId: jobId,
+        });
 
-    // Poll RunPod for job status
-    const statusRes = await fetch(
-      `https://api.runpod.ai/v2/${captionsEndpoint}/status/${jobId}`,
-      {
-        headers: { Authorization: `Bearer ${runpodApiKey}` },
-      }
-    );
+        const data = result.data as Record<string, unknown>;
+        const chunks = data?.chunks as Array<{ timestamp: [number, number]; text: string }> | undefined;
 
-    if (!statusRes.ok) {
-      return NextResponse.json(
-        { status: "processing", progress: 50 }
-      );
-    }
+        if (!chunks || chunks.length === 0) {
+          return NextResponse.json({
+            status: "completed",
+            output: {
+              srt: "1\n00:00:00,000 --> 00:05:00,000\n(No speech detected)\n",
+              segments: [],
+              detectedLanguage: "auto",
+              plainText: "(No speech detected)",
+            },
+          });
+        }
 
-    const statusData = await statusRes.json();
+        const srt = chunksToSrt(chunks);
+        const segments = chunks.map((chunk) => ({
+          start: chunk.timestamp[0],
+          end: chunk.timestamp[1],
+          text: chunk.text.trim(),
+        }));
+        const plainText = segments.map((s) => s.text).join(" ");
 
-    if (statusData.status === "COMPLETED") {
-      const output = statusData.output;
-
-      // RunPod ai-api-faster-whisper output formats:
-      // - SRT format: { transcription: "1\n00:00:00,000 --> ...\ntext\n\n..." }
-      // - Plain text: { transcription: "text..." }
-      // - Segments: { segments: [{start, end, text}...] }
-      // - Direct string: "text..."
-      let srt = "";
-      let segments = output?.segments || output?.transcription?.segments || [];
-      let plainText = "";
-
-      if (typeof output === "string") {
-        // Direct string output — could be SRT or plain text
-        srt = output.includes("-->") ? output : "";
-        plainText = output;
-      } else if (output?.transcription && typeof output.transcription === "string") {
-        // Transcription as string — SRT or plain text
-        srt = output.transcription.includes("-->") ? output.transcription : "";
-        plainText = output.transcription;
-      } else if (segments.length > 0) {
-        // Segments array — convert to SRT
-        srt = segmentsToSrt(segments);
-        plainText = segments.map((s: { text: string }) => s.text).join(" ");
+        return NextResponse.json({
+          status: "completed",
+          output: {
+            srt,
+            segments,
+            detectedLanguage: (data?.detected_language as string) || "auto",
+            plainText,
+          },
+        });
       }
 
-      // Fallback: if we got plain text but no SRT, wrap it
-      if (!srt && plainText) {
-        srt = `1\n00:00:00,000 --> 00:05:00,000\n${plainText}\n`;
+      if ((statusResult.status as string) === "FAILED") {
+        return NextResponse.json({
+          status: "failed",
+          errorMessage: "Caption generation failed. Please try again.",
+        });
       }
 
+      // Still processing
+      const progress = statusResult.status === "IN_PROGRESS" ? 60 : 20;
       return NextResponse.json({
-        status: "completed",
-        output: {
-          srt,
-          segments,
-          detectedLanguage: output?.detected_language || output?.language || "auto",
-          plainText,
-        },
+        status: "processing",
+        progress,
+      });
+    } catch (falError) {
+      console.error("FAL status check error:", falError);
+      // Return processing status if we can't reach FAL (transient error)
+      return NextResponse.json({
+        status: "processing",
+        progress: 30,
       });
     }
-
-    if (statusData.status === "FAILED") {
-      return NextResponse.json({
-        status: "failed",
-        errorMessage: statusData.error || "Caption generation failed on GPU",
-      });
-    }
-
-    // Still processing
-    const progress = statusData.status === "IN_PROGRESS" ? 60 : 20;
-    return NextResponse.json({
-      status: "processing",
-      progress,
-    });
   } catch (error) {
     console.error("Caption status error:", error);
     return NextResponse.json(

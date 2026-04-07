@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
-import { uploadToR2 } from "@/lib/storage";
+import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 import { fal } from "@fal-ai/client";
 
 /**
@@ -90,15 +90,26 @@ export async function POST(req: NextRequest) {
     heroVideoUrls.forEach((u, i) => log(`  [${i}]: ${u}`));
 
     // Step 3: Extract poster frame from top video
-    // FAL needs a publicly accessible URL — use the raw video_url if it's external,
-    // otherwise use the proxy URL. FAL can't access our proxy directly.
+    // FAL needs a publicly accessible URL. Our videos are in R2 behind a proxy,
+    // so we generate a signed R2 URL that FAL can access directly.
     const topVideo = videos[0];
-    const topVideoUrlForFal = topVideo.video_url?.startsWith("http")
-      ? topVideo.video_url
-      : `${appUrl}/api/explore/video/${topVideo.id}`;
-    let posterUrl = "";
+    let topVideoUrlForFal = "";
 
-    log(`Extracting poster frame from: ${topVideoUrlForFal}`);
+    // Try to get a signed URL from R2
+    const r2Key = `explore/${topVideo.id}.mp4`;
+    try {
+      topVideoUrlForFal = await getSignedDownloadUrl(r2Key, 600); // 10 min expiry
+      log(`Using signed R2 URL for poster extraction`);
+    } catch {
+      // Fallback to proxy URL (may not work with FAL)
+      topVideoUrlForFal = topVideo.video_url?.startsWith("http")
+        ? topVideo.video_url
+        : `${appUrl}/api/explore/video/${topVideo.id}`;
+      log(`R2 signed URL failed, using: ${topVideoUrlForFal}`);
+    }
+
+    let posterUrl = "";
+    log(`Extracting poster frame...`);
     try {
       // Use FAL extract-frame endpoint
       const frameResult = await fal.run("fal-ai/ffmpeg-api/extract-frame", {

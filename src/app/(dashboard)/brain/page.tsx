@@ -870,7 +870,7 @@ export default function BrainStudioPage() {
                       isProcessing ? "border-violet-500/30 shadow-lg shadow-violet-500/5" :
                       isCompleted ? "border-emerald-500/20" :
                       isFailed ? "border-red-500/20" :
-                      "border-white/[0.06] opacity-60"
+                      "border-white/[0.06] opacity-75"
                     }`}
                   >
                     {/* Active scene glow */}
@@ -903,8 +903,11 @@ export default function BrainStudioPage() {
                               <X className="w-6 h-6 text-red-400/60" />
                             </div>
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
-                              <Clock className="w-5 h-5 text-zinc-700" />
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900/40 via-[#0D0D14] to-zinc-800/20">
+                              <div className="relative flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full border-2 border-zinc-700/50 border-t-violet-500/60 animate-spin" />
+                                <Clock className="absolute w-3.5 h-3.5 text-zinc-500" />
+                              </div>
                             </div>
                           )}
 
@@ -939,7 +942,7 @@ export default function BrainStudioPage() {
                                 variant={isCompleted ? "emerald" : isProcessing ? "violet" : isFailed ? "red" : "default"}
                                 className="shrink-0 text-[9px]"
                               >
-                                {isCompleted ? "Ready" : isProcessing ? "Generating" : isFailed ? "Failed" : "Queued"}
+                                {isCompleted ? "Ready" : isProcessing ? "Generating" : isFailed ? "Failed" : "In Queue"}
                               </Badge>
                             </div>
                             <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">

@@ -163,16 +163,11 @@ export default function CaptionsPage() {
 
     let targetUrl = resolvedVideoUrl;
 
-    // For file upload, we need to upload first
+    // For file upload, use signed URL upload (bypasses Vercel 4.5MB limit)
     if (inputMode === "upload" && videoFile) {
       try {
-        const formData = new FormData();
-        formData.append("file", videoFile);
-        formData.append("purpose", "video");
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!uploadRes.ok) throw new Error("Upload failed");
-        const { publicUrl } = await uploadRes.json();
-        targetUrl = publicUrl;
+        const { uploadFile } = await import("@/lib/upload-client");
+        targetUrl = await uploadFile(videoFile, "video");
       } catch {
         setError("Failed to upload video. Please try again.");
         generateLockRef.current = false;

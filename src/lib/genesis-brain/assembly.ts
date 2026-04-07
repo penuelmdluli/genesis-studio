@@ -5,6 +5,7 @@
 
 import {
   getProduction,
+  getProductionScenes,
   updateProduction,
 } from "./orchestrator";
 import {
@@ -29,11 +30,13 @@ import { ModelId, SoundDesign, AspectRatio } from "@/types";
  */
 export async function triggerBrainAssembly(
   productionId: string,
-  scenes: Array<{ id: string; sceneNumber: number; status: string; outputVideoUrl?: string }>
+  _scenes?: Array<{ id: string; sceneNumber: number; status: string; outputVideoUrl?: string }>
 ): Promise<void> {
   try {
-    // Collect completed scene video URLs in order
-    const completedScenes = scenes
+    // Always re-fetch scenes from DB for fresh outputVideoUrl values
+    // (in-memory scenes may be stale if updated during the same request)
+    const freshScenes = await getProductionScenes(productionId);
+    const completedScenes = freshScenes
       .filter((s) => s.status === "completed" && s.outputVideoUrl)
       .sort((a, b) => a.sceneNumber - b.sceneNumber);
 

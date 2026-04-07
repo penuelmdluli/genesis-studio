@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Build permanent video URLs
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app";
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app").trim();
     const heroVideoUrls = videos.map((v) => {
       // If video_url is already a proxy path, make it absolute
       if (v.video_url?.startsWith("/api/")) {
@@ -90,15 +90,20 @@ export async function POST(req: NextRequest) {
     heroVideoUrls.forEach((u, i) => log(`  [${i}]: ${u}`));
 
     // Step 3: Extract poster frame from top video
-    const topVideoUrl = heroVideoUrls[0];
+    // FAL needs a publicly accessible URL — use the raw video_url if it's external,
+    // otherwise use the proxy URL. FAL can't access our proxy directly.
+    const topVideo = videos[0];
+    const topVideoUrlForFal = topVideo.video_url?.startsWith("http")
+      ? topVideo.video_url
+      : `${appUrl}/api/explore/video/${topVideo.id}`;
     let posterUrl = "";
 
-    log(`Extracting poster frame from: ${topVideoUrl}`);
+    log(`Extracting poster frame from: ${topVideoUrlForFal}`);
     try {
       // Use FAL extract-frame endpoint
       const frameResult = await fal.run("fal-ai/ffmpeg-api/extract-frame", {
         input: {
-          video_url: topVideoUrl,
+          video_url: topVideoUrlForFal,
           frame_type: "middle", // Middle frame usually looks best
         },
       }) as { images?: Array<{ url: string }> };
@@ -129,10 +134,23 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       log(`Poster extraction failed: ${err instanceof Error ? err.message : err}`);
-      // Use thumbnail_url as fallback poster
-      if (videos[0]?.thumbnail_url) {
-        posterUrl = videos[0].thumbnail_url;
-        log(`Using thumbnail as fallback poster: ${posterUrl}`);
+      log("Trying thumbnail as fallback poster...");
+
+      // Try to download a thumbnail and upload to R2
+      const thumbUrl = videos[0]?.thumbnail_url;
+      if (thumbUrl && thumbUrl.startsWith("http")) {
+        try {
+          const thumbRes = await fetch(thumbUrl);
+          if (thumbRes.ok) {
+            const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer());
+            const posterKey = "assets/hero-poster.jpg";
+            await uploadToR2(posterKey, thumbBuffer, "image/jpeg");
+            posterUrl = `${appUrl}/api/assets/hero-poster`;
+            log(`Thumbnail uploaded as poster: ${posterUrl} (${thumbBuffer.length} bytes)`);
+          }
+        } catch (thumbErr) {
+          log(`Thumbnail fallback also failed: ${thumbErr instanceof Error ? thumbErr.message : thumbErr}`);
+        }
       }
     }
 

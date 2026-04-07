@@ -538,6 +538,133 @@ export async function cancelProduction(
   }
 }
 
+/**
+ * Resubmit scenes that are stuck in "queued" with no job ID.
+ * Called by the status polling endpoint when it detects orphaned scenes.
+ * This handles the case where Vercel's after() callback dies mid-execution.
+ */
+export async function resubmitStuckScenes(
+  productionId: string
+): Promise<number> {
+  const production = await getProduction(productionId);
+  if (!production || !production.plan) return 0;
+
+  const scenes = await getProductionScenes(productionId);
+  const stuckScenes = scenes.filter(
+    (s) => s.status === "queued" && !s.runpodJobId
+  );
+
+  if (stuckScenes.length === 0) return 0;
+
+  // Check if scenes have been queued for at least 30 seconds
+  const now = Date.now();
+  const productionStarted = production.startedAt
+    ? new Date(production.startedAt).getTime()
+    : new Date(production.createdAt).getTime();
+  const elapsedSec = (now - productionStarted) / 1000;
+  if (elapsedSec < 30) return 0; // Give after() a chance to complete
+
+  console.log(
+    `[BRAIN RESUBMIT] ${stuckScenes.length} stuck scenes detected for production ${productionId} (${Math.round(elapsedSec)}s elapsed). Resubmitting...`
+  );
+
+  const plan = production.plan;
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000";
+  const webhookUrl = `${appUrl}/api/brain/webhook`;
+
+  let submitted = 0;
+
+  for (const scene of stuckScenes) {
+    const sceneDef = plan.scenes.find(
+      (s) => s.sceneNumber === scene.sceneNumber
+    );
+    if (!sceneDef) continue;
+
+    const model = AI_MODELS[sceneDef.modelId];
+    const isFalModel = model?.provider === "fal";
+
+    // Build prompt (same logic as executeProduction)
+    let scenePrompt = sceneDef.prompt;
+    if (isFalModel && model?.hasAudio && sceneDef.soundDesign) {
+      const audioDesc = buildAudioPromptFromSoundDesign(sceneDef.soundDesign);
+      if (audioDesc && !scenePrompt.toLowerCase().includes("sound")) {
+        scenePrompt = `${scenePrompt}. Audio: ${audioDesc}`;
+      }
+    }
+
+    try {
+      if (isFalModel) {
+        const falResult = await submitFalJob({
+          modelId: sceneDef.modelId,
+          type: "t2v",
+          prompt: scenePrompt,
+          negativePrompt: sceneDef.negativePrompt,
+          duration: sceneDef.duration,
+          aspectRatio: production.aspectRatio,
+          enableAudio: model?.hasAudio ?? false,
+        });
+
+        await updateProductionScene(scene.id, {
+          status: "processing",
+          runpod_job_id: falResult.request_id,
+          progress: 10,
+        });
+
+        const supabase = createSupabaseAdmin();
+        await supabase
+          .from("production_scenes")
+          .update({
+            provider: "fal",
+            model_has_audio: model?.hasAudio ?? false,
+          })
+          .eq("id", scene.id);
+      } else {
+        const runpodInput = buildRunPodInput({
+          modelId: sceneDef.modelId,
+          type: "t2v",
+          prompt: scenePrompt,
+          negativePrompt: sceneDef.negativePrompt,
+          resolution: sceneDef.resolution,
+          duration: sceneDef.duration,
+          fps: 24,
+          seed: undefined,
+          guidanceScale: undefined,
+          numInferenceSteps: undefined,
+          isDraft: false,
+          aspectRatio: production.aspectRatio,
+        });
+
+        const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl);
+
+        await updateProductionScene(scene.id, {
+          status: "processing",
+          runpod_job_id: job.id,
+          progress: 10,
+        });
+      }
+
+      submitted++;
+      console.log(
+        `[BRAIN RESUBMIT] Scene ${scene.sceneNumber} resubmitted (${isFalModel ? "FAL" : "RunPod"})`
+      );
+    } catch (err) {
+      console.error(
+        `[BRAIN RESUBMIT] Scene ${scene.sceneNumber} resubmit failed:`,
+        err
+      );
+      await updateProductionScene(scene.id, {
+        status: "failed",
+        error_message: `Resubmit failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
+    }
+  }
+
+  return submitted;
+}
+
 // ---- DB MAPPERS ----
 
 function mapProduction(row: Record<string, unknown>): Production {

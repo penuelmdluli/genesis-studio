@@ -6,6 +6,7 @@ import {
   getProductionScenes,
   updateProductionScene,
   updateProduction,
+  resubmitStuckScenes,
 } from "@/lib/genesis-brain/orchestrator";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
 import { createSupabaseAdmin } from "@/lib/supabase";
@@ -39,6 +40,25 @@ export async function GET(req: NextRequest) {
 
     // Get scene statuses
     const scenes = await getProductionScenes(productionId);
+
+    // Resubmit stuck scenes (queued with no job ID for 30+ seconds)
+    // This handles the case where Vercel's after() callback dies mid-execution
+    if (production.status === "generating") {
+      const stuckQueued = scenes.filter((s) => s.status === "queued" && !s.runpodJobId);
+      if (stuckQueued.length > 0) {
+        try {
+          const resubmitted = await resubmitStuckScenes(productionId);
+          if (resubmitted > 0) {
+            // Re-fetch scenes after resubmission
+            const refreshedScenes = await getProductionScenes(productionId);
+            scenes.length = 0;
+            scenes.push(...refreshedScenes);
+          }
+        } catch (err) {
+          console.error(`[BRAIN STATUS] Resubmit stuck scenes error:`, err);
+        }
+      }
+    }
 
     // Poll scenes that are still processing
     // FAL models: poll FAL API directly (FAL uses polling, not webhooks)

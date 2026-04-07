@@ -584,6 +584,28 @@ export async function getFalQueueResult(
   return result.data as Record<string, unknown>;
 }
 
+/**
+ * Submit a job to merge two audio tracks into one (voiceover + music).
+ * Uses merge-audio-video with a silent video workaround, then extracts audio.
+ * Alternative: use ffmpeg-api/compose to layer audio tracks.
+ */
+export async function submitMergeAudioTracksJob(
+  primaryAudioUrl: string,
+  secondaryAudioUrl: string
+): Promise<{ requestId: string }> {
+  // Use amix endpoint to mix voiceover (weight 1.0) + music (weight 0.25)
+  // This properly layers both audio tracks instead of replacing one with the other
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/amix", {
+    input: {
+      audio_urls: [primaryAudioUrl, secondaryAudioUrl],
+      weights: [1.0, 0.25],
+      duration: "longest",
+      normalize: true,
+    },
+  });
+  return { requestId: result.request_id };
+}
+
 // ---- SCENE ASSEMBLY — FAL FFmpeg ----
 
 /**

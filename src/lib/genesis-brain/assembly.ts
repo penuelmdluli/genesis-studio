@@ -14,6 +14,7 @@ import {
   submitMMAudioJob,
   submitMergeAudioVideoJob,
   submitMergeVideosJob,
+  submitMergeAudioTracksJob,
   checkFalQueueStatus,
   getFalQueueResult,
 } from "./audio";
@@ -161,11 +162,11 @@ export async function pollAssembly(productionId: string): Promise<void> {
       case "concat":
         updated = await pollConcatPhase(productionId, state, production);
         break;
-      case "mix_voiceover":
-        updated = await pollMixVoiceoverPhase(productionId, state, production);
+      case "compose_audio":
+        updated = await pollComposeAudioPhase(productionId, state, production);
         break;
-      case "mix_music":
-        updated = await pollMixMusicPhase(productionId, state, production);
+      case "mix_final":
+        updated = await pollMixFinalPhase(productionId, state, production);
         break;
       case "done":
         // Already complete — finalize
@@ -400,15 +401,21 @@ async function pollConcatPhase(
     }
   }
 
-  // Concat done — check if we need audio mixing (voiceover first, then music)
-  if (production.voiceoverUrl && state.concatJob.videoUrl) {
-    state.phase = "mix_voiceover";
-    await updateProduction(productionId, { progress: 90 });
-    console.log(`[ASSEMBLY] Concat done → mix_voiceover`);
-  } else if (production.musicUrl && state.concatJob.videoUrl) {
-    state.phase = "mix_music";
+  // Concat done — check if we need audio mixing
+  const hasVoiceover = !!production.voiceoverUrl;
+  const hasMusic = !!production.musicUrl;
+
+  if ((hasVoiceover || hasMusic) && state.concatJob.videoUrl) {
+    if (hasVoiceover && hasMusic) {
+      // Both voiceover + music → compose them into one audio track first
+      state.phase = "compose_audio";
+      console.log(`[ASSEMBLY] Concat done → compose_audio (voiceover + music)`);
+    } else {
+      // Only one audio layer → merge directly onto video
+      state.phase = "mix_final";
+      console.log(`[ASSEMBLY] Concat done → mix_final (single audio layer)`);
+    }
     await updateProduction(productionId, { progress: 92 });
-    console.log(`[ASSEMBLY] Concat done → mix_music`);
   } else {
     state.phase = "done";
     await updateProduction(productionId, { progress: 98 });
@@ -418,107 +425,112 @@ async function pollConcatPhase(
   return true;
 }
 
-async function pollMixVoiceoverPhase(
+async function pollComposeAudioPhase(
   productionId: string,
   state: AssemblyState,
   production: Production
 ): Promise<boolean> {
-  // Submit voiceover mix job if not yet submitted
-  if (!state.mixVoiceoverJob) {
-    const audioUrl = production.voiceoverUrl;
-    const videoUrl = state.concatJob?.videoUrl;
-    if (!audioUrl || !videoUrl) {
-      state.phase = "done";
+  // This phase layers voiceover (100% vol) + music (25% vol) into a single audio track
+  // using fal-ai/ffmpeg-api/compose, so neither gets replaced.
+
+  if (!state.composeAudioJob) {
+    const voiceoverUrl = production.voiceoverUrl;
+    const musicUrl = production.musicUrl;
+
+    if (!voiceoverUrl || !musicUrl) {
+      // Shouldn't reach here if routing is correct, but handle gracefully
+      state.phase = "mix_final";
       return true;
     }
 
     try {
-      const { requestId } = await submitMergeAudioVideoJob(videoUrl, audioUrl);
-      state.mixVoiceoverJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Mix-voiceover submitted: ${requestId}`);
+      const { requestId } = await submitMergeAudioTracksJob(voiceoverUrl, musicUrl);
+      state.composeAudioJob = { requestId, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Compose-audio submitted: ${requestId} (voiceover + music)`);
     } catch (err) {
-      console.warn(`[ASSEMBLY] Mix-voiceover submit failed, using unmixed video:`, err);
-      // If music exists, still try to mix that
-      if (production.musicUrl) {
-        state.phase = "mix_music";
-      } else {
-        state.phase = "done";
-      }
+      console.warn(`[ASSEMBLY] Compose-audio submit failed, falling back to voiceover only:`, err);
+      // Fall through to mix_final with just voiceover
+      state.phase = "mix_final";
     }
     return true;
   }
 
-  // Poll voiceover mix job
-  if (state.mixVoiceoverJob.status !== "COMPLETED" && state.mixVoiceoverJob.status !== "FAILED") {
-    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", state.mixVoiceoverJob.requestId);
+  // Poll compose job
+  if (state.composeAudioJob.status !== "COMPLETED" && state.composeAudioJob.status !== "FAILED") {
+    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/amix", state.composeAudioJob.requestId);
 
     if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", state.mixVoiceoverJob.requestId);
-      const video = data?.video as { url: string } | undefined;
-      state.mixVoiceoverJob.status = "COMPLETED";
-      state.mixVoiceoverJob.videoUrl = video?.url || state.concatJob?.videoUrl;
-      console.log(`[ASSEMBLY] Mix-voiceover completed: ${state.mixVoiceoverJob.videoUrl}`);
+      const data = await getFalQueueResult("fal-ai/ffmpeg-api/amix", state.composeAudioJob.requestId);
+      const audio = data?.audio as { url: string } | undefined;
+      state.composeAudioJob.status = "COMPLETED";
+      state.composeAudioJob.audioUrl = audio?.url || "";
+      console.log(`[ASSEMBLY] Compose-audio completed: ${state.composeAudioJob.audioUrl}`);
     } else if (result.status === "FAILED") {
-      state.mixVoiceoverJob.status = "FAILED";
-      state.mixVoiceoverJob.videoUrl = state.concatJob?.videoUrl; // fallback to unmixed
-      console.warn(`[ASSEMBLY] Mix-voiceover failed, using unmixed`);
+      state.composeAudioJob.status = "FAILED";
+      console.warn(`[ASSEMBLY] Compose-audio failed, will use voiceover only in mix_final`);
     } else {
       return false; // Still in progress
     }
   }
 
-  // Voiceover done — check if music needs mixing too
-  if (production.musicUrl) {
-    state.phase = "mix_music";
-    await updateProduction(productionId, { progress: 94 });
-    console.log(`[ASSEMBLY] Mix-voiceover done → mix_music`);
-  } else {
-    state.phase = "done";
-    await updateProduction(productionId, { progress: 98 });
-    console.log(`[ASSEMBLY] Mix-voiceover done → done (no music)`);
-  }
+  // Compose done → merge the combined audio onto the video
+  state.phase = "mix_final";
+  await updateProduction(productionId, { progress: 94 });
+  console.log(`[ASSEMBLY] Compose-audio done → mix_final`);
   return true;
 }
 
-async function pollMixMusicPhase(
+async function pollMixFinalPhase(
   productionId: string,
   state: AssemblyState,
   production: Production
 ): Promise<boolean> {
-  // Submit music mix job if not yet submitted
-  if (!state.mixMusicJob) {
-    const audioUrl = production.musicUrl;
-    const videoUrl = state.mixVoiceoverJob?.videoUrl || state.concatJob?.videoUrl;
-    if (!audioUrl || !videoUrl) {
+  // Merge a single audio track onto the concatenated video.
+  // Audio source priority: composed track > voiceover > music
+
+  if (!state.mixFinalJob) {
+    const videoUrl = state.concatJob?.videoUrl;
+    if (!videoUrl) {
+      state.phase = "done";
+      return true;
+    }
+
+    // Pick the best audio track available
+    const audioUrl =
+      state.composeAudioJob?.audioUrl ||  // composed voiceover + music
+      production.voiceoverUrl ||           // voiceover only
+      production.musicUrl;                 // music only
+
+    if (!audioUrl) {
       state.phase = "done";
       return true;
     }
 
     try {
       const { requestId } = await submitMergeAudioVideoJob(videoUrl, audioUrl);
-      state.mixMusicJob = { requestId, status: "IN_QUEUE" };
-      console.log(`[ASSEMBLY] Mix-music submitted: ${requestId}`);
+      state.mixFinalJob = { requestId, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Mix-final submitted: ${requestId}`);
     } catch (err) {
-      console.warn(`[ASSEMBLY] Mix-music submit failed, using video without music:`, err);
+      console.warn(`[ASSEMBLY] Mix-final submit failed, using video without narration:`, err);
       state.phase = "done";
     }
     return true;
   }
 
-  // Poll music mix job
-  if (state.mixMusicJob.status !== "COMPLETED" && state.mixMusicJob.status !== "FAILED") {
-    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", state.mixMusicJob.requestId);
+  // Poll mix-final job
+  if (state.mixFinalJob.status !== "COMPLETED" && state.mixFinalJob.status !== "FAILED") {
+    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", state.mixFinalJob.requestId);
 
     if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", state.mixMusicJob.requestId);
+      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", state.mixFinalJob.requestId);
       const video = data?.video as { url: string } | undefined;
-      state.mixMusicJob.status = "COMPLETED";
-      state.mixMusicJob.videoUrl = video?.url || state.mixVoiceoverJob?.videoUrl || state.concatJob?.videoUrl;
-      console.log(`[ASSEMBLY] Mix-music completed: ${state.mixMusicJob.videoUrl}`);
+      state.mixFinalJob.status = "COMPLETED";
+      state.mixFinalJob.videoUrl = video?.url || state.concatJob?.videoUrl;
+      console.log(`[ASSEMBLY] Mix-final completed: ${state.mixFinalJob.videoUrl}`);
     } else if (result.status === "FAILED") {
-      state.mixMusicJob.status = "FAILED";
-      state.mixMusicJob.videoUrl = state.mixVoiceoverJob?.videoUrl || state.concatJob?.videoUrl; // fallback
-      console.warn(`[ASSEMBLY] Mix-music failed, using video without music`);
+      state.mixFinalJob.status = "FAILED";
+      state.mixFinalJob.videoUrl = state.concatJob?.videoUrl; // fallback to video without narration
+      console.warn(`[ASSEMBLY] Mix-final failed, using video without audio overlay`);
     } else {
       return false; // Still in progress
     }
@@ -526,6 +538,7 @@ async function pollMixMusicPhase(
 
   state.phase = "done";
   await updateProduction(productionId, { progress: 98 });
+  console.log(`[ASSEMBLY] Mix-final done → done`);
   return true;
 }
 
@@ -536,8 +549,8 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video URL
-  const finalUrl = state.mixMusicJob?.videoUrl || state.mixVoiceoverJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video URL — priority: mix_final > concat > first scene
+  const finalUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!finalUrl) {
     await updateProduction(productionId, {

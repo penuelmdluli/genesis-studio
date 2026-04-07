@@ -101,7 +101,7 @@ export default function BrainStudioPage() {
   const [plan, setPlan] = useState<ScenePlan | null>(null);
   const [totalCredits, setTotalCredits] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [sceneStatuses, setSceneStatuses] = useState<Array<{ sceneNumber: number; status: string; progress: number; outputVideoUrl?: string }>>([]);
+  const [sceneStatuses, setSceneStatuses] = useState<Array<{ sceneNumber: number; status: string; progress: number; outputVideoUrl?: string; modelId?: string; duration?: number; errorMessage?: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [outputVideoUrls, setOutputVideoUrls] = useState<Record<string, string> | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -764,76 +764,286 @@ export default function BrainStudioPage() {
         )}
 
         {/* ═══ STATE 4: PRODUCING ═══ */}
-        {brainState === "producing" && (
+        {brainState === "producing" && (() => {
+          const completedCount = sceneStatuses.filter(s => s.status === "completed").length;
+          const totalCount = sceneStatuses.length || 1;
+          const activeScene = sceneStatuses.find(s => s.status === "processing");
+          const isAssembling = progress >= 70;
+          const activeModel = activeScene?.modelId ? AI_MODELS[activeScene.modelId as ModelId] : null;
+          const estMinutes = Math.max(1, Math.ceil((totalCount - completedCount) * 1.5));
+
+          return (
           <div className="space-y-4">
-            <Card className="glass-strong">
-              <CardContent className="p-6">
+            {/* Status Header */}
+            <Card className="glass-strong border-violet-500/20 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600/5 via-transparent to-fuchsia-600/5" />
+              <CardContent className="p-5 relative">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-zinc-200">Producing...</h2>
-                  <Button variant="ghost" size="sm" onClick={handleCancel} className="text-red-400 hover:text-red-300">
-                    <Square className="w-4 h-4" /> Cancel
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                      <div className="absolute inset-0 w-3 h-3 rounded-full bg-red-500 animate-ping opacity-30" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-zinc-100">
+                        {isAssembling ? "Assembling Final Video" : `Creating Scene ${completedCount + 1} of ${totalCount}`}
+                      </h2>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {isAssembling
+                          ? "Adding audio, merging scenes, finalizing..."
+                          : activeModel
+                            ? `Using ${activeModel.name}`
+                            : "Generating with AI"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleCancel} className="text-zinc-500 hover:text-red-400 transition-colors">
+                    <Square className="w-3.5 h-3.5" />
                   </Button>
                 </div>
 
-                <Progress value={progress} className="mb-4" />
-                <p className="text-sm text-zinc-500 text-center">{progress}% complete</p>
+                {/* Progress bar */}
+                <div className="relative mb-2">
+                  <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-400 font-mono">{progress}%</span>
+                  {!isAssembling && <span className="text-zinc-600">~{estMinutes} min remaining</span>}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Scene Progress */}
-            <StaggerGroup className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {sceneStatuses.map((scene) => (
-                <StaggerItem key={scene.sceneNumber}>
-                  <Card className="glass-strong">
-                    <CardContent className="p-3 text-center">
-                      <div className="text-sm font-medium text-zinc-400 mb-1">Scene {scene.sceneNumber}</div>
-                      <Badge
-                        variant={
-                          scene.status === "completed" ? "emerald"
-                            : scene.status === "processing" ? "cyan"
-                            : scene.status === "failed" ? "red"
-                            : "default"
-                        }
-                      >
-                        {scene.status === "processing" && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
-                        {scene.status}
-                      </Badge>
-                      {scene.progress > 0 && scene.status !== "completed" && (
-                        <Progress value={scene.progress} className="mt-2 h-1" />
+            {/* Scene Cards */}
+            <div className="space-y-3">
+              {sceneStatuses.map((scene) => {
+                const scenePlan = plan?.scenes?.find((s: SceneDefinition) => s.sceneNumber === scene.sceneNumber);
+                const model = scene.modelId ? AI_MODELS[scene.modelId as ModelId] : null;
+                const isCompleted = scene.status === "completed";
+                const isProcessing = scene.status === "processing";
+                const isFailed = scene.status === "failed";
+                const isQueued = !isCompleted && !isProcessing && !isFailed;
+
+                return (
+                  <Card
+                    key={scene.sceneNumber}
+                    className={`glass-strong overflow-hidden transition-all duration-500 ${
+                      isProcessing ? "border-violet-500/30 shadow-lg shadow-violet-500/5" :
+                      isCompleted ? "border-emerald-500/20" :
+                      isFailed ? "border-red-500/20" :
+                      "border-white/[0.06] opacity-60"
+                    }`}
+                  >
+                    {/* Active scene glow */}
+                    {isProcessing && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-violet-600/[0.04] via-transparent to-fuchsia-600/[0.04] animate-pulse" />
+                    )}
+
+                    <CardContent className="p-0 relative">
+                      <div className="flex">
+                        {/* Video preview / status indicator */}
+                        <div className={`w-36 sm:w-48 shrink-0 ${aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} relative overflow-hidden bg-black/40`}>
+                          {isCompleted && scene.outputVideoUrl ? (
+                            <video
+                              src={scene.outputVideoUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                              playsInline
+                              autoPlay
+                              loop
+                            />
+                          ) : isProcessing ? (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/20">
+                              <div className="relative">
+                                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                                <div className="absolute inset-0 w-8 h-8 rounded-full bg-violet-500/20 animate-ping" />
+                              </div>
+                            </div>
+                          ) : isFailed ? (
+                            <div className="w-full h-full flex items-center justify-center bg-red-950/20">
+                              <X className="w-6 h-6 text-red-400/60" />
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
+                              <Clock className="w-5 h-5 text-zinc-700" />
+                            </div>
+                          )}
+
+                          {/* Scene number overlay */}
+                          <div className="absolute top-2 left-2">
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold backdrop-blur-sm ${
+                              isCompleted ? "bg-emerald-500/80 text-white" :
+                              isProcessing ? "bg-violet-500/80 text-white" :
+                              isFailed ? "bg-red-500/80 text-white" :
+                              "bg-black/50 text-zinc-400"
+                            }`}>
+                              {isCompleted ? <Check className="w-3 h-3" /> : scene.sceneNumber}
+                            </div>
+                          </div>
+
+                          {/* Duration badge */}
+                          <div className="absolute bottom-2 right-2">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-300 font-mono backdrop-blur-sm">
+                              {scene.duration || scenePlan?.duration || 5}s
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Scene info */}
+                        <div className="flex-1 min-w-0 p-3 sm:p-4 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h3 className="text-sm font-semibold text-zinc-200 truncate">
+                                {scenePlan?.description || `Scene ${scene.sceneNumber}`}
+                              </h3>
+                              <Badge
+                                variant={isCompleted ? "emerald" : isProcessing ? "violet" : isFailed ? "red" : "default"}
+                                className="shrink-0 text-[9px]"
+                              >
+                                {isCompleted ? "Ready" : isProcessing ? "Generating" : isFailed ? "Failed" : "Queued"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                              {scenePlan?.prompt?.slice(0, 120) || "..."}
+                              {(scenePlan?.prompt?.length || 0) > 120 ? "..." : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {model && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500">
+                                {model.name}
+                              </span>
+                            )}
+                            {scenePlan?.cameraMovement && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500 hidden sm:inline">
+                                {scenePlan.cameraMovement}
+                              </span>
+                            )}
+                            {isProcessing && scene.progress > 0 && (
+                              <span className="text-[10px] font-mono text-violet-400">{scene.progress}%</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Processing progress bar */}
+                      {isProcessing && (
+                        <div className="h-0.5 bg-white/[0.04]">
+                          <motion.div
+                            className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                            initial={{ width: "10%" }}
+                            animate={{ width: `${Math.max(scene.progress, 20)}%` }}
+                            transition={{ duration: 1 }}
+                          />
+                        </div>
                       )}
                     </CardContent>
                   </Card>
-                </StaggerItem>
-              ))}
-            </StaggerGroup>
+                );
+              })}
+            </div>
+
+            {/* Post-Production Pipeline */}
+            {isAssembling && (
+              <Card className="glass-strong border-violet-500/10">
+                <CardContent className="p-4">
+                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Post-Production</h3>
+                  <div className="space-y-2">
+                    {[
+                      { icon: Film, label: "Assembling scenes", done: progress >= 80 },
+                      { icon: Mic, label: "Adding audio", done: progress >= 90 },
+                      { icon: Music, label: "Mixing soundtrack", done: progress >= 95 },
+                      { icon: Wand2, label: "Final rendering", done: progress >= 100 },
+                    ].map((step, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          step.done ? "bg-emerald-500/20" :
+                          progress >= (75 + i * 5) ? "bg-violet-500/20" :
+                          "bg-white/[0.04]"
+                        }`}>
+                          {step.done ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : progress >= (75 + i * 5) ? (
+                            <Loader2 className="w-3 h-3 text-violet-400 animate-spin" />
+                          ) : (
+                            <Clock className="w-3 h-3 text-zinc-600" />
+                          )}
+                        </div>
+                        <span className={`text-sm ${step.done ? "text-zinc-300" : progress >= (75 + i * 5) ? "text-zinc-400" : "text-zinc-600"}`}>
+                          {step.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ═══ STATE 5: COMPLETED ═══ */}
         {brainState === "completed" && outputVideoUrls && (
-          <div className="space-y-4">
-            <Card className="glass-strong overflow-hidden">
-              <CardContent className="p-0">
-                {outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0] ? (
-                  <VideoPlayer
-                    src={outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0]}
-                    poster={thumbnailUrl || undefined}
-                    title={plan?.title || concept.slice(0, 50)}
-                    autoPlay
-                    className={aspectRatio === "portrait" ? "aspect-[9/16] max-h-[70vh] mx-auto" : "aspect-video"}
-                  />
-                ) : (
-                  <div className="aspect-video bg-black flex items-center justify-center">
-                    <p className="text-zinc-500">Video processing...</p>
+          <div className="space-y-5">
+            {/* Celebration header */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Clapperboard className="w-5 h-5 text-violet-400" />
+                <h2 className="text-lg font-bold text-zinc-100">That&apos;s a Wrap!</h2>
+              </div>
+              <p className="text-xs text-zinc-500">{plan?.title || concept.slice(0, 60)}</p>
+            </motion.div>
+
+            {/* Main video with glow ring */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              <Card className="glass-strong overflow-hidden border-violet-500/20 shadow-xl shadow-violet-500/5">
+                <CardContent className="p-0">
+                  <div className="relative">
+                    <div className="absolute -inset-[1px] rounded-xl bg-gradient-to-r from-violet-500/20 via-fuchsia-500/10 to-violet-500/20 blur-sm" />
+                    <div className="relative">
+                      {outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0] ? (
+                        <VideoPlayer
+                          src={outputVideoUrls["final"] || outputVideoUrls[aspectRatio] || Object.values(outputVideoUrls)[0]}
+                          poster={thumbnailUrl || undefined}
+                          title={plan?.title || concept.slice(0, 50)}
+                          autoPlay
+                          className={aspectRatio === "portrait" ? "aspect-[9/16] max-h-[70vh] mx-auto" : "aspect-video"}
+                        />
+                      ) : (
+                        <div className="aspect-video bg-black flex items-center justify-center">
+                          <p className="text-zinc-500">Video processing...</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             {/* Actions */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2"
+            >
               <Button
                 variant="primary"
+                className="shadow-lg shadow-violet-600/20"
                 onClick={async () => {
                   const videoUrl = outputVideoUrls?.["final"] || outputVideoUrls?.[aspectRatio] || Object.values(outputVideoUrls || {})[0];
                   if (!videoUrl) return;
@@ -879,30 +1089,55 @@ export default function BrainStudioPage() {
               >
                 <Plus className="w-4 h-4" /> New Production
               </Button>
-            </div>
+            </motion.div>
 
-            {/* Scene strip */}
-            {sceneStatuses.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {sceneStatuses.filter(s => s.outputVideoUrl).map((scene) => (
-                  <div key={scene.sceneNumber} className="shrink-0 w-32">
-                    <div className="aspect-video rounded-lg bg-black overflow-hidden relative group cursor-pointer">
-                      <video
-                        src={scene.outputVideoUrl}
-                        className="w-full h-full object-cover"
-                        muted
-                        playsInline
-                        onMouseEnter={(e) => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
-                        onMouseLeave={(e) => e.currentTarget.pause()}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Play className="w-4 h-4 text-white" />
+            {/* Scene strip with hover-to-play */}
+            {sceneStatuses.filter(s => s.outputVideoUrl).length > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Individual Scenes</h3>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                  {sceneStatuses.filter(s => s.outputVideoUrl).map((scene) => {
+                    const scenePlan = plan?.scenes?.find((s: SceneDefinition) => s.sceneNumber === scene.sceneNumber);
+                    return (
+                      <div key={scene.sceneNumber} className="shrink-0 w-40 sm:w-48 group">
+                        <div className="aspect-video rounded-xl bg-black overflow-hidden relative cursor-pointer ring-1 ring-white/[0.06] group-hover:ring-violet-500/30 transition-all">
+                          <video
+                            src={scene.outputVideoUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                            onMouseEnter={(e) => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
+                            onMouseLeave={(e) => e.currentTarget.pause()}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                              <Play className="w-3.5 h-3.5 text-white ml-0.5" />
+                            </div>
+                          </div>
+                          <div className="absolute top-1.5 left-1.5">
+                            <div className="w-5 h-5 rounded-md bg-emerald-500/80 flex items-center justify-center backdrop-blur-sm">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          <div className="absolute bottom-1.5 right-1.5">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-300 font-mono backdrop-blur-sm">
+                              {scene.duration || scenePlan?.duration || 5}s
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1.5 truncate px-0.5">
+                          {scenePlan?.description || `Scene ${scene.sceneNumber}`}
+                        </p>
                       </div>
-                    </div>
-                    <p className="text-[10px] text-zinc-600 mt-1 text-center">Scene {scene.sceneNumber}</p>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
             )}
           </div>
         )}

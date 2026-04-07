@@ -80,6 +80,8 @@ export async function startAssembly(
             // Store voiceover URL
             await updateProduction(productionId, { voiceover_url: voResult.fullUrl });
             // Store clips + durations in assembly pre-state
+            // IMPORTANT: Pass raw object, NOT JSON.stringify! Supabase JSONB stores
+            // stringified values as JSON strings, making properties inaccessible.
             const preState: Record<string, unknown> = {
               ...(existingState || {}),
               voiceoverClips: voResult.clips.map((c) => ({
@@ -92,7 +94,7 @@ export async function startAssembly(
             };
             await supabase
               .from("productions")
-              .update({ assembly_state: JSON.stringify(preState) })
+              .update({ assembly_state: preState })
               .eq("id", productionId);
             // Update in-memory reference
             if (production) {
@@ -266,7 +268,11 @@ export async function pollAssembly(productionId: string): Promise<void> {
         updated = await pollMergeAudioPhase(productionId, state);
         break;
       case "speed_adjust":
-        updated = await pollSpeedAdjustPhase(productionId, state);
+        // Speed_adjust is deprecated — compose API can't change playback speed.
+        // Mix_final now trims output to voiceover duration instead.
+        console.log(`[ASSEMBLY] Skipping deprecated speed_adjust phase → concat`);
+        state.phase = "concat";
+        updated = true;
         break;
       case "concat":
         updated = await pollConcatPhase(productionId, state, production);
@@ -394,9 +400,9 @@ async function pollMMAudioPhase(
 
     if (needsMerge) {
       state.phase = "merge_audio";
-    } else if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
-      state.phase = "speed_adjust";
     } else {
+      // Skip speed_adjust — compose API doesn't change playback speed, just trims/pads.
+      // Instead, mix_final now trims the output video to match voiceover duration.
       state.phase = "concat";
     }
     await updateProduction(productionId, { progress: 78 });
@@ -458,17 +464,13 @@ async function pollMergeAudioPhase(
     }
   }
 
-  // All merge jobs done → speed-adjust scenes to match voiceover, then concat
+  // All merge jobs done → skip straight to concat
+  // Speed_adjust is removed — compose API can't change playback speed.
+  // Instead, mix_final trims the output to match voiceover duration.
   if (!anyPending && updated) {
-    if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
-      state.phase = "speed_adjust";
-      await updateProduction(productionId, { progress: 84 });
-      console.log(`[ASSEMBLY] Merge phase done → speed_adjust (voiceover-driven alignment)`);
-    } else {
-      state.phase = "concat";
-      await updateProduction(productionId, { progress: 84 });
-      console.log(`[ASSEMBLY] Merge phase done → concat (no voiceover durations, skipping speed adjust)`);
-    }
+    state.phase = "concat";
+    await updateProduction(productionId, { progress: 84 });
+    console.log(`[ASSEMBLY] Merge phase done → concat`);
   }
 
   return updated;
@@ -946,6 +948,15 @@ async function pollMixFinalPhase(
   // compose natively supports multiple audio tracks layered simultaneously.
 
   if (!state.mixFinalJob) {
+    // Recalculate voiceover clip timestamps so they play back-to-back
+    // (original startMs values are based on PLAN durations, not actual VO durations)
+    if (state.voiceoverClips?.length && state.sceneAudioDurations) {
+      const freshScenes = await getProductionScenes(productionId);
+      const completedScenes = freshScenes
+        .filter((s) => s.status === "completed")
+        .sort((a, b) => a.sceneNumber - b.sceneNumber);
+      recalculateVoiceoverTimestamps(state, completedScenes);
+    }
     const videoUrl = state.concatJob?.videoUrl;
     if (!videoUrl) {
       state.phase = "done";
@@ -968,45 +979,61 @@ async function pollMixFinalPhase(
       return true;
     }
 
-    // Get the REAL concat video duration from FAL metadata (not planned durations)
-    // This ensures audio tracks match the actual video length exactly
-    let realDurationSec = await getMediaDuration(videoUrl);
-    if (realDurationSec <= 0) {
-      // Retry once — FAL metadata can be flaky on first call
-      console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
-      realDurationSec = await getMediaDuration(videoUrl);
-    }
-    if (realDurationSec <= 0) {
-      // Fallback: sum ACTUAL scene video durations (not plan durations!)
-      // Plan durations are what we REQUESTED, not what was generated.
-      // Actual videos may be shorter (e.g. 5s clips instead of planned 10s).
-      console.log(`[ASSEMBLY] Metadata failed, measuring individual scene videos...`);
-      const freshScenes = await getProductionScenes(productionId);
-      const completedScenes = freshScenes
-        .filter((s) => s.status === "completed")
-        .sort((a, b) => a.sceneNumber - b.sceneNumber);
-      let sumFromScenes = 0;
-      for (let i = 0; i < completedScenes.length; i++) {
-        const sceneUrl = state.processedSceneUrls[i];
-        if (sceneUrl) {
-          const sceneDur = await getMediaDuration(sceneUrl);
-          if (sceneDur > 0) {
-            sumFromScenes += sceneDur;
-            continue;
-          }
-        }
-        // Last resort for this scene: use plan duration
-        const plan = production.plan;
-        const sceneDef = plan?.scenes?.find(
-          (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
-        );
-        sumFromScenes += sceneDef?.duration || 5;
+    // Determine the correct output duration.
+    // VOICEOVER IS THE SPINE — if we have per-scene voiceover clips, the total video
+    // length should match total voiceover duration (not the raw concatenated video length,
+    // which may be much longer due to video models generating fixed-length clips).
+    let totalDurationMs: number;
+
+    if (voiceoverClips && voiceoverClips.length > 0) {
+      // Calculate total duration from voiceover clips (the most reliable source)
+      const lastClip = voiceoverClips.reduce((latest, c) =>
+        (c.startMs + c.durationMs) > (latest.startMs + latest.durationMs) ? c : latest
+      );
+      totalDurationMs = lastClip.startMs + lastClip.durationMs + 500; // +0.5s buffer for natural ending
+      console.log(`[ASSEMBLY] Output duration from voiceover clips: ${(totalDurationMs / 1000).toFixed(1)}s (voiceover is the spine)`);
+    } else if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
+      // Use per-scene audio durations to calculate total
+      const totalFromAudio = Object.values(state.sceneAudioDurations).reduce((sum, d) => sum + d, 0);
+      totalDurationMs = totalFromAudio + 500;
+      console.log(`[ASSEMBLY] Output duration from sceneAudioDurations: ${(totalDurationMs / 1000).toFixed(1)}s`);
+    } else {
+      // No voiceover — use actual concat video duration
+      let realDurationSec = await getMediaDuration(videoUrl);
+      if (realDurationSec <= 0) {
+        console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
+        realDurationSec = await getMediaDuration(videoUrl);
       }
-      realDurationSec = sumFromScenes;
-      console.log(`[ASSEMBLY] Duration from scene measurement: ${realDurationSec}s`);
+      if (realDurationSec <= 0) {
+        // Fallback: measure individual scene videos
+        console.log(`[ASSEMBLY] Metadata failed, measuring individual scene videos...`);
+        const freshScenes = await getProductionScenes(productionId);
+        const completedScenes = freshScenes
+          .filter((s) => s.status === "completed")
+          .sort((a, b) => a.sceneNumber - b.sceneNumber);
+        let sumFromScenes = 0;
+        for (let i = 0; i < completedScenes.length; i++) {
+          const sceneUrl = state.processedSceneUrls[i];
+          if (sceneUrl) {
+            const sceneDur = await getMediaDuration(sceneUrl);
+            if (sceneDur > 0) {
+              sumFromScenes += sceneDur;
+              continue;
+            }
+          }
+          const planData = production.plan;
+          const sceneDef = planData?.scenes?.find(
+            (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
+          );
+          sumFromScenes += sceneDef?.duration || 5;
+        }
+        totalDurationMs = Math.ceil(sumFromScenes * 1000);
+        console.log(`[ASSEMBLY] Duration from scene measurement: ${sumFromScenes}s`);
+      } else {
+        totalDurationMs = Math.ceil(realDurationSec * 1000);
+      }
+      console.log(`[ASSEMBLY] Output duration from video measurement: ${(totalDurationMs / 1000).toFixed(1)}s (no voiceover)`);
     }
-    const totalDurationMs = Math.ceil(realDurationSec * 1000);
-    console.log(`[ASSEMBLY] Real video duration: ${realDurationSec}s (${totalDurationMs}ms)`);
 
     // Get music duration so we can loop it if it's shorter than the video
     let musicDurationMs: number | undefined;
@@ -1014,7 +1041,7 @@ async function pollMixFinalPhase(
       const musicDurSec = await getMediaDuration(musicUrl);
       if (musicDurSec > 0) {
         musicDurationMs = Math.ceil(musicDurSec * 1000);
-        console.log(`[ASSEMBLY] Music duration: ${musicDurSec}s (${musicDurationMs}ms) — video: ${realDurationSec}s`);
+        console.log(`[ASSEMBLY] Music duration: ${musicDurSec}s (${musicDurationMs}ms) — video: ${(totalDurationMs/1000).toFixed(1)}s`);
       }
     }
 
@@ -1037,7 +1064,7 @@ async function pollMixFinalPhase(
         ? `${soundDesignClips.ambient.length}amb+${soundDesignClips.sfx.length}sfx+${soundDesignClips.foley.length}foley`
         : "";
       const audioDesc = [voDesc, musicUrl ? "music" : "", sfxDesc].filter(Boolean).join(" + ");
-      console.log(`[ASSEMBLY] Compose-final submitted: ${requestId} (video + ${audioDesc}, ${realDurationSec}s)`);
+      console.log(`[ASSEMBLY] Compose-final submitted: ${requestId} (video + ${audioDesc}, ${(totalDurationMs/1000).toFixed(1)}s)`);
     } catch (err) {
       console.warn(`[ASSEMBLY] Compose-final failed, using video without audio:`, err);
       state.phase = "done";
@@ -1184,12 +1211,25 @@ async function finalizeAssembly(
 
   // --- ALWAYS SAVE TO GALLERY ---
   const plan = production.plan;
-  const totalDuration = completedScenes.reduce((sum, s) => {
-    const sceneDef = plan?.scenes?.find(
-      (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+  // Use voiceover-driven duration if available (most accurate for trimmed videos)
+  let totalDuration: number;
+  if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
+    totalDuration = Math.ceil(
+      Object.values(state.sceneAudioDurations).reduce((sum, d) => sum + d, 0) / 1000
     );
-    return sum + (sceneDef?.duration || 5);
-  }, 0);
+  } else if (state.voiceoverClips?.length) {
+    const lastClip = state.voiceoverClips.reduce((latest, c) =>
+      (c.startMs + c.durationMs) > (latest.startMs + latest.durationMs) ? c : latest
+    );
+    totalDuration = Math.ceil((lastClip.startMs + lastClip.durationMs) / 1000);
+  } else {
+    totalDuration = completedScenes.reduce((sum, s) => {
+      const sceneDef = plan?.scenes?.find(
+        (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+      );
+      return sum + (sceneDef?.duration || 5);
+    }, 0);
+  }
 
   // Determine best model ID from scenes
   const sceneModels = completedScenes.map(s => s.modelId).filter(Boolean);

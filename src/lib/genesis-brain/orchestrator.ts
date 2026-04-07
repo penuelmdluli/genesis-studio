@@ -436,7 +436,7 @@ export async function executeProduction(
             const supabase = createSupabaseAdmin();
             await supabase
               .from("productions")
-              .update({ assembly_state: JSON.stringify(assemblyPreState) })
+              .update({ assembly_state: assemblyPreState })
               .eq("id", productionId);
           }
         } else if (audio.type === "music" && audio.url) {

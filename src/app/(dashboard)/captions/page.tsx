@@ -94,8 +94,15 @@ export default function CaptionsPage() {
   // Result state
   const [srtContent, setSrtContent] = useState<string | null>(null);
 
+  // Burn state
+  const [isBurning, setIsBurning] = useState(false);
+  const [burnProgress, setBurnProgress] = useState(0);
+  const [burnedVideoUrl, setBurnedVideoUrl] = useState<string | null>(null);
+  const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
+
   // Double-click protection
   const generateLockRef = useRef(false);
+  const burnLockRef = useRef(false);
 
   const isLoading = !isInitialized;
 
@@ -160,6 +167,7 @@ export default function CaptionsPage() {
 
     setError(null);
     setSrtContent(null);
+    setBurnedVideoUrl(null);
 
     let targetUrl = resolvedVideoUrl;
 
@@ -174,6 +182,9 @@ export default function CaptionsPage() {
         return;
       }
     }
+
+    // Save the URL for burn-into-video reuse
+    setLastUploadedUrl(targetUrl);
 
     if (!targetUrl) {
       setError("Please provide a video URL or upload a video.");
@@ -274,6 +285,108 @@ export default function CaptionsPage() {
     a.download = "captions.srt";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleBurnIntoVideo = async () => {
+    if (burnLockRef.current || isBurning) return;
+    burnLockRef.current = true;
+
+    // We need a video URL to burn captions into
+    const videoToBurn = lastUploadedUrl || resolvedVideoUrl;
+    if (!videoToBurn) {
+      toast("No video URL available. Please generate captions first.", "error");
+      burnLockRef.current = false;
+      return;
+    }
+
+    if (captionStyle === "srt_only") {
+      toast("SRT Only style doesn't support burn. Select TikTok, YouTube, or Cinematic.", "error");
+      burnLockRef.current = false;
+      return;
+    }
+
+    setIsBurning(true);
+    setBurnProgress(10);
+    setBurnedVideoUrl(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/captions/burn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl: videoToBurn,
+          style: captionStyle,
+          language,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Burn failed.");
+        toast(data.error || "Burn failed", "error");
+        setIsBurning(false);
+        burnLockRef.current = false;
+        return;
+      }
+
+      updateCreditBalance((user?.creditBalance ?? 0) - (data.creditsCost || 5));
+      toast("Burning captions into video...", "success");
+
+      // Simulated progress
+      let currentProgress = 10;
+      const interval = setInterval(() => {
+        currentProgress += Math.random() * 10;
+        if (currentProgress >= 90) {
+          currentProgress = 90;
+          clearInterval(interval);
+        }
+        setBurnProgress(Math.round(currentProgress));
+      }, 3000);
+
+      // Poll for completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/captions/burn/${data.jobId}`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.status === "completed" && statusData.output?.videoUrl) {
+              clearInterval(pollInterval);
+              clearInterval(interval);
+              setBurnProgress(100);
+              setBurnedVideoUrl(statusData.output.videoUrl);
+              setIsBurning(false);
+              toast("Captions burned into video!", "success");
+            } else if (statusData.status === "failed") {
+              clearInterval(pollInterval);
+              clearInterval(interval);
+              setError(statusData.errorMessage || "Burn failed.");
+              setIsBurning(false);
+            }
+          }
+        } catch {
+          // Ignore polling errors
+        }
+      }, 5000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        clearInterval(interval);
+        if (isBurning) {
+          setIsBurning(false);
+          setBurnProgress(0);
+          setError("Burn timed out. Your job may still complete.");
+        }
+      }, 300000);
+    } catch (err) {
+      console.error("Burn failed:", err);
+      setError("Network error. Please try again.");
+      setIsBurning(false);
+    } finally {
+      burnLockRef.current = false;
+    }
   };
 
   return (
@@ -500,13 +613,60 @@ export default function CaptionsPage() {
                   <Button onClick={handleDownloadSrt} className="flex-1">
                     <Download className="w-4 h-4" /> Download SRT
                   </Button>
-                  <Button variant="ghost" disabled className="flex-1 relative">
-                    <Sparkles className="w-4 h-4" /> Burn into Video
-                    <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-violet-500/20 text-[10px] text-violet-300 border border-violet-500/30">
-                      Soon
-                    </span>
+                  <Button
+                    variant={captionStyle === "srt_only" ? "ghost" : "outline"}
+                    className="flex-1"
+                    disabled={captionStyle === "srt_only" || isBurning}
+                    loading={isBurning}
+                    onClick={handleBurnIntoVideo}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {isBurning ? "Burning..." : "Burn into Video"}
                   </Button>
                 </div>
+
+                {/* Burn progress */}
+                {isBurning && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <GenesisButtonLoader />
+                      <span className="text-sm text-zinc-300">Burning captions into video...</span>
+                    </div>
+                    <Progress value={burnProgress} />
+                    <p className="text-xs text-zinc-500 text-center">{burnProgress}% — 5 credits</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Burned Video Result */}
+          {burnedVideoUrl && (
+            <Card glow>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Film className="w-4 h-4 text-emerald-400" />
+                  Video with Captions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <video
+                  src={burnedVideoUrl}
+                  controls
+                  className="w-full rounded-lg border border-white/[0.08]"
+                />
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = burnedVideoUrl;
+                    a.download = "video-with-captions.mp4";
+                    a.target = "_blank";
+                    a.click();
+                  }}
+                >
+                  <Download className="w-4 h-4" /> Download Video
+                </Button>
               </CardContent>
             </Card>
           )}

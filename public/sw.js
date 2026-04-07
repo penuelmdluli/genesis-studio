@@ -1,5 +1,5 @@
 // Genesis Studio Service Worker — PWA support
-const CACHE_NAME = "genesis-v1";
+const CACHE_NAME = "genesis-v2";
 const STATIC_ASSETS = ["/", "/dashboard", "/generate"];
 
 self.addEventListener("install", (event) => {
@@ -19,8 +19,19 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Network-first for API calls and dynamic pages
-  if (event.request.url.includes("/api/") || event.request.method !== "GET") {
+  const url = event.request.url;
+
+  // Skip non-GET, API calls, and external URLs (videos, media, CDN assets)
+  if (
+    event.request.method !== "GET" ||
+    url.includes("/api/") ||
+    !url.startsWith(self.location.origin) // Only cache same-origin requests
+  ) {
+    return;
+  }
+
+  // Skip media files — never cache videos/audio
+  if (url.match(/\.(mp4|webm|mov|mp3|wav|ogg)$/i)) {
     return;
   }
 

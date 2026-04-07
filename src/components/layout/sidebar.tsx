@@ -32,6 +32,7 @@ import {
   FolderOpen,
   Image,
   Users,
+  Radio,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
@@ -77,6 +78,7 @@ export function Sidebar() {
   const navItems = useMemo(() => {
     const items = [...baseNavItems];
     if (user?.isOwner) {
+      items.push({ href: "/studio", label: "Content Engine", icon: Radio, section: "Automate", badge: "NEW" });
       items.push({ href: "/admin", label: "Admin", icon: Shield });
     }
     return items;

@@ -117,16 +117,25 @@ export default function BrainStudioPage() {
   };
 
   // Parse caption metadata from API into CaptionCue[]
+  // Handles both formats:
+  //   - Plan-based captions: entries with startTime/endTime as SRT strings
+  //   - Whisper subtitles: entries with startTime/endTime as numbers (seconds)
+  //   - Legacy Whisper: entries with start/end as numbers (seconds)
   const parseCaptionsFromMetadata = (captionsUrlStr: string) => {
     try {
       const meta = typeof captionsUrlStr === "string" ? JSON.parse(captionsUrlStr) : captionsUrlStr;
-      const entries = meta?.entries as Array<{ startTime: string; endTime: string; text: string }> | undefined;
+      const entries = meta?.entries as Array<Record<string, unknown>> | undefined;
       if (!entries || entries.length === 0) return;
-      const cues: CaptionCue[] = entries.map((e) => ({
-        startTime: typeof e.startTime === "number" ? e.startTime : parseSrtTime(e.startTime),
-        endTime: typeof e.endTime === "number" ? e.endTime : parseSrtTime(e.endTime),
-        text: e.text,
-      }));
+      const cues: CaptionCue[] = entries.map((e) => {
+        // Support both property naming conventions
+        const rawStart = e.startTime ?? e.start;
+        const rawEnd = e.endTime ?? e.end;
+        return {
+          startTime: typeof rawStart === "number" ? rawStart : parseSrtTime(String(rawStart || "0")),
+          endTime: typeof rawEnd === "number" ? rawEnd : parseSrtTime(String(rawEnd || "0")),
+          text: String(e.text || ""),
+        };
+      });
       setCaptionCues(cues);
     } catch {
       // Invalid caption data — skip silently

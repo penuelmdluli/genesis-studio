@@ -1120,7 +1120,7 @@ async function pollMixFinalPhase(
   if (state.voiceoverClips?.length && !state.subtitleData) {
     try {
       const subtitles = await generateWordLevelSubtitles(
-        state.voiceoverClips.map((c) => ({ ...c, sceneNumber: 0 }))
+        state.voiceoverClips.map((c) => ({ ...c, sceneNumber: c.sceneNumber || 0 }))
       );
       if (subtitles.length > 0) {
         state.subtitleData = subtitles;
@@ -1357,7 +1357,15 @@ async function finalizeAssembly(
   // --- STORE SUBTITLE DATA (if generated) ---
   if (state.subtitleData && state.subtitleData.length > 0) {
     try {
-      // Convert word-level subtitles to SRT format and store as captions
+      // Convert Whisper subtitle entries (start/end in seconds) to the format
+      // the UI expects (startTime/endTime as numbers in seconds).
+      // The UI parser handles both number and SRT-string formats.
+      const normalizedEntries = state.subtitleData.map((entry) => ({
+        startTime: entry.start,
+        endTime: entry.end,
+        text: entry.text,
+      }));
+
       const srtContent = state.subtitleData.map((entry, i) => {
         const startTime = formatSrtTimestamp(entry.start);
         const endTime = formatSrtTimestamp(entry.end);
@@ -1367,12 +1375,12 @@ async function finalizeAssembly(
       await updateProduction(productionId, {
         captions_url: JSON.stringify({
           srtContent,
-          captionCount: state.subtitleData.length,
-          entries: state.subtitleData,
+          captionCount: normalizedEntries.length,
+          entries: normalizedEntries,
           source: "whisper-word-level",
         }),
       });
-      console.log(`[ASSEMBLY] ✅ Word-level subtitles saved: ${state.subtitleData.length} entries`);
+      console.log(`[ASSEMBLY] ✅ Word-level subtitles saved: ${normalizedEntries.length} entries`);
     } catch (subtitleErr) {
       console.warn(`[ASSEMBLY] Failed to save subtitle data:`, subtitleErr);
     }

@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { checkRateLimit } from "@/lib/fraud";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
 
 const SYSTEM_PROMPT = `You are the Genesis Studio AI assistant — part helper, part creative advisor, part brand ambassador. You're excited about the platform and genuinely love helping creators succeed.
 

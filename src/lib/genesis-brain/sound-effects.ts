@@ -20,7 +20,7 @@ export async function designSceneSounds(
   scene: SceneDefinition,
   existingSoundDesign?: SoundDesign
 ): Promise<EnhancedSoundDesign> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     // Fallback: convert existing basic soundDesign to enhanced format
     return convertBasicSoundDesign(scene, existingSoundDesign);

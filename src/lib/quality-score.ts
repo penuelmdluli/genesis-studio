@@ -6,7 +6,7 @@
 
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
 
 interface QualityResult {
   score: number; // 1-10

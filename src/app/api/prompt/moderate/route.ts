@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
 
 const SYSTEM_PROMPT = `You are a content moderation system for a video generation platform. Your job is to evaluate whether a user's prompt would result in harmful video content.
 

@@ -369,7 +369,7 @@ describe("Planner", () => {
     };
 
     beforeEach(() => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "test-key-123");
+      vi.stubEnv("GENESIS_CLAUDE_KEY", "test-key-123");
     });
 
     afterEach(() => {
@@ -405,7 +405,7 @@ describe("Planner", () => {
     });
 
     it("throws when ANTHROPIC_API_KEY is not set", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "");
+      vi.stubEnv("GENESIS_CLAUDE_KEY", "");
       const input = makeBrainInput();
       await expect(planProduction(input)).rejects.toThrow(
         "ANTHROPIC_API_KEY is not configured"

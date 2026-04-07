@@ -123,7 +123,7 @@ export async function planProduction(input: BrainInput): Promise<ScenePlan> {
     throw new Error("Target duration must be between 15 and 120 seconds");
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured. Brain features require a Claude API key.");
   }

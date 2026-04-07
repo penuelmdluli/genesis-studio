@@ -191,7 +191,7 @@ export class ConsistencyEngine {
    * so scenes look like they belong in the SAME film.
    */
   async harmonizeVisualStyle(plan: ScenePlan): Promise<ScenePlan> {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return plan;
 
     // Extract the visual style metadata from plan (if the planner provided it)

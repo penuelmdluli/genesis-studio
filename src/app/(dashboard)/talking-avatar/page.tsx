@@ -9,6 +9,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { GenesisButtonLoader, GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   MessageCircle,
   Upload,
@@ -21,7 +22,6 @@ import {
   Lock,
   Globe,
   Clock,
-  Loader2,
 } from "lucide-react";
 
 type InputMode = "script" | "audio";
@@ -489,7 +489,7 @@ export default function TalkingAvatarPage() {
                             title={previewingVoice === voice.id ? "Stop" : "Preview"}
                           >
                             {loadingPreview === voice.id ? (
-                              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                              <GenesisButtonLoader />
                             ) : previewingVoice === voice.id ? (
                               <Square className="h-2 w-2" />
                             ) : (
@@ -691,7 +691,7 @@ export default function TalkingAvatarPage() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-48 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                <div className="w-10 h-10 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mb-3" />
+                <GenesisLoader size="md" />
                 <p className="text-sm text-zinc-300 font-medium">Generating your talking avatar...</p>
                 <p className="text-[11px] text-zinc-600 mt-1.5">
                   This may take 1-3 minutes — you can leave this page

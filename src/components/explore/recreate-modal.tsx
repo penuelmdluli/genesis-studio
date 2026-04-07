@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   X,
   Copy,
@@ -346,7 +347,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
         {!isLoaded ? (
           // Loading state
           <div className="px-5 pb-5 flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            <GenesisLoader size="md" />
           </div>
         ) : isSignedIn ? (
           renderLoggedInContent()

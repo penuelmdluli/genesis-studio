@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { X, Send, MessageCircle, Loader2 } from "lucide-react";
+import { X, Send, MessageCircle } from "lucide-react";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 
 interface Message {
   role: "user" | "assistant";
@@ -137,7 +138,7 @@ export function ChatBot() {
 
             {isLoading && (
               <div className="bg-white/[0.04] rounded-xl p-3 mr-6 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                <GenesisButtonLoader />
                 <span className="text-sm text-white/50">Thinking...</span>
               </div>
             )}

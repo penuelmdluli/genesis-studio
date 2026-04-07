@@ -10,6 +10,7 @@ import { VideoPlayer } from "@/components/ui/video-player";
 import { PageTransition, StaggerGroup, StaggerItem, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Film,
   Search,
@@ -618,7 +619,7 @@ function VideoCard({
         {/* Loading spinner on hover while video loads */}
         {isVisible && isHovered && !videoLoaded && (
           <div className="absolute inset-0 flex items-center justify-center z-[6]">
-            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-violet-500 animate-spin" />
+            <GenesisLoader size="md" />
           </div>
         )}
 

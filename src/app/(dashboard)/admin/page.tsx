@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PageTransition, StaggerGroup, StaggerItem } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { formatRelativeTime } from "@/lib/utils";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Users,
   Zap,
@@ -229,7 +230,7 @@ export default function AdminPage() {
     return (
       <PageTransition>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+          <GenesisLoader size="md" />
         </div>
       </PageTransition>
     );

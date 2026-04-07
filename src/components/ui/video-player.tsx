@@ -12,10 +12,10 @@ import {
   SkipBack,
   SkipForward,
   Download,
-  Loader2,
   AlertTriangle,
   RotateCcw,
 } from "lucide-react";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 
 interface VideoPlayerProps {
   src: string;
@@ -347,7 +347,7 @@ export function VideoPlayer({
       {/* Loading spinner */}
       {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-          <Loader2 className="w-10 h-10 text-white animate-spin" />
+          <GenesisLoader size="lg" />
         </div>
       )}
 

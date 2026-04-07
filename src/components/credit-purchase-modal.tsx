@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useStore } from "@/hooks/use-store";
 import { CREDIT_PACKS } from "@/lib/constants";
-import { Zap, ArrowRight, Loader2, Crown, Check } from "lucide-react";
+import { Zap, ArrowRight, Crown, Check } from "lucide-react";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 
 export function CreditPurchaseModal() {
   const router = useRouter();
@@ -97,7 +98,7 @@ export function CreditPurchaseModal() {
                 <p className="text-white font-bold">${pack.price}</p>
               </div>
               {loading === pack.id ? (
-                <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                <GenesisButtonLoader />
               ) : (
                 <ArrowRight className="w-4 h-4 text-zinc-600" />
               )}

@@ -13,7 +13,6 @@ import {
   Sparkles,
   Image as ImageIcon,
   Download,
-  Loader2,
   Wand2,
   Zap,
   Square,
@@ -22,6 +21,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
+import { GenesisLoader, GenesisButtonLoader } from "@/components/ui/genesis-loader";
 
 type AspectRatioOption = "landscape" | "portrait" | "square";
 
@@ -59,7 +59,7 @@ function ImageCard({ url, index, onDownload }: { url: string; index: number; onD
       {!loaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+            <GenesisLoader size="md" />
             <span className="text-xs text-zinc-500">Loading image...</span>
           </div>
         </div>
@@ -254,7 +254,7 @@ export default function ImagesPage() {
                   onClick={handleEnhance}
                   disabled={isEnhancing || !prompt.trim()}
                 >
-                  {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                  {isEnhancing ? <GenesisButtonLoader /> : <Wand2 className="w-3 h-3" />}
                   {isEnhancing ? "Enhancing..." : "Enhance with AI"}
                 </Button>
               </div>

@@ -10,6 +10,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import {
   Captions,
   Upload,
@@ -17,7 +18,6 @@ import {
   Zap,
   Download,
   Film,
-  Loader2,
   ChevronDown,
   Type,
   Sparkles,
@@ -586,7 +586,7 @@ export default function CaptionsPage() {
               {isProcessing && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                    <GenesisButtonLoader />
                     <span className="text-sm text-zinc-300">Processing captions...</span>
                   </div>
                   <Progress value={progress} />

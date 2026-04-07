@@ -11,7 +11,8 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { STORAGE_LIMITS } from "@/lib/profitability";
 import { Switch } from "@/components/ui/switch";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, Loader2, History } from "lucide-react";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useStore();
@@ -200,7 +201,7 @@ export default function SettingsPage() {
         <CardContent>
           {!creditHistoryLoaded ? (
             <Button variant="secondary" size="sm" onClick={loadCreditHistory} disabled={creditHistoryLoading} className="w-full">
-              {creditHistoryLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <History className="w-3 h-3 mr-1.5" />}
+              {creditHistoryLoading ? <GenesisButtonLoader /> : <History className="w-3 h-3 mr-1.5" />}
               {creditHistoryLoading ? "Loading..." : "View Credit History"}
             </Button>
           ) : creditHistory.length === 0 ? (
@@ -333,7 +334,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <Button variant="secondary" size="sm" onClick={handleExportData} disabled={isExporting} className="w-full sm:w-auto">
-              {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              {isExporting ? <GenesisButtonLoader /> : <Download className="w-3 h-3" />}
               {isExporting ? "Exporting..." : "Export"}
             </Button>
           </div>
@@ -384,7 +385,7 @@ export default function SettingsPage() {
               Cancel
             </Button>
             <Button variant="danger" size="sm" onClick={handleDeleteAccount} disabled={isDeleting}>
-              {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {isDeleting ? <GenesisButtonLoader /> : <Trash2 className="w-3 h-3" />}
               {isDeleting ? "Deleting..." : "Delete My Account"}
             </Button>
           </div>

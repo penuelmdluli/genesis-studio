@@ -36,7 +36,6 @@ import {
   Check,
   X,
   AlertTriangle,
-  Loader2,
   Camera,
   Palette,
   Type,
@@ -51,6 +50,7 @@ import {
   History,
   Clapperboard,
 } from "lucide-react";
+import { GenesisLoader, GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { VideoStyle, AspectRatio, ScenePlan, SceneDefinition, TransitionType, ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 import { formatDuration } from "@/lib/utils";
@@ -369,7 +369,7 @@ export default function BrainStudioPage() {
         {isRestoring && (
           <Card className="border-violet-500/30 bg-violet-500/5">
             <CardContent className="flex items-center justify-center gap-3 py-12">
-              <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+              <GenesisLoader size="sm" />
               <span className="text-zinc-400">Checking for in-progress productions...</span>
             </CardContent>
           </Card>
@@ -861,7 +861,7 @@ export default function BrainStudioPage() {
                           ) : isProcessing ? (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/20">
                               <div className="relative">
-                                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                                <GenesisLoader size="md" />
                                 <div className="absolute inset-0 w-8 h-8 rounded-full bg-violet-500/20 animate-ping" />
                               </div>
                             </div>
@@ -970,7 +970,7 @@ export default function BrainStudioPage() {
                           {step.done ? (
                             <Check className="w-3 h-3 text-emerald-400" />
                           ) : progress >= (75 + i * 5) ? (
-                            <Loader2 className="w-3 h-3 text-violet-400 animate-spin" />
+                            <GenesisButtonLoader />
                           ) : (
                             <Clock className="w-3 h-3 text-zinc-600" />
                           )}

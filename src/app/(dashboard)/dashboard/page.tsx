@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { SkeletonCard, SkeletonVideoCard } from "@/components/ui/skeleton";
 import { PageTransition, StaggerGroup, StaggerItem, AnimatedCounter, MotionSection, GlowCard, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Sparkles,
   Film,
@@ -480,7 +481,7 @@ function DashboardVideoCard({ video }: {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[shimmer_2s_infinite]" />
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 rounded-full border-2 border-transparent border-t-violet-500/60 animate-spin" />
+              <GenesisLoader size="md" />
             </div>
           </div>
         )}

@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Play, AlertTriangle, Volume2, VolumeX } from "lucide-react";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 
 interface LazyVideoProps {
   src: string;
@@ -166,7 +167,7 @@ export function LazyVideo({
       {/* Layer 4: Loading indicator (video loading but not yet ready) */}
       {isVisible && !videoReady && !hasError && isHovered && (
         <div className="absolute inset-0 flex items-center justify-center z-20">
-          <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-violet-500 animate-spin" />
+          <GenesisLoader size="md" />
         </div>
       )}
 

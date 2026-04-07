@@ -11,6 +11,7 @@ import {
 import { ShareModal } from "@/components/explore/share-modal";
 import { RecreateModal } from "@/components/explore/recreate-modal";
 import { VideoViewerModal } from "@/components/explore/video-viewer-modal";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Flame,
   Sparkles,
@@ -19,7 +20,6 @@ import {
   Film,
   Star,
   ArrowRight,
-  Loader2,
   VideoOff,
 } from "lucide-react";
 
@@ -368,7 +368,7 @@ export default function ExplorePage() {
         {/* Loading more spinner */}
         {isLoadingMore && (
           <div className="flex items-center justify-center py-10">
-            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+            <GenesisLoader size="md" />
           </div>
         )}
 

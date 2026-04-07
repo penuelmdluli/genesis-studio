@@ -51,12 +51,12 @@ import {
   X,
   Info,
   Pause,
-  Loader2,
   LayoutTemplate,
   AlertTriangle,
   Globe,
   Languages,
 } from "lucide-react";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
   { value: "t2v", label: "Text to Video", icon: Film, desc: "Generate from text prompt" },
@@ -545,7 +545,7 @@ export default function GeneratePage() {
                     onClick={handleTranslatePrompt}
                     disabled={isTranslating || !form.prompt.trim()}
                   >
-                    {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+                    {isTranslating ? <GenesisButtonLoader /> : <Languages className="w-3 h-3" />}
                     <span className="hidden sm:inline">{isTranslating ? "Translating..." : "Translate"}</span>
                   </Button>
                   <Button
@@ -555,7 +555,7 @@ export default function GeneratePage() {
                     onClick={handleEnhancePrompt}
                     disabled={isEnhancing || !form.prompt.trim()}
                   >
-                    {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    {isEnhancing ? <GenesisButtonLoader /> : <Wand2 className="w-3 h-3" />}
                     <span className="hidden sm:inline">{isEnhancing ? "Enhancing..." : "Enhance"}</span>
                   </Button>
                 </div>

@@ -8,6 +8,7 @@ import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   ImageIcon,
   Download,
@@ -466,7 +467,7 @@ export default function ThumbnailsPage() {
       {isGenerating && (
         <Card>
           <CardContent className="p-8 flex flex-col items-center justify-center gap-4">
-            <div className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+            <GenesisLoader size="lg" />
             <div className="text-center">
               <p className="text-sm font-medium text-zinc-200">
                 Generating your thumbnails...

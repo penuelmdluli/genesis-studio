@@ -9,7 +9,8 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
-import { Mic, Play, Square, Download, Zap, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { GenesisButtonLoader, GenesisLoader } from "@/components/ui/genesis-loader";
+import { Mic, Play, Square, Download, Zap, AlertCircle, RefreshCw } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "\u{1F1FA}\u{1F1F8}",
@@ -278,7 +279,7 @@ export default function VoiceoverPage() {
                           title={previewingVoice === voice.id ? "Stop preview" : "Preview voice"}
                         >
                           {loadingPreview === voice.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <GenesisButtonLoader />
                           ) : previewingVoice === voice.id ? (
                             <Square className="h-3 w-3" />
                           ) : (
@@ -402,7 +403,7 @@ export default function VoiceoverPage() {
           {isGenerating && !audioUrl && (
             <Card className="border-zinc-800 bg-zinc-900/60">
               <CardContent className="flex flex-col items-center gap-3 py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500" />
+                <GenesisLoader size="md" />
                 <p className="text-sm text-zinc-400">
                   Generating your voiceover... This may take up to a minute.
                 </p>

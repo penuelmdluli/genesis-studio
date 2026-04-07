@@ -285,7 +285,10 @@ export async function pollAssembly(productionId: string): Promise<void> {
         updated = await pollMixFinalPhase(productionId, state, production);
         break;
       case "trim_final":
-        updated = await pollTrimFinalPhase(productionId, state);
+        updated = await pollTrimFinalPhase(productionId, state, production);
+        break;
+      case "burn_captions":
+        updated = await pollBurnCaptionsPhase(productionId, state);
         break;
       case "normalize":
         // Normalize phase is deprecated — loudnorm strips video stream.
@@ -1122,8 +1125,13 @@ async function pollMixFinalPhase(
   // We want exactly concat length — all video clips, nothing more.
   if (state.concatDurationMs && state.concatDurationMs > 0) {
     state.phase = "trim_final";
-    await updateProduction(productionId, { progress: 96 });
+    await updateProduction(productionId, { progress: 94 });
     console.log(`[ASSEMBLY] Mix-final done → trim_final (trim to ${(state.concatDurationMs / 1000).toFixed(1)}s — all clips preserved)`);
+  } else if (production.captions && production.voiceover) {
+    // No trim needed but captions requested — go straight to burn
+    state.phase = "burn_captions";
+    await updateProduction(productionId, { progress: 96 });
+    console.log(`[ASSEMBLY] Mix-final done → burn_captions (no trim, captions enabled)`);
   } else {
     state.phase = "done";
     await updateProduction(productionId, { progress: 98 });
@@ -1136,7 +1144,8 @@ async function pollMixFinalPhase(
 
 async function pollTrimFinalPhase(
   productionId: string,
-  state: AssemblyState
+  state: AssemblyState,
+  production: Production
 ): Promise<boolean> {
   // Trim to concat video duration — this cuts music padding while keeping ALL video clips.
   // Voiceover plays naturally; if shorter than video, remaining clips have music/ambient only.
@@ -1195,9 +1204,95 @@ async function pollTrimFinalPhase(
     }
   }
 
+  // If captions are enabled and we have voiceover (audio to transcribe), burn captions
+  if (production.captions && production.voiceover) {
+    state.phase = "burn_captions";
+    await updateProduction(productionId, { progress: 96 });
+    console.log(`[ASSEMBLY] Trim done → burn_captions (captions enabled)`);
+  } else {
+    state.phase = "done";
+    await updateProduction(productionId, { progress: 98 });
+    console.log(`[ASSEMBLY] Trim done → done`);
+  }
+  return true;
+}
+
+// ---- PHASE 6: BURN CAPTIONS — Burn styled subtitles into the final video ----
+
+async function pollBurnCaptionsPhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  // Get the best available video URL (priority: trim > mix_final > concat)
+  const videoUrl = state.trimFinalJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;
+
+  if (!videoUrl) {
+    console.warn(`[ASSEMBLY] No video URL for caption burn, skipping`);
+    state.phase = "done";
+    return true;
+  }
+
+  // Submit burn job if not yet started
+  if (!state.burnCaptionsJob) {
+    try {
+      const result = await fal.queue.submit("fal-ai/workflow-utilities/auto-subtitle", {
+        input: {
+          video_url: videoUrl,
+          // Cinematic style — elegant, professional look for Brain Studio productions
+          font: "Montserrat/Montserrat-ExtraBold.ttf",
+          font_size: 80,
+          font_color: "white",
+          stroke_color: "black",
+          stroke_width: 4,
+          highlight_color: "yellow",
+          caption_position: "bottom",
+          bounce: false,
+        } as Record<string, unknown> & { video_url: string },
+      });
+
+      state.burnCaptionsJob = { requestId: result.request_id, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Caption burn submitted: ${result.request_id}`);
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Caption burn submit failed, skipping:`, err);
+      state.phase = "done";
+    }
+    return true;
+  }
+
+  // Poll burn job
+  if (state.burnCaptionsJob.status !== "COMPLETED" && state.burnCaptionsJob.status !== "FAILED") {
+    try {
+      const result = await checkFalQueueStatus(
+        "fal-ai/workflow-utilities/auto-subtitle",
+        state.burnCaptionsJob.requestId
+      );
+
+      if (result.status === "COMPLETED") {
+        const data = await getFalQueueResult(
+          "fal-ai/workflow-utilities/auto-subtitle",
+          state.burnCaptionsJob.requestId
+        );
+        const burnedUrl = (data?.video as { url: string })?.url || "";
+        state.burnCaptionsJob.status = "COMPLETED";
+        state.burnCaptionsJob.videoUrl = burnedUrl || videoUrl;
+        console.log(`[ASSEMBLY] Caption burn completed: ${state.burnCaptionsJob.videoUrl?.slice(0, 60)}...`);
+      } else if (result.status === "FAILED") {
+        state.burnCaptionsJob.status = "FAILED";
+        state.burnCaptionsJob.videoUrl = videoUrl; // Fall back to original
+        console.warn(`[ASSEMBLY] Caption burn failed, using video without captions`);
+      } else {
+        return false; // Still in progress
+      }
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Caption burn poll error, skipping:`, err);
+      state.burnCaptionsJob.status = "FAILED";
+      state.burnCaptionsJob.videoUrl = videoUrl;
+    }
+  }
+
   state.phase = "done";
   await updateProduction(productionId, { progress: 98 });
-  console.log(`[ASSEMBLY] Trim done → done`);
+  console.log(`[ASSEMBLY] Caption burn done → done`);
   return true;
 }
 
@@ -1213,8 +1308,8 @@ async function finalizeAssembly(
   state: AssemblyState,
   production: Production
 ): Promise<void> {
-  // Determine final video source URL — priority: trim > mix_final > concat > first scene
-  const sourceUrl = state.trimFinalJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+  // Determine final video source URL — priority: burn_captions > trim > mix_final > concat > first scene
+  const sourceUrl = state.burnCaptionsJob?.videoUrl || state.trimFinalJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!sourceUrl) {
     await updateProduction(productionId, {

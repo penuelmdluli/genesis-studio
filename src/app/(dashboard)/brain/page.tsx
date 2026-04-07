@@ -816,7 +816,11 @@ export default function BrainStudioPage() {
                       </h2>
                       <p className="text-xs text-zinc-500 mt-0.5">
                         {isAssembling
-                          ? "Adding audio, merging scenes, finalizing..."
+                          ? progress >= 96
+                            ? "Burning captions into video..."
+                            : progress >= 94
+                              ? "Trimming and polishing..."
+                              : "Adding audio, merging scenes, finalizing..."
                           : activeModel
                             ? `Using ${activeModel.name}`
                             : "Generating with AI"}

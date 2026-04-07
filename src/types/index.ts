@@ -484,9 +484,11 @@ export interface CharacterDefinition {
 
 // Assembly state machine — tracks async FAL jobs during assembly
 export interface AssemblyState {
-  phase: "mmaudio" | "merge_audio" | "speed_adjust" | "concat" | "compose_audio" | "mix_final" | "trim_final" | "normalize" | "done";
+  phase: "mmaudio" | "merge_audio" | "speed_adjust" | "concat" | "compose_audio" | "mix_final" | "trim_final" | "burn_captions" | "normalize" | "done";
   // Trim final video to voiceover duration
   trimFinalJob?: { requestId: string; status: string; videoUrl?: string };
+  // Burn captions into video (auto-subtitle)
+  burnCaptionsJob?: { requestId: string; status: string; videoUrl?: string };
   // Per-scene MMAudio jobs: sceneId -> FAL request_id
   mmaudioJobs: Record<string, { requestId: string; status: string; audioUrl?: string }>;
   // Per-scene merge-audio-video jobs: sceneId -> FAL request_id

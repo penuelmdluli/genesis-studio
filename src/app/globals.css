@@ -138,6 +138,15 @@ body {
   50% { transform: translateY(-6px); }
 }
 
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.02); }
+}
+
+.animate-hero-float {
+  animation: hero-float 20s ease-in-out infinite;
+}
+
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

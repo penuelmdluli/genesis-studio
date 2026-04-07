@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 import { ShareModal } from "@/components/explore/share-modal";
 import { RecreateModal } from "@/components/explore/recreate-modal";
 import { VideoViewerModal } from "@/components/explore/video-viewer-modal";
+import { HeroVideo } from "@/components/hero-video";
 import {
   MotionSection,
   StaggerGroup,
@@ -111,12 +112,6 @@ const capabilities = [
 // ============================================
 
 export default function LandingPage() {
-  // Hero crossfade
-  const [heroIndex, setHeroIndex] = useState(0);
-  const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [heroVideos, setHeroVideos] = useState<string[]>([]);
-  const [heroVideoFailed, setHeroVideoFailed] = useState(false);
-
   // Community feed
   const [feedTab, setFeedTab] = useState<FeedTab>("trending");
   const [feedVideos, setFeedVideos] = useState<ExploreVideo[]>([]);
@@ -126,33 +121,6 @@ export default function LandingPage() {
   const [shareVideo, setShareVideo] = useState<ExploreVideo | null>(null);
   const [recreateVideo, setRecreateVideo] = useState<ExploreVideo | null>(null);
   const [viewerVideo, setViewerVideo] = useState<ExploreVideo | null>(null);
-
-  // ---- Fetch hero videos from featured explore_videos ----
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/explore?tab=picks&limit=6");
-        if (res.ok) {
-          const data = await res.json();
-          const urls = (data.videos || [])
-            .map((v: ExploreVideo) => v.videoUrl)
-            .filter(Boolean);
-          if (urls.length > 0) setHeroVideos(urls);
-        }
-      } catch {
-        // No hero videos available yet
-      }
-    })();
-  }, []);
-
-  // ---- Hero crossfade every 5s ----
-  useEffect(() => {
-    if (heroVideos.length === 0) return;
-    const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroVideos.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [heroVideos.length]);
 
   // ---- Fetch community feed ----
   const fetchFeed = useCallback(async (tab: FeedTab) => {
@@ -205,34 +173,8 @@ export default function LandingPage() {
           SECTION 1: HERO — Full-screen video bg
       ======================================== */}
       <section className="relative h-screen w-full overflow-hidden">
-        {/* Video layers for crossfade — only mount active + next for performance */}
-        {heroVideos.length > 0 && !heroVideoFailed ? heroVideos.map((src, i) => {
-          const isActive = i === heroIndex;
-          const isNext = i === (heroIndex + 1) % heroVideos.length;
-          if (!isActive && !isNext) return null;
-          return (
-            <video
-              key={src}
-              ref={(el) => { heroVideoRefs.current[i] = el; }}
-              src={src}
-              autoPlay
-              muted
-              loop
-              playsInline
-              crossOrigin="anonymous"
-              preload={isActive ? "auto" : "metadata"}
-              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1500 ease-in-out"
-              style={{ opacity: isActive ? 1 : 0 }}
-              onError={() => setHeroVideoFailed(true)}
-            />
-          );
-        }) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-[#0A0A0F] to-blue-900/30" />
-        )}
-
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-transparent to-transparent" />
+        {/* 3-layer instant-load hero: gradient (0ms) -> poster (~300ms) -> video (3-5s) */}
+        <HeroVideo />
 
         {/* Center content */}
         <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 sm:px-6 text-center">

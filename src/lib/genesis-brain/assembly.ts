@@ -1,6 +1,7 @@
 // ============================================
-// GENESIS BRAIN — Cinematic Assembly Pipeline
-// MMAudio V2 + FFmpeg Scene Concatenation
+// GENESIS BRAIN — Async Cinematic Assembly
+// State-machine design: submit FAL jobs, poll
+// each step, advance phases. No timeouts.
 // ============================================
 
 import {
@@ -9,32 +10,28 @@ import {
   updateProduction,
 } from "./orchestrator";
 import {
-  generateVideoAudio,
   buildAudioPromptFromSoundDesign,
-  mergeAudioOntoVideo,
-  assembleScenes,
+  submitMMAudioJob,
+  submitMergeAudioVideoJob,
+  submitMergeVideosJob,
+  checkFalQueueStatus,
+  getFalQueueResult,
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
 import { AI_MODELS } from "@/lib/constants";
-import { ModelId, SoundDesign, AspectRatio } from "@/types";
+import { ModelId, SoundDesign, AspectRatio, AssemblyState, Production } from "@/types";
+
+// ---- PHASE 1: START ASSEMBLY (called once) ----
 
 /**
- * CINEMATIC ASSEMBLY PIPELINE
- *
- * 1. For each completed silent scene → run MMAudio V2 to generate synchronized audio
- * 2. Merge MMAudio onto silent videos via FFmpeg
- * 3. Concatenate all scenes (with audio) into a single video via FAL FFmpeg
- * 4. Mix in voiceover and music tracks
- * 5. Mark production as completed
+ * Kick off async assembly — submits MMAudio jobs for silent scenes
+ * and returns immediately. Each call takes <3s.
  */
-export async function triggerBrainAssembly(
-  productionId: string,
-  _scenes?: Array<{ id: string; sceneNumber: number; status: string; outputVideoUrl?: string }>
+export async function startAssembly(
+  productionId: string
 ): Promise<void> {
   try {
-    // Always re-fetch scenes from DB for fresh outputVideoUrl values
-    // (in-memory scenes may be stale if updated during the same request)
     const freshScenes = await getProductionScenes(productionId);
     const completedScenes = freshScenes
       .filter((s) => s.status === "completed" && s.outputVideoUrl)
@@ -49,20 +46,27 @@ export async function triggerBrainAssembly(
       return;
     }
 
-    await updateProduction(productionId, { progress: 72 });
-
-    // Get production data for plan (sound design info) and audio URLs
     const production = await getProduction(productionId);
     const plan = production?.plan;
-
-    // --- Step 1: MMAudio for silent scenes ---
-    console.log(`[BRAIN ASSEMBLY] Processing ${completedScenes.length} scenes for audio`);
-
-    const processedSceneUrls: string[] = [];
     const supabase = createSupabaseAdmin();
 
-    for (const scene of completedScenes) {
-      // Check if this scene's model has native audio
+    // Build assembly state
+    const state: AssemblyState = {
+      phase: "mmaudio",
+      mmaudioJobs: {},
+      mergeJobs: {},
+      processedSceneUrls: new Array(completedScenes.length).fill(""),
+      sceneOrder: {},
+      nativeAudioScenes: [],
+    };
+
+    let needsMMAudio = false;
+
+    for (let i = 0; i < completedScenes.length; i++) {
+      const scene = completedScenes[i];
+      state.sceneOrder[scene.id] = i;
+
+      // Check if model has native audio
       const { data: sceneRow } = await supabase
         .from("production_scenes")
         .select("model_id, provider, model_has_audio")
@@ -74,106 +78,449 @@ export async function triggerBrainAssembly(
       const hasNativeAudio = sceneRow?.model_has_audio || model?.hasAudio || false;
 
       if (hasNativeAudio) {
-        // Scene already has audio (Kling, Veo) — use as-is
-        processedSceneUrls.push(scene.outputVideoUrl!);
-        console.log(`[BRAIN ASSEMBLY] Scene ${scene.sceneNumber}: native audio (${modelId})`);
+        // Scene already has audio — use as-is, skip MMAudio
+        state.processedSceneUrls[i] = scene.outputVideoUrl!;
+        state.nativeAudioScenes.push(scene.id);
+        console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: native audio (${modelId}), skipping MMAudio`);
       } else {
-        // Silent scene — generate audio with MMAudio V2
+        // Silent scene — submit MMAudio job
         const sceneDef = plan?.scenes?.find(
           (s: { sceneNumber: number }) => s.sceneNumber === scene.sceneNumber
         );
         const soundDesign = sceneDef?.soundDesign as SoundDesign | undefined;
         const audioPrompt = buildAudioPromptFromSoundDesign(soundDesign);
 
-        console.log(`[BRAIN ASSEMBLY] Scene ${scene.sceneNumber}: generating MMAudio (${modelId})`);
-
-        const audioResult = await generateVideoAudio(
-          scene.outputVideoUrl!,
-          audioPrompt,
-          sceneDef?.duration || 5
-        );
-
-        if (audioResult.url) {
-          // Merge audio onto the silent video
-          const mergedUrl = await mergeAudioOntoVideo(scene.outputVideoUrl!, audioResult.url);
-          processedSceneUrls.push(mergedUrl);
-          console.log(`[BRAIN ASSEMBLY] Scene ${scene.sceneNumber}: MMAudio merged`);
-        } else {
-          // MMAudio failed — use silent video
-          processedSceneUrls.push(scene.outputVideoUrl!);
-          console.warn(`[BRAIN ASSEMBLY] Scene ${scene.sceneNumber}: MMAudio unavailable, using silent`);
+        try {
+          const { requestId } = await submitMMAudioJob(
+            scene.outputVideoUrl!,
+            audioPrompt,
+            sceneDef?.duration || 5
+          );
+          state.mmaudioJobs[scene.id] = { requestId, status: "IN_QUEUE" };
+          needsMMAudio = true;
+          console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: MMAudio submitted (${requestId})`);
+        } catch (err) {
+          // MMAudio submission failed — use silent video
+          console.warn(`[ASSEMBLY] Scene ${scene.sceneNumber}: MMAudio submit failed, using silent`, err);
+          state.processedSceneUrls[i] = scene.outputVideoUrl!;
+          state.nativeAudioScenes.push(scene.id);
         }
       }
     }
 
-    await updateProduction(productionId, { progress: 85 });
-
-    // --- Step 2: Assemble all scenes into final video ---
-    console.log(`[BRAIN ASSEMBLY] Concatenating ${processedSceneUrls.length} scenes`);
-
-    const { videoUrl: assembledUrl } = await assembleScenes(processedSceneUrls, {
-      voiceoverUrl: production?.voiceoverUrl || undefined,
-      musicUrl: production?.musicUrl || undefined,
-    });
-
-    await updateProduction(productionId, { progress: 95 });
-
-    // --- Step 3: Store final output ---
-    const sceneUrlMap: Record<string, string> = {};
-    completedScenes.forEach((s, i) => {
-      sceneUrlMap[`scene_${s.sceneNumber}`] = processedSceneUrls[i] || s.outputVideoUrl!;
-    });
-    sceneUrlMap["final"] = assembledUrl;
-
-    // Use first scene URL as thumbnail (video player shows first frame)
-    // Don't construct a _thumb.jpg URL — RunPod/FAL don't generate those
-    const finalThumbnail = completedScenes[0].outputVideoUrl || undefined;
-
-    await updateProduction(productionId, {
-      status: "completed",
-      output_video_urls: JSON.stringify(sceneUrlMap),
-      thumbnail_url: finalThumbnail,
-      progress: 100,
-      completed_at: new Date().toISOString(),
-    });
-
-    // Create a Video record so the production shows in Gallery
-    try {
-      const totalDuration = completedScenes.reduce((sum, s) => {
-        const sceneDef = plan?.scenes?.find(
-          (sd: { sceneNumber: number }) => sd.sceneNumber === s.sceneNumber
-        );
-        return sum + (sceneDef?.duration || 5);
-      }, 0);
-
-      await createVideo({
-        userId: production!.userId,
-        jobId: `brain-${productionId}`,
-        title: production!.concept || "Brain Studio Production",
-        url: assembledUrl,
-        thumbnailUrl: finalThumbnail || "",
-        modelId: "wan-2.2" as ModelId,
-        prompt: production!.concept || "",
-        resolution: "720p",
-        duration: totalDuration,
-        fps: 24,
-        fileSize: 0,
-        aspectRatio: (production!.aspectRatio || "landscape") as AspectRatio,
-      });
-      console.log(`[BRAIN ASSEMBLY] Video record created for Gallery`);
-    } catch (videoErr) {
-      console.error(`[BRAIN ASSEMBLY] Failed to create Video record (Gallery):`, videoErr);
+    // If no scenes need MMAudio, skip straight to concat
+    if (!needsMMAudio) {
+      state.phase = "concat";
+      console.log(`[ASSEMBLY] All scenes have audio — skipping to concat`);
     }
 
-    console.log(
-      `[BRAIN ASSEMBLY] Production ${productionId} COMPLETE — ${completedScenes.length} scenes assembled with audio`
-    );
+    // Save state and return immediately
+    await updateProduction(productionId, {
+      assembly_state: state as unknown as Record<string, unknown>,
+      progress: 72,
+    });
+
+    console.log(`[ASSEMBLY] startAssembly complete for ${productionId} — phase: ${state.phase}`);
   } catch (err) {
-    console.error(`[BRAIN ASSEMBLY] Error for ${productionId}:`, err);
+    console.error(`[ASSEMBLY] startAssembly error for ${productionId}:`, err);
     await updateProduction(productionId, {
       status: "failed",
-      error_message: `Video assembly failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      error_message: `Assembly start failed: ${err instanceof Error ? err.message : "Unknown error"}`,
       completed_at: new Date().toISOString(),
     });
   }
+}
+
+// ---- PHASE 2: POLL ASSEMBLY (called on every status poll) ----
+
+/**
+ * Advance assembly state machine one tick. Each call is fast (<5s).
+ * Called by the status endpoint on each poll while status === "assembling".
+ */
+export async function pollAssembly(productionId: string): Promise<void> {
+  try {
+    const production = await getProduction(productionId);
+    if (!production || production.status !== "assembling") return;
+
+    const state = production.assemblyState;
+    if (!state) {
+      // No assembly state yet — startAssembly hasn't run
+      console.warn(`[ASSEMBLY POLL] No assembly_state for ${productionId}`);
+      return;
+    }
+
+    let updated = false;
+
+    switch (state.phase) {
+      case "mmaudio":
+        updated = await pollMMAudioPhase(productionId, state);
+        break;
+      case "merge_audio":
+        updated = await pollMergeAudioPhase(productionId, state);
+        break;
+      case "concat":
+        updated = await pollConcatPhase(productionId, state, production);
+        break;
+      case "mix_final":
+        updated = await pollMixFinalPhase(productionId, state, production);
+        break;
+      case "done":
+        // Already complete — finalize
+        await finalizeAssembly(productionId, state, production);
+        return;
+    }
+
+    if (updated) {
+      await updateProduction(productionId, {
+        assembly_state: state as unknown as Record<string, unknown>,
+      });
+    }
+  } catch (err) {
+    console.error(`[ASSEMBLY POLL] Error for ${productionId}:`, err);
+    // Don't fail the production on a single poll error — it'll retry next poll
+  }
+}
+
+// ---- Phase handlers ----
+
+async function pollMMAudioPhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  let anyPending = false;
+  let updated = false;
+
+  for (const [sceneId, job] of Object.entries(state.mmaudioJobs)) {
+    if (job.status === "COMPLETED" || job.status === "FAILED") continue;
+
+    const result = await checkFalQueueStatus("fal-ai/mmaudio-v2", job.requestId);
+
+    if (result.status === "COMPLETED") {
+      const data = await getFalQueueResult("fal-ai/mmaudio-v2", job.requestId);
+      const audioData = data?.audio as { url: string } | undefined;
+      job.status = "COMPLETED";
+      job.audioUrl = audioData?.url || "";
+      updated = true;
+      console.log(`[ASSEMBLY] MMAudio completed for scene ${sceneId}`);
+    } else if (result.status === "FAILED") {
+      job.status = "FAILED";
+      updated = true;
+      // Use silent video as fallback
+      const idx = state.sceneOrder[sceneId];
+      if (idx !== undefined) {
+        const scenes = await getProductionScenes(productionId);
+        const scene = scenes.find(s => s.id === sceneId);
+        if (scene?.outputVideoUrl) {
+          state.processedSceneUrls[idx] = scene.outputVideoUrl;
+        }
+      }
+      console.warn(`[ASSEMBLY] MMAudio failed for scene ${sceneId}, using silent`);
+    } else {
+      anyPending = true;
+    }
+  }
+
+  // Check if all MMAudio jobs are done
+  if (!anyPending && updated) {
+    // Submit merge-audio-video jobs for scenes that got audio
+    const scenes = await getProductionScenes(productionId);
+    let needsMerge = false;
+
+    for (const [sceneId, job] of Object.entries(state.mmaudioJobs)) {
+      if (job.status === "COMPLETED" && job.audioUrl) {
+        const scene = scenes.find(s => s.id === sceneId);
+        if (scene?.outputVideoUrl) {
+          try {
+            const { requestId } = await submitMergeAudioVideoJob(
+              scene.outputVideoUrl,
+              job.audioUrl
+            );
+            state.mergeJobs[sceneId] = { requestId, status: "IN_QUEUE" };
+            needsMerge = true;
+            console.log(`[ASSEMBLY] Merge-audio submitted for scene ${sceneId} (${requestId})`);
+          } catch (err) {
+            // Merge submission failed — use silent video
+            console.warn(`[ASSEMBLY] Merge submit failed for ${sceneId}`, err);
+            const idx = state.sceneOrder[sceneId];
+            if (idx !== undefined) state.processedSceneUrls[idx] = scene.outputVideoUrl;
+          }
+        }
+      } else if (job.status === "FAILED") {
+        // Already handled above — silent video fallback
+      }
+    }
+
+    state.phase = needsMerge ? "merge_audio" : "concat";
+    await updateProduction(productionId, { progress: 78 });
+    console.log(`[ASSEMBLY] MMAudio phase done → ${state.phase}`);
+  }
+
+  if (updated) {
+    await updateProduction(productionId, { progress: 75 });
+  }
+
+  return updated;
+}
+
+async function pollMergeAudioPhase(
+  productionId: string,
+  state: AssemblyState
+): Promise<boolean> {
+  let anyPending = false;
+  let updated = false;
+
+  for (const [sceneId, job] of Object.entries(state.mergeJobs)) {
+    if (job.status === "COMPLETED" || job.status === "FAILED") continue;
+
+    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", job.requestId);
+
+    if (result.status === "COMPLETED") {
+      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", job.requestId);
+      const video = data?.video as { url: string } | undefined;
+      job.status = "COMPLETED";
+      job.mergedUrl = video?.url || "";
+      updated = true;
+
+      // Put merged URL into processedSceneUrls at correct position
+      const idx = state.sceneOrder[sceneId];
+      if (idx !== undefined && job.mergedUrl) {
+        state.processedSceneUrls[idx] = job.mergedUrl;
+      } else {
+        // Fallback to original video
+        const scenes = await getProductionScenes(productionId);
+        const scene = scenes.find(s => s.id === sceneId);
+        if (scene?.outputVideoUrl && idx !== undefined) {
+          state.processedSceneUrls[idx] = scene.outputVideoUrl;
+        }
+      }
+      console.log(`[ASSEMBLY] Merge-audio completed for scene ${sceneId}`);
+    } else if (result.status === "FAILED") {
+      job.status = "FAILED";
+      updated = true;
+      // Fallback to original silent video
+      const idx = state.sceneOrder[sceneId];
+      const scenes = await getProductionScenes(productionId);
+      const scene = scenes.find(s => s.id === sceneId);
+      if (scene?.outputVideoUrl && idx !== undefined) {
+        state.processedSceneUrls[idx] = scene.outputVideoUrl;
+      }
+      console.warn(`[ASSEMBLY] Merge-audio failed for scene ${sceneId}, using silent`);
+    } else {
+      anyPending = true;
+    }
+  }
+
+  // All merge jobs done → move to concat
+  if (!anyPending && updated) {
+    state.phase = "concat";
+    await updateProduction(productionId, { progress: 84 });
+    console.log(`[ASSEMBLY] Merge phase done → concat`);
+  }
+
+  return updated;
+}
+
+async function pollConcatPhase(
+  productionId: string,
+  state: AssemblyState,
+  production: Production
+): Promise<boolean> {
+  // If no concat job submitted yet, submit it now
+  if (!state.concatJob) {
+    const validUrls = state.processedSceneUrls.filter(u => u && u.length > 0);
+    if (validUrls.length === 0) {
+      // No valid scene URLs — fail
+      await updateProduction(productionId, {
+        status: "failed",
+        error_message: "No valid scene URLs for concatenation",
+        completed_at: new Date().toISOString(),
+      });
+      return false;
+    }
+
+    // Single scene — skip concat
+    if (validUrls.length === 1) {
+      state.concatJob = { requestId: "skip", status: "COMPLETED", videoUrl: validUrls[0] };
+      console.log(`[ASSEMBLY] Single scene — skipping concat`);
+    } else {
+      try {
+        const { requestId } = await submitMergeVideosJob(validUrls);
+        state.concatJob = { requestId, status: "IN_QUEUE" };
+        console.log(`[ASSEMBLY] Concat submitted: ${requestId} (${validUrls.length} scenes)`);
+      } catch (err) {
+        console.error(`[ASSEMBLY] Concat submit failed:`, err);
+        // Fallback: use first scene
+        state.concatJob = { requestId: "skip", status: "COMPLETED", videoUrl: validUrls[0] };
+      }
+    }
+    return true;
+  }
+
+  // Poll concat job
+  if (state.concatJob.status !== "COMPLETED" && state.concatJob.status !== "FAILED") {
+    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
+
+    if (result.status === "COMPLETED") {
+      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-videos", state.concatJob.requestId);
+      const video = data?.video as { url: string } | undefined;
+      state.concatJob.status = "COMPLETED";
+      state.concatJob.videoUrl = video?.url || state.processedSceneUrls[0];
+      console.log(`[ASSEMBLY] Concat completed: ${state.concatJob.videoUrl}`);
+    } else if (result.status === "FAILED") {
+      state.concatJob.status = "FAILED";
+      state.concatJob.videoUrl = state.processedSceneUrls[0]; // fallback
+      console.warn(`[ASSEMBLY] Concat failed, using first scene`);
+    } else {
+      return false; // Still in progress
+    }
+  }
+
+  // Concat done — check if we need audio mixing
+  const needsMix = production.voiceoverUrl || production.musicUrl;
+  if (needsMix && state.concatJob.videoUrl) {
+    state.phase = "mix_final";
+    await updateProduction(productionId, { progress: 92 });
+    console.log(`[ASSEMBLY] Concat done → mix_final`);
+  } else {
+    state.phase = "done";
+    await updateProduction(productionId, { progress: 98 });
+    console.log(`[ASSEMBLY] Concat done → done (no audio mix needed)`);
+  }
+
+  return true;
+}
+
+async function pollMixFinalPhase(
+  productionId: string,
+  state: AssemblyState,
+  production: Production
+): Promise<boolean> {
+  // Submit mix job if not yet submitted
+  if (!state.mixJob) {
+    const audioUrl = production.voiceoverUrl || production.musicUrl;
+    const videoUrl = state.concatJob?.videoUrl;
+    if (!audioUrl || !videoUrl) {
+      state.phase = "done";
+      return true;
+    }
+
+    try {
+      const { requestId } = await submitMergeAudioVideoJob(videoUrl, audioUrl);
+      state.mixJob = { requestId, status: "IN_QUEUE" };
+      console.log(`[ASSEMBLY] Mix-final submitted: ${requestId}`);
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Mix-final submit failed, using unmixed video:`, err);
+      state.phase = "done";
+    }
+    return true;
+  }
+
+  // Poll mix job
+  if (state.mixJob.status !== "COMPLETED" && state.mixJob.status !== "FAILED") {
+    const result = await checkFalQueueStatus("fal-ai/ffmpeg-api/merge-audio-video", state.mixJob.requestId);
+
+    if (result.status === "COMPLETED") {
+      const data = await getFalQueueResult("fal-ai/ffmpeg-api/merge-audio-video", state.mixJob.requestId);
+      const video = data?.video as { url: string } | undefined;
+      state.mixJob.status = "COMPLETED";
+      state.mixJob.videoUrl = video?.url || state.concatJob?.videoUrl;
+      console.log(`[ASSEMBLY] Mix-final completed: ${state.mixJob.videoUrl}`);
+    } else if (result.status === "FAILED") {
+      state.mixJob.status = "FAILED";
+      state.mixJob.videoUrl = state.concatJob?.videoUrl; // fallback to unmixed
+      console.warn(`[ASSEMBLY] Mix-final failed, using unmixed`);
+    } else {
+      return false; // Still in progress
+    }
+  }
+
+  state.phase = "done";
+  await updateProduction(productionId, { progress: 98 });
+  return true;
+}
+
+// ---- FINALIZE — Write output + create gallery record ----
+
+async function finalizeAssembly(
+  productionId: string,
+  state: AssemblyState,
+  production: Production
+): Promise<void> {
+  // Determine final video URL
+  const finalUrl = state.mixJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
+
+  if (!finalUrl) {
+    await updateProduction(productionId, {
+      status: "failed",
+      error_message: "Assembly produced no output video",
+      completed_at: new Date().toISOString(),
+    });
+    return;
+  }
+
+  // Build scene URL map
+  const freshScenes = await getProductionScenes(productionId);
+  const completedScenes = freshScenes
+    .filter((s) => s.status === "completed" && s.outputVideoUrl)
+    .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+  const sceneUrlMap: Record<string, string> = {};
+  completedScenes.forEach((s, i) => {
+    sceneUrlMap[`scene_${s.sceneNumber}`] = state.processedSceneUrls[i] || s.outputVideoUrl!;
+  });
+  sceneUrlMap["final"] = finalUrl;
+
+  const finalThumbnail = completedScenes[0]?.outputVideoUrl || undefined;
+
+  await updateProduction(productionId, {
+    status: "completed",
+    output_video_urls: JSON.stringify(sceneUrlMap),
+    thumbnail_url: finalThumbnail,
+    progress: 100,
+    completed_at: new Date().toISOString(),
+  });
+
+  // Create Video record for Gallery
+  try {
+    const plan = production.plan;
+    const totalDuration = completedScenes.reduce((sum, s) => {
+      const sceneDef = plan?.scenes?.find(
+        (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
+      );
+      return sum + (sceneDef?.duration || 5);
+    }, 0);
+
+    await createVideo({
+      userId: production.userId,
+      jobId: `brain-${productionId}`,
+      title: production.concept || "Brain Studio Production",
+      url: finalUrl,
+      thumbnailUrl: finalThumbnail || "",
+      modelId: "wan-2.2" as ModelId,
+      prompt: production.concept || "",
+      resolution: "720p",
+      duration: totalDuration,
+      fps: 24,
+      fileSize: 0,
+      aspectRatio: (production.aspectRatio || "landscape") as AspectRatio,
+    });
+    console.log(`[ASSEMBLY] Video record created for Gallery`);
+  } catch (videoErr) {
+    console.error(`[ASSEMBLY] Failed to create Video record:`, videoErr);
+  }
+
+  console.log(`[ASSEMBLY] Production ${productionId} COMPLETE`);
+}
+
+// ---- LEGACY COMPAT (keep old function signature, redirect to new) ----
+
+/**
+ * @deprecated Use startAssembly() + pollAssembly() instead
+ */
+export async function triggerBrainAssembly(
+  productionId: string,
+  _scenes?: Array<{ id: string; sceneNumber: number; status: string; outputVideoUrl?: string }>
+): Promise<void> {
+  // Redirect to new async assembly
+  await startAssembly(productionId);
 }

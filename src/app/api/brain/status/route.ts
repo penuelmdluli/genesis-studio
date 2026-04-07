@@ -138,19 +138,17 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Check if all scenes are now done — trigger assembly
+      // Check if all scenes are now done — kick off async assembly
       const allDone = scenes.every((s) => s.status === "completed" || s.status === "failed");
       const anyCompleted = scenes.some((s) => s.status === "completed");
       if (allDone && production.status === "generating") {
         if (anyCompleted) {
-          // At least some scenes completed — move to assembly
+          // At least some scenes completed — start async assembly
           await updateProduction(productionId, { status: "assembling", progress: 70 });
           production.status = "assembling" as typeof production.status;
 
-          const { triggerBrainAssembly } = await import("@/lib/genesis-brain/assembly");
-          triggerBrainAssembly(productionId, scenes).catch((err: unknown) => {
-            console.error(`[BRAIN STATUS] Assembly trigger failed:`, err);
-          });
+          const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+          await startAssembly(productionId); // Fast: just submits FAL jobs, returns immediately
         } else {
           // All scenes failed — mark production as failed
           await updateProduction(productionId, {
@@ -160,6 +158,20 @@ export async function GET(req: NextRequest) {
           });
           production.status = "failed" as typeof production.status;
         }
+      }
+    }
+
+    // Poll assembly state machine (advances one tick per poll)
+    if (production.status === "assembling") {
+      const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
+      await pollAssembly(productionId);
+      // Re-fetch production to get latest status after poll
+      const refreshed = await getProduction(productionId);
+      if (refreshed) {
+        production.status = refreshed.status as typeof production.status;
+        production.progress = refreshed.progress;
+        production.outputVideoUrls = refreshed.outputVideoUrls;
+        production.thumbnailUrl = refreshed.thumbnailUrl;
       }
     }
 
@@ -174,7 +186,8 @@ export async function GET(req: NextRequest) {
       const sceneProgress = totalScenes > 0 ? (completedScenes / totalScenes) * 60 : 0;
       progress = Math.round(10 + sceneProgress);
     } else if (production.status === "assembling") {
-      progress = 70 + Math.round((production.progress - 70) || 0);
+      // Assembly progress is managed by the state machine (72-98)
+      progress = production.progress || 72;
     } else if (production.status === "completed") {
       progress = 100;
     }

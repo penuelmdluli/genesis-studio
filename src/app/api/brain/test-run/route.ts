@@ -200,17 +200,32 @@ export async function GET(req: NextRequest) {
       const allDone = scenes.every((s) => s.status === "completed" || s.status === "failed");
       const anyCompleted = scenes.some((s) => s.status === "completed");
       if (allDone && anyCompleted) {
-        log("All scenes done — triggering assembly");
+        log("All scenes done — starting async assembly");
         await updateProduction(productionId, { status: "assembling", progress: 70 });
-        const { triggerBrainAssembly } = await import("@/lib/genesis-brain/assembly");
-        await triggerBrainAssembly(productionId, scenes);
-        log("Assembly triggered");
+        const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+        await startAssembly(productionId);
+        log("Assembly started (async)");
         production.status = "assembling" as typeof production.status;
       } else if (allDone && !anyCompleted) {
         log("All scenes failed");
         await updateProduction(productionId, { status: "failed", error_message: "All scenes failed" });
         production.status = "failed" as typeof production.status;
       }
+    }
+
+    // Poll assembly state machine if assembling
+    if (production.status === "assembling") {
+      const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
+      await pollAssembly(productionId);
+      // Re-fetch to get updated status
+      const refreshed = await getProduction(productionId);
+      if (refreshed) {
+        production.status = refreshed.status as typeof production.status;
+        production.progress = refreshed.progress;
+        production.outputVideoUrls = refreshed.outputVideoUrls;
+        production.thumbnailUrl = refreshed.thumbnailUrl;
+      }
+      log(`Assembly poll — status: ${production.status}, progress: ${production.progress}`);
     }
 
     const completedScenes = scenes.filter((s) => s.status === "completed").length;

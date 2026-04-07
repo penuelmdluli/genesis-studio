@@ -445,6 +445,81 @@ export function buildAudioPromptFromSoundDesign(soundDesign?: SoundDesign): stri
   return parts.join(". ") || "natural ambient audio";
 }
 
+// ---- ASYNC FAL QUEUE — Submit & Poll (avoids Vercel timeout) ----
+
+/**
+ * Submit MMAudio V2 job to FAL queue (async, returns immediately)
+ */
+export async function submitMMAudioJob(
+  videoUrl: string,
+  prompt: string,
+  duration: number,
+  negativePrompt?: string
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/mmaudio-v2", {
+    input: {
+      video_url: videoUrl,
+      prompt: prompt || "natural ambient audio matching the video content",
+      negative_prompt: negativePrompt || "silence, static noise, distortion, music",
+      num_steps: 25,
+      duration,
+      cfg_strength: 4.5,
+    },
+  });
+  return { requestId: result.request_id };
+}
+
+/**
+ * Submit merge-audio-video job to FAL queue (async)
+ */
+export async function submitMergeAudioVideoJob(
+  videoUrl: string,
+  audioUrl: string
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/merge-audio-video", {
+    input: { video_url: videoUrl, audio_url: audioUrl },
+  });
+  return { requestId: result.request_id };
+}
+
+/**
+ * Submit merge-videos (concat) job to FAL queue (async)
+ */
+export async function submitMergeVideosJob(
+  videoUrls: string[]
+): Promise<{ requestId: string }> {
+  const result = await fal.queue.submit("fal-ai/ffmpeg-api/merge-videos", {
+    input: { video_urls: videoUrls },
+  });
+  return { requestId: result.request_id };
+}
+
+/**
+ * Check FAL queue job status (generic — works for any FAL model)
+ */
+export async function checkFalQueueStatus(
+  falModelId: string,
+  requestId: string
+): Promise<{ status: string; error?: string }> {
+  try {
+    const status = await fal.queue.status(falModelId, { requestId, logs: false });
+    return { status: status.status };
+  } catch (err) {
+    return { status: "FAILED", error: String(err) };
+  }
+}
+
+/**
+ * Get FAL queue job result (generic)
+ */
+export async function getFalQueueResult(
+  falModelId: string,
+  requestId: string
+): Promise<Record<string, unknown>> {
+  const result = await fal.queue.result(falModelId, { requestId });
+  return result.data as Record<string, unknown>;
+}
+
 // ---- SCENE ASSEMBLY — FAL FFmpeg ----
 
 /**

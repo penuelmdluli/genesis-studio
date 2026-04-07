@@ -4,7 +4,7 @@ import {
   updateProductionScene,
   updateProduction,
 } from "@/lib/genesis-brain/orchestrator";
-import { triggerBrainAssembly } from "@/lib/genesis-brain/assembly";
+import { startAssembly } from "@/lib/genesis-brain/assembly";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 /**
@@ -111,10 +111,8 @@ export async function POST(req: NextRequest) {
           `[BRAIN WEBHOOK] Production ${productionId} → assembling (${completedScenes}/${totalScenes} scenes)`
         );
 
-        // Trigger cinematic assembly pipeline in background
-        triggerBrainAssembly(productionId, allScenes).catch((err) => {
-          console.error(`[BRAIN WEBHOOK] Assembly failed for ${productionId}:`, err);
-        });
+        // Start async assembly — submits FAL jobs and returns immediately
+        await startAssembly(productionId);
       }
     }
 

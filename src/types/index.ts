@@ -452,6 +452,25 @@ export interface CharacterDefinition {
   distinguishingFeatures?: string;
 }
 
+// Assembly state machine — tracks async FAL jobs during assembly
+export interface AssemblyState {
+  phase: "mmaudio" | "merge_audio" | "concat" | "mix_final" | "done";
+  // Per-scene MMAudio jobs: sceneId -> FAL request_id
+  mmaudioJobs: Record<string, { requestId: string; status: string; audioUrl?: string }>;
+  // Per-scene merge-audio-video jobs: sceneId -> FAL request_id
+  mergeJobs: Record<string, { requestId: string; status: string; mergedUrl?: string }>;
+  // Final concatenation job
+  concatJob?: { requestId: string; status: string; videoUrl?: string };
+  // Final audio mix job (voiceover/music overlay)
+  mixJob?: { requestId: string; status: string; videoUrl?: string };
+  // Ordered scene URLs ready for concat (populated as merge/skip completes)
+  processedSceneUrls: string[];
+  // Scene order map: sceneId -> index in processedSceneUrls
+  sceneOrder: Record<string, number>;
+  // Scenes that have native audio (skip MMAudio)
+  nativeAudioScenes: string[];
+}
+
 export interface Production {
   id: string;
   userId: string;
@@ -471,6 +490,7 @@ export interface Production {
   voiceoverUrl?: string;
   musicUrl?: string;
   captionsUrl?: string;
+  assemblyState?: AssemblyState;
   errorMessage?: string;
   progress: number;
   createdAt: string;

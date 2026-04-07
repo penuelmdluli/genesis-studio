@@ -3,7 +3,7 @@
 // Coordinates the entire Brain pipeline
 // ============================================
 
-import { BrainInput, ScenePlan, Production, ProductionScene, ModelId } from "@/types";
+import { BrainInput, ScenePlan, Production, ProductionScene, ModelId, AssemblyState } from "@/types";
 import { planProduction, calculateBrainCredits } from "./planner";
 import { consistencyEngine } from "./consistency";
 import { generateVoiceover, selectMusic, generateCaptions, buildAudioPromptFromSoundDesign } from "./audio";
@@ -63,6 +63,7 @@ export async function updateProduction(
     voiceover_url: string;
     music_url: string;
     captions_url: string;
+    assembly_state: Record<string, unknown>;
     error_message: string;
     progress: number;
     started_at: string;
@@ -445,6 +446,7 @@ function mapProduction(row: Record<string, unknown>): Production {
     voiceoverUrl: (row.voiceover_url || undefined) as string | undefined,
     musicUrl: (row.music_url || undefined) as string | undefined,
     captionsUrl: (row.captions_url || undefined) as string | undefined,
+    assemblyState: row.assembly_state ? (row.assembly_state as AssemblyState) : undefined,
     errorMessage: (row.error_message || undefined) as string | undefined,
     progress: (row.progress || 0) as number,
     createdAt: row.created_at as string,

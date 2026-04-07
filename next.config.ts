@@ -17,12 +17,21 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.io https://*.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://img.clerk.com https://*.clerk.accounts.dev https://*.fal.media https://fal.media; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.fal.media https://fal.media; font-src 'self' data:; connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.io https://clerk-telemetry.com https://img.clerk.com https://api.stripe.com https://*.fal.run https://queue.fal.run https://*.fal.media https://fal.media https://api.runpod.ai https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://*.clerk.accounts.dev https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.io https://*.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://img.clerk.com https://*.clerk.accounts.dev https://*.fal.media https://fal.media https://*.cloudfront.net; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.fal.media https://fal.media https://*.cloudfront.net; font-src 'self' data:; connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.io https://clerk-telemetry.com https://img.clerk.com https://api.stripe.com https://*.fal.run https://queue.fal.run https://*.fal.media https://fal.media https://api.runpod.ai https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net; frame-src 'self' https://*.clerk.accounts.dev https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;",
           },
         ],
       },
       {
         source: "/api/videos/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, HEAD, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Range" },
+          { key: "Access-Control-Expose-Headers", value: "Content-Range, Content-Length" },
+        ],
+      },
+      {
+        source: "/api/explore/video/:path*",
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Methods", value: "GET, HEAD, OPTIONS" },

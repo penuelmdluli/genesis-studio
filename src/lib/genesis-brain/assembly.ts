@@ -21,6 +21,8 @@ import {
   checkFalQueueStatus,
   getFalQueueResult,
   generateWordLevelSubtitles,
+  generatePerSceneVoiceover,
+  selectMusic,
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
@@ -59,9 +61,78 @@ export async function startAssembly(
     const plan = production?.plan;
     const supabase = createSupabaseAdmin();
 
-    // Preserve per-scene voiceover clips from orchestration phase (if any)
+    // ---- Audio Recovery ----
+    // If after() died before audio generation, generate missing audio now.
+    // This is the safety net: scenes are already done, we just need audio.
     const existingState = production?.assemblyState as Record<string, unknown> | undefined;
-    const savedVoiceoverClips = existingState?.voiceoverClips;
+
+    // Recover voiceover if requested but missing
+    if (production?.voiceover && !production.voiceoverUrl && plan?.scenes) {
+      const scenesWithVO = plan.scenes.filter((s: { voiceoverLine?: string }) => s.voiceoverLine?.trim());
+      if (scenesWithVO.length > 0) {
+        console.log(`[ASSEMBLY] Recovering missing voiceover for ${scenesWithVO.length} scenes...`);
+        try {
+          const voResult = await generatePerSceneVoiceover(
+            plan.scenes,
+            "en-US" // Default language for recovery
+          );
+          if (voResult.clips.length > 0) {
+            // Store voiceover URL
+            await updateProduction(productionId, { voiceover_url: voResult.fullUrl });
+            // Store clips + durations in assembly pre-state
+            const preState: Record<string, unknown> = {
+              ...(existingState || {}),
+              voiceoverClips: voResult.clips.map((c) => ({
+                url: c.url,
+                startMs: c.startMs,
+                durationMs: c.durationMs,
+                sceneNumber: c.sceneNumber,
+              })),
+              sceneAudioDurations: voResult.sceneAudioDurations,
+            };
+            await supabase
+              .from("productions")
+              .update({ assembly_state: JSON.stringify(preState) })
+              .eq("id", productionId);
+            // Update in-memory reference
+            if (production) {
+              production.voiceoverUrl = voResult.fullUrl;
+            }
+            console.log(`[ASSEMBLY] Voiceover recovered: ${voResult.clips.length} clips`);
+          }
+        } catch (voErr) {
+          console.error(`[ASSEMBLY] Voiceover recovery failed (non-fatal):`, voErr);
+        }
+      }
+    }
+
+    // Recover music if requested but missing
+    if (production?.music && !production.musicUrl && plan) {
+      console.log(`[ASSEMBLY] Recovering missing music...`);
+      try {
+        const musicResult = await selectMusic(
+          plan.musicMood || "cinematic",
+          plan.musicTempo || "medium",
+          plan.totalDuration || 15
+        );
+        if (musicResult.url) {
+          await updateProduction(productionId, { music_url: musicResult.url });
+          if (production) {
+            production.musicUrl = musicResult.url;
+          }
+          console.log(`[ASSEMBLY] Music recovered: ${musicResult.url.slice(0, 60)}...`);
+        }
+      } catch (musicErr) {
+        console.error(`[ASSEMBLY] Music recovery failed (non-fatal):`, musicErr);
+      }
+    }
+
+    // Re-fetch production to get updated audio URLs after recovery
+    const refreshedProd = await getProduction(productionId);
+    const refreshedState = refreshedProd?.assemblyState as Record<string, unknown> | undefined;
+
+    // Preserve per-scene voiceover clips from orchestration phase (or recovery)
+    const savedVoiceoverClips = refreshedState?.voiceoverClips || existingState?.voiceoverClips;
 
     // Build assembly state
     const state: AssemblyState = {
@@ -80,17 +151,17 @@ export async function startAssembly(
     }
 
     // Carry forward per-scene audio durations and transition type
-    const savedAudioDurations = existingState?.sceneAudioDurations;
+    const savedAudioDurations = refreshedState?.sceneAudioDurations || existingState?.sceneAudioDurations;
     if (savedAudioDurations) {
       state.sceneAudioDurations = savedAudioDurations as AssemblyState["sceneAudioDurations"];
     }
-    const savedTransition = existingState?.transitionType;
+    const savedTransition = refreshedState?.transitionType || existingState?.transitionType;
     if (savedTransition) {
       state.transitionType = savedTransition as string;
     }
 
     // Carry forward sound design assets (ambient, SFX, foley per scene)
-    const savedSoundAssets = existingState?.soundAssets;
+    const savedSoundAssets = refreshedState?.soundAssets || existingState?.soundAssets;
     if (savedSoundAssets) {
       state.soundAssets = savedSoundAssets as AssemblyState["soundAssets"];
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);

@@ -20,6 +20,7 @@ import {
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
+import { extractThumbnailFromUrl } from "@/lib/thumbnails";
 import { AI_MODELS } from "@/lib/constants";
 import { ModelId, SoundDesign, AspectRatio, AssemblyState, Production } from "@/types";
 
@@ -573,12 +574,19 @@ async function finalizeAssembly(
   });
   sceneUrlMap["final"] = finalUrl;
 
-  const finalThumbnail = completedScenes[0]?.outputVideoUrl || undefined;
+  // Extract a real thumbnail from the final video
+  const videoId = `brain-${productionId}`;
+  let finalThumbnail = "";
+  try {
+    finalThumbnail = await extractThumbnailFromUrl(finalUrl, production.userId, videoId);
+  } catch {
+    console.warn(`[ASSEMBLY] Thumbnail extraction failed, using empty`);
+  }
 
   await updateProduction(productionId, {
     status: "completed",
     output_video_urls: JSON.stringify(sceneUrlMap),
-    thumbnail_url: finalThumbnail,
+    thumbnail_url: finalThumbnail || undefined,
     progress: 100,
     completed_at: new Date().toISOString(),
   });
@@ -595,10 +603,10 @@ async function finalizeAssembly(
 
     await createVideo({
       userId: production.userId,
-      jobId: `brain-${productionId}`,
+      jobId: videoId,
       title: production.concept || "Brain Studio Production",
       url: finalUrl,
-      thumbnailUrl: finalThumbnail || "",
+      thumbnailUrl: finalThumbnail,
       modelId: "wan-2.2" as ModelId,
       prompt: production.concept || "",
       resolution: "720p",

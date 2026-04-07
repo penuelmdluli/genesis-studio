@@ -5,6 +5,7 @@ import { refundCredits } from "@/lib/credits";
 import { uploadVideo, uploadThumbnail, videoStorageKey, thumbnailStorageKey, verifyR2Upload } from "@/lib/storage";
 import { autoPublishToExplore } from "@/lib/auto-publish";
 import { sendVideoReadyEmail } from "@/lib/email";
+import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 
 export async function POST(req: NextRequest) {
   try {
@@ -105,9 +106,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // Upload succeeded + verified — create video record with correct URL in one shot
+      // Upload succeeded + verified — extract thumbnail + create video record
       const videoId = randomUUID();
       const videoApiUrl = `/api/videos/${videoId}`;
+
+      // Extract poster frame from the uploaded video (fire-and-forget safe)
+      const thumbnailUrl = await extractAndUploadThumbnail(vKey, job.user_id, videoId);
 
       await createVideo({
         id: videoId,
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
         jobId: job.id,
         title: job.prompt.slice(0, 100),
         url: videoApiUrl,
-        thumbnailUrl: "",
+        thumbnailUrl,
         modelId: job.model_id,
         prompt: job.prompt,
         resolution: job.resolution,
@@ -148,7 +152,7 @@ export async function POST(req: NextRequest) {
         prompt: job.prompt,
         modelId: job.model_id,
         videoUrl: videoApiUrl,
-        thumbnailUrl: "",
+        thumbnailUrl,
         duration: job.duration,
         resolution: job.resolution,
         hasAudio: !!job.audio_url,

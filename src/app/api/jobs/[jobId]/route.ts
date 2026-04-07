@@ -9,6 +9,7 @@ import { refundCredits } from "@/lib/credits";
 import { sendVideoReadyEmail } from "@/lib/email";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { autoPublishToExplore } from "@/lib/auto-publish";
+import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { ModelId, GenerationType } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 import { createSupabaseAdmin } from "@/lib/supabase";
@@ -62,13 +63,14 @@ export async function GET(
 
             const videoId = randomUUID();
             const videoApiUrl = `/api/videos/${videoId}`;
+            const thumbnailUrl = await extractAndUploadThumbnail(vKey, job.user_id, videoId);
             await createVideo({
               id: videoId,
               userId: job.user_id,
               jobId: job.id,
               title: job.prompt.slice(0, 100),
               url: videoApiUrl,
-              thumbnailUrl: "",
+              thumbnailUrl,
               modelId: job.model_id,
               prompt: job.prompt,
               resolution: job.resolution,
@@ -144,6 +146,7 @@ export async function GET(
             // Create video record
             const videoId = randomUUID();
             const videoApiUrl = `/api/videos/${videoId}`;
+            const thumbnailUrl = await extractAndUploadThumbnail(vKey, job.user_id, videoId);
 
             await createVideo({
               id: videoId,
@@ -151,7 +154,7 @@ export async function GET(
               jobId: job.id,
               title: job.prompt.slice(0, 100),
               url: videoApiUrl,
-              thumbnailUrl: "",
+              thumbnailUrl,
               modelId: job.model_id,
               prompt: job.prompt,
               resolution: job.resolution,
@@ -184,7 +187,7 @@ export async function GET(
               prompt: job.prompt,
               modelId: job.model_id,
               videoUrl: videoApiUrl,
-              thumbnailUrl: "",
+              thumbnailUrl,
               duration: job.duration,
               resolution: job.resolution,
               hasAudio: !!job.audio_url || !!job.audio_track_id,
@@ -340,6 +343,7 @@ export async function GET(
           // Create video record with correct API URL (same pattern as webhook)
           const videoId = randomUUID();
           const videoApiUrl = `/api/videos/${videoId}`;
+          const thumbnailUrl = await extractAndUploadThumbnail(vKey, job.user_id, videoId);
 
           await createVideo({
             id: videoId,
@@ -347,7 +351,7 @@ export async function GET(
             jobId: job.id,
             title: job.prompt.slice(0, 100),
             url: videoApiUrl,
-            thumbnailUrl: "",
+            thumbnailUrl,
             modelId: job.model_id,
             prompt: job.prompt,
             resolution: job.resolution,

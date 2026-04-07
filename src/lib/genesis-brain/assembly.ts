@@ -983,61 +983,47 @@ async function pollMixFinalPhase(
       return true;
     }
 
-    // Determine the correct output duration.
-    // VOICEOVER IS THE SPINE — if we have per-scene voiceover clips, the total video
-    // length should match total voiceover duration (not the raw concatenated video length,
-    // which may be much longer due to video models generating fixed-length clips).
+    // Determine output duration = CONCAT VIDEO LENGTH.
+    // We use ALL generated video clips — no cutting. Voiceover plays naturally
+    // over the visuals; when narration ends, the remaining clips play with
+    // just music/ambient. This keeps every scene the user paid for.
     let totalDurationMs: number;
 
-    if (voiceoverClips && voiceoverClips.length > 0) {
-      // Calculate total duration from voiceover clips (the most reliable source)
-      const lastClip = voiceoverClips.reduce((latest, c) =>
-        (c.startMs + c.durationMs) > (latest.startMs + latest.durationMs) ? c : latest
-      );
-      totalDurationMs = lastClip.startMs + lastClip.durationMs + 500; // +0.5s buffer for natural ending
-      console.log(`[ASSEMBLY] Output duration from voiceover clips: ${(totalDurationMs / 1000).toFixed(1)}s (voiceover is the spine)`);
-    } else if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
-      // Use per-scene audio durations to calculate total
-      const totalFromAudio = Object.values(state.sceneAudioDurations).reduce((sum, d) => sum + d, 0);
-      totalDurationMs = totalFromAudio + 500;
-      console.log(`[ASSEMBLY] Output duration from sceneAudioDurations: ${(totalDurationMs / 1000).toFixed(1)}s`);
-    } else {
-      // No voiceover — use actual concat video duration
-      let realDurationSec = await getMediaDuration(videoUrl);
-      if (realDurationSec <= 0) {
-        console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
-        realDurationSec = await getMediaDuration(videoUrl);
-      }
-      if (realDurationSec <= 0) {
-        // Fallback: measure individual scene videos
-        console.log(`[ASSEMBLY] Metadata failed, measuring individual scene videos...`);
-        const freshScenes = await getProductionScenes(productionId);
-        const completedScenes = freshScenes
-          .filter((s) => s.status === "completed")
-          .sort((a, b) => a.sceneNumber - b.sceneNumber);
-        let sumFromScenes = 0;
-        for (let i = 0; i < completedScenes.length; i++) {
-          const sceneUrl = state.processedSceneUrls[i];
-          if (sceneUrl) {
-            const sceneDur = await getMediaDuration(sceneUrl);
-            if (sceneDur > 0) {
-              sumFromScenes += sceneDur;
-              continue;
-            }
-          }
-          const planData = production.plan;
-          const sceneDef = planData?.scenes?.find(
-            (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
-          );
-          sumFromScenes += sceneDef?.duration || 5;
-        }
-        totalDurationMs = Math.ceil(sumFromScenes * 1000);
-        console.log(`[ASSEMBLY] Duration from scene measurement: ${sumFromScenes}s`);
-      } else {
-        totalDurationMs = Math.ceil(realDurationSec * 1000);
-      }
-      console.log(`[ASSEMBLY] Output duration from video measurement: ${(totalDurationMs / 1000).toFixed(1)}s (no voiceover)`);
+    let realDurationSec = await getMediaDuration(videoUrl);
+    if (realDurationSec <= 0) {
+      console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
+      realDurationSec = await getMediaDuration(videoUrl);
     }
+    if (realDurationSec <= 0) {
+      // Fallback: measure individual scene videos
+      console.log(`[ASSEMBLY] Metadata failed, measuring individual scene videos...`);
+      const freshScenes = await getProductionScenes(productionId);
+      const completedScenes = freshScenes
+        .filter((s) => s.status === "completed")
+        .sort((a, b) => a.sceneNumber - b.sceneNumber);
+      let sumFromScenes = 0;
+      for (let i = 0; i < completedScenes.length; i++) {
+        const sceneUrl = state.processedSceneUrls[i];
+        if (sceneUrl) {
+          const sceneDur = await getMediaDuration(sceneUrl);
+          if (sceneDur > 0) {
+            sumFromScenes += sceneDur;
+            continue;
+          }
+        }
+        const planData = production.plan;
+        const sceneDef = planData?.scenes?.find(
+          (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
+        );
+        sumFromScenes += sceneDef?.duration || 5;
+      }
+      realDurationSec = sumFromScenes;
+      console.log(`[ASSEMBLY] Duration from scene measurement: ${realDurationSec}s`);
+    }
+    totalDurationMs = Math.ceil(realDurationSec * 1000);
+    // Store concat duration for trim phase (trim music padding, not video)
+    state.concatDurationMs = totalDurationMs;
+    console.log(`[ASSEMBLY] Output duration: ${(totalDurationMs / 1000).toFixed(1)}s (all ${state.processedSceneUrls.filter(u=>u).length} clips preserved)`);
 
     // Get music duration so we can loop it if it's shorter than the video
     let musicDurationMs: number | undefined;
@@ -1131,19 +1117,17 @@ async function pollMixFinalPhase(
     }
   }
 
-  // Check if we need to trim — voiceover determines final duration
-  const totalVOMs = state.sceneAudioDurations
-    ? Object.values(state.sceneAudioDurations).reduce((s, d) => s + d, 0)
-    : 0;
-
-  if (totalVOMs > 0) {
+  // Trim if compose output is longer than the actual concat video
+  // (compose extends to the longest audio track, e.g. 30s music).
+  // We want exactly concat length — all video clips, nothing more.
+  if (state.concatDurationMs && state.concatDurationMs > 0) {
     state.phase = "trim_final";
     await updateProduction(productionId, { progress: 96 });
-    console.log(`[ASSEMBLY] Mix-final done → trim_final (will trim to ${(totalVOMs / 1000).toFixed(1)}s + buffer)`);
+    console.log(`[ASSEMBLY] Mix-final done → trim_final (trim to ${(state.concatDurationMs / 1000).toFixed(1)}s — all clips preserved)`);
   } else {
     state.phase = "done";
     await updateProduction(productionId, { progress: 98 });
-    console.log(`[ASSEMBLY] Mix-final done → done (no voiceover, no trim needed)`);
+    console.log(`[ASSEMBLY] Mix-final done → done (no trim needed)`);
   }
   return true;
 }
@@ -1154,11 +1138,9 @@ async function pollTrimFinalPhase(
   productionId: string,
   state: AssemblyState
 ): Promise<boolean> {
-  // Calculate target duration from voiceover
-  const totalVOMs = state.sceneAudioDurations
-    ? Object.values(state.sceneAudioDurations).reduce((s, d) => s + d, 0)
-    : 0;
-  const targetSec = (totalVOMs / 1000) + 0.5; // +0.5s buffer for natural ending
+  // Trim to concat video duration — this cuts music padding while keeping ALL video clips.
+  // Voiceover plays naturally; if shorter than video, remaining clips have music/ambient only.
+  const targetSec = (state.concatDurationMs || 0) / 1000;
 
   const videoUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;
 
@@ -1295,17 +1277,10 @@ async function finalizeAssembly(
 
   // --- ALWAYS SAVE TO GALLERY ---
   const plan = production.plan;
-  // Use voiceover-driven duration if available (most accurate for trimmed videos)
+  // Use concat duration (all clips combined) — this is the actual video length
   let totalDuration: number;
-  if (state.sceneAudioDurations && Object.keys(state.sceneAudioDurations).length > 0) {
-    totalDuration = Math.ceil(
-      Object.values(state.sceneAudioDurations).reduce((sum, d) => sum + d, 0) / 1000
-    );
-  } else if (state.voiceoverClips?.length) {
-    const lastClip = state.voiceoverClips.reduce((latest, c) =>
-      (c.startMs + c.durationMs) > (latest.startMs + latest.durationMs) ? c : latest
-    );
-    totalDuration = Math.ceil((lastClip.startMs + lastClip.durationMs) / 1000);
+  if (state.concatDurationMs && state.concatDurationMs > 0) {
+    totalDuration = Math.ceil(state.concatDurationMs / 1000);
   } else {
     totalDuration = completedScenes.reduce((sum, s) => {
       const sceneDef = plan?.scenes?.find(

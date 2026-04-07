@@ -515,6 +515,8 @@ export interface AssemblyState {
   transitionType?: string;
   // Per-scene speed adjustment jobs (stretch/compress video to match voiceover duration)
   speedAdjustJobs?: Record<string, { requestId: string; status: string; adjustedUrl?: string }>;
+  // Actual concat video duration in ms (used by trim_final to cut music padding)
+  concatDurationMs?: number;
   // Per-scene sound design assets (ambient, SFX, foley URLs with timing)
   soundAssets?: Array<SceneSoundAssets>;
 }

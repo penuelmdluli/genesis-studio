@@ -4,24 +4,19 @@ import { useState, useRef, useEffect } from "react";
 
 // ============================================
 // HERO VIDEO — Instant-load 3-layer strategy
-// Layer 1 (0ms):   Animated gradient background
-// Layer 2 (~300ms): Static poster image
+// Layer 1 (0ms):   Animated gradient + particles
+// Layer 2 (~300ms): Static poster image (from R2)
 // Layer 3 (3-5s):   Actual video fades in
+//
+// The user NEVER sees a black screen.
 // ============================================
 
-// CRITICAL: Hardcode URLs — NEVER fetch from API.
-// API calls add 500ms-2s delay before the video even starts downloading.
-const HERO_VIDEO = {
-  // Best showcase video — permanent R2/Supabase URL
-  // TODO: Replace with your best showcase video URL
-  src: "",
-  // Compressed poster frame (<50KB JPEG, slightly blurred)
-  // Generate: ffmpeg -i hero.mp4 -vframes 1 -q:v 8 -vf "scale=1280:-1,boxblur=2:1" poster.jpg
-  // TODO: Replace with permanent poster URL
-  poster: "",
-};
+// Poster served from R2 via /api/assets/hero-poster
+// This is a permanent, heavily cached (1 week) image.
+// If no poster exists yet, the gradient stays visible.
+const HERO_POSTER = "/api/assets/hero-poster";
 
-// Fallback: fetch from explore API if no hardcoded URL
+// Fetch featured videos from explore API
 async function fetchHeroVideos(): Promise<string[]> {
   try {
     const res = await fetch("/api/explore?tab=picks&limit=6");
@@ -39,31 +34,25 @@ export function HeroVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [posterLoaded, setPosterLoaded] = useState(false);
-  const [videoSrc, setVideoSrc] = useState(HERO_VIDEO.src);
+  const [posterError, setPosterError] = useState(false);
 
-  // Crossfade state for multiple videos
-  const [heroVideos, setHeroVideos] = useState<string[]>(
-    HERO_VIDEO.src ? [HERO_VIDEO.src] : []
-  );
+  // Video crossfade state
+  const [heroVideos, setHeroVideos] = useState<string[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  // Preload poster image immediately
+  // Layer 2: Preload poster image immediately on mount
   useEffect(() => {
-    if (!HERO_VIDEO.poster) return;
     const img = new Image();
     img.onload = () => setPosterLoaded(true);
-    img.src = HERO_VIDEO.poster;
+    img.onerror = () => setPosterError(true);
+    img.src = HERO_POSTER;
   }, []);
 
-  // If no hardcoded URL, fetch from API (fallback)
+  // Layer 3: Fetch videos from API
   useEffect(() => {
-    if (HERO_VIDEO.src) return;
     fetchHeroVideos().then((urls) => {
-      if (urls.length > 0) {
-        setHeroVideos(urls);
-        setVideoSrc(urls[0]);
-      }
+      if (urls.length > 0) setHeroVideos(urls);
     });
   }, []);
 
@@ -77,7 +66,7 @@ export function HeroVideo() {
   }, [heroVideos.length]);
 
   const hasMultiple = heroVideos.length > 1;
-  const hasAnyVideo = heroVideos.length > 0 || !!videoSrc;
+  const hasAnyVideo = heroVideos.length > 0;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -99,13 +88,13 @@ export function HeroVideo() {
         />
         {/* Soft glow orbs for depth */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-blue-600/8 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-blue-600/8 rounded-full blur-3xl animate-pulse" />
       </div>
 
-      {/* ---- LAYER 2: Poster image — loads in <500ms ---- */}
-      {posterLoaded && HERO_VIDEO.poster && (
+      {/* ---- LAYER 2: Poster image — loads in <500ms, blurred for cinematic feel ---- */}
+      {posterLoaded && !posterError && (
         <img
-          src={HERO_VIDEO.poster}
+          src={HERO_POSTER}
           alt=""
           aria-hidden="true"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
@@ -115,10 +104,10 @@ export function HeroVideo() {
         />
       )}
 
-      {/* ---- LAYER 3: Actual video — fades in when ready ---- */}
+      {/* ---- LAYER 3: Actual video — fades in smoothly when buffered ---- */}
       {hasAnyVideo &&
         (hasMultiple ? (
-          // Multiple videos with crossfade
+          // Multiple videos with crossfade rotation
           heroVideos.map((src, i) => {
             const isActive = i === heroIndex;
             const isNext = i === (heroIndex + 1) % heroVideos.length;
@@ -145,10 +134,10 @@ export function HeroVideo() {
             );
           })
         ) : (
-          // Single video
+          // Single video — simplest case
           <video
             ref={videoRef}
-            src={videoSrc}
+            src={heroVideos[0]}
             autoPlay
             muted
             loop

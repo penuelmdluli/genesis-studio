@@ -86,6 +86,13 @@ export default function RootLayout({
         <head>
           <meta name="theme-color" content="#7c3aed" />
           <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+          {/* Hero poster preload — starts downloading BEFORE anything renders */}
+          <link
+            rel="preload"
+            as="image"
+            href="/api/assets/hero-poster"
+            fetchPriority="high"
+          />
         </head>
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>

@@ -147,8 +147,11 @@ export async function GET(
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
-    // Auth check: allow if video is public, otherwise require owner
-    if (!video.is_public) {
+    // Auth check: allow if video is public, has valid cron secret, or require owner
+    const cronSecret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
+    const hasCronAccess = cronSecret === process.env.CRON_SECRET;
+
+    if (!video.is_public && !hasCronAccess) {
       const { userId: clerkId } = await auth();
       if (!clerkId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

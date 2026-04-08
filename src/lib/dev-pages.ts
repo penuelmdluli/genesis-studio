@@ -9,6 +9,10 @@ export interface DevPageConfig {
   caption_style: string;
   hashtags: string[];
   enabled: boolean;
+  facebook_page_key?: string;      // Maps to FB_PAGES key in post-to-facebook route
+  youtube_enabled?: boolean;        // Whether to post to YouTube Shorts
+  topics_per_cycle: number;         // How many unique topics to generate per cycle (default 2)
+  niche_weights?: Record<string, number>; // Weight per niche for topic scoring (higher = preferred)
 }
 
 export const DEV_PAGES: Record<string, DevPageConfig> = {
@@ -23,6 +27,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "mbs_style",
     hashtags: ["#MzansiBabyStars", "#AIBabies", "#SouthAfrica", "#MadeWithAI"],
     enabled: true,
+    facebook_page_key: "blissful_moments",
+    youtube_enabled: true,
+    topics_per_cycle: 2,
   },
   africa_2050: {
     id: "africa_2050_dev",
@@ -35,6 +42,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "pride_curiosity",
     hashtags: ["#Africa2050", "#Afrofuturism", "#AfricaRising", "#GenesisStudio"],
     enabled: true,
+    facebook_page_key: "limitless_you",
+    youtube_enabled: true,
+    topics_per_cycle: 2,
   },
   afrika_toons: {
     id: "afrika_toons_dev",
@@ -47,6 +57,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "news_toon",
     hashtags: ["#AfrikaToons", "#AfricanNews", "#AfricanFolklore", "#AIAnimation"],
     enabled: true,
+    facebook_page_key: "motivation",
+    youtube_enabled: true,
+    topics_per_cycle: 2,
   },
   tech_pulse_africa: {
     id: "tech_pulse_africa_dev",
@@ -59,6 +72,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "tech_shock",
     hashtags: ["#TechPulseAfrica", "#GenesisStudio", "#AIVideo", "#MadeWithAI"],
     enabled: true,
+    facebook_page_key: "tech_news",
+    youtube_enabled: true,
+    topics_per_cycle: 3,
   },
   world_news_animated: {
     id: "world_news_animated_dev",
@@ -71,6 +87,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "news_urgent",
     hashtags: ["#WorldNews", "#AnimatedNews", "#BreakingNews", "#AIAnimation"],
     enabled: true,
+    facebook_page_key: "health_wellness",
+    youtube_enabled: true,
+    topics_per_cycle: 3,
   },
   pop_culture_buzz: {
     id: "pop_culture_buzz_dev",
@@ -83,6 +102,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "entertainment_hook",
     hashtags: ["#PopCulture", "#Entertainment", "#CelebNews", "#Trending"],
     enabled: true,
+    youtube_enabled: true,
+    topics_per_cycle: 2,
   },
   ai_revolution: {
     id: "ai_revolution_dev",
@@ -95,6 +116,9 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "tech_shock",
     hashtags: ["#AIRevolution", "#ArtificialIntelligence", "#FutureOfWork", "#TechNews"],
     enabled: true,
+    facebook_page_key: "ai_money",
+    youtube_enabled: true,
+    topics_per_cycle: 3,
   },
 };
 
@@ -108,4 +132,8 @@ export function getAllDevPages(): DevPageConfig[] {
 
 export function getDevPagesByPillar(pillar: string): DevPageConfig[] {
   return Object.values(DEV_PAGES).filter(p => p.enabled && p.content_pillars.includes(pillar));
+}
+
+export function getDevPageByFacebookKey(fbKey: string): DevPageConfig | undefined {
+  return Object.values(DEV_PAGES).find(p => p.enabled && p.facebook_page_key === fbKey);
 }

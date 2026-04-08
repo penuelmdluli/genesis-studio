@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/retention",
       "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/cron/content-pipeline",
+      "schedule": "0 5,13 * * *"
     }
   ]
 }

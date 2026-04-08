@@ -310,7 +310,33 @@ export async function pollAssembly(productionId: string): Promise<void> {
     }
   } catch (err) {
     console.error(`[ASSEMBLY POLL] Error for ${productionId}:`, err);
-    // Don't fail the production on a single poll error — it'll retry next poll
+
+    // Track consecutive poll failures — fail production after 5 in a row
+    const supabase = createSupabaseAdmin();
+    const { data: prodRow } = await supabase
+      .from("productions")
+      .select("assembly_state")
+      .eq("id", productionId)
+      .single();
+
+    const currentState = prodRow?.assembly_state as Record<string, unknown> | null;
+    const pollErrors = ((currentState?.pollErrorCount as number) || 0) + 1;
+
+    if (pollErrors >= 5) {
+      const errMsg = err instanceof Error ? err.message : "Unknown assembly error";
+      console.error(`[ASSEMBLY POLL] 5 consecutive errors — failing production ${productionId}: ${errMsg}`);
+      await updateProduction(productionId, {
+        status: "failed",
+        error_message: `Assembly failed after 5 poll errors: ${errMsg}`,
+        completed_at: new Date().toISOString(),
+      });
+    } else {
+      // Save error count for next poll
+      await supabase
+        .from("productions")
+        .update({ assembly_state: { ...currentState, pollErrorCount: pollErrors } })
+        .eq("id", productionId);
+    }
   }
 }
 

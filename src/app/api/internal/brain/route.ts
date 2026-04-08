@@ -227,6 +227,18 @@ export async function POST(req: NextRequest) {
 
       // Poll assembly
       if (production.status === "assembling") {
+        // Timeout: if assembling for more than 10 minutes, fail it
+        const assemblyStart = production.updatedAt ? new Date(production.updatedAt).getTime() : 0;
+        const assemblyAge = assemblyStart ? (Date.now() - assemblyStart) / 1000 : 0;
+        if (assemblyAge > 600) {
+          console.error(`[INTERNAL BRAIN] Assembly stuck for ${Math.round(assemblyAge)}s — failing production ${productionId}`);
+          await updateProduction(productionId, {
+            status: "failed",
+            error_message: `Assembly timed out after ${Math.round(assemblyAge / 60)} minutes`,
+            completed_at: new Date().toISOString(),
+          });
+        }
+
         // If assembly_state is null, startAssembly failed — retry it
         const supabaseCheck = createSupabaseAdmin();
         const { data: prodRow } = await supabaseCheck
@@ -236,12 +248,24 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (!prodRow?.assembly_state) {
-          console.log(`[INTERNAL BRAIN] assembly_state is null — retrying startAssembly`);
-          try {
-            const { startAssembly } = await import("@/lib/genesis-brain/assembly");
-            await startAssembly(productionId);
-          } catch (err) {
-            console.error(`[INTERNAL BRAIN] startAssembly retry failed:`, err);
+          const retryCount = (prodRow as Record<string, unknown>)?.assembly_retry_count as number || 0;
+          if (retryCount < 3) {
+            console.log(`[INTERNAL BRAIN] assembly_state is null — retrying startAssembly (attempt ${retryCount + 1}/3)`);
+            try {
+              const supabaseRetry = createSupabaseAdmin();
+              await supabaseRetry.from("productions").update({ assembly_retry_count: retryCount + 1 } as Record<string, unknown>).eq("id", productionId);
+              const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+              await startAssembly(productionId);
+            } catch (err) {
+              console.error(`[INTERNAL BRAIN] startAssembly retry failed:`, err);
+            }
+          } else {
+            console.error(`[INTERNAL BRAIN] startAssembly failed 3 times — failing production ${productionId}`);
+            await updateProduction(productionId, {
+              status: "failed",
+              error_message: "Assembly failed to start after 3 retries",
+              completed_at: new Date().toISOString(),
+            });
           }
         }
 

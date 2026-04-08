@@ -59,12 +59,32 @@ export function selectEngine(
   }
 
   // FAST: News content needs speed
-  if (pillar === "news_animated" || contentType === "breaking_news") {
+  if (pillar === "news_animated" || pillar === "breaking_news" || pillar === "geopolitics" || contentType === "breaking_news") {
     return {
       modelId: "ltx-video" as ModelId,
       provider: "runpod-hub",
       estimatedCostUsd: ENGINE_COSTS["ltx-video"],
       reason: "Breaking news — LTX Video (fastest, 30s generation)",
+    };
+  }
+
+  // ENTERTAINMENT: Celebrity/viral content — good quality
+  if (pillar === "entertainment" || pillar === "celebrity" || pillar === "viral_moments") {
+    return {
+      modelId: "wan-2.2" as ModelId,
+      provider: "runpod-hub",
+      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
+      reason: "Entertainment content — Wan 2.2 (best visual quality)",
+    };
+  }
+
+  // AI/TECH: AI disruption content
+  if (pillar === "ai_news" || pillar === "ai_disruption" || pillar === "tech") {
+    return {
+      modelId: "wan-2.2" as ModelId,
+      provider: "runpod-hub",
+      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
+      reason: "AI/Tech content — Wan 2.2 (cinematic quality)",
     };
   }
 

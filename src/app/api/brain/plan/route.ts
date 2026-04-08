@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
     // Apply consistency engine
     plan = consistencyEngine.applyAll(plan, body.brandKit);
 
+    // Store voice settings in the plan so produce route can access them
+    if (body.voiceoverVoice) {
+      (plan as Record<string, unknown>).voiceoverVoice = body.voiceoverVoice;
+    }
+    if (body.voiceoverLanguage) {
+      (plan as Record<string, unknown>).voiceoverLanguage = body.voiceoverLanguage;
+    }
+
     // Calculate credit cost
     const totalCredits = calculateBrainCredits(plan, body);
 

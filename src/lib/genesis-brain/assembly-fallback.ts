@@ -7,16 +7,14 @@
  * The result is a working video without post-processing polish.
  */
 
-import { AssemblyState, Production } from "@/types";
+import { AssemblyState } from "@/types";
 import {
   getProduction,
   getProductionScenes,
   updateProduction,
 } from "./orchestrator";
-import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
-import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { ModelId } from "@/types";
 import { randomUUID } from "crypto";
 
@@ -93,14 +91,29 @@ export function createSimplifiedAssemblyState(
 }
 
 /**
- * Simplified finalization for when FAL is unavailable.
- * Uses the first (or best) completed scene video as the final output.
- * No concat, no audio mixing, no caption burn -- just a clean working video.
+ * Full local assembly — uses FFmpeg + Edge TTS instead of FAL.
+ * Produces a complete video with: all scenes concatenated + voiceover + music + captions.
+ * Falls back to simplified (scene 1 only) if local FFmpeg is not available.
  */
 export async function simplifiedFinalize(
   productionId: string
 ): Promise<void> {
   try {
+    // Try full local assembly first (FFmpeg + Edge TTS)
+    try {
+      const { localAssembly } = await import("./assembly-local");
+      console.log(`[ASSEMBLY FALLBACK] Attempting full local assembly (FFmpeg + Edge TTS)...`);
+      const result = await localAssembly(productionId);
+      if (result.success) {
+        console.log(`[ASSEMBLY FALLBACK] Local assembly succeeded! Video: ${result.videoId}, Duration: ${result.duration}s`);
+        return;
+      }
+      console.warn(`[ASSEMBLY FALLBACK] Local assembly failed: ${result.error}. Falling back to single-scene.`);
+    } catch (localErr) {
+      console.warn(`[ASSEMBLY FALLBACK] Local assembly not available:`, localErr);
+    }
+
+    // Fallback: single scene (last resort)
     const production = await getProduction(productionId);
     if (!production) {
       console.error(`[ASSEMBLY FALLBACK] Production ${productionId} not found`);
@@ -122,51 +135,32 @@ export async function simplifiedFinalize(
     }
 
     // Use the first completed scene as the final video
-    // (Without FAL we can't concatenate multiple scenes)
     const sourceUrl = completedScenes[0].outputVideoUrl!;
-    console.log(`[ASSEMBLY FALLBACK] Using scene ${completedScenes[0].sceneNumber} as final video (${completedScenes.length} scenes available, no FAL for concat)`);
+    console.log(`[ASSEMBLY FALLBACK] Using scene ${completedScenes[0].sceneNumber} as final video (single-scene fallback)`);
 
-    // Persist to R2
     const videoId = randomUUID();
     const vKey = videoStorageKey(production.userId, videoId);
     let videoApiUrl = `/api/videos/${videoId}`;
     let fileSize = 0;
 
     try {
-      console.log(`[ASSEMBLY FALLBACK] Downloading scene video to R2: ${sourceUrl.slice(0, 80)}...`);
       const videoRes = await fetch(sourceUrl);
-      if (!videoRes.ok) {
-        throw new Error(`Failed to download video: ${videoRes.status}`);
-      }
+      if (!videoRes.ok) throw new Error(`Download failed: ${videoRes.status}`);
       const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
       fileSize = videoBuffer.length;
       await uploadVideo(vKey, videoBuffer);
       await verifyR2Upload(vKey);
-      console.log(`[ASSEMBLY FALLBACK] Video persisted to R2: ${vKey} (${(fileSize / 1024 / 1024).toFixed(1)} MB)`);
     } catch (storageErr) {
-      console.error(`[ASSEMBLY FALLBACK] R2 upload failed, using source URL:`, storageErr);
+      console.error(`[ASSEMBLY FALLBACK] R2 upload failed:`, storageErr);
       videoApiUrl = sourceUrl;
     }
 
-    // Build scene URL map
     const sceneUrlMap: Record<string, string> = {};
     completedScenes.forEach((s) => {
       sceneUrlMap[`scene_${s.sceneNumber}`] = s.outputVideoUrl!;
     });
     sceneUrlMap["final"] = videoApiUrl;
 
-    // Extract thumbnail (skip FAL-based extraction since FAL is down)
-    let finalThumbnail = "";
-    try {
-      if (videoApiUrl.startsWith("/api/videos/")) {
-        finalThumbnail = await extractAndUploadThumbnail(vKey, production.userId, videoId);
-      }
-      // Cannot use extractThumbnailFromUrl -- it requires FAL
-    } catch (thumbErr) {
-      console.warn(`[ASSEMBLY FALLBACK] Thumbnail extraction failed:`, thumbErr);
-    }
-
-    // Create video record
     try {
       await createVideo({
         id: videoId,
@@ -175,7 +169,7 @@ export async function simplifiedFinalize(
         prompt: production.concept,
         modelId: "wan-2.2" as ModelId,
         url: videoApiUrl,
-        thumbnailUrl: finalThumbnail || "",
+        thumbnailUrl: "",
         duration: completedScenes[0].duration || 5,
         resolution: "1280x720",
         fps: 24,
@@ -183,24 +177,22 @@ export async function simplifiedFinalize(
         fileSize,
       });
     } catch (dbErr) {
-      console.warn(`[ASSEMBLY FALLBACK] Video record creation failed (non-fatal):`, dbErr);
+      console.warn(`[ASSEMBLY FALLBACK] Video record creation failed:`, dbErr);
     }
 
-    // Mark production as completed
     await updateProduction(productionId, {
       status: "completed",
       output_video_urls: JSON.stringify(sceneUrlMap),
-      thumbnail_url: finalThumbnail || undefined,
       progress: 100,
       completed_at: new Date().toISOString(),
     });
 
-    console.log(`[ASSEMBLY FALLBACK] Production ${productionId} completed (simplified -- no FAL post-processing)`);
+    console.log(`[ASSEMBLY FALLBACK] Production ${productionId} completed (single-scene fallback)`);
   } catch (err) {
-    console.error(`[ASSEMBLY FALLBACK] Simplified finalize failed:`, err);
+    console.error(`[ASSEMBLY FALLBACK] Failed:`, err);
     await updateProduction(productionId, {
       status: "failed",
-      error_message: `Simplified assembly failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      error_message: `Assembly failed: ${err instanceof Error ? err.message : "Unknown error"}`,
       completed_at: new Date().toISOString(),
     });
   }

@@ -83,13 +83,19 @@ function topicMatchesPillar(topic: UnifiedNewsItem, pillar: string): boolean {
   const pillarKeywords: Record<string, string[]> = {
     mbs_episodes: ["baby", "child", "kids", "family", "parenting"],
     baby_scenarios: ["baby", "child", "kids", "cute", "funny"],
-    afrofuturism: ["future", "technology", "innovation", "space", "ai", "robot"],
-    african_cities: ["city", "urban", "infrastructure", "development", "smart"],
-    news_animated: ["news", "breaking", "politics", "economy", "world"],
+    afrofuturism: ["future", "technology", "innovation", "space", "ai", "robot", "city"],
+    african_cities: ["city", "urban", "infrastructure", "development", "smart", "africa"],
+    news_animated: ["news", "breaking", "politics", "economy", "world", "war", "iran", "trump", "ukraine", "military", "strikes"],
+    breaking_news: ["breaking", "war", "military", "attack", "crisis", "iran", "israel", "ukraine", "trump", "threat", "strait", "retaliation"],
+    geopolitics: ["war", "iran", "israel", "ukraine", "russia", "china", "sanctions", "military", "ceasefire", "strait", "hormuz", "nato"],
     african_folklore: ["folklore", "legend", "myth", "story", "tradition", "culture"],
     genesis_demo: ["ai", "video", "generation", "genesis", "demo", "technology"],
-    ai_news: ["ai", "artificial intelligence", "machine learning", "chatgpt", "openai"],
-    tech: ["tech", "software", "startup", "app", "digital"],
+    ai_news: ["ai", "artificial intelligence", "machine learning", "chatgpt", "openai", "claude", "amd", "layoff", "jobs"],
+    tech: ["tech", "software", "startup", "app", "digital", "data center", "linkedin", "browser", "tax"],
+    ai_disruption: ["ai", "layoff", "jobs", "replace", "automate", "employees", "workforce", "cut", "industry"],
+    entertainment: ["celebrity", "actor", "movie", "show", "kimmel", "clooney", "hollywood", "netflix", "disney"],
+    celebrity: ["actor", "celebrity", "star", "kimmel", "clooney", "comedian", "host", "show"],
+    viral_moments: ["viral", "trending", "video", "cancelled", "monologue", "maga", "harsh", "condemns"],
   };
 
   const keywords = pillarKeywords[pillar] || [];
@@ -238,15 +244,27 @@ function buildVideoPrompt(
     african_cities:
       "Modern African city skyline, futuristic architecture, bustling streets, golden hour lighting.",
     news_animated:
-      "Animated news scene, dynamic text overlays, African newsroom, bold colors, dramatic.",
+      "Animated news scene, dynamic text overlays, newsroom setting, bold colors, dramatic urgency.",
+    breaking_news:
+      "Breaking news animation, red alert graphics, globe spinning, dramatic lighting, urgent atmosphere.",
+    geopolitics:
+      "World map with highlighted regions, military and diplomatic imagery, dramatic documentary style, cinematic tension.",
     african_folklore:
       "African folklore animation, traditional art style, mystical atmosphere, rich earth tones.",
     genesis_demo:
       "AI-generated cinematic footage, sleek technology showcase, professional quality, 4K detail.",
     ai_news:
-      "Tech news visualization, AI and robots, digital world, blue and white color scheme, modern.",
+      "Tech news visualization, AI and robots, digital neural networks, blue and white futuristic color scheme.",
     tech:
-      "Technology showcase, sleek devices, digital innovation, modern African tech hub.",
+      "Technology showcase, sleek devices, data centers, digital innovation, modern tech aesthetic.",
+    ai_disruption:
+      "Dramatic visualization of AI replacing workers, robots in offices, before/after tech transformation, cinematic.",
+    entertainment:
+      "Hollywood glamour, red carpet, celebrity lifestyle, vibrant entertainment industry, cinematic close-ups.",
+    celebrity:
+      "Celebrity portrait style, dramatic lighting, paparazzi flashes, red carpet atmosphere, bold colors.",
+    viral_moments:
+      "Dynamic social media style, trending graphics, reaction shots, bold text overlays, viral energy.",
   };
 
   const style = styleCues[pillar] || "Cinematic, high quality, dramatic lighting.";

@@ -53,12 +53,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Reconstruct input from production
+    // Voice settings stored in plan.voiceoverVoice or default to best voice
+    const parsedPlan = typeof plan === "string" ? JSON.parse(plan) : plan;
     const input = {
       concept: production.concept,
       targetDuration: production.targetDuration,
       style: production.style,
       aspectRatio: production.aspectRatio,
       voiceover: production.voiceover,
+      voiceoverVoice: parsedPlan?.voiceoverVoice || "en-US-GuyNeural",
+      voiceoverLanguage: parsedPlan?.voiceoverLanguage || "en-US",
       music: production.music,
       captions: production.captions,
       soundEffects: soundEffectsFlag === true,

@@ -34,12 +34,12 @@ RULES:
      * Example: "A man in a leather jacket walks through a rainy alley, his boots splashing in puddles, distant thunder rolling, neon signs buzzing overhead, he mutters 'we need to go'"
      * The audio model generates synchronized audio FROM the prompt — every sound you describe will be rendered
 4. CHARACTER CONSISTENCY: Use the EXACT same description string for any character across ALL scenes they appear in.
-5. Pick optimal model per scene based on AUDIO NEEDS:
-   - Scenes with dialogue/talking: "kling-3.0" (best lip sync + character consistency + native audio)
-   - Scenes with rich environmental sound (rain, crowds, machines): "kling-2.6" (native audio, great ambient)
-   - Hero cinematic shots with complex audio (music, effects): "veo-3.1" (Google's best audio sync)
-   - Silent cinematic beauty shots: "wan-2.2" (best open-source quality — audio added via MMAudio post-processing)
-   - Budget/fast establishing shots: "wan-2.2" or "seedance-1.5"
+5. Pick optimal model per scene — ONLY use RunPod models (FAL credits unavailable):
+   - Hero cinematic shots, dialogue, character-driven scenes: "wan-2.2" (best quality, RunPod credits available)
+   - Fast establishing shots, news clips, quick transitions: "ltx-video" (fastest generation ~30s, RunPod)
+   - All other scenes: "wan-2.2" (reliable flagship model)
+   - DO NOT use kling-2.6, kling-3.0, veo-3.1, or seedance-1.5 — these require FAL credits which are exhausted
+   - Audio will be added via MMAudio post-processing for all scenes
 6. SOUND DESIGN per scene — set the "soundDesign" field:
    - "ambientDescription": What the environment sounds like (e.g. "busy city traffic, distant sirens, construction noise")
    - "dialogueLines": Any spoken words in the scene (array of { speaker, line })
@@ -78,7 +78,7 @@ RULES:
 
 12. Text overlays: use sparingly — opening hook, key stats, CTA at end
 
-VALID MODELS: "wan-2.2", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"
+VALID MODELS: "wan-2.2", "ltx-video" (RunPod only — FAL models are disabled)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -207,14 +207,31 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   const validModels = Object.keys(AI_MODELS) as ModelId[];
   const validTransitions: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"];
 
+  // FAL models to force-swap to RunPod (FAL credits exhausted)
+  const FAL_MODELS: string[] = ["kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"];
+  const RUNPOD_MODELS: ModelId[] = ["wan-2.2", "ltx-video", "hunyuan-video", "mochi-1", "wan-2.1-turbo"];
+
   // Validate each scene
   plan.scenes = plan.scenes.map((scene, i) => {
+    // Force-swap FAL models to wan-2.2 (RunPod)
+    let selectedModel: ModelId = "wan-2.2";
+    if (validModels.includes(scene.modelId as ModelId)) {
+      if (FAL_MODELS.includes(scene.modelId as string)) {
+        console.log(`[BRAIN PLANNER] Swapping FAL model ${scene.modelId} → wan-2.2 (FAL credits exhausted)`);
+        selectedModel = "wan-2.2";
+      } else if (RUNPOD_MODELS.includes(scene.modelId as ModelId)) {
+        selectedModel = scene.modelId as ModelId;
+      } else {
+        selectedModel = "wan-2.2"; // Default fallback
+      }
+    }
+
     const s: SceneDefinition = {
       sceneNumber: i + 1,
       description: scene.description || `Scene ${i + 1}`,
       prompt: scene.prompt || scene.description || "",
       negativePrompt: scene.negativePrompt || getDefaultNegativePrompt(),
-      modelId: validModels.includes(scene.modelId as ModelId) ? scene.modelId as ModelId : "wan-2.2",
+      modelId: selectedModel,
       duration: Math.max(3, Math.min(10, scene.duration || 5)),
       resolution: scene.resolution || "720p",
       cameraMovement: scene.cameraMovement || "slow push-in",

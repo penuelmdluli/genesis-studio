@@ -228,7 +228,8 @@ export async function POST(req: NextRequest) {
       // Poll assembly
       if (production.status === "assembling") {
         // Timeout: if assembling for more than 10 minutes, fail it
-        const assemblyStart = production.updatedAt ? new Date(production.updatedAt).getTime() : 0;
+        // Use startedAt as proxy for when assembly began (updatedAt is not on the Production type)
+        const assemblyStart = production.startedAt ? new Date(production.startedAt).getTime() : new Date(production.createdAt).getTime();
         const assemblyAge = assemblyStart ? (Date.now() - assemblyStart) / 1000 : 0;
         if (assemblyAge > 600) {
           console.error(`[INTERNAL BRAIN] Assembly stuck for ${Math.round(assemblyAge)}s — failing production ${productionId}`);

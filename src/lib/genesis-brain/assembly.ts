@@ -58,6 +58,18 @@ export async function startAssembly(
       return;
     }
 
+    // Check if FAL is available -- if not, use simplified assembly
+    const { checkFalAvailability, simplifiedFinalize } = await import("./assembly-fallback");
+    const falAvailable = await checkFalAvailability();
+
+    if (!falAvailable) {
+      console.log(`[ASSEMBLY] FAL credits exhausted -- using simplified assembly (scene videos only)`);
+      // Skip MMAudio, concat, and all FAL-dependent phases.
+      // Use the completed scene videos directly as the final output.
+      await simplifiedFinalize(productionId);
+      return;
+    }
+
     const production = await getProduction(productionId);
     const plan = production?.plan;
     const supabase = createSupabaseAdmin();

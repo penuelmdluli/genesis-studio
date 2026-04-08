@@ -183,6 +183,24 @@ export async function GET(req: NextRequest) {
 
     // Poll assembly state machine (advances one tick per poll)
     if (production.status === "assembling") {
+      // If assembly_state is null, startAssembly failed or was killed — retry it
+      const supabaseCheck = createSupabaseAdmin();
+      const { data: prodRow } = await supabaseCheck
+        .from("productions")
+        .select("assembly_state")
+        .eq("id", productionId)
+        .single();
+
+      if (!prodRow?.assembly_state) {
+        console.log(`[BRAIN STATUS] assembly_state is null — retrying startAssembly`);
+        try {
+          const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+          await startAssembly(productionId);
+        } catch (err) {
+          console.error(`[BRAIN STATUS] startAssembly retry failed:`, err);
+        }
+      }
+
       const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
       await pollAssembly(productionId);
       // Re-fetch production to get latest status after poll

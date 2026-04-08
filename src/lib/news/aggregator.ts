@@ -120,9 +120,78 @@ export async function aggregateAllSources(): Promise<UnifiedNewsItem[]> {
     console.error("[Aggregator] Gemini source failed:", error);
   }
 
-  // 2. Future sources would be added here:
-  // try { const newsApiItems = await fetchNewsApi(); ... } catch { ... }
-  // try { const redditItems = await fetchReddit(); ... } catch { ... }
+  // 2. Fetch from NewsAPI (existing source — no Gemini key needed)
+  try {
+    const newsApiKey = process.env.NEWS_API_KEY || process.env.NEWSAPI_KEY;
+    if (newsApiKey) {
+      const categories = ["general", "technology", "business", "entertainment"];
+      const newsResults = await Promise.allSettled(
+        categories.map(async (category) => {
+          const res = await fetch(
+            `https://newsapi.org/v2/top-headlines?category=${category}&language=en&pageSize=5&apiKey=${newsApiKey}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (!res.ok) return [];
+          const data = await res.json();
+          return (data.articles || []).map((a: { title: string; description: string | null; source: { name: string } }) => ({
+            title: a.title || "",
+            summary: a.description || "",
+            category: category === "general" ? "breaking" : category as "technology" | "entertainment" | "breaking",
+            viral_potential: 6,
+            content_angle: `Cover this ${category} story as a 30-second animated news clip`,
+            suggested_hook: a.title?.split(" - ")[0] || a.title || "",
+            region: "GLOBAL",
+            source: "newsapi",
+            timestamp: new Date().toISOString(),
+          }));
+        })
+      );
+      const newsItems = newsResults
+        .filter((r): r is PromiseFulfilledResult<GeminiNewsItem[]> => r.status === "fulfilled")
+        .flatMap((r) => r.value)
+        .filter((item) => item.title && item.title.length > 10);
+      allItems.push(...newsItems.map(toUnified));
+      console.log(`[Aggregator] NewsAPI returned ${newsItems.length} items`);
+    }
+  } catch (error) {
+    console.error("[Aggregator] NewsAPI source failed:", error);
+  }
+
+  // 3. Fetch from Reddit (free, no API key needed)
+  try {
+    const subreddits = ["worldnews", "technology", "entertainment", "GetMotivated"];
+    const redditResults = await Promise.allSettled(
+      subreddits.map(async (sub) => {
+        const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=5`, {
+          headers: { "User-Agent": "GenesisStudio/1.0" },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data?.data?.children || []).map((post: { data: { title: string; score: number; subreddit: string } }) => ({
+          title: post.data.title || "",
+          summary: `Trending on r/${post.data.subreddit} with ${post.data.score} upvotes`,
+          category: sub === "technology" ? "technology" : sub === "GetMotivated" ? "culture" : "breaking" as "technology" | "culture" | "breaking",
+          viral_potential: Math.min(10, Math.round(post.data.score / 5000) + 5),
+          content_angle: `Viral Reddit story — great for animated news or commentary`,
+          suggested_hook: post.data.title?.slice(0, 80) || "",
+          region: "GLOBAL",
+          source: "reddit",
+          timestamp: new Date().toISOString(),
+        }));
+      })
+    );
+    const redditItems = redditResults
+      .filter((r): r is PromiseFulfilledResult<GeminiNewsItem[]> => r.status === "fulfilled")
+      .flatMap((r) => r.value)
+      .filter((item) => item.title && item.title.length > 10);
+    allItems.push(...redditItems.map(toUnified));
+    console.log(`[Aggregator] Reddit returned ${redditItems.length} items`);
+  } catch (error) {
+    console.error("[Aggregator] Reddit source failed:", error);
+  }
+
+  // Future: Twitter/X, TikTok Creative Center, Google Trends RSS
 
   // 3. Deduplicate
   const deduplicated = deduplicateItems(allItems);

@@ -90,7 +90,6 @@ export async function POST(req: NextRequest) {
           region: item.region,
           source: item.source,
           sources_count: item.sources_count,
-          timestamp: item.timestamp,
           page_target: item.page_target,
           status: item.status,
         })),

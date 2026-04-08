@@ -54,7 +54,6 @@ async function handleFetchTrends(): Promise<{
     sources_count: t.sources_count,
     page_target: t.page_target,
     status: "pending",
-    fetched_at: new Date().toISOString(),
   }));
 
   const { error } = await supabase.from("dev_trending_topics").upsert(rows, {
@@ -164,16 +163,18 @@ async function handleGenerate(): Promise<{
     // Add to dev_content_queue
     const { error: queueErr } = await supabase.from("dev_content_queue").insert({
       page_id: page.id,
-      page_name: page.name,
       pillar: matchedPillar,
-      topic_id: matchedTopic.id,
-      topic_title: matchedTopic.title,
-      video_prompt: videoPrompt,
       engine: engine.modelId,
-      provider: engine.provider,
-      estimated_cost_usd: engine.estimatedCostUsd,
+      news_topic_id: matchedTopic.id,
+      input_data: {
+        page_name: page.name,
+        topic_title: matchedTopic.title,
+        video_prompt: videoPrompt,
+        provider: engine.provider,
+        reason: engine.reason,
+      },
+      cost_usd: engine.estimatedCostUsd,
       status: "pending",
-      created_at: new Date().toISOString(),
     });
 
     if (queueErr) {
@@ -191,7 +192,12 @@ async function handleGenerate(): Promise<{
     matchedTopic.status = "queued";
 
     // Log cost entry (non-critical)
-    const { error: costErr } = await supabase.from("dev_cost_log").insert(costEntry);
+    const { error: costErr } = await supabase.from("dev_generation_costs").insert({
+      engine: costEntry.engine,
+      pillar: costEntry.pillar,
+      page_id: costEntry.page_id,
+      estimated_cost_usd: costEntry.estimated_cost_usd,
+    });
     if (costErr) {
       console.warn(`[DEV SCHEDULER] Cost log insert failed for ${page.name}: ${costErr.message}`);
     }

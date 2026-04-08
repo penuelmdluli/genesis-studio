@@ -227,6 +227,24 @@ export async function POST(req: NextRequest) {
 
       // Poll assembly
       if (production.status === "assembling") {
+        // If assembly_state is null, startAssembly failed — retry it
+        const supabaseCheck = createSupabaseAdmin();
+        const { data: prodRow } = await supabaseCheck
+          .from("productions")
+          .select("assembly_state")
+          .eq("id", productionId)
+          .single();
+
+        if (!prodRow?.assembly_state) {
+          console.log(`[INTERNAL BRAIN] assembly_state is null — retrying startAssembly`);
+          try {
+            const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+            await startAssembly(productionId);
+          } catch (err) {
+            console.error(`[INTERNAL BRAIN] startAssembly retry failed:`, err);
+          }
+        }
+
         const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
         await pollAssembly(productionId);
         const refreshed = await getProduction(productionId);

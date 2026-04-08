@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         else if (production.status === "assembling") {
           await pollAssembly(pid);
           const refreshed = await getProduction(pid);
-          const phase = (refreshed?.assemblyState as Record<string, unknown>)?.phase as string || "unknown";
+          const phase = (refreshed?.assemblyState as unknown as Record<string, unknown>)?.phase as string || "unknown";
           results.push({
             id: pid,
             status: refreshed?.status || "assembling",

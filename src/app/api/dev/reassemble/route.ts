@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
     let plan = production.plan;
     if (typeof plan === "string") {
       plan = JSON.parse(plan);
-      log(`[REASSEMBLE] Parsed plan from string — ${(plan as Record<string, unknown>).scenes ? ((plan as Record<string, unknown>).scenes as unknown[]).length : 0} scenes`);
+      log(`[REASSEMBLE] Parsed plan from string — ${(plan as unknown as Record<string, unknown>).scenes ? ((plan as unknown as Record<string, unknown>).scenes as unknown[]).length : 0} scenes`);
     }
-    const sceneDefs = ((plan as Record<string, unknown>)?.scenes || []) as Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }>;
+    const sceneDefs = ((plan as unknown as Record<string, unknown>)?.scenes || []) as Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }>;
     log(`[REASSEMBLE] Scene defs: ${sceneDefs.length}, voiceover lines: ${sceneDefs.filter(s => s.voiceoverLine).length}`);
 
     // Get completed scenes

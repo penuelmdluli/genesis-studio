@@ -177,9 +177,9 @@ export async function localAssembly(productionId: string): Promise<{
     // Get plan for voiceover lines (plan may be stored as JSON string)
     let plan = production.plan;
     if (typeof plan === "string") {
-      try { plan = JSON.parse(plan); } catch { plan = null; }
+      try { plan = JSON.parse(plan); } catch { plan = undefined; }
     }
-    const sceneDefs = (plan as Record<string, unknown>)?.scenes as Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }> || [];
+    const sceneDefs = (plan as unknown as Record<string, unknown>)?.scenes as Array<{ sceneNumber: number; duration: number; voiceoverLine?: string }> || [];
 
     console.log(`[LOCAL ASSEMBLY] Assembling ${completedScenes.length} scenes with voiceover + music + captions`);
 
@@ -253,7 +253,7 @@ export async function localAssembly(productionId: string): Promise<{
       .join(". ") || production.concept;
 
     // Map the voice setting to Edge TTS voice
-    const edgeVoice = mapToEdgeVoice(production.voiceoverVoice);
+    const edgeVoice = mapToEdgeVoice((production as unknown as Record<string, unknown>).voiceoverVoice as string | undefined);
     const hasVoiceover = await generateVoiceoverLocal(voiceoverScript, voiceoverPath, edgeVoice);
 
     if (hasVoiceover) {

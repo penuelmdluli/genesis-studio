@@ -137,8 +137,8 @@ export async function POST(req: NextRequest) {
         plan = consistencyEngine.applyAll(plan);
 
         // Store voice in plan for produce route
-        (plan as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
-        (plan as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
+        (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
+        (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
 
         // Step 2: Create production record
         const production = await createProduction(DEV_USER_ID, brainInput, plan);

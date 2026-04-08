@@ -84,10 +84,10 @@ export async function POST(req: NextRequest) {
 
     // Store voice settings in the plan so produce route can access them
     if (body.voiceoverVoice) {
-      (plan as Record<string, unknown>).voiceoverVoice = body.voiceoverVoice;
+      (plan as unknown as Record<string, unknown>).voiceoverVoice = body.voiceoverVoice;
     }
     if (body.voiceoverLanguage) {
-      (plan as Record<string, unknown>).voiceoverLanguage = body.voiceoverLanguage;
+      (plan as unknown as Record<string, unknown>).voiceoverLanguage = body.voiceoverLanguage;
     }
 
     // Calculate credit cost

@@ -337,32 +337,56 @@ async function handleProduce(): Promise<{
   triggered: number;
   results: Array<{ queueId: string; status: string }>;
 }> {
-  console.log("[DEV SCHEDULER] Triggering Brain Studio production...");
+  console.log("[DEV SCHEDULER] Triggering Brain Studio productions (one at a time)...");
 
   const appUrl = getAppUrl();
   const cronSecret = getCronSecret();
 
-  const res = await fetch(`${appUrl}/api/dev/produce`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-cron-secret": cronSecret,
-    },
-    body: JSON.stringify({}),
-  });
+  let totalTriggered = 0;
+  const allResults: Array<{ queueId: string; status: string }> = [];
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "no body");
-    console.error(`[DEV SCHEDULER] Produce call failed (${res.status}): ${text}`);
-    throw new Error(`Produce endpoint returned ${res.status}`);
+  // The produce endpoint now processes ONE item per call.
+  // Loop up to 6 times to process all pending items.
+  for (let i = 0; i < 6; i++) {
+    try {
+      const res = await fetch(`${appUrl}/api/dev/produce`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": cronSecret,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "no body");
+        console.error(`[DEV SCHEDULER] Produce call ${i + 1} failed (${res.status}): ${text}`);
+        break;
+      }
+
+      const data = await res.json();
+      if (data.produced === 0) {
+        console.log(`[DEV SCHEDULER] No more pending items after ${totalTriggered} productions`);
+        break;
+      }
+
+      totalTriggered += data.produced || 0;
+      if (data.productionId) {
+        allResults.push({ queueId: data.productionId, status: "started" });
+      }
+
+      console.log(`[DEV SCHEDULER] Produce call ${i + 1}: ${data.concept?.slice(0, 50)} → ${data.productionId}`);
+
+      // If no more remaining, stop
+      if ((data.remaining || 0) === 0) break;
+    } catch (err) {
+      console.error(`[DEV SCHEDULER] Produce call ${i + 1} error:`, err);
+      break;
+    }
   }
 
-  const data = await res.json();
-  const triggered = data.produced || 0;
-  const results = data.results || [];
-
-  console.log(`[DEV SCHEDULER] Produce triggered ${triggered} production(s)`);
-  return { triggered, results };
+  console.log(`[DEV SCHEDULER] Produce triggered ${totalTriggered} production(s) total`);
+  return { triggered: totalTriggered, results: allResults };
 }
 
 // ──────────────────────────────────────────────────────────

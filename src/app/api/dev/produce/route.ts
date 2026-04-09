@@ -197,101 +197,97 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Limit to 3 per call — each gets its own after() for reliability
-    const itemsToProcess = queueItems.slice(0, 3);
+    // Process ONE item per call — planning is done synchronously (within the function timeout),
+    // only scene execution goes into after() (which is lightweight — just API calls + audio gen)
+    const item = queueItems[0];
+    const concept = item.input_data?.topic_title || "Dev content";
+    const videoPrompt = item.input_data?.video_prompt || concept;
+    const pageName = item.input_data?.page_name || item.page_id;
 
-    console.log(`[DEV PRODUCE] Launching ${itemsToProcess.length} Hollywood productions (each in separate after())`);
+    console.log(`[DEV PRODUCE] Processing ${pageName}: "${concept.slice(0, 60)}..."`);
 
-    // Mark all as "generating" immediately
-    for (const item of itemsToProcess) {
-      await supabase
-        .from("dev_content_queue")
-        .update({ status: "generating" })
-        .eq("id", item.id);
-    }
+    // Mark as generating
+    await supabase
+      .from("dev_content_queue")
+      .update({ status: "generating" })
+      .eq("id", item.id);
 
-    // Spawn a SEPARATE after() for EACH item — so if one dies, others still run
-    for (const item of itemsToProcess) {
-      after(async () => {
-        const itemSupabase = createSupabaseAdmin();
-        try {
-          const concept = item.input_data?.topic_title || "Dev content";
-          const videoPrompt = item.input_data?.video_prompt || concept;
-          const pageName = item.input_data?.page_name || item.page_id;
+    // ── SYNCHRONOUS: Plan + i2v image (within function timeout) ──
 
-          console.log(`[DEV PRODUCE] Planning production for ${pageName}: "${concept.slice(0, 60)}..."`);
+    const brainInput: BrainInput = {
+      concept: videoPrompt,
+      targetDuration: 20,
+      style: "cinematic",
+      aspectRatio: "portrait",
+      voiceover: true,
+      voiceoverVoice: DEFAULT_VOICE,
+      voiceoverLanguage: DEFAULT_LANGUAGE,
+      music: true,
+      captions: true,
+      soundEffects: true,
+    };
 
-          // Build Brain Studio input with FULL audio pipeline
-          const brainInput: BrainInput = {
-            concept: videoPrompt,
-            targetDuration: 20,
-            style: "cinematic",
-            aspectRatio: "portrait",
-            voiceover: true,
-            voiceoverVoice: DEFAULT_VOICE,
-            voiceoverLanguage: DEFAULT_LANGUAGE,
-            music: true,
-            captions: true,
-            soundEffects: true,
-          };
+    // Step 1: Plan with Hollywood cinematography prompt (~10-15s)
+    let plan = await planProduction(brainInput);
+    plan = consistencyEngine.applyAll(plan);
+    (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
+    (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
 
-          // Step 1: Plan with Hollywood cinematography prompt
-          let plan = await planProduction(brainInput);
-          plan = consistencyEngine.applyAll(plan);
-          (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
-          (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
+    console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-          // Step 1b: Generate hero reference image for i2v character consistency
-          plan = await injectReferenceImages(plan);
+    // Step 1b: Generate hero reference image for i2v (~5-10s)
+    plan = await injectReferenceImages(plan);
 
-          // Step 2: Create production record
-          brainInput.concept = concept;
-          const production = await createProduction(DEV_USER_ID, brainInput, plan);
-          console.log(`[DEV PRODUCE] Production ${production.id} created for ${pageName}`);
+    // Step 2: Create production record
+    brainInput.concept = concept;
+    const production = await createProduction(DEV_USER_ID, brainInput, plan);
+    console.log(`[DEV PRODUCE] Production ${production.id} created for ${pageName}`);
 
-          // Link queue item to production
-          await itemSupabase
-            .from("dev_content_queue")
-            .update({
-              status: "generating",
-              input_data: { ...item.input_data, production_id: production.id },
-            })
-            .eq("id", item.id);
+    // Link queue item to production
+    await supabase
+      .from("dev_content_queue")
+      .update({
+        status: "generating",
+        input_data: { ...item.input_data, production_id: production.id },
+      })
+      .eq("id", item.id);
 
-          // Step 3: Execute (scenes + audio + assembly)
-          await executeProduction(production.id, DEV_USER_ID, DEV_CLERK_ID, plan, brainInput);
-
-          console.log(`[DEV PRODUCE] Production ${production.id} DONE for ${pageName}`);
-          await itemSupabase
-            .from("dev_content_queue")
-            .update({ status: "ready", generated_at: new Date().toISOString() })
-            .eq("id", item.id);
-        } catch (err) {
-          console.error(`[DEV PRODUCE] FAILED for queue item ${item.id}:`, err);
-          await itemSupabase
-            .from("dev_content_queue")
-            .update({
-              status: "failed",
-              error_message: err instanceof Error ? err.message : "Production failed",
-            })
-            .eq("id", item.id);
-        }
-      });
-    }
+    // ── ASYNC: Scene execution + audio in after() ──
+    // executeProduction submits scenes to RunPod (fast API calls) then generates audio.
+    // This is the lightweight part — the heavy Claude+FLUX work is already done above.
+    after(async () => {
+      const bgSupabase = createSupabaseAdmin();
+      try {
+        await executeProduction(production.id, DEV_USER_ID, DEV_CLERK_ID, plan, brainInput);
+        console.log(`[DEV PRODUCE] Production ${production.id} DONE for ${pageName}`);
+        await bgSupabase
+          .from("dev_content_queue")
+          .update({ status: "ready", generated_at: new Date().toISOString() })
+          .eq("id", item.id);
+      } catch (err) {
+        console.error(`[DEV PRODUCE] Production ${production.id} FAILED:`, err);
+        await bgSupabase
+          .from("dev_content_queue")
+          .update({
+            status: "failed",
+            error_message: err instanceof Error ? err.message : "Production failed",
+          })
+          .eq("id", item.id);
+      }
+    });
 
     return NextResponse.json({
       success: true,
-      produced: itemsToProcess.length,
-      remaining: queueItems.length - itemsToProcess.length,
+      produced: 1,
+      remaining: queueItems.length - 1,
       total: queueItems.length,
+      productionId: production.id,
+      concept,
+      scenes: plan.scenes.length,
+      i2v: !!plan.scenes[0]?.referenceImageUrl,
       pipeline: "Brain Studio Hollywood (Claude plan + FLUX Pro i2v + RunPod + FAL audio)",
       voice: `${DEFAULT_VOICE} (Kokoro am_adam)`,
-      note: "Each item runs in its own background worker — call again for remaining items",
-      results: itemsToProcess.map((item) => ({
-        queueId: item.id,
-        pageName: item.input_data?.page_name || item.page_id,
-        status: "queued_for_production",
-      })),
+      note: "Scenes submitted to RunPod in background. Call again for next item.",
     });
   } catch (error) {
     console.error("[DEV PRODUCE] Error:", error);

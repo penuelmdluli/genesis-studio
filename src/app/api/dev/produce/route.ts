@@ -235,8 +235,9 @@ export async function POST(req: NextRequest) {
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-    // Step 1b: Generate hero reference image for i2v (~5-10s)
-    plan = await injectReferenceImages(plan);
+    // Step 1b: i2v disabled — RunPod wan-2-2-i2v-720-lora endpoint not deployed
+    // TODO: Re-enable when i2v endpoint is available
+    // plan = await injectReferenceImages(plan);
 
     // Step 2: Create production record
     brainInput.concept = concept;

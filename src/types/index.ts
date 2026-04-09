@@ -416,6 +416,7 @@ export interface SceneDefinition {
   characterIds?: string[];
   colorGrade?: string;
   soundDesign?: SoundDesign;
+  referenceImageUrl?: string; // For i2v: generate from this image instead of text-only
 }
 
 export interface SoundDesign {

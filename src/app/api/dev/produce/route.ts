@@ -19,8 +19,10 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { planProduction } from "@/lib/genesis-brain/planner";
 import { createProduction, executeProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
-import { BrainInput } from "@/types";
+import { BrainInput, ScenePlan } from "@/types";
 import { after } from "next/server";
+
+const FAL_API_KEY = process.env.FAL_KEY || "";
 
 export const maxDuration = 120;
 
@@ -31,6 +33,93 @@ const DEV_CLERK_ID = process.env.OWNER_CLERK_IDS?.split(",")[0]?.trim() || "";
 // Best voice for all content — cinematic male narrator
 const DEFAULT_VOICE = "en-US-GuyNeural"; // Maps to Kokoro "am_adam"
 const DEFAULT_LANGUAGE = "en-US";
+
+/**
+ * Generate a reference image for a scene using FLUX Pro.
+ * This image is then used for i2v (image-to-video) to get character consistency.
+ * Returns the image URL or null on failure.
+ */
+async function generateReferenceImage(scenePrompt: string): Promise<string | null> {
+  if (!FAL_API_KEY) {
+    console.warn("[DEV PRODUCE] No FAL_KEY — skipping reference image generation");
+    return null;
+  }
+
+  try {
+    // Build an image-optimized prompt from the video prompt
+    // Strip camera movement/duration language, keep visual description
+    const imagePrompt = scenePrompt
+      .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle/gi, "")
+      .replace(/\d+mm|f\/[\d.]+/gi, "") // remove lens specs
+      .replace(/cinematic,?\s*/gi, "")
+      .replace(/4K,?\s*/gi, "")
+      .replace(/film grain,?\s*/gi, "")
+      .trim();
+
+    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+      method: "POST",
+      headers: {
+        "Authorization": `Key ${FAL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: `${imagePrompt}, highly detailed, sharp focus, studio quality, photorealistic`,
+        image_size: { width: 720, height: 1280 }, // Portrait for Reels
+        num_images: 1,
+        enable_safety_checker: false,
+        output_format: "jpeg",
+        num_inference_steps: 28,
+        guidance_scale: 3.5,
+      }),
+    });
+
+    if (!falRes.ok) {
+      console.error("[DEV PRODUCE] FLUX Pro error:", await falRes.text().catch(() => "unknown"));
+      return null;
+    }
+
+    const result = await falRes.json();
+    const imageUrl = result.images?.[0]?.url;
+    if (!imageUrl) {
+      console.error("[DEV PRODUCE] FLUX Pro returned no images");
+      return null;
+    }
+
+    console.log(`[DEV PRODUCE] Reference image generated: ${imageUrl.slice(0, 80)}...`);
+    return imageUrl;
+  } catch (err) {
+    console.error("[DEV PRODUCE] Reference image generation failed:", err);
+    return null;
+  }
+}
+
+/**
+ * For each scene in the plan, generate a reference image and set referenceImageUrl.
+ * Uses scene 1's image as the hero reference for all scenes (character consistency).
+ */
+async function injectReferenceImages(plan: ScenePlan): Promise<ScenePlan> {
+  if (!FAL_API_KEY || plan.scenes.length === 0) return plan;
+
+  console.log(`[DEV PRODUCE] Generating hero reference image for i2v character consistency...`);
+
+  // Generate ONE hero reference from scene 1 — used for ALL scenes
+  // This ensures the same character/style appears consistently throughout
+  const heroPrompt = plan.scenes[0].prompt;
+  const heroImageUrl = await generateReferenceImage(heroPrompt);
+
+  if (!heroImageUrl) {
+    console.warn("[DEV PRODUCE] Hero reference image failed — falling back to t2v");
+    return plan;
+  }
+
+  // Apply hero reference to ALL scenes for maximum consistency
+  for (const scene of plan.scenes) {
+    scene.referenceImageUrl = heroImageUrl;
+  }
+
+  console.log(`[DEV PRODUCE] All ${plan.scenes.length} scenes set to i2v with hero reference image`);
+  return plan;
+}
 
 function validateCronSecret(req: NextRequest): boolean {
   const secret =
@@ -130,7 +219,7 @@ export async function POST(req: NextRequest) {
           voiceoverLanguage: DEFAULT_LANGUAGE,
           music: true,
           captions: true,
-          soundEffects: false, // Keep it efficient
+          soundEffects: true, // Hollywood Sound Design — ambient, SFX, foley
         };
 
         // Step 1: Plan the production with Claude
@@ -140,6 +229,9 @@ export async function POST(req: NextRequest) {
         // Store voice in plan for produce route
         (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
         (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
+
+        // Step 1b: Generate hero reference image for i2v (character consistency)
+        plan = await injectReferenceImages(plan);
 
         // Step 2: Create production record (use clean title for gallery display)
         brainInput.concept = concept;

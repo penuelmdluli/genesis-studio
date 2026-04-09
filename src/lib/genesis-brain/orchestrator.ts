@@ -249,13 +249,22 @@ export async function executeProduction(
         }
       }
 
+      // Determine if this scene should use i2v (reference image available)
+      const hasReferenceImage = !!sceneDef.referenceImageUrl;
+      const generationType = hasReferenceImage ? "i2v" : "t2v";
+
+      if (hasReferenceImage) {
+        console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: using i2v with reference image for character consistency`);
+      }
+
       try {
         if (isFalModel) {
           const falResult = await submitFalJob({
             modelId: sceneDef.modelId,
-            type: "t2v",
+            type: generationType as "t2v" | "i2v",
             prompt: scenePrompt,
             negativePrompt: sceneDef.negativePrompt,
+            imageUrl: sceneDef.referenceImageUrl,
             duration: sceneDef.duration,
             aspectRatio: input.aspectRatio,
             enableAudio: model?.hasAudio ?? false,
@@ -278,9 +287,10 @@ export async function executeProduction(
         } else {
           const runpodInput = buildRunPodInput({
             modelId: sceneDef.modelId,
-            type: "t2v",
+            type: generationType,
             prompt: scenePrompt,
             negativePrompt: sceneDef.negativePrompt,
+            inputImageUrl: sceneDef.referenceImageUrl,
             resolution: sceneDef.resolution,
             duration: sceneDef.duration,
             fps: 24,
@@ -291,7 +301,8 @@ export async function executeProduction(
             aspectRatio: input.aspectRatio,
           });
 
-          const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl);
+          // Use i2v endpoint for wan-2.2 when reference image is available
+          const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl, generationType);
 
           await updateProductionScene(scene.id, {
             status: "processing",
@@ -582,13 +593,18 @@ export async function resubmitStuckScenes(
       }
     }
 
+    // Determine if this scene should use i2v (reference image available)
+    const hasReferenceImage = !!sceneDef.referenceImageUrl;
+    const generationType = hasReferenceImage ? "i2v" : "t2v";
+
     try {
       if (isFalModel) {
         const falResult = await submitFalJob({
           modelId: sceneDef.modelId,
-          type: "t2v",
+          type: generationType as "t2v" | "i2v",
           prompt: scenePrompt,
           negativePrompt: sceneDef.negativePrompt,
+          imageUrl: sceneDef.referenceImageUrl,
           duration: sceneDef.duration,
           aspectRatio: production.aspectRatio,
           enableAudio: model?.hasAudio ?? false,
@@ -611,9 +627,10 @@ export async function resubmitStuckScenes(
       } else {
         const runpodInput = buildRunPodInput({
           modelId: sceneDef.modelId,
-          type: "t2v",
+          type: generationType,
           prompt: scenePrompt,
           negativePrompt: sceneDef.negativePrompt,
+          inputImageUrl: sceneDef.referenceImageUrl,
           resolution: sceneDef.resolution,
           duration: sceneDef.duration,
           fps: 24,
@@ -624,7 +641,7 @@ export async function resubmitStuckScenes(
           aspectRatio: production.aspectRatio,
         });
 
-        const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl);
+        const job = await submitRunPodJob(sceneDef.modelId, runpodInput, webhookUrl, generationType);
 
         await updateProductionScene(scene.id, {
           status: "processing",
@@ -635,7 +652,7 @@ export async function resubmitStuckScenes(
 
       submitted++;
       console.log(
-        `[BRAIN RESUBMIT] Scene ${scene.sceneNumber} resubmitted (${isFalModel ? "FAL" : "RunPod"})`
+        `[BRAIN RESUBMIT] Scene ${scene.sceneNumber} resubmitted (${isFalModel ? "FAL" : "RunPod"}, ${generationType})`
       );
     } catch (err) {
       console.error(

@@ -703,6 +703,37 @@ function recalculateVoiceoverTimestamps(
   console.log(`[ASSEMBLY] Voiceover timestamps recalculated for ${state.voiceoverClips.length} clips`);
 }
 
+/**
+ * Recalculate voiceover clip startMs based on ACTUAL VIDEO durations.
+ * This ensures voiceover starts exactly when each scene appears on screen.
+ * Video durations are measured from processedSceneUrls — the real source of truth.
+ */
+function recalculateTimestampsFromVideoDurations(state: AssemblyState) {
+  if (!state.voiceoverClips?.length || !state.sceneVideoDurations) return;
+
+  // Build cumulative offsets from actual video durations
+  const sceneNums = Object.keys(state.sceneVideoDurations).map(Number).sort((a, b) => a - b);
+  const sceneOffsets: Record<number, number> = {};
+  let offset = 0;
+  for (const sceneNum of sceneNums) {
+    sceneOffsets[sceneNum] = offset;
+    offset += state.sceneVideoDurations[sceneNum];
+  }
+
+  // Update voiceover clip timestamps to match video scene boundaries
+  for (const clip of state.voiceoverClips) {
+    if (clip.sceneNumber && sceneOffsets[clip.sceneNumber] !== undefined) {
+      const oldStart = clip.startMs;
+      clip.startMs = sceneOffsets[clip.sceneNumber];
+      if (oldStart !== clip.startMs) {
+        console.log(`[ASSEMBLY] VO clip scene ${clip.sceneNumber}: ${(oldStart / 1000).toFixed(1)}s → ${(clip.startMs / 1000).toFixed(1)}s (video-aligned)`);
+      }
+    }
+  }
+
+  console.log(`[ASSEMBLY] Voiceover timestamps aligned to actual video scene boundaries (${state.voiceoverClips.length} clips)`);
+}
+
 // ---- PHASE 3: CONCAT — Join all scenes into one video ----
 
 async function pollConcatPhase(
@@ -954,14 +985,20 @@ async function buildSoundDesignClips(
   const plan = production.plan;
   if (!plan?.scenes) return null;
 
-  // Calculate per-scene start offset — prefer voiceover-driven durations (post speed-adjust)
+  // Calculate per-scene start offset using ACTUAL VIDEO durations (not voiceover TTS durations).
+  // Sound effects must sync to what's ON SCREEN, not when the narrator speaks.
+  // Priority: sceneVideoDurations (measured) > sceneAudioDurations (voiceover) > plan duration
   const sceneOffsets: Record<number, number> = {};
+  const sceneDurations: Record<number, number> = {};
   let offsetMs = 0;
   const sortedScenes = [...plan.scenes].sort((a, b) => a.sceneNumber - b.sceneNumber);
   for (const scene of sortedScenes) {
     sceneOffsets[scene.sceneNumber] = offsetMs;
+    const videoDuration = state.sceneVideoDurations?.[scene.sceneNumber];
     const voDuration = state.sceneAudioDurations?.[scene.sceneNumber];
-    offsetMs += voDuration || (scene.duration * 1000);
+    const duration = videoDuration || voDuration || (scene.duration * 1000);
+    sceneDurations[scene.sceneNumber] = duration;
+    offsetMs += duration;
   }
 
   const ambient: Array<{ url: string; startMs: number; durationMs: number }> = [];
@@ -971,30 +1008,35 @@ async function buildSoundDesignClips(
   for (const assets of state.soundAssets) {
     const sceneStartMs = sceneOffsets[assets.sceneNumber] ?? 0;
 
-    // Ambient — plays at scene start for scene duration
+    // Scene's actual duration for clamping timestamps
+    const sceneMs = sceneDurations[assets.sceneNumber] || 5000;
+
+    // Ambient — plays at scene start for the FULL scene video duration
     if (assets.ambientUrl) {
       ambient.push({
         url: await resolveAudioUrl(assets.ambientUrl),
         startMs: sceneStartMs,
-        durationMs: assets.ambientDurationMs || (sortedScenes.find(s => s.sceneNumber === assets.sceneNumber)?.duration || 5) * 1000,
+        durationMs: sceneMs, // Match actual video duration, not generated audio length
       });
     }
 
-    // SFX — placed at scene offset + clip timestamp
+    // SFX — placed at scene offset + clip timestamp, clamped to scene bounds
     for (const clip of assets.sfxClips) {
+      const clampedTimestamp = Math.min(clip.timestampMs, Math.max(0, sceneMs - 500));
       sfx.push({
         url: await resolveAudioUrl(clip.url),
-        startMs: sceneStartMs + clip.timestampMs,
-        durationMs: clip.durationMs,
+        startMs: sceneStartMs + clampedTimestamp,
+        durationMs: Math.min(clip.durationMs, sceneMs - clampedTimestamp),
       });
     }
 
-    // Foley — placed at scene offset + clip timestamp
+    // Foley — placed at scene offset + clip timestamp, clamped to scene bounds
     for (const clip of assets.foleyClips) {
+      const clampedTimestamp = Math.min(clip.timestampMs, Math.max(0, sceneMs - 500));
       foley.push({
         url: await resolveAudioUrl(clip.url),
-        startMs: sceneStartMs + clip.timestampMs,
-        durationMs: clip.durationMs,
+        startMs: sceneStartMs + clampedTimestamp,
+        durationMs: Math.min(clip.durationMs, sceneMs - clampedTimestamp),
       });
     }
   }
@@ -1016,19 +1058,43 @@ async function pollMixFinalPhase(
   // compose natively supports multiple audio tracks layered simultaneously.
 
   if (!state.mixFinalJob) {
-    // Recalculate voiceover clip timestamps so they play back-to-back
-    // (original startMs values are based on PLAN durations, not actual VO durations)
-    if (state.voiceoverClips?.length && state.sceneAudioDurations) {
-      const freshScenes = await getProductionScenes(productionId);
-      const completedScenes = freshScenes
-        .filter((s) => s.status === "completed")
-        .sort((a, b) => a.sceneNumber - b.sceneNumber);
-      recalculateVoiceoverTimestamps(state, completedScenes);
-    }
     const videoUrl = state.concatJob?.videoUrl;
     if (!videoUrl) {
       state.phase = "done";
       return true;
+    }
+
+    // ── Measure ACTUAL video scene durations for proper audio alignment ──
+    // Sound effects and voiceover must sync to the VIDEO (what you see),
+    // not voiceover TTS durations (which differ from video clip lengths).
+    if (!state.sceneVideoDurations) {
+      const freshScenes = await getProductionScenes(productionId);
+      const completedScenes = freshScenes
+        .filter((s) => s.status === "completed")
+        .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+      state.sceneVideoDurations = {};
+      const crossfadeSec = state.transitionType === "crossfade" ? 0.5 : 0;
+
+      for (let i = 0; i < completedScenes.length; i++) {
+        const sceneUrl = state.processedSceneUrls[i];
+        if (sceneUrl) {
+          const durSec = await getMediaDuration(sceneUrl);
+          // Effective duration in concat = clip duration minus crossfade overlap (except last scene)
+          const effectiveSec = durSec > 0
+            ? durSec - (i < completedScenes.length - 1 ? crossfadeSec : 0)
+            : 5;
+          state.sceneVideoDurations[completedScenes[i].sceneNumber] = Math.round(effectiveSec * 1000);
+          console.log(`[ASSEMBLY] Scene ${completedScenes[i].sceneNumber} actual video: ${effectiveSec.toFixed(1)}s`);
+        }
+      }
+      console.log(`[ASSEMBLY] Measured ${Object.keys(state.sceneVideoDurations).length} actual video durations for audio alignment`);
+    }
+
+    // Recalculate voiceover timestamps to match ACTUAL video scene boundaries
+    // (not voiceover TTS durations — those don't match the video)
+    if (state.voiceoverClips?.length && state.sceneVideoDurations) {
+      recalculateTimestampsFromVideoDurations(state);
     }
 
     const voiceoverUrl = production.voiceoverUrl;
@@ -1039,6 +1105,7 @@ async function pollMixFinalPhase(
     const voiceoverClips = state.voiceoverClips;
 
     // Build sound design clips from per-scene assets (ambient, SFX, foley)
+    // Uses sceneVideoDurations for proper visual sync
     const soundDesignClips = await buildSoundDesignClips(state, production);
 
     if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl && !soundDesignClips) {

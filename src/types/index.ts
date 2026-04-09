@@ -522,6 +522,8 @@ export interface AssemblyState {
   concatDurationMs?: number;
   // Per-scene sound design assets (ambient, SFX, foley URLs with timing)
   soundAssets?: Array<SceneSoundAssets>;
+  // Actual video clip durations in ms (measured from processedSceneUrls, used for audio alignment)
+  sceneVideoDurations?: Record<number, number>;
 }
 
 export interface Production {

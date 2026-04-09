@@ -24,7 +24,7 @@ import { after } from "next/server";
 
 const FAL_API_KEY = process.env.FAL_KEY || "";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // The owner user ID — dev productions are created under this account
 const DEV_USER_ID = "c1fccbb2-86e9-4d34-ae43-4a7cf4fd4a26";
@@ -156,26 +156,40 @@ export async function POST(req: NextRequest) {
 
     const supabase = createSupabaseAdmin();
 
-    // Get pending queue items
-    let query = supabase
-      .from("dev_content_queue")
-      .select("*")
-      .eq("status", "pending")
-      .order("created_at", { ascending: true })
-      .limit(10);
+    // Get pending items — also recover items stuck at "generating" for >5 min
+    let queueItems: QueueItem[] = [];
 
     if (queueItemId) {
-      query = supabase
+      const { data, error: fetchErr } = await supabase
         .from("dev_content_queue")
         .select("*")
         .eq("id", queueItemId)
         .limit(1);
+      if (fetchErr) throw new Error(`Failed to fetch queue: ${fetchErr.message}`);
+      queueItems = (data || []) as QueueItem[];
+    } else {
+      // Fetch pending items
+      const { data: pending } = await supabase
+        .from("dev_content_queue")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true })
+        .limit(6);
+
+      // Also recover stuck "generating" items (no production_id and older than 5 min)
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: stuck } = await supabase
+        .from("dev_content_queue")
+        .select("*")
+        .eq("status", "generating")
+        .lt("created_at", fiveMinAgo)
+        .order("created_at", { ascending: true })
+        .limit(6);
+
+      queueItems = [...((pending || []) as QueueItem[]), ...((stuck || []) as QueueItem[])];
     }
 
-    const { data: items, error: fetchErr } = await query;
-    if (fetchErr) throw new Error(`Failed to fetch queue: ${fetchErr.message}`);
-
-    if (!items || items.length === 0) {
+    if (queueItems.length === 0) {
       return NextResponse.json({
         success: true,
         message: "No pending items in queue",
@@ -183,21 +197,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log(`[DEV PRODUCE] Queuing ${items.length} items for Hollywood pipeline (plan + i2v + produce)`);
+    // Limit to 3 per call — each gets its own after() for reliability
+    const itemsToProcess = queueItems.slice(0, 3);
 
-    // Mark all items as generating immediately, then do ALL heavy work in after()
-    const queueItems = items as QueueItem[];
-    for (const item of queueItems) {
+    console.log(`[DEV PRODUCE] Launching ${itemsToProcess.length} Hollywood productions (each in separate after())`);
+
+    // Mark all as "generating" immediately
+    for (const item of itemsToProcess) {
       await supabase
         .from("dev_content_queue")
         .update({ status: "generating" })
         .eq("id", item.id);
     }
 
-    // All heavy work (Claude planning + FLUX Pro i2v + RunPod scenes + audio)
-    // runs inside after() to avoid Vercel function timeout (60s on Hobby)
-    after(async () => {
-      for (const item of queueItems) {
+    // Spawn a SEPARATE after() for EACH item — so if one dies, others still run
+    for (const item of itemsToProcess) {
+      after(async () => {
+        const itemSupabase = createSupabaseAdmin();
         try {
           const concept = item.input_data?.topic_title || "Dev content";
           const videoPrompt = item.input_data?.video_prompt || concept;
@@ -216,88 +232,62 @@ export async function POST(req: NextRequest) {
             voiceoverLanguage: DEFAULT_LANGUAGE,
             music: true,
             captions: true,
-            soundEffects: true, // Hollywood Sound Design — ambient, SFX, foley
+            soundEffects: true,
           };
 
-          // Step 1: Plan the production with Claude
+          // Step 1: Plan with Hollywood cinematography prompt
           let plan = await planProduction(brainInput);
           plan = consistencyEngine.applyAll(plan);
-
-          // Store voice in plan
           (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
           (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
 
-          // Step 1b: Generate hero reference image for i2v (character consistency)
+          // Step 1b: Generate hero reference image for i2v character consistency
           plan = await injectReferenceImages(plan);
 
-          // Step 2: Create production record (use clean title for gallery display)
+          // Step 2: Create production record
           brainInput.concept = concept;
           const production = await createProduction(DEV_USER_ID, brainInput, plan);
-
-          console.log(`[DEV PRODUCE] Production created: ${production.id} for ${pageName}`);
+          console.log(`[DEV PRODUCE] Production ${production.id} created for ${pageName}`);
 
           // Link queue item to production
-          await supabase
+          await itemSupabase
             .from("dev_content_queue")
             .update({
               status: "generating",
-              input_data: {
-                ...item.input_data,
-                production_id: production.id,
-              },
+              input_data: { ...item.input_data, production_id: production.id },
             })
             .eq("id", item.id);
 
-          // Step 3: Execute production (scene generation + audio + assembly)
-          try {
-            await executeProduction(
-              production.id,
-              DEV_USER_ID,
-              DEV_CLERK_ID,
-              plan,
-              brainInput
-            );
-            console.log(`[DEV PRODUCE] Production ${production.id} completed for ${pageName}`);
+          // Step 3: Execute (scenes + audio + assembly)
+          await executeProduction(production.id, DEV_USER_ID, DEV_CLERK_ID, plan, brainInput);
 
-            await supabase
-              .from("dev_content_queue")
-              .update({
-                status: "ready",
-                generated_at: new Date().toISOString(),
-              })
-              .eq("id", item.id);
-          } catch (err) {
-            console.error(`[DEV PRODUCE] Production ${production.id} failed:`, err);
-            await supabase
-              .from("dev_content_queue")
-              .update({
-                status: "failed",
-                error_message: err instanceof Error ? err.message : "Production failed",
-              })
-              .eq("id", item.id);
-          }
+          console.log(`[DEV PRODUCE] Production ${production.id} DONE for ${pageName}`);
+          await itemSupabase
+            .from("dev_content_queue")
+            .update({ status: "ready", generated_at: new Date().toISOString() })
+            .eq("id", item.id);
         } catch (err) {
-          console.error(`[DEV PRODUCE] Failed to plan production for ${item.id}:`, err);
-          await supabase
+          console.error(`[DEV PRODUCE] FAILED for queue item ${item.id}:`, err);
+          await itemSupabase
             .from("dev_content_queue")
             .update({
               status: "failed",
-              error_message: err instanceof Error ? err.message : "Failed to plan",
+              error_message: err instanceof Error ? err.message : "Production failed",
             })
             .eq("id", item.id);
         }
-      }
-    });
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      produced: queueItems.length,
-      failed: 0,
+      produced: itemsToProcess.length,
+      remaining: queueItems.length - itemsToProcess.length,
       total: queueItems.length,
       pipeline: "Brain Studio Hollywood (Claude plan + FLUX Pro i2v + RunPod + FAL audio)",
       voice: `${DEFAULT_VOICE} (Kokoro am_adam)`,
-      note: "All work runs in background — check queue status for progress",
-      results: queueItems.map((item) => ({
+      note: "Each item runs in its own background worker — call again for remaining items",
+      results: itemsToProcess.map((item) => ({
         queueId: item.id,
         pageName: item.input_data?.page_name || item.page_id,
         status: "queued_for_production",

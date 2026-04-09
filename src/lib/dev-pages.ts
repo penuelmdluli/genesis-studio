@@ -29,7 +29,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "blissful_moments",
     youtube_enabled: true,
-    topics_per_cycle: 2,
+    topics_per_cycle: 1,
   },
   africa_2050: {
     id: "africa_2050_dev",
@@ -44,7 +44,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "limitless_you",
     youtube_enabled: true,
-    topics_per_cycle: 2,
+    topics_per_cycle: 1,
   },
   afrika_toons: {
     id: "afrika_toons_dev",
@@ -59,7 +59,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "motivation",
     youtube_enabled: true,
-    topics_per_cycle: 2,
+    topics_per_cycle: 1,
   },
   tech_pulse_africa: {
     id: "tech_pulse_africa_dev",
@@ -74,12 +74,12 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "tech_news",
     youtube_enabled: true,
-    topics_per_cycle: 3,
+    topics_per_cycle: 1,
   },
   world_news_animated: {
     id: "world_news_animated_dev",
     name: "World News Animated [DEV]",
-    content_pillars: ["news_animated", "breaking_news", "geopolitics"],
+    content_pillars: ["breaking_news", "geopolitics"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
     post_times: ["07:00", "13:00", "19:00"],
@@ -89,7 +89,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "health_wellness",
     youtube_enabled: true,
-    topics_per_cycle: 3,
+    topics_per_cycle: 1,
   },
   pop_culture_buzz: {
     id: "pop_culture_buzz_dev",
@@ -103,7 +103,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     hashtags: ["#PopCulture", "#Entertainment", "#CelebNews", "#Trending"],
     enabled: true,
     youtube_enabled: true,
-    topics_per_cycle: 2,
+    topics_per_cycle: 1,
   },
   ai_revolution: {
     id: "ai_revolution_dev",
@@ -118,7 +118,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     enabled: true,
     facebook_page_key: "ai_money",
     youtube_enabled: true,
-    topics_per_cycle: 3,
+    topics_per_cycle: 1,
   },
 };
 

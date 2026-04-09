@@ -107,7 +107,8 @@ export async function POST(req: NextRequest) {
     // Process each item — create a Brain Studio production
     for (const item of items as QueueItem[]) {
       try {
-        const concept = item.input_data?.video_prompt || item.input_data?.topic_title || "Dev content";
+        const concept = item.input_data?.topic_title || "Dev content";
+        const videoPrompt = item.input_data?.video_prompt || concept;
         const pageName = item.input_data?.page_name || item.page_id;
 
         console.log(`[DEV PRODUCE] Creating production for ${pageName}: "${concept.slice(0, 60)}..."`);
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
 
         // Build Brain Studio input with FULL audio pipeline
         const brainInput: BrainInput = {
-          concept,
+          concept: videoPrompt,
           targetDuration: 20,
           style: "cinematic",
           aspectRatio: "portrait", // 9:16 vertical for Reels
@@ -140,7 +141,8 @@ export async function POST(req: NextRequest) {
         (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
         (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
 
-        // Step 2: Create production record
+        // Step 2: Create production record (use clean title for gallery display)
+        brainInput.concept = concept;
         const production = await createProduction(DEV_USER_ID, brainInput, plan);
 
         console.log(`[DEV PRODUCE] Production created: ${production.id} for ${pageName}`);

@@ -33,7 +33,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   africa_2050: {
     id: "africa_2050_dev",
-    name: "Africa 2050 [DEV]",
+    name: "Africa 2050",
     content_pillars: ["afrofuturism", "african_cities"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
@@ -48,7 +48,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   afrika_toons: {
     id: "afrika_toons_dev",
-    name: "Afrika Toons [DEV]",
+    name: "Afrika Toons",
     content_pillars: ["news_animated", "african_folklore"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
@@ -63,7 +63,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   tech_pulse_africa: {
     id: "tech_pulse_africa_dev",
-    name: "Tech Pulse Africa [DEV]",
+    name: "Tech Pulse Africa",
     content_pillars: ["genesis_demo", "ai_news", "tech"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
@@ -78,7 +78,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   world_news_animated: {
     id: "world_news_animated_dev",
-    name: "World News Animated [DEV]",
+    name: "World News Animated",
     content_pillars: ["breaking_news", "geopolitics"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
@@ -93,7 +93,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   pop_culture_buzz: {
     id: "pop_culture_buzz_dev",
-    name: "Pop Culture Buzz [DEV]",
+    name: "Pop Culture Buzz",
     content_pillars: ["entertainment", "celebrity", "viral_moments"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",
@@ -107,7 +107,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   },
   ai_revolution: {
     id: "ai_revolution_dev",
-    name: "AI Revolution [DEV]",
+    name: "AI Revolution",
     content_pillars: ["ai_news", "tech", "ai_disruption"],
     engine: "wan-2.2",
     premium_engine: "wan-2.2",

@@ -15,12 +15,12 @@ export const maxDuration = 120;
 
 // Page configs — 6 Facebook pages
 const FB_PAGES: Record<string, { pageId: string; tokenEnv: string; name: string }> = {
-  tech_news: { pageId: "100919755007786", tokenEnv: "FB_PAGE_TOKEN_tech_news", name: "Tech News" },
-  ai_money: { pageId: "107465491085378", tokenEnv: "FB_PAGE_TOKEN_ai_money", name: "AI Money" },
-  motivation: { pageId: "102206758210905", tokenEnv: "FB_PAGE_TOKEN_motivation", name: "Motivation" },
-  health_wellness: { pageId: "106788301081578", tokenEnv: "FB_PAGE_TOKEN_health_wellness", name: "Health & Wellness" },
-  blissful_moments: { pageId: "112465853843545", tokenEnv: "FB_PAGE_TOKEN_blissful_moments", name: "Blissful Moments" },
-  limitless_you: { pageId: "104120995511039", tokenEnv: "FB_PAGE_TOKEN_limitless_you", name: "Limitless You" },
+  tech_news: { pageId: "100919755007786", tokenEnv: "FB_PAGE_TOKEN_tech_news", name: "Tech Pulse Africa" },
+  ai_money: { pageId: "107465491085378", tokenEnv: "FB_PAGE_TOKEN_ai_money", name: "AI Revolution" },
+  motivation: { pageId: "102206758210905", tokenEnv: "FB_PAGE_TOKEN_motivation", name: "Afrika Toons" },
+  health_wellness: { pageId: "106788301081578", tokenEnv: "FB_PAGE_TOKEN_health_wellness", name: "World News Animated" },
+  blissful_moments: { pageId: "112465853843545", tokenEnv: "FB_PAGE_TOKEN_blissful_moments", name: "Mzansi Baby Stars" },
+  limitless_you: { pageId: "104120995511039", tokenEnv: "FB_PAGE_TOKEN_limitless_you", name: "Africa 2050" },
 };
 
 interface PostResult {

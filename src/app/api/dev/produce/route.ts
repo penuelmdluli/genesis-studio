@@ -183,77 +183,72 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log(`[DEV PRODUCE] Processing ${items.length} queue items with full Brain Studio pipeline`);
+    console.log(`[DEV PRODUCE] Queuing ${items.length} items for Hollywood pipeline (plan + i2v + produce)`);
 
-    const results: Array<{
-      queueId: string;
-      pageName: string;
-      productionId?: string;
-      status: string;
-      error?: string;
-    }> = [];
+    // Mark all items as generating immediately, then do ALL heavy work in after()
+    const queueItems = items as QueueItem[];
+    for (const item of queueItems) {
+      await supabase
+        .from("dev_content_queue")
+        .update({ status: "generating" })
+        .eq("id", item.id);
+    }
 
-    // Process each item — create a Brain Studio production
-    for (const item of items as QueueItem[]) {
-      try {
-        const concept = item.input_data?.topic_title || "Dev content";
-        const videoPrompt = item.input_data?.video_prompt || concept;
-        const pageName = item.input_data?.page_name || item.page_id;
+    // All heavy work (Claude planning + FLUX Pro i2v + RunPod scenes + audio)
+    // runs inside after() to avoid Vercel function timeout (60s on Hobby)
+    after(async () => {
+      for (const item of queueItems) {
+        try {
+          const concept = item.input_data?.topic_title || "Dev content";
+          const videoPrompt = item.input_data?.video_prompt || concept;
+          const pageName = item.input_data?.page_name || item.page_id;
 
-        console.log(`[DEV PRODUCE] Creating production for ${pageName}: "${concept.slice(0, 60)}..."`);
+          console.log(`[DEV PRODUCE] Planning production for ${pageName}: "${concept.slice(0, 60)}..."`);
 
-        // Mark as generating
-        await supabase
-          .from("dev_content_queue")
-          .update({ status: "generating" })
-          .eq("id", item.id);
+          // Build Brain Studio input with FULL audio pipeline
+          const brainInput: BrainInput = {
+            concept: videoPrompt,
+            targetDuration: 20,
+            style: "cinematic",
+            aspectRatio: "portrait",
+            voiceover: true,
+            voiceoverVoice: DEFAULT_VOICE,
+            voiceoverLanguage: DEFAULT_LANGUAGE,
+            music: true,
+            captions: true,
+            soundEffects: true, // Hollywood Sound Design — ambient, SFX, foley
+          };
 
-        // Build Brain Studio input with FULL audio pipeline
-        const brainInput: BrainInput = {
-          concept: videoPrompt,
-          targetDuration: 20,
-          style: "cinematic",
-          aspectRatio: "portrait", // 9:16 vertical for Reels
-          voiceover: true,
-          voiceoverVoice: DEFAULT_VOICE,
-          voiceoverLanguage: DEFAULT_LANGUAGE,
-          music: true,
-          captions: true,
-          soundEffects: true, // Hollywood Sound Design — ambient, SFX, foley
-        };
+          // Step 1: Plan the production with Claude
+          let plan = await planProduction(brainInput);
+          plan = consistencyEngine.applyAll(plan);
 
-        // Step 1: Plan the production with Claude
-        let plan = await planProduction(brainInput);
-        plan = consistencyEngine.applyAll(plan);
+          // Store voice in plan
+          (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
+          (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
 
-        // Store voice in plan for produce route
-        (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
-        (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
+          // Step 1b: Generate hero reference image for i2v (character consistency)
+          plan = await injectReferenceImages(plan);
 
-        // Step 1b: Generate hero reference image for i2v (character consistency)
-        plan = await injectReferenceImages(plan);
+          // Step 2: Create production record (use clean title for gallery display)
+          brainInput.concept = concept;
+          const production = await createProduction(DEV_USER_ID, brainInput, plan);
 
-        // Step 2: Create production record (use clean title for gallery display)
-        brainInput.concept = concept;
-        const production = await createProduction(DEV_USER_ID, brainInput, plan);
+          console.log(`[DEV PRODUCE] Production created: ${production.id} for ${pageName}`);
 
-        console.log(`[DEV PRODUCE] Production created: ${production.id} for ${pageName}`);
+          // Link queue item to production
+          await supabase
+            .from("dev_content_queue")
+            .update({
+              status: "generating",
+              input_data: {
+                ...item.input_data,
+                production_id: production.id,
+              },
+            })
+            .eq("id", item.id);
 
-        // Link queue item to production
-        await supabase
-          .from("dev_content_queue")
-          .update({
-            status: "generating",
-            input_data: {
-              ...item.input_data,
-              production_id: production.id,
-            },
-          })
-          .eq("id", item.id);
-
-        // Step 3: Execute production in background (scene generation + audio + assembly)
-        // Uses after() to keep alive after response
-        after(async () => {
+          // Step 3: Execute production (scene generation + audio + assembly)
           try {
             await executeProduction(
               production.id,
@@ -264,7 +259,6 @@ export async function POST(req: NextRequest) {
             );
             console.log(`[DEV PRODUCE] Production ${production.id} completed for ${pageName}`);
 
-            // Update queue item with success
             await supabase
               .from("dev_content_queue")
               .update({
@@ -282,45 +276,32 @@ export async function POST(req: NextRequest) {
               })
               .eq("id", item.id);
           }
-        });
-
-        results.push({
-          queueId: item.id,
-          pageName,
-          productionId: production.id,
-          status: "started",
-        });
-      } catch (err) {
-        console.error(`[DEV PRODUCE] Failed to start production for ${item.id}:`, err);
-
-        await supabase
-          .from("dev_content_queue")
-          .update({
-            status: "failed",
-            error_message: err instanceof Error ? err.message : "Failed to start",
-          })
-          .eq("id", item.id);
-
-        results.push({
-          queueId: item.id,
-          pageName: item.input_data?.page_name || item.page_id,
-          status: "failed",
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
+        } catch (err) {
+          console.error(`[DEV PRODUCE] Failed to plan production for ${item.id}:`, err);
+          await supabase
+            .from("dev_content_queue")
+            .update({
+              status: "failed",
+              error_message: err instanceof Error ? err.message : "Failed to plan",
+            })
+            .eq("id", item.id);
+        }
       }
-    }
-
-    const started = results.filter((r) => r.status === "started").length;
-    const failed = results.filter((r) => r.status === "failed").length;
+    });
 
     return NextResponse.json({
-      success: started > 0,
-      produced: started,
-      failed,
-      total: results.length,
-      pipeline: "Brain Studio (RunPod video + FAL audio/voiceover/captions)",
+      success: true,
+      produced: queueItems.length,
+      failed: 0,
+      total: queueItems.length,
+      pipeline: "Brain Studio Hollywood (Claude plan + FLUX Pro i2v + RunPod + FAL audio)",
       voice: `${DEFAULT_VOICE} (Kokoro am_adam)`,
-      results,
+      note: "All work runs in background — check queue status for progress",
+      results: queueItems.map((item) => ({
+        queueId: item.id,
+        pageName: item.input_data?.page_name || item.page_id,
+        status: "queued_for_production",
+      })),
     });
   } catch (error) {
     console.error("[DEV PRODUCE] Error:", error);

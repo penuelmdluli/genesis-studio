@@ -722,9 +722,10 @@ export async function submitComposeVideoJob(
     ambient: Array<{ url: string; startMs: number; durationMs: number }>;
     sfx: Array<{ url: string; startMs: number; durationMs: number }>;
     foley: Array<{ url: string; startMs: number; durationMs: number }>;
-  }
+  },
+  soundBedUrl?: string // Pre-mixed + loudnormed sound design audio (already at -35 LUFS)
 ): Promise<{ requestId: string }> {
-  const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string; volume?: number }> }> = [
+  const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [
     {
       id: "video-main",
       type: "video",
@@ -732,14 +733,13 @@ export async function submitComposeVideoJob(
     },
   ];
 
-  // ── Volume Mixing Levels ──
-  // Voiceover is KING — everything else sits underneath.
-  // These are linear amplitude multipliers (0.0–1.0).
-  const VOL_VOICEOVER = 1.0;   // Full volume — narrator must always be heard clearly
-  const VOL_MUSIC     = 0.18;  // Quiet background bed, subtle emotional support
-  const VOL_AMBIENT   = 0.12;  // Very subtle atmosphere — barely noticeable
-  const VOL_SFX       = 0.25;  // Noticeable accent hits, but never louder than voice
-  const VOL_FOLEY     = 0.15;  // Subtle texture — cloth rustle, footsteps, breathing
+  // ── Audio Mixing Strategy ──
+  // FAL compose API does NOT support per-track volume control.
+  // Instead, we pre-normalize each audio layer via loudnorm BEFORE this compose call:
+  //   - Voiceover: raw (full volume ~-14 LUFS) — narrator is always dominant
+  //   - Music: pre-loudnormed to -28 LUFS (compose_audio phase)
+  //   - Sound design: pre-mixed + loudnormed to -35 LUFS (sound_premix phase)
+  // This guarantees the voiceover is always clearly heard above everything else.
 
   // Per-scene voiceover clips take priority — each placed at its scene's timestamp
   if (voiceoverClips && voiceoverClips.length > 0) {
@@ -750,36 +750,33 @@ export async function submitComposeVideoJob(
         timestamp: c.startMs,
         duration: c.durationMs,
         url: c.url,
-        volume: VOL_VOICEOVER,
       })),
     });
-    console.log(`[AUDIO] Compose with ${voiceoverClips.length} per-scene voiceover clips (vol: ${VOL_VOICEOVER})`);
+    console.log(`[AUDIO] Compose with ${voiceoverClips.length} per-scene voiceover clips (full volume)`);
   } else if (voiceoverUrl) {
     // Fallback: single voiceover track
     tracks.push({
       id: "audio-voiceover",
       type: "audio",
-      keyframes: [{ timestamp: 0, duration: durationMs, url: voiceoverUrl, volume: VOL_VOICEOVER }],
+      keyframes: [{ timestamp: 0, duration: durationMs, url: voiceoverUrl }],
     });
   }
 
   if (musicUrl) {
-    // If we know the music duration and it's shorter than the video,
-    // tile the music with multiple keyframes so it loops seamlessly
-    const musicKFs: Array<{ timestamp: number; duration: number; url: string; volume?: number }> = [];
+    // Music is already loudnormed to -28 LUFS by compose_audio phase
+    const musicKFs: Array<{ timestamp: number; duration: number; url: string }> = [];
     if (musicDurationMs && musicDurationMs > 0 && musicDurationMs < durationMs) {
       // Loop music by placing consecutive keyframes
       let offset = 0;
       while (offset < durationMs) {
         const remaining = durationMs - offset;
         const segDuration = Math.min(musicDurationMs, remaining);
-        musicKFs.push({ timestamp: offset, duration: segDuration, url: musicUrl, volume: VOL_MUSIC });
+        musicKFs.push({ timestamp: offset, duration: segDuration, url: musicUrl });
         offset += musicDurationMs;
       }
-      console.log(`[AUDIO] Music looped: ${musicKFs.length} segments to cover ${durationMs}ms (vol: ${VOL_MUSIC})`);
+      console.log(`[AUDIO] Music looped: ${musicKFs.length} segments (pre-normalized to -28 LUFS)`);
     } else {
-      // Music is long enough or unknown duration — single keyframe
-      musicKFs.push({ timestamp: 0, duration: durationMs, url: musicUrl, volume: VOL_MUSIC });
+      musicKFs.push({ timestamp: 0, duration: durationMs, url: musicUrl });
     }
 
     tracks.push({
@@ -789,49 +786,35 @@ export async function submitComposeVideoJob(
     });
   }
 
-  // Hollywood Sound Design layers — ambient, SFX, foley placed at scene-accurate timestamps
-  // Each layer has its own volume level to keep voiceover front and center.
-  if (soundDesignClips) {
-    if (soundDesignClips.ambient.length > 0) {
-      tracks.push({
-        id: "audio-ambient",
-        type: "audio",
-        keyframes: soundDesignClips.ambient.map((c) => ({
-          timestamp: c.startMs,
-          duration: c.durationMs,
-          url: c.url,
-          volume: VOL_AMBIENT,
-        })),
-      });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.ambient.length} ambient clips (vol: ${VOL_AMBIENT})`);
-    }
+  // Pre-mixed sound design bed (already loudnormed to -35 LUFS in sound_premix phase)
+  // This single track replaces individual ambient/SFX/foley tracks
+  if (soundBedUrl) {
+    tracks.push({
+      id: "audio-sound-bed",
+      type: "audio",
+      keyframes: [{ timestamp: 0, duration: durationMs, url: soundBedUrl }],
+    });
+    console.log(`[AUDIO] Compose with pre-mixed sound bed (pre-normalized to -35 LUFS)`);
+  }
 
-    if (soundDesignClips.sfx.length > 0) {
+  // Legacy: individual sound design clips (only used if sound_premix phase was skipped)
+  if (!soundBedUrl && soundDesignClips) {
+    const allClips = [
+      ...soundDesignClips.ambient.map(c => ({ ...c, layer: "ambient" })),
+      ...soundDesignClips.sfx.map(c => ({ ...c, layer: "sfx" })),
+      ...soundDesignClips.foley.map(c => ({ ...c, layer: "foley" })),
+    ];
+    if (allClips.length > 0) {
       tracks.push({
-        id: "audio-sfx",
+        id: "audio-sound-design",
         type: "audio",
-        keyframes: soundDesignClips.sfx.map((c) => ({
+        keyframes: allClips.map((c) => ({
           timestamp: c.startMs,
           duration: c.durationMs,
           url: c.url,
-          volume: VOL_SFX,
         })),
       });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.sfx.length} SFX clips (vol: ${VOL_SFX})`);
-    }
-
-    if (soundDesignClips.foley.length > 0) {
-      tracks.push({
-        id: "audio-foley",
-        type: "audio",
-        keyframes: soundDesignClips.foley.map((c) => ({
-          timestamp: c.startMs,
-          duration: c.durationMs,
-          url: c.url,
-          volume: VOL_FOLEY,
-        })),
-      });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.foley.length} foley clips (vol: ${VOL_FOLEY})`);
+      console.log(`[AUDIO] WARNING: Using raw sound clips (${allClips.length}) without volume control — may be too loud`);
     }
   }
 

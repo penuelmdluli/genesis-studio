@@ -293,6 +293,9 @@ export async function pollAssembly(productionId: string): Promise<void> {
       case "compose_audio":
         updated = await pollComposeAudioPhase(productionId, state, production);
         break;
+      case "sound_premix":
+        updated = await pollSoundPremixPhase(productionId, state, production);
+        break;
       case "mix_final":
         updated = await pollMixFinalPhase(productionId, state, production);
         break;
@@ -868,9 +871,16 @@ async function pollConcatPhase(
       state.phase = "compose_audio";
       console.log(`[ASSEMBLY] Concat done → compose_audio (${hasPerSceneVO ? "per-scene VO" : "voiceover"} + music)`);
     } else {
-      // Only one audio layer → merge directly onto video
-      state.phase = "mix_final";
-      console.log(`[ASSEMBLY] Concat done → mix_final (single audio layer)`);
+      // Only one audio layer — check if we need sound premix first
+      const hasSoundDesign = (state.soundAssets?.length || 0) > 0 &&
+        state.soundAssets!.some(a => a.ambientUrl || a.sfxClips.length > 0 || a.foleyClips.length > 0);
+      if (hasSoundDesign) {
+        state.phase = "sound_premix";
+        console.log(`[ASSEMBLY] Concat done → sound_premix (pre-mix sound design)`);
+      } else {
+        state.phase = "mix_final";
+        console.log(`[ASSEMBLY] Concat done → mix_final (single audio layer)`);
+      }
     }
     await updateProduction(productionId, { progress: 92 });
   } else {
@@ -894,8 +904,10 @@ async function pollComposeAudioPhase(
     const musicUrl = production.musicUrl;
 
     if (!musicUrl) {
-      // No music to process — skip to mix_final
-      state.phase = "mix_final";
+      // No music to process — check for sound design premix, else skip to mix_final
+      const hasSoundDesign = (state.soundAssets?.length || 0) > 0 &&
+        state.soundAssets!.some(a => a.ambientUrl || a.sfxClips.length > 0 || a.foleyClips.length > 0);
+      state.phase = hasSoundDesign ? "sound_premix" : "mix_final";
       return true;
     }
 
@@ -907,8 +919,10 @@ async function pollComposeAudioPhase(
       console.log(`[ASSEMBLY] Loudnorm submitted for music: ${requestId} (target: -28 LUFS — background level)`);
     } catch (err) {
       console.warn(`[ASSEMBLY] Loudnorm submit failed, using original music volume:`, err);
-      // Still proceed to mix_final — music will be at original volume
-      state.phase = "mix_final";
+      // Still proceed — check for sound design premix
+      const hasSoundDesign = (state.soundAssets?.length || 0) > 0 &&
+        state.soundAssets!.some(a => a.ambientUrl || a.sfxClips.length > 0 || a.foleyClips.length > 0);
+      state.phase = hasSoundDesign ? "sound_premix" : "mix_final";
     }
     return true;
   }
@@ -941,10 +955,17 @@ async function pollComposeAudioPhase(
     }
   }
 
-  // Loudnorm done → move to mix_final (compose video + voiceover + music)
-  state.phase = "mix_final";
+  // Loudnorm done → check if we have sound design to premix, else go to mix_final
+  const hasSoundAssets = (state.soundAssets?.length || 0) > 0 &&
+    state.soundAssets!.some(a => a.ambientUrl || a.sfxClips.length > 0 || a.foleyClips.length > 0);
+  if (hasSoundAssets) {
+    state.phase = "sound_premix";
+    console.log(`[ASSEMBLY] Compose-audio done → sound_premix (pre-mix sound design to quiet bed)`);
+  } else {
+    state.phase = "mix_final";
+    console.log(`[ASSEMBLY] Compose-audio done → mix_final (no sound design)`);
+  }
   await updateProduction(productionId, { progress: 94 });
-  console.log(`[ASSEMBLY] Compose-audio done → mix_final`);
   return true;
 }
 
@@ -1048,6 +1069,174 @@ async function buildSoundDesignClips(
   return { ambient, sfx, foley };
 }
 
+// ---- PHASE: SOUND PREMIX — Compose all SFX into one quiet audio bed ----
+// The FAL compose API does NOT support per-track volume control.
+// So we: (1) compose all sound clips into ONE audio track, (2) loudnorm it to -35 LUFS
+// This produces a single quiet "sound bed" that sits far below the voiceover.
+
+async function pollSoundPremixPhase(
+  productionId: string,
+  state: AssemblyState,
+  production: Production
+): Promise<boolean> {
+  // Step 1: Compose all sound design clips into a single audio track
+  if (!state.soundPremixJob) {
+    try {
+      const soundDesignClips = await buildSoundDesignClips(state, production);
+      if (!soundDesignClips) {
+        // No sound clips — skip to mix_final
+        state.phase = "mix_final";
+        return true;
+      }
+
+      // Get total duration from concat video
+      const totalDurationMs = state.concatDurationMs || 30000;
+
+      // Build tracks for audio-only compose (no video track)
+      const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [];
+
+      // Add a silent video placeholder — compose requires at least one video track
+      // Use the concat video but we only care about the audio output
+      if (state.concatJob?.videoUrl) {
+        tracks.push({
+          id: "video-silent",
+          type: "video",
+          keyframes: [{ timestamp: 0, duration: totalDurationMs, url: state.concatJob.videoUrl }],
+        });
+      }
+
+      if (soundDesignClips.ambient.length > 0) {
+        tracks.push({
+          id: "audio-ambient",
+          type: "audio",
+          keyframes: soundDesignClips.ambient.map((c) => ({
+            timestamp: c.startMs,
+            duration: c.durationMs,
+            url: c.url,
+          })),
+        });
+      }
+
+      if (soundDesignClips.sfx.length > 0) {
+        tracks.push({
+          id: "audio-sfx",
+          type: "audio",
+          keyframes: soundDesignClips.sfx.map((c) => ({
+            timestamp: c.startMs,
+            duration: c.durationMs,
+            url: c.url,
+          })),
+        });
+      }
+
+      if (soundDesignClips.foley.length > 0) {
+        tracks.push({
+          id: "audio-foley",
+          type: "audio",
+          keyframes: soundDesignClips.foley.map((c) => ({
+            timestamp: c.startMs,
+            duration: c.durationMs,
+            url: c.url,
+          })),
+        });
+      }
+
+      const totalClips = (soundDesignClips.ambient.length + soundDesignClips.sfx.length + soundDesignClips.foley.length);
+      console.log(`[ASSEMBLY] Sound premix: composing ${totalClips} clips into one audio bed...`);
+
+      const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {
+        input: { tracks },
+      });
+
+      state.soundPremixJob = { requestId: result.request_id, status: "IN_QUEUE", phase: "compose" };
+      console.log(`[ASSEMBLY] Sound premix compose submitted: ${result.request_id}`);
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Sound premix compose failed, skipping sound design:`, err);
+      state.soundPremixJob = { requestId: "skip", status: "FAILED", phase: "compose" };
+      state.phase = "mix_final";
+    }
+    return true;
+  }
+
+  // Step 1b: Poll compose job
+  if (state.soundPremixJob.phase === "compose" && state.soundPremixJob.status !== "COMPLETED" && state.soundPremixJob.status !== "FAILED") {
+    try {
+      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", state.soundPremixJob.requestId);
+      if (result.status === "COMPLETED") {
+        const data = await getFalQueueResult("fal-ai/ffmpeg-api", state.soundPremixJob.requestId);
+        const videoUrl = (data?.video_url as string) || (data?.video as { url: string })?.url || "";
+        if (videoUrl) {
+          // Compose returned a video with the mixed sound design audio.
+          // Now loudnorm the audio to -35 LUFS (very quiet background level).
+          state.soundPremixJob.status = "COMPLETED";
+          state.soundPremixJob.audioUrl = videoUrl; // This is actually a video — we extract audio via loudnorm
+          console.log(`[ASSEMBLY] Sound premix composed: ${videoUrl}`);
+
+          // Step 2: Loudnorm to -35 LUFS — very quiet, well below voiceover (-14 LUFS) and music (-28 LUFS)
+          try {
+            const { requestId } = await submitLoudnormJob(videoUrl, -35);
+            state.soundPremixJob.phase = "loudnorm";
+            state.soundPremixJob.status = "IN_QUEUE";
+            state.soundPremixLoudnormId = requestId;
+            console.log(`[ASSEMBLY] Sound premix loudnorm submitted: ${requestId} (target: -35 LUFS)`);
+          } catch (err) {
+            console.warn(`[ASSEMBLY] Sound premix loudnorm failed, skipping sound design:`, err);
+            state.soundPremixJob.audioUrl = undefined;
+            state.phase = "mix_final";
+          }
+        } else {
+          state.soundPremixJob.status = "FAILED";
+          state.phase = "mix_final";
+        }
+      } else if (result.status === "FAILED") {
+        console.warn(`[ASSEMBLY] Sound premix compose failed`);
+        state.soundPremixJob.status = "FAILED";
+        state.phase = "mix_final";
+      } else {
+        return false; // Still composing
+      }
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Sound premix poll error:`, err);
+      state.soundPremixJob.status = "FAILED";
+      state.phase = "mix_final";
+    }
+    return true;
+  }
+
+  // Step 2b: Poll loudnorm job
+  if (state.soundPremixJob.phase === "loudnorm" && state.soundPremixJob.status !== "COMPLETED" && state.soundPremixJob.status !== "FAILED") {
+    const requestId = state.soundPremixLoudnormId || state.soundPremixJob.requestId;
+    try {
+      const result = await checkFalQueueStatus("fal-ai/ffmpeg-api", requestId);
+      if (result.status === "COMPLETED") {
+        const data = await getFalQueueResult("fal-ai/ffmpeg-api", requestId);
+        const audio = data?.audio as { url: string } | undefined;
+        state.soundPremixJob.status = "COMPLETED";
+        state.soundPremixJob.audioUrl = audio?.url || "";
+        console.log(`[ASSEMBLY] Sound premix loudnormed to -35 LUFS: ${state.soundPremixJob.audioUrl}`);
+        state.phase = "mix_final";
+      } else if (result.status === "FAILED") {
+        console.warn(`[ASSEMBLY] Sound premix loudnorm failed, skipping sound design`);
+        state.soundPremixJob.status = "FAILED";
+        state.soundPremixJob.audioUrl = undefined;
+        state.phase = "mix_final";
+      } else {
+        return false; // Still normalizing
+      }
+    } catch (err) {
+      console.warn(`[ASSEMBLY] Sound premix loudnorm poll error:`, err);
+      state.soundPremixJob.status = "FAILED";
+      state.soundPremixJob.audioUrl = undefined;
+      state.phase = "mix_final";
+    }
+    return true;
+  }
+
+  // If we get here, premix is done (or failed) — move to mix_final
+  state.phase = "mix_final";
+  return true;
+}
+
 async function pollMixFinalPhase(
   productionId: string,
   state: AssemblyState,
@@ -1104,11 +1293,14 @@ async function pollMixFinalPhase(
     // Check for per-scene voiceover clips stored during orchestration
     const voiceoverClips = state.voiceoverClips;
 
-    // Build sound design clips from per-scene assets (ambient, SFX, foley)
-    // Uses sceneVideoDurations for proper visual sync
-    const soundDesignClips = await buildSoundDesignClips(state, production);
+    // Use pre-mixed + loudnormed sound design bed (from sound_premix phase)
+    // This is a single quiet audio track at -35 LUFS — sits far below voiceover
+    const soundBedUrl = state.soundPremixJob?.status === "COMPLETED" ? state.soundPremixJob.audioUrl : undefined;
+    if (soundBedUrl) {
+      console.log(`[ASSEMBLY] Using pre-mixed sound bed at -35 LUFS: ${soundBedUrl}`);
+    }
 
-    if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl && !soundDesignClips) {
+    if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl && !soundBedUrl) {
       // No audio to add — video is already done
       state.phase = "done";
       return true;
@@ -1169,6 +1361,7 @@ async function pollMixFinalPhase(
     // Always use compose — it preserves video length and layers audio correctly.
     // merge-audio-video truncates video to audio length which is a bug.
     // Per-scene voiceover clips are placed at each scene's timestamp for full coverage.
+    // Sound design is passed as a single pre-mixed+loudnormed URL (not raw clips).
     try {
       const { requestId } = await submitComposeVideoJob(
         videoUrl,
@@ -1177,14 +1370,12 @@ async function pollMixFinalPhase(
         totalDurationMs,
         musicDurationMs,
         voiceoverClips?.length ? voiceoverClips : undefined,
-        soundDesignClips || undefined
+        undefined, // No raw sound design clips — use pre-mixed bed instead
+        soundBedUrl // Pre-mixed + loudnormed sound bed at -35 LUFS
       );
       state.mixFinalJob = { requestId, status: "IN_QUEUE" };
       const voDesc = voiceoverClips?.length ? `${voiceoverClips.length} VO clips` : (voiceoverUrl ? "voiceover" : "");
-      const sfxDesc = soundDesignClips
-        ? `${soundDesignClips.ambient.length}amb+${soundDesignClips.sfx.length}sfx+${soundDesignClips.foley.length}foley`
-        : "";
-      const audioDesc = [voDesc, musicUrl ? "music" : "", sfxDesc].filter(Boolean).join(" + ");
+      const audioDesc = [voDesc, musicUrl ? "music(-28 LUFS)" : "", soundBedUrl ? "sound-bed(-35 LUFS)" : ""].filter(Boolean).join(" + ");
       console.log(`[ASSEMBLY] Compose-final submitted: ${requestId} (video + ${audioDesc}, ${(totalDurationMs/1000).toFixed(1)}s)`);
     } catch (err) {
       console.warn(`[ASSEMBLY] Compose-final failed, using video without audio:`, err);

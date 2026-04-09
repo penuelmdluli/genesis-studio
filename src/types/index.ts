@@ -485,7 +485,7 @@ export interface CharacterDefinition {
 
 // Assembly state machine — tracks async FAL jobs during assembly
 export interface AssemblyState {
-  phase: "mmaudio" | "merge_audio" | "speed_adjust" | "concat" | "compose_audio" | "mix_final" | "trim_final" | "burn_captions" | "normalize" | "done";
+  phase: "mmaudio" | "merge_audio" | "speed_adjust" | "concat" | "compose_audio" | "sound_premix" | "mix_final" | "trim_final" | "burn_captions" | "normalize" | "done";
   // Trim final video to voiceover duration
   trimFinalJob?: { requestId: string; status: string; videoUrl?: string };
   // Burn captions into video (auto-subtitle)
@@ -524,6 +524,10 @@ export interface AssemblyState {
   soundAssets?: Array<SceneSoundAssets>;
   // Actual video clip durations in ms (measured from processedSceneUrls, used for audio alignment)
   sceneVideoDurations?: Record<number, number>;
+  // Pre-mixed sound design audio (ambient+SFX+foley composed then loudnormed to sit behind voiceover)
+  soundPremixJob?: { requestId: string; status: string; audioUrl?: string; phase?: "compose" | "loudnorm" };
+  // Request ID for the loudnorm step of sound premix
+  soundPremixLoudnormId?: string;
 }
 
 export interface Production {

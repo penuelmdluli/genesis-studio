@@ -724,13 +724,22 @@ export async function submitComposeVideoJob(
     foley: Array<{ url: string; startMs: number; durationMs: number }>;
   }
 ): Promise<{ requestId: string }> {
-  const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [
+  const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string; volume?: number }> }> = [
     {
       id: "video-main",
       type: "video",
       keyframes: [{ timestamp: 0, duration: durationMs, url: videoUrl }],
     },
   ];
+
+  // ── Volume Mixing Levels ──
+  // Voiceover is KING — everything else sits underneath.
+  // These are linear amplitude multipliers (0.0–1.0).
+  const VOL_VOICEOVER = 1.0;   // Full volume — narrator must always be heard clearly
+  const VOL_MUSIC     = 0.18;  // Quiet background bed, subtle emotional support
+  const VOL_AMBIENT   = 0.12;  // Very subtle atmosphere — barely noticeable
+  const VOL_SFX       = 0.25;  // Noticeable accent hits, but never louder than voice
+  const VOL_FOLEY     = 0.15;  // Subtle texture — cloth rustle, footsteps, breathing
 
   // Per-scene voiceover clips take priority — each placed at its scene's timestamp
   if (voiceoverClips && voiceoverClips.length > 0) {
@@ -741,35 +750,36 @@ export async function submitComposeVideoJob(
         timestamp: c.startMs,
         duration: c.durationMs,
         url: c.url,
+        volume: VOL_VOICEOVER,
       })),
     });
-    console.log(`[AUDIO] Compose with ${voiceoverClips.length} per-scene voiceover clips`);
+    console.log(`[AUDIO] Compose with ${voiceoverClips.length} per-scene voiceover clips (vol: ${VOL_VOICEOVER})`);
   } else if (voiceoverUrl) {
     // Fallback: single voiceover track
     tracks.push({
       id: "audio-voiceover",
       type: "audio",
-      keyframes: [{ timestamp: 0, duration: durationMs, url: voiceoverUrl }],
+      keyframes: [{ timestamp: 0, duration: durationMs, url: voiceoverUrl, volume: VOL_VOICEOVER }],
     });
   }
 
   if (musicUrl) {
     // If we know the music duration and it's shorter than the video,
     // tile the music with multiple keyframes so it loops seamlessly
-    const musicKFs: Array<{ timestamp: number; duration: number; url: string }> = [];
+    const musicKFs: Array<{ timestamp: number; duration: number; url: string; volume?: number }> = [];
     if (musicDurationMs && musicDurationMs > 0 && musicDurationMs < durationMs) {
       // Loop music by placing consecutive keyframes
       let offset = 0;
       while (offset < durationMs) {
         const remaining = durationMs - offset;
         const segDuration = Math.min(musicDurationMs, remaining);
-        musicKFs.push({ timestamp: offset, duration: segDuration, url: musicUrl });
+        musicKFs.push({ timestamp: offset, duration: segDuration, url: musicUrl, volume: VOL_MUSIC });
         offset += musicDurationMs;
       }
-      console.log(`[AUDIO] Music looped: ${musicKFs.length} segments to cover ${durationMs}ms (source: ${musicDurationMs}ms)`);
+      console.log(`[AUDIO] Music looped: ${musicKFs.length} segments to cover ${durationMs}ms (vol: ${VOL_MUSIC})`);
     } else {
       // Music is long enough or unknown duration — single keyframe
-      musicKFs.push({ timestamp: 0, duration: durationMs, url: musicUrl });
+      musicKFs.push({ timestamp: 0, duration: durationMs, url: musicUrl, volume: VOL_MUSIC });
     }
 
     tracks.push({
@@ -780,6 +790,7 @@ export async function submitComposeVideoJob(
   }
 
   // Hollywood Sound Design layers — ambient, SFX, foley placed at scene-accurate timestamps
+  // Each layer has its own volume level to keep voiceover front and center.
   if (soundDesignClips) {
     if (soundDesignClips.ambient.length > 0) {
       tracks.push({
@@ -789,9 +800,10 @@ export async function submitComposeVideoJob(
           timestamp: c.startMs,
           duration: c.durationMs,
           url: c.url,
+          volume: VOL_AMBIENT,
         })),
       });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.ambient.length} ambient clips`);
+      console.log(`[AUDIO] Compose with ${soundDesignClips.ambient.length} ambient clips (vol: ${VOL_AMBIENT})`);
     }
 
     if (soundDesignClips.sfx.length > 0) {
@@ -802,9 +814,10 @@ export async function submitComposeVideoJob(
           timestamp: c.startMs,
           duration: c.durationMs,
           url: c.url,
+          volume: VOL_SFX,
         })),
       });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.sfx.length} SFX clips`);
+      console.log(`[AUDIO] Compose with ${soundDesignClips.sfx.length} SFX clips (vol: ${VOL_SFX})`);
     }
 
     if (soundDesignClips.foley.length > 0) {
@@ -815,9 +828,10 @@ export async function submitComposeVideoJob(
           timestamp: c.startMs,
           duration: c.durationMs,
           url: c.url,
+          volume: VOL_FOLEY,
         })),
       });
-      console.log(`[AUDIO] Compose with ${soundDesignClips.foley.length} foley clips`);
+      console.log(`[AUDIO] Compose with ${soundDesignClips.foley.length} foley clips (vol: ${VOL_FOLEY})`);
     }
   }
 

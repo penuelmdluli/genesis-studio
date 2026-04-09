@@ -921,10 +921,34 @@ async function pollComposeAudioPhase(
  * Build sound design clips from per-scene sound assets, placed at correct global timeline offsets.
  * Returns null if no sound assets exist.
  */
-function buildSoundDesignClips(
+/**
+ * Resolve a URL: if it's a full URL (http/https), return as-is.
+ * If it's an R2 key (e.g. "sfx/user-id/file.mp3"), generate a presigned download URL.
+ * This is needed because FAL's ffmpeg-api needs publicly accessible URLs.
+ */
+async function resolveAudioUrl(url: string): Promise<string> {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // It's an R2 key — generate a presigned download URL (valid for 1 hour)
+  try {
+    const { getSignedDownloadUrl } = await import("@/lib/storage");
+    const signedUrl = await getSignedDownloadUrl(url, 3600);
+    return signedUrl;
+  } catch (err) {
+    console.warn(`[ASSEMBLY] Failed to sign R2 URL for ${url}:`, err);
+    // Fallback: try the app's video proxy
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+    if (appUrl) {
+      return `${appUrl}/api/audio/${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
+}
+
+async function buildSoundDesignClips(
   state: AssemblyState,
   production: Production
-): { ambient: Array<{ url: string; startMs: number; durationMs: number }>; sfx: Array<{ url: string; startMs: number; durationMs: number }>; foley: Array<{ url: string; startMs: number; durationMs: number }> } | null {
+): Promise<{ ambient: Array<{ url: string; startMs: number; durationMs: number }>; sfx: Array<{ url: string; startMs: number; durationMs: number }>; foley: Array<{ url: string; startMs: number; durationMs: number }> } | null> {
   if (!state.soundAssets || state.soundAssets.length === 0) return null;
 
   const plan = production.plan;
@@ -936,7 +960,6 @@ function buildSoundDesignClips(
   const sortedScenes = [...plan.scenes].sort((a, b) => a.sceneNumber - b.sceneNumber);
   for (const scene of sortedScenes) {
     sceneOffsets[scene.sceneNumber] = offsetMs;
-    // Use voiceover duration if available (videos are speed-matched to this)
     const voDuration = state.sceneAudioDurations?.[scene.sceneNumber];
     offsetMs += voDuration || (scene.duration * 1000);
   }
@@ -951,7 +974,7 @@ function buildSoundDesignClips(
     // Ambient — plays at scene start for scene duration
     if (assets.ambientUrl) {
       ambient.push({
-        url: assets.ambientUrl,
+        url: await resolveAudioUrl(assets.ambientUrl),
         startMs: sceneStartMs,
         durationMs: assets.ambientDurationMs || (sortedScenes.find(s => s.sceneNumber === assets.sceneNumber)?.duration || 5) * 1000,
       });
@@ -960,7 +983,7 @@ function buildSoundDesignClips(
     // SFX — placed at scene offset + clip timestamp
     for (const clip of assets.sfxClips) {
       sfx.push({
-        url: clip.url,
+        url: await resolveAudioUrl(clip.url),
         startMs: sceneStartMs + clip.timestampMs,
         durationMs: clip.durationMs,
       });
@@ -969,7 +992,7 @@ function buildSoundDesignClips(
     // Foley — placed at scene offset + clip timestamp
     for (const clip of assets.foleyClips) {
       foley.push({
-        url: clip.url,
+        url: await resolveAudioUrl(clip.url),
         startMs: sceneStartMs + clip.timestampMs,
         durationMs: clip.durationMs,
       });
@@ -1016,7 +1039,7 @@ async function pollMixFinalPhase(
     const voiceoverClips = state.voiceoverClips;
 
     // Build sound design clips from per-scene assets (ambient, SFX, foley)
-    const soundDesignClips = buildSoundDesignClips(state, production);
+    const soundDesignClips = await buildSoundDesignClips(state, production);
 
     if (!voiceoverUrl && !voiceoverClips?.length && !musicUrl && !soundDesignClips) {
       // No audio to add — video is already done

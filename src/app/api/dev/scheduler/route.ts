@@ -482,18 +482,31 @@ async function handlePost(): Promise<{
 
     const { data: production } = await supabase
       .from("productions")
-      .select("id, final_video_url, status")
+      .select("id, output_video_urls, status")
       .eq("id", productionId)
       .single();
 
-    if (!production || production.status !== "completed" || !production.final_video_url) {
+    // Parse output_video_urls — could be string or object
+    let outputUrls: Record<string, string> = {};
+    if (production?.output_video_urls) {
+      try {
+        outputUrls = typeof production.output_video_urls === "string"
+          ? JSON.parse(production.output_video_urls)
+          : production.output_video_urls;
+      } catch { /* ignore */ }
+    }
+
+    const hasFinalVideo = production?.status === "completed" && (outputUrls.final || Object.keys(outputUrls).length > 0);
+
+    if (!production || !hasFinalVideo) {
       console.log(
         `[DEV SCHEDULER] Production ${productionId} not ready (status=${production?.status})`,
       );
       continue;
     }
 
-    const videoId = production.id;
+    // The final video is served via /api/videos/{videoId} which reads from R2
+    const videoId = outputUrls.final?.replace("/api/videos/", "") || production.id;
     const topicTitle = item.input_data?.topic_title || "Trending Now";
 
     // Build caption with page hashtags

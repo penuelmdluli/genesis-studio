@@ -610,15 +610,18 @@ async function handlePost(): Promise<{
   }
 
   // ---- Update queue status based on results ----
+  // Build a set of successfully posted videoIds for quick lookup
+  const postedVideoIds = new Set(
+    results.filter((r) => r.success).map((r) => r.videoId),
+  );
+
   for (const item of readyItems) {
-    const page = pages.find((p) => p.id === item.page_id);
-    const pageName = page?.name || "";
-    const fbSuccess = results.some(
-      (r) => r.success && r.platform === "facebook" && r.page === (page?.facebook_page_key || pageName),
-    );
-    const ytSuccess = results.some(
-      (r) => r.success && r.platform === "youtube",
-    );
+    const productionId = item.input_data?.production_id;
+    // Check if any of this item's videos were successfully posted
+    const fbPost = fbPosts.find((p) => p.queueId === item.id);
+    const ytPost = ytPosts.find((p) => p.queueId === item.id);
+    const fbSuccess = fbPost && postedVideoIds.has(fbPost.videoId);
+    const ytSuccess = ytPost && postedVideoIds.has(ytPost.videoId);
 
     if (fbSuccess || ytSuccess) {
       await supabase

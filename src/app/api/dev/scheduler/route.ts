@@ -446,55 +446,119 @@ async function handleProduce(): Promise<{
   triggered: number;
   results: Array<{ queueId: string; status: string }>;
 }> {
-  console.log("[DEV SCHEDULER] Triggering Brain Studio productions (one at a time)...");
+  console.log(
+    "[DEV SCHEDULER] Triggering Brain Studio productions (round-robin best-per-page)...",
+  );
 
   const appUrl = getAppUrl();
   const cronSecret = getCronSecret();
+  const supabase = createSupabaseAdmin();
+
+  // Pull every fresh pending item across all pages and rank within each page
+  // by niche_score. We then take the BEST item per page so every active page
+  // gets one production this cycle (round-robin), prioritised by quality.
+  const fortyEightHoursAgo = new Date(
+    Date.now() - 48 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data: freshPending, error: freshErr } = await supabase
+    .from("dev_content_queue")
+    .select("id, page_id, input_data, created_at")
+    .eq("status", "pending")
+    .gte("created_at", fortyEightHoursAgo)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (freshErr) {
+    console.error("[DEV SCHEDULER] Failed to fetch fresh pending items:", freshErr.message);
+  }
+
+  // Group by page, rank by niche_score (then newest)
+  const bestPerPage = new Map<
+    string,
+    { id: string; page_id: string; score: number; createdAt: string; title: string }
+  >();
+  for (const row of (freshPending || []) as Array<{
+    id: string;
+    page_id: string;
+    input_data: Record<string, unknown> | null;
+    created_at: string;
+  }>) {
+    const score = Number((row.input_data || {}).niche_score || 0);
+    const title = String((row.input_data || {}).topic_title || "");
+    const current = bestPerPage.get(row.page_id);
+    if (
+      !current ||
+      score > current.score ||
+      (score === current.score && row.created_at > current.createdAt)
+    ) {
+      bestPerPage.set(row.page_id, {
+        id: row.id,
+        page_id: row.page_id,
+        score,
+        createdAt: row.created_at,
+        title,
+      });
+    }
+  }
+
+  // Order pages by best item's score so the strongest get produced first
+  const orderedPicks = [...bestPerPage.values()].sort((a, b) => b.score - a.score);
+
+  if (orderedPicks.length === 0) {
+    console.log(
+      "[DEV SCHEDULER] No fresh pending items in the last 48h — nothing to produce",
+    );
+    return { triggered: 0, results: [] };
+  }
+
+  console.log(
+    `[DEV SCHEDULER] Will produce ${orderedPicks.length} item(s), one per page (best-scored each)`,
+  );
 
   let totalTriggered = 0;
   const allResults: Array<{ queueId: string; status: string }> = [];
 
-  // The produce endpoint now processes ONE item per call.
-  // Loop up to 6 times to process all pending items.
-  for (let i = 0; i < 6; i++) {
+  for (const pick of orderedPicks) {
     try {
+      console.log(
+        `[DEV SCHEDULER] Produce → page=${pick.page_id} score=${pick.score} title="${pick.title.slice(0, 50)}"`,
+      );
+
       const res = await fetch(`${appUrl}/api/dev/produce`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-cron-secret": cronSecret,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ queueItemId: pick.id }),
       });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "no body");
-        console.error(`[DEV SCHEDULER] Produce call ${i + 1} failed (${res.status}): ${text}`);
-        break;
+        console.error(
+          `[DEV SCHEDULER] Produce for ${pick.page_id} failed (${res.status}): ${text}`,
+        );
+        continue;
       }
 
       const data = await res.json();
-      if (data.produced === 0) {
-        console.log(`[DEV SCHEDULER] No more pending items after ${totalTriggered} productions`);
-        break;
-      }
-
       totalTriggered += data.produced || 0;
       if (data.productionId) {
         allResults.push({ queueId: data.productionId, status: "started" });
       }
-
-      console.log(`[DEV SCHEDULER] Produce call ${i + 1}: ${data.concept?.slice(0, 50)} → ${data.productionId}`);
-
-      // If no more remaining, stop
-      if ((data.remaining || 0) === 0) break;
     } catch (err) {
-      console.error(`[DEV SCHEDULER] Produce call ${i + 1} error:`, err);
-      break;
+      console.error(
+        `[DEV SCHEDULER] Produce for ${pick.page_id} error:`,
+        err,
+      );
+      continue;
     }
   }
 
-  console.log(`[DEV SCHEDULER] Produce triggered ${totalTriggered} production(s) total`);
+  console.log(
+    `[DEV SCHEDULER] Produce triggered ${totalTriggered} production(s) total across ${orderedPicks.length} page(s)`,
+  );
   return { triggered: totalTriggered, results: allResults };
 }
 

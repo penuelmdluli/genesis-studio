@@ -172,15 +172,35 @@ export async function POST(req: NextRequest) {
       if (fetchErr) throw new Error(`Failed to fetch queue: ${fetchErr.message}`);
       queueItems = (data || []) as QueueItem[];
     } else {
-      // Fetch pending items
-      const { data: pending } = await supabase
+      // "Best trending" selection: prefer the freshest queue items first
+      // (last 48 hours) and within those, pick the highest niche_score.
+      // This guarantees we always produce the BEST currently-trending topic
+      // instead of draining stale items in FIFO order.
+      const fortyEightHoursAgo = new Date(
+        Date.now() - 48 * 60 * 60 * 1000,
+      ).toISOString();
+
+      const { data: freshPending } = await supabase
         .from("dev_content_queue")
         .select("*")
         .eq("status", "pending")
-        .order("created_at", { ascending: true })
-        .limit(6);
+        .gte("created_at", fortyEightHoursAgo)
+        .order("created_at", { ascending: false })
+        .limit(50);
 
-      // Also recover stuck "generating" items (no production_id and older than 5 min)
+      // Sort the fresh pool by niche_score (highest first), tiebreak newest
+      const sortedFresh = ((freshPending || []) as QueueItem[]).sort((a, b) => {
+        const scoreA = Number(
+          (a.input_data as Record<string, unknown> | undefined)?.niche_score || 0,
+        );
+        const scoreB = Number(
+          (b.input_data as Record<string, unknown> | undefined)?.niche_score || 0,
+        );
+        return scoreB - scoreA;
+      });
+
+      // Also recover stuck "generating" items as a SECONDARY source —
+      // only used if no fresh pending items remain
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: stuck } = await supabase
         .from("dev_content_queue")
@@ -190,7 +210,7 @@ export async function POST(req: NextRequest) {
         .order("created_at", { ascending: true })
         .limit(6);
 
-      queueItems = [...((pending || []) as QueueItem[]), ...((stuck || []) as QueueItem[])];
+      queueItems = [...sortedFresh, ...((stuck || []) as QueueItem[])];
     }
 
     if (queueItems.length === 0) {

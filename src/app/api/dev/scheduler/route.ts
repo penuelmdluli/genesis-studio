@@ -634,12 +634,62 @@ async function handlePost(): Promise<{
     return { posted: 0, results: [] };
   }
 
-  // Round-robin best-per-page selection: from all ready items, pick the
-  // single highest-scored / freshest one per page so every page gets ONE
-  // post this cycle (and the strongest topic per page is the one that
-  // actually goes out).
+  // Pre-filter: only consider ready items whose underlying production is
+  // actually `completed` with an output URL. Queue items get marked `ready`
+  // eagerly by executeProduction, but the production itself may still be
+  // rendering — posting before the video is final would break.
+  const candidateProductionIds = Array.from(
+    new Set(
+      (allReady as Array<Record<string, unknown>>)
+        .map(
+          (row) =>
+            ((row.input_data as Record<string, unknown> | null) || {}).production_id as
+              | string
+              | undefined,
+        )
+        .filter((x): x is string => !!x),
+    ),
+  );
+
+  const completedProductionIds = new Set<string>();
+  if (candidateProductionIds.length > 0) {
+    const { data: prodRows } = await supabase
+      .from("productions")
+      .select("id, status, output_video_urls")
+      .in("id", candidateProductionIds)
+      .eq("status", "completed");
+
+    for (const p of (prodRows || []) as Array<{
+      id: string;
+      output_video_urls: unknown;
+    }>) {
+      let urls: Record<string, string> = {};
+      try {
+        urls =
+          typeof p.output_video_urls === "string"
+            ? JSON.parse(p.output_video_urls)
+            : (p.output_video_urls as Record<string, string>) || {};
+      } catch {
+        /* ignore */
+      }
+      if (urls.final || Object.keys(urls).length > 0) {
+        completedProductionIds.add(p.id);
+      }
+    }
+  }
+
+  const postable = (allReady as Array<Record<string, unknown>>).filter((row) => {
+    const pid = ((row.input_data as Record<string, unknown> | null) || {})
+      .production_id as string | undefined;
+    return pid ? completedProductionIds.has(pid) : false;
+  });
+
+  // Round-robin best-per-page selection — ONLY from items whose production
+  // is verified complete. This guarantees every page with any completed
+  // production gets a post this cycle, not just pages whose #1 ready item
+  // happens to be done.
   const bestPerPage = new Map<string, (typeof allReady)[number]>();
-  for (const row of allReady) {
+  for (const row of postable as unknown as typeof allReady) {
     const score = Number(
       ((row.input_data as Record<string, unknown> | null) || {}).niche_score || 0,
     );
@@ -668,7 +718,7 @@ async function handlePost(): Promise<{
   });
 
   console.log(
-    `[DEV SCHEDULER] Posting ${readyItems.length} item(s) (best-per-page from ${allReady.length} total ready)`,
+    `[DEV SCHEDULER] Posting ${readyItems.length} item(s) (best-per-page from ${postable.length} postable / ${allReady.length} total ready)`,
   );
 
   const pages = getAllDevPages();

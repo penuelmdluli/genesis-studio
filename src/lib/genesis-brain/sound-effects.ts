@@ -10,6 +10,11 @@ import { uploadAudio } from "@/lib/storage";
 import { fal } from "@fal-ai/client";
 import { randomUUID } from "crypto";
 
+// Configure fal client credentials at module load.
+// This MUST happen here — depending on module load order in serverless,
+// other fal.config() calls in sibling files may not have run yet.
+fal.config({ credentials: process.env.FAL_KEY || "" });
+
 // ---- SOUND DESIGNER — Claude analyzes scenes and creates sound maps ----
 
 /**
@@ -148,31 +153,27 @@ export async function generateSoundEffect(params: {
   userId?: string;
 }): Promise<{ url: string; durationMs: number }> {
   const durationSec = Math.min(Math.max(params.duration, 0.5), 47);
+  const falKey = process.env.FAL_KEY;
+
+  if (!falKey) {
+    throw new Error("FAL_KEY not set in environment — cannot generate sound effects");
+  }
 
   console.log(`[SFX] Generating via stable-audio: "${params.description.slice(0, 50)}..." (${durationSec}s)`);
 
-  const result = await fal.subscribe("fal-ai/stable-audio", {
-    input: {
-      prompt: params.description,
-      seconds_total: durationSec,
-      steps: 50,  // Fewer steps than music (100) — SFX needs less refinement, faster
-    },
-    logs: false,
-  });
-
-  const data = result.data as Record<string, unknown>;
-  const audioFile = data?.audio_file as { url: string } | undefined;
-
-  if (!audioFile?.url) {
-    throw new Error("stable-audio returned no audio URL");
-  }
+  // Direct REST submission + polling (more reliable on serverless than fal.subscribe)
+  const audioFileUrl = await submitAndPollStableAudio(
+    falKey,
+    params.description,
+    durationSec
+  );
 
   // Persist to R2 so the URL doesn't expire (FAL URLs are temporary)
   const sfxId = randomUUID();
   const key = `sfx/${params.userId || "system"}/${sfxId}.mp3`;
 
   try {
-    const audioRes = await fetch(audioFile.url);
+    const audioRes = await fetch(audioFileUrl);
     if (!audioRes.ok) throw new Error(`Failed to download SFX: ${audioRes.status}`);
     const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
 
@@ -186,8 +187,91 @@ export async function generateSoundEffect(params: {
   } catch (uploadErr) {
     // If R2 upload fails, use the FAL URL directly (temporary but functional)
     console.warn(`[SFX] R2 persist failed, using FAL URL directly:`, uploadErr);
-    return { url: audioFile.url, durationMs: durationSec * 1000 };
+    return { url: audioFileUrl, durationMs: durationSec * 1000 };
   }
+}
+
+/**
+ * Submit a stable-audio job via FAL queue and poll until complete.
+ * Uses direct REST calls instead of fal.subscribe to avoid long-poll issues on serverless.
+ */
+async function submitAndPollStableAudio(
+  falKey: string,
+  prompt: string,
+  durationSec: number
+): Promise<string> {
+  // Submit
+  const submitRes = await fetch("https://queue.fal.run/fal-ai/stable-audio", {
+    method: "POST",
+    headers: {
+      "Authorization": `Key ${falKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt,
+      seconds_total: durationSec,
+      steps: 50,
+    }),
+  });
+
+  if (!submitRes.ok) {
+    const errText = await submitRes.text().catch(() => "unknown");
+    throw new Error(`stable-audio submit failed: ${submitRes.status} ${errText.slice(0, 200)}`);
+  }
+
+  const submitData = await submitRes.json();
+  const requestId = submitData.request_id;
+  if (!requestId) {
+    throw new Error(`stable-audio submit returned no request_id: ${JSON.stringify(submitData).slice(0, 200)}`);
+  }
+
+  // Poll with exponential-ish backoff. Max ~90 seconds total.
+  const maxAttempts = 30;
+  const baseDelayMs = 2000;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((r) => setTimeout(r, baseDelayMs + Math.min(attempt * 500, 3000)));
+
+    const statusRes = await fetch(
+      `https://queue.fal.run/fal-ai/stable-audio/requests/${requestId}/status`,
+      {
+        headers: { "Authorization": `Key ${falKey}` },
+      }
+    );
+
+    if (!statusRes.ok) {
+      // Transient — retry
+      continue;
+    }
+
+    const statusData = await statusRes.json();
+    const status = statusData.status;
+
+    if (status === "COMPLETED") {
+      // Fetch the result
+      const resultRes = await fetch(
+        `https://queue.fal.run/fal-ai/stable-audio/requests/${requestId}`,
+        {
+          headers: { "Authorization": `Key ${falKey}` },
+        }
+      );
+      if (!resultRes.ok) {
+        throw new Error(`stable-audio result fetch failed: ${resultRes.status}`);
+      }
+      const resultData = await resultRes.json();
+      const audioUrl = resultData.audio_file?.url;
+      if (!audioUrl) {
+        throw new Error(`stable-audio completed but no audio_file.url: ${JSON.stringify(resultData).slice(0, 200)}`);
+      }
+      return audioUrl;
+    }
+
+    if (status === "FAILED" || status === "ERROR") {
+      throw new Error(`stable-audio job failed: ${JSON.stringify(statusData).slice(0, 200)}`);
+    }
+    // status is IN_QUEUE or IN_PROGRESS — keep polling
+  }
+
+  throw new Error(`stable-audio timeout after ${maxAttempts} poll attempts (~90s)`);
 }
 
 // ---- GENERATE ALL SOUNDS FOR A SCENE ----
@@ -293,17 +377,48 @@ export async function generateAllSceneSounds(
 ): Promise<SceneSoundAssets[]> {
   console.log(`[SOUND DESIGN] Starting Hollywood Sound Design for ${scenes.length} scenes...`);
 
-  // Step 1: Design sounds for all scenes in parallel (Claude)
-  const designPromises = scenes.map((scene) =>
-    designSceneSounds(scene, scene.soundDesign)
-  );
-  const designs = await Promise.all(designPromises);
+  if (!process.env.FAL_KEY) {
+    console.error(`[SOUND DESIGN] FAL_KEY not set — cannot generate sound effects`);
+    return [];
+  }
 
-  // Step 2: Generate audio assets for all scenes in parallel (FAL stable-audio)
-  const assetPromises = designs.map((design) =>
-    generateSceneSoundAssets(design, userId)
+  // Step 1: Design sounds for all scenes in parallel (Claude).
+  // Use allSettled so one failure doesn't kill the batch.
+  const designResults = await Promise.allSettled(
+    scenes.map((scene) => designSceneSounds(scene, scene.soundDesign))
   );
-  const allAssets = await Promise.all(assetPromises);
+  const designs: EnhancedSoundDesign[] = [];
+  for (let i = 0; i < designResults.length; i++) {
+    const r = designResults[i];
+    if (r.status === "fulfilled") {
+      designs.push(r.value);
+    } else {
+      console.error(`[SOUND DESIGN] Design failed for scene ${scenes[i].sceneNumber}:`, r.reason);
+      // Fallback: basic design from scene's sound hints
+      designs.push(convertBasicSoundDesign(scenes[i], scenes[i].soundDesign));
+    }
+  }
+
+  // Step 2: Generate audio assets for all scenes in parallel (FAL stable-audio).
+  // Use allSettled so one scene's failure doesn't kill the others.
+  const assetResults = await Promise.allSettled(
+    designs.map((design) => generateSceneSoundAssets(design, userId))
+  );
+  const allAssets: SceneSoundAssets[] = [];
+  for (let i = 0; i < assetResults.length; i++) {
+    const r = assetResults[i];
+    if (r.status === "fulfilled") {
+      allAssets.push(r.value);
+    } else {
+      console.error(`[SOUND DESIGN] Asset generation failed for scene ${designs[i].sceneNumber}:`, r.reason);
+      // Push empty placeholder so scene indices still match
+      allAssets.push({
+        sceneNumber: designs[i].sceneNumber,
+        sfxClips: [],
+        foleyClips: [],
+      });
+    }
+  }
 
   const totalClips = allAssets.reduce(
     (sum, a) => sum + (a.ambientUrl ? 1 : 0) + a.sfxClips.length + a.foleyClips.length,

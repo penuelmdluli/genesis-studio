@@ -409,19 +409,73 @@ export async function executeProduction(
     }
 
     // Step 5b: Hollywood Sound Design — generate ambient, SFX, foley for each scene
+    // Run in parallel with voiceover/music. Await LATER so we don't block audio gen.
     let sceneSoundAssets: SceneSoundAssets[] = [];
+    let soundDesignError: string | null = null;
+    const soundDesignPromise: Promise<SceneSoundAssets[]> = input.soundEffects
+      ? (async () => {
+          console.log(`[BRAIN] Starting Hollywood Sound Design for ${enhancedPlan.scenes.length} scenes (parallel)...`);
+          try {
+            const result = await generateAllSceneSounds(enhancedPlan.scenes, userId);
+            const totalClips = result.reduce(
+              (sum, a) => sum + (a.ambientUrl ? 1 : 0) + a.sfxClips.length + a.foleyClips.length,
+              0
+            );
+            console.log(`[BRAIN] Sound Design complete: ${result.length} scenes, ${totalClips} total clips`);
+            if (totalClips === 0) {
+              soundDesignError = "All FAL stable-audio calls failed silently — 0 clips generated";
+              console.error(`[BRAIN] ⚠️  ${soundDesignError}`);
+            }
+            return result;
+          } catch (sfxErr) {
+            soundDesignError = sfxErr instanceof Error ? `${sfxErr.name}: ${sfxErr.message}` : String(sfxErr);
+            console.error(`[BRAIN] Sound Design THREW:`, soundDesignError);
+            if (sfxErr instanceof Error && sfxErr.stack) {
+              console.error(`[BRAIN] Sound Design stack:`, sfxErr.stack);
+            }
+            return [];
+          }
+        })()
+      : Promise.resolve([]);
+
+    // Wait for voiceover/music generation
+    const audioResults = await Promise.allSettled(audioPromises);
+    // Wait for sound design (may still be running)
+    sceneSoundAssets = await soundDesignPromise;
+
+    // ── Save sound assets to assembly_state IMMEDIATELY & INDEPENDENTLY ──
+    // This must happen regardless of whether voiceover succeeded,
+    // so sound design is never lost to nested conditionals.
     if (input.soundEffects) {
-      console.log(`[BRAIN] Generating Hollywood Sound Design for ${enhancedPlan.scenes.length} scenes...`);
       try {
-        sceneSoundAssets = await generateAllSceneSounds(enhancedPlan.scenes, userId);
-        console.log(`[BRAIN] Sound Design complete: ${sceneSoundAssets.length} scenes with sound assets`);
-      } catch (sfxErr) {
-        console.error(`[BRAIN] Sound Design failed (non-fatal):`, sfxErr);
+        const supabase = createSupabaseAdmin();
+        // Merge with existing assembly_state rather than overwriting
+        const { data: currentRow } = await supabase
+          .from("productions")
+          .select("assembly_state")
+          .eq("id", productionId)
+          .single();
+        const currentAssemblyState = (currentRow?.assembly_state as Record<string, unknown>) || {};
+        const merged: Record<string, unknown> = {
+          ...currentAssemblyState,
+          soundAssets: sceneSoundAssets,
+          soundDesignAttempted: true,
+          soundDesignError: soundDesignError,
+        };
+        await supabase
+          .from("productions")
+          .update({ assembly_state: merged })
+          .eq("id", productionId);
+        const totalClips = sceneSoundAssets.reduce(
+          (sum, a) => sum + (a.ambientUrl ? 1 : 0) + a.sfxClips.length + a.foleyClips.length,
+          0
+        );
+        console.log(`[BRAIN] Sound assets persisted: ${sceneSoundAssets.length} scenes, ${totalClips} clips${soundDesignError ? ` (error: ${soundDesignError})` : ""}`);
+      } catch (persistErr) {
+        console.error(`[BRAIN] Failed to persist sound assets:`, persistErr);
       }
     }
 
-    // Wait for audio generation
-    const audioResults = await Promise.allSettled(audioPromises);
     for (const result of audioResults) {
       if (result.status === "fulfilled") {
         const audio = result.value;
@@ -435,19 +489,23 @@ export async function executeProduction(
           if (clips && clips.length > 0) {
             console.log(`[BRAIN] Per-scene voiceover clips: ${clips.length} saved`);
             const defaultTransition = enhancedPlan.scenes[0]?.transitionOut || "crossfade";
-            const assemblyPreState: Record<string, unknown> = {
+            // Merge with existing state (which may already contain soundAssets)
+            const supabase = createSupabaseAdmin();
+            const { data: currentRow } = await supabase
+              .from("productions")
+              .select("assembly_state")
+              .eq("id", productionId)
+              .single();
+            const currentAssemblyState = (currentRow?.assembly_state as Record<string, unknown>) || {};
+            const merged: Record<string, unknown> = {
+              ...currentAssemblyState,
               voiceoverClips: clips,
               sceneAudioDurations: audioDurations || {},
               transitionType: defaultTransition,
             };
-            if (sceneSoundAssets.length > 0) {
-              assemblyPreState.soundAssets = sceneSoundAssets;
-              console.log(`[BRAIN] Sound assets stored: ${sceneSoundAssets.length} scenes`);
-            }
-            const supabase = createSupabaseAdmin();
             await supabase
               .from("productions")
-              .update({ assembly_state: assemblyPreState })
+              .update({ assembly_state: merged })
               .eq("id", productionId);
           }
         } else if (audio.type === "music" && audio.url) {

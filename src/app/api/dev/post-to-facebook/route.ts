@@ -13,7 +13,7 @@ import { getSignedDownloadUrl, videoStorageKey } from "@/lib/storage";
 
 export const maxDuration = 120;
 
-// Page configs — 6 Facebook pages
+// Page configs — 7 Facebook pages
 const FB_PAGES: Record<string, { pageId: string; tokenEnv: string; name: string }> = {
   tech_news: { pageId: "100919755007786", tokenEnv: "FB_PAGE_TOKEN_tech_news", name: "Tech Pulse Africa" },
   ai_money: { pageId: "107465491085378", tokenEnv: "FB_PAGE_TOKEN_ai_money", name: "AI Revolution" },
@@ -21,6 +21,7 @@ const FB_PAGES: Record<string, { pageId: string; tokenEnv: string; name: string 
   health_wellness: { pageId: "106788301081578", tokenEnv: "FB_PAGE_TOKEN_health_wellness", name: "World News Animated" },
   blissful_moments: { pageId: "112465853843545", tokenEnv: "FB_PAGE_TOKEN_blissful_moments", name: "Mzansi Baby Stars" },
   limitless_you: { pageId: "104120995511039", tokenEnv: "FB_PAGE_TOKEN_limitless_you", name: "Africa 2050" },
+  pop_culture_buzz: { pageId: "100904675009786", tokenEnv: "FB_PAGE_TOKEN_pop_culture_buzz", name: "Pop Culture Buzz" },
 };
 
 interface PostResult {

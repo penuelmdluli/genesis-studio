@@ -102,6 +102,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "entertainment_hook",
     hashtags: ["#PopCulture", "#Entertainment", "#CelebNews", "#Trending"],
     enabled: true,
+    facebook_page_key: "pop_culture_buzz",
     youtube_enabled: true,
     topics_per_cycle: 1,
   },

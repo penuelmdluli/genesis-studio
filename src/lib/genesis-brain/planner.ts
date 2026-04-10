@@ -245,6 +245,18 @@ export async function planProduction(input: BrainInput): Promise<ScenePlan> {
   // Validate and sanitize the plan
   plan = validateAndSanitizePlan(plan!, input);
 
+  // Premium, content-aware engagement CTA — dedicated Claude call with a
+  // pattern rubric. Runs AFTER the main plan so it can study the actual
+  // final scene's narration and match the tone exactly.
+  if (input.voiceover && input.engagementCTA) {
+    try {
+      await applyPremiumEngagementCTA(plan, apiKey);
+    } catch (ctaErr) {
+      console.warn("[BRAIN PLANNER] Premium CTA generation failed, using rotating fallback:", ctaErr);
+      enforceEngagementCTA(plan);
+    }
+  }
+
   return plan;
 }
 
@@ -319,18 +331,142 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   // Calculate total duration
   plan.totalDuration = plan.scenes.reduce((sum, s) => sum + s.duration, 0);
 
-  // Enforce engagement CTA on the final scene's voiceoverLine (belt-and-suspenders
-  // guarantee in case Claude forgets the rule).
-  if (input.voiceover && input.engagementCTA) {
-    enforceEngagementCTA(plan);
-  }
-
   // Generate voiceover timings if needed
   if (input.voiceover && plan.voiceoverScript && !plan.voiceoverTimings) {
     plan.voiceoverTimings = generateTimings(plan);
   }
 
   return plan;
+}
+
+// ────────────────────────────────────────────────────────────
+// PREMIUM ENGAGEMENT CTA
+// Dedicated Claude call that studies the final scene and picks from
+// a rubric of proven engagement patterns. This is the "smart" layer —
+// content-aware, tonally matched, never canned.
+// ────────────────────────────────────────────────────────────
+
+const CTA_RUBRIC_SYSTEM_PROMPT = `You are a world-class short-form video engagement specialist.
+Your ONLY job: write a single bespoke closing line for a video's narrator that earns likes, comments, and shares WITHOUT feeling like a cheap "smash that like button" plea.
+
+You write in the NARRATOR'S voice as a natural continuation of the emotional beat they just delivered.
+The line must invite the viewer to LIKE, COMMENT, and SHARE (all three actions), but the WORDING is varied and pattern-matched to the content's emotional tone.
+
+ENGAGEMENT PATTERNS — pick the ONE that fits the content:
+
+1. AUTHORITY
+   Use when: breaking news, geopolitics, tech disruption, data-driven stories
+   Tone: decisive, informed, "you need to know this"
+   Sample beats: "the data doesn't lie", "you need to see this", "mark these words"
+
+2. INTIMACY
+   Use when: motivation, personal transformation, emotional stories, tributes
+   Tone: warm, close, "just between us"
+   Sample beats: "if this moved you", "we read every comment", "send this to someone who needs it"
+
+3. CURIOSITY
+   Use when: debate topics, open-ended questions, "what would you do" content
+   Tone: provocative, inviting a take
+   Sample beats: "so what would YOU do", "drop your take", "who's right here"
+
+4. COMMUNITY / BELONGING
+   Use when: African pride, cultural, tribal, identity content
+   Tone: collective, "this is ours"
+   Sample beats: "this is our story", "tag your tribe", "tell us where you're watching from"
+
+5. FOMO / URGENCY
+   Use when: trending, viral, time-sensitive, "before it blows up"
+   Tone: urgent, now-or-never
+   Sample beats: "don't sleep on this", "share before this blows up", "you'll regret missing this"
+
+6. GRATITUDE / JOY
+   Use when: wholesome, uplifting, babies, animals, feel-good
+   Tone: light, joyful, thankful
+   Sample beats: "if this made you smile", "pass the joy", "who else needed this today"
+
+RULES:
+- Always invite ALL THREE actions: like, comment, share (or natural synonyms — "tap", "drop", "pass it on", "send", etc.)
+- Max 22 words. Under 18 is better.
+- Must feel like the narrator's OWN voice continuing — not a jarring hard pivot
+- Start with a short bridge phrase that connects to the narration's emotional beat (e.g. "If that hit home…", "So what's your take?", "Don't sleep on this…")
+- Never use the exact phrase "smash that like button" or "like and subscribe" — that's cheap
+- Vary phrasing completely between runs — no templates, no repeats
+- NEVER start with "Remember to" or "Make sure to" — those kill engagement
+
+OUTPUT: Return ONLY the CTA line. No JSON. No markdown. No explanation. No quotes around it. Just the raw line the narrator will speak.`;
+
+async function applyPremiumEngagementCTA(plan: ScenePlan, apiKey: string): Promise<void> {
+  if (!plan.scenes || plan.scenes.length === 0) return;
+  const lastScene = plan.scenes[plan.scenes.length - 1];
+
+  // Build rich context: the actual content the CTA needs to flow from
+  const lastLine = (lastScene.voiceoverLine || "").trim();
+  const openingLine = (plan.scenes[0]?.voiceoverLine || "").trim();
+  const content = [
+    `TITLE: ${plan.title || "(untitled)"}`,
+    `STYLE: ${plan.overallStyle || "cinematic"}`,
+    `OPENING HOOK: "${openingLine || "(no hook)"}"`,
+    `FINAL SCENE NARRATION: "${lastLine || "(empty)"}"`,
+    `FINAL SCENE DESCRIPTION: "${lastScene.description || ""}"`,
+  ].join("\n");
+
+  const userPrompt = `Write ONE bespoke engagement CTA line to append to the narrator's closing.
+It must flow as a natural continuation of the emotional beat of the final scene.
+Pick the engagement pattern that best fits this content.
+
+${content}
+
+Return ONLY the CTA line (no JSON, no quotes, no explanation).`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 200,
+      system: CTA_RUBRIC_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`CTA Claude call failed: ${res.status}`);
+  }
+  const data = await res.json();
+  let cta = (data.content?.[0]?.text || "").trim();
+
+  // Strip any stray quotes or markdown
+  cta = cta.replace(/^["'`]+|["'`]+$/g, "").replace(/^```[a-z]*\n?|```$/g, "").trim();
+
+  // Sanity check: must contain at least 2 engagement signals
+  const signals = [
+    /\blike\b/i, /\bcomment/i, /\bshare\b/i, /\btap\b/i, /\bdrop\b/i,
+    /\bpass\b/i, /\bsend\b/i, /\btag\b/i, /\btell us\b/i, /\bwhat('s| is) your\b/i,
+  ];
+  const hits = signals.filter((rx) => rx.test(cta)).length;
+  if (!cta || cta.length < 15 || cta.length > 220 || hits < 2) {
+    throw new Error(`CTA validation failed (length=${cta.length}, hits=${hits}): "${cta.slice(0, 80)}"`);
+  }
+
+  // Append to final scene voiceoverLine with a soft separator so TTS pauses naturally
+  const sep = lastLine && !/[.!?]$/.test(lastLine) ? ". " : lastLine ? " " : "";
+  lastScene.voiceoverLine = `${lastLine}${sep}${cta}`;
+
+  // Keep the overall script in sync for fallback TTS paths
+  if (plan.voiceoverScript) {
+    const script = plan.voiceoverScript.trim();
+    const scriptHits = signals.filter((rx) => rx.test(script)).length;
+    if (scriptHits < 2) {
+      const scriptSep = script && !/[.!?]$/.test(script) ? ". " : script ? " " : "";
+      plan.voiceoverScript = `${script}${scriptSep}${cta}`;
+    }
+  }
+
+  console.log(`[BRAIN PLANNER] Premium CTA applied: "${cta.slice(0, 80)}..."`);
 }
 
 /**

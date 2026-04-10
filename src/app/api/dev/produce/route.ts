@@ -225,6 +225,7 @@ export async function POST(req: NextRequest) {
       music: true,
       captions: true,
       soundEffects: true,
+      engagementCTA: true, // Narrator always closes with like/comment/share
     };
 
     // Step 1: Plan with Hollywood cinematography prompt (~10-15s)

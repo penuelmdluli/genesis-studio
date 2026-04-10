@@ -117,6 +117,14 @@ COMPOSITION RULES:
    - Write like a CINEMATIC NARRATOR: evocative, emotional, rhythmic. Not a news anchor.
    - Use power words: "witness", "unleash", "transform", "shatter", "ignite", "reveal"
    - Vary sentence length. Short punch. Then a longer, flowing descriptive passage that builds.
+   - ENGAGEMENT CTA (if "ENGAGEMENT CTA: Yes" is set in input): The FINAL scene's voiceoverLine
+     MUST end with a natural, in-voice call-to-action asking viewers to like, comment, and share.
+     Weave it into the narrator's emotional climax — don't break the fourth wall jarringly.
+     Vary the phrasing every time (never the same CTA twice). Examples of tone:
+       • "…if this moved you, tap that like, share it with someone who needs to hear this, and drop your thoughts below."
+       • "…smash the like, share this with a friend who'd get it, and tell us in the comments what you felt."
+       • "…hit like if this hit home, share it forward, and let us know what stood out in the comments."
+     Keep it under 18 words. Make it feel earned, not bolted on.
 
 9. VISUAL CONSISTENCY:
    - ALL scenes share: same lighting setup, color temperature, quality keywords, camera style
@@ -141,6 +149,9 @@ ASPECT RATIO: ${input.aspectRatio === "landscape" ? "16:9" : input.aspectRatio =
 
   if (input.voiceover) {
     prompt += `\nVOICEOVER: Yes (language: ${input.voiceoverLanguage || "en-US"})`;
+  }
+  if (input.voiceover && input.engagementCTA) {
+    prompt += `\nENGAGEMENT CTA: Yes — final scene voiceoverLine MUST end with a varied like/comment/share CTA (see rule 8)`;
   }
   if (input.music) {
     prompt += `\nMUSIC: Yes — select appropriate mood and tempo`;
@@ -308,12 +319,81 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   // Calculate total duration
   plan.totalDuration = plan.scenes.reduce((sum, s) => sum + s.duration, 0);
 
+  // Enforce engagement CTA on the final scene's voiceoverLine (belt-and-suspenders
+  // guarantee in case Claude forgets the rule).
+  if (input.voiceover && input.engagementCTA) {
+    enforceEngagementCTA(plan);
+  }
+
   // Generate voiceover timings if needed
   if (input.voiceover && plan.voiceoverScript && !plan.voiceoverTimings) {
     plan.voiceoverTimings = generateTimings(plan);
   }
 
   return plan;
+}
+
+/**
+ * Ensure the final scene's voiceoverLine contains a like/comment/share CTA.
+ * If Claude already wrote one, leave it alone. Otherwise append a rotating fallback
+ * so the narrator always closes with an engagement prompt.
+ */
+function enforceEngagementCTA(plan: ScenePlan): void {
+  if (!plan.scenes || plan.scenes.length === 0) return;
+
+  const lastScene = plan.scenes[plan.scenes.length - 1];
+  const existing = (lastScene.voiceoverLine || "").trim();
+
+  // CTA detection — look for two or more engagement verbs/nouns within the line.
+  // This avoids false positives on a single casual "like" and guarantees a real CTA.
+  const engagementSignals = [
+    /\blike\b/i,
+    /\bcomment/i,
+    /\bshare\b/i,
+    /\bsubscribe\b/i,
+    /\bfollow\b/i,
+    /\btap\b/i,
+    /\bsmash\b/i,
+    /\bdrop a /i,
+    /\blet us know\b/i,
+  ];
+  const matches = engagementSignals.filter((rx) => rx.test(existing)).length;
+  if (matches >= 2) {
+    // Claude already wrote a proper CTA — trust it.
+    return;
+  }
+
+  // Rotating fallback pool — picked pseudo-randomly by plan title hash so the same
+  // concept doesn't drift between runs, but the pipeline as a whole varies naturally.
+  const fallbacks = [
+    "If this moved you, tap like, share it with someone who needs to hear it, and drop your thoughts below.",
+    "Smash the like, share with a friend who'd get it, and tell us what hit hardest in the comments.",
+    "Hit like if this landed, share it forward, and let us know what stood out in the comments.",
+    "Like if you felt that. Share with someone who needs it. Comment your favourite moment below.",
+    "Tap like, share with your people, and drop a comment — we read every single one.",
+    "If this spoke to you, leave a like, send it to a friend, and tell us your story in the comments.",
+  ];
+  const hash = Array.from(plan.title || "genesis").reduce(
+    (acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0,
+    0
+  );
+  const cta = fallbacks[hash % fallbacks.length];
+
+  // Append to the final voiceoverLine. Add a soft separator so TTS pauses naturally.
+  const separator = existing && !/[.!?]$/.test(existing) ? ". " : existing ? " " : "";
+  lastScene.voiceoverLine = `${existing}${separator}${cta}`;
+
+  // Keep the overall voiceoverScript in sync so fallback TTS paths see the CTA too.
+  if (plan.voiceoverScript) {
+    const scriptTrim = plan.voiceoverScript.trim();
+    const scriptMatches = engagementSignals.filter((rx) => rx.test(scriptTrim)).length;
+    if (scriptMatches < 2) {
+      const scriptSep = scriptTrim && !/[.!?]$/.test(scriptTrim) ? ". " : scriptTrim ? " " : "";
+      plan.voiceoverScript = `${scriptTrim}${scriptSep}${cta}`;
+    }
+  }
+
+  console.log(`[BRAIN PLANNER] Appended engagement CTA to final scene voiceoverLine`);
 }
 
 function generateTimings(plan: ScenePlan): VoiceoverTiming[] {

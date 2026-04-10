@@ -372,6 +372,7 @@ export interface BrainInput {
   captions: boolean;
   music: boolean;
   soundEffects: boolean; // Hollywood Sound Design: ambient, SFX, foley per scene
+  engagementCTA?: boolean; // Narrator ends with a like/comment/share call-to-action
   characterRefs?: string[];
   brandKit?: BrandKit;
   outputFormats?: AspectRatio[];

@@ -1,23 +1,24 @@
 // POST /api/dev/scheduler -- Automated dev content pipeline
-// Query params: ?action=fetch_trends|generate|produce|poll|post|full
+// Query params: ?action=fetch_trends|generate|produce|poll|post|pull_metrics|analyze|full
 // Auth: CRON_SECRET
 //
-// Pipeline: fetch_trends -> generate -> produce -> poll -> post
+// Pipeline: fetch_trends -> generate -> produce -> poll -> post -> pull_metrics -> analyze
 //
 // Actions:
 // - fetch_trends : Aggregate trending topics from all news sources
-// - generate     : Smart niche-scored topic assignment across dev pages (no duplicates)
+// - generate     : Smart niche-scored topic assignment with adaptive learning weights
 // - produce      : Trigger Brain Studio video production for pending queue items
 // - poll         : Poll assembly progress for in-progress productions
 // - post         : Post completed videos to Facebook Reels + YouTube Shorts
-// - full         : Run all steps in sequence (fetch -> generate -> produce -> post)
+// - pull_metrics : Pull engagement insights from FB + YT for posted videos
+// - analyze      : Aggregate engagement and compute adaptive niche weights
+// - full         : Run the full learn-and-adapt loop end-to-end
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { aggregateAllSources, UnifiedNewsItem } from "@/lib/news/aggregator";
 import { getAllDevPages, DevPageConfig } from "@/lib/dev-pages";
 import { selectEngine, createCostEntry } from "@/lib/dev-engine-router";
-import { after } from "next/server";
 
 export const maxDuration = 300;
 
@@ -49,30 +50,102 @@ function getCronSecret(): string {
 /**
  * Score a topic's relevance to a page using niche overlap.
  * Topics MUST have at least one matching niche to score > 0.
- * Score = nicheOverlap * 3 + viralPotential
- * Optional niche_weights on the page further boost specific niches.
+ * Score = nicheOverlap * 3 + viralPotential + static + learned weights
+ * Learned weights come from recent engagement metrics (learn-and-adapt).
  */
 function scoreTopicForPage(
   topic: { niches?: string[] | null; viral_potential: number },
   page: DevPageConfig,
+  learnedBoost: Record<string, number> = {},
 ): number {
   const topicNiches = topic.niches || [];
   const nicheWeights = page.niche_weights || {};
 
   let nicheOverlap = 0;
   let weightBonus = 0;
+  let learnedBonus = 0;
 
   for (const pillar of page.content_pillars) {
     if (topicNiches.includes(pillar)) {
       nicheOverlap++;
       weightBonus += nicheWeights[pillar] || 0;
+      learnedBonus += learnedBoost[pillar] || 0;
     }
   }
 
   // Must have at least 1 niche match
   if (nicheOverlap === 0) return 0;
 
-  return nicheOverlap * 3 + (topic.viral_potential || 5) + weightBonus;
+  return (
+    nicheOverlap * 3 +
+    (topic.viral_potential || 5) +
+    weightBonus +
+    learnedBonus
+  );
+}
+
+/**
+ * Learn-and-adapt: compute per-pillar engagement boosts from the last 30 days
+ * of posted content. Pillars with above-average engagement get positive boosts;
+ * pillars with below-average engagement get negative boosts. Returns {} until
+ * at least one posted item has metrics in input_data.latest_metrics.
+ */
+async function computeLearnedPillarBoost(): Promise<Record<string, number>> {
+  try {
+    const supabase = createSupabaseAdmin();
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: items } = await supabase
+      .from("dev_content_queue")
+      .select("pillar, input_data")
+      .eq("status", "posted")
+      .gte("posted_at", since)
+      .limit(500);
+
+    if (!items || items.length === 0) return {};
+
+    const buckets: Record<string, number[]> = {};
+    for (const item of items) {
+      const input = (item.input_data as Record<string, unknown>) || {};
+      const latest = input.latest_metrics as
+        | { combined?: { engagement_rate?: number } }
+        | undefined;
+      const engagement = Number(latest?.combined?.engagement_rate || 0);
+      if (!latest?.combined) continue;
+      const pillar = (item.pillar as string) || "unknown";
+      (buckets[pillar] ||= []).push(engagement);
+    }
+
+    const means = Object.entries(buckets)
+      .filter(([, v]) => v.length >= 1)
+      .map(([k, v]) => ({
+        pillar: k,
+        mean: v.reduce((a, b) => a + b, 0) / v.length,
+      }));
+
+    if (means.length === 0) return {};
+
+    const globalMean =
+      means.reduce((a, r) => a + r.mean, 0) / Math.max(means.length, 1);
+
+    const boost: Record<string, number> = {};
+    for (const row of means) {
+      // Each +0.05 above global mean -> +10 score units
+      const delta = Math.round((row.mean - globalMean) * 200);
+      if (Math.abs(delta) >= 1) boost[row.pillar] = delta;
+    }
+
+    if (Object.keys(boost).length > 0) {
+      console.log(
+        `[DEV SCHEDULER] Learned pillar boost applied:`,
+        JSON.stringify(boost),
+      );
+    }
+    return boost;
+  } catch (err) {
+    console.warn("[DEV SCHEDULER] computeLearnedPillarBoost failed:", err);
+    return {};
+  }
 }
 
 /**
@@ -202,6 +275,9 @@ async function handleGenerate(): Promise<{
 
   console.log(`[DEV SCHEDULER] ${topics.length} pending topics, ${pages.length} active pages`);
 
+  // 1b. Load adaptive pillar boosts from recent engagement metrics
+  const learnedBoost = await computeLearnedPillarBoost();
+
   // 2. Greedy niche-scored assignment (no cross-page duplicates)
   const assignedTopicIds = new Set<string>();
   const assignments: Array<{
@@ -221,6 +297,7 @@ async function handleGenerate(): Promise<{
         const score = scoreTopicForPage(
           { niches: t.niches, viral_potential: t.viral_potential },
           page,
+          learnedBoost,
         );
         // Determine which pillar matched best
         const topicNiches: string[] = t.niches || [];
@@ -435,6 +512,7 @@ async function handlePost(): Promise<{
     videoId: string;
     platform: string;
     success: boolean;
+    postId?: string;
     error?: string;
   }>;
 }> {
@@ -470,6 +548,7 @@ async function handlePost(): Promise<{
     videoId: string;
     platform: string;
     success: boolean;
+    postId?: string;
     error?: string;
   }> = [];
 
@@ -591,6 +670,7 @@ async function handlePost(): Promise<{
             videoId: r.videoId,
             platform: "facebook",
             success: r.success,
+            postId: r.postId,
             error: r.error,
           });
         }
@@ -624,6 +704,7 @@ async function handlePost(): Promise<{
             videoId: r.videoId,
             platform: "youtube",
             success: r.success,
+            postId: r.youtubeVideoId,
             error: r.error,
           });
         }
@@ -634,25 +715,48 @@ async function handlePost(): Promise<{
   }
 
   // ---- Update queue status based on results ----
-  // Build a set of successfully posted videoIds for quick lookup
-  const postedVideoIds = new Set(
-    results.filter((r) => r.success).map((r) => r.videoId),
-  );
+  // Index successful post IDs by queue item for quick lookup
+  const fbResultByVideoId = new Map<string, typeof results[number]>();
+  const ytResultByVideoId = new Map<string, typeof results[number]>();
+  for (const r of results) {
+    if (!r.success) continue;
+    if (r.platform === "facebook") fbResultByVideoId.set(r.videoId, r);
+    if (r.platform === "youtube") ytResultByVideoId.set(r.videoId, r);
+  }
 
   for (const item of readyItems) {
     const productionId = item.input_data?.production_id;
     // Check if any of this item's videos were successfully posted
     const fbPost = fbPosts.find((p) => p.queueId === item.id);
     const ytPost = ytPosts.find((p) => p.queueId === item.id);
-    const fbSuccess = fbPost && postedVideoIds.has(fbPost.videoId);
-    const ytSuccess = ytPost && postedVideoIds.has(ytPost.videoId);
+    const fbResult = fbPost ? fbResultByVideoId.get(fbPost.videoId) : undefined;
+    const ytResult = ytPost ? ytResultByVideoId.get(ytPost.videoId) : undefined;
+    const fbSuccess = !!fbResult;
+    const ytSuccess = !!ytResult;
 
     if (fbSuccess || ytSuccess) {
+      // Persist FB + YT post IDs so the learn-and-adapt loop can pull insights later.
+      const existingInput = (item.input_data as Record<string, unknown>) || {};
+      const postIds: Record<string, string> = {};
+      if (fbResult?.postId) postIds.facebook = fbResult.postId;
+      if (ytResult?.postId) postIds.youtube = ytResult.postId;
+      // Also remember which page_key the FB post went to (for token lookup on pull)
+      if (fbPost) postIds.facebook_page_key = fbPost.pageKey;
+
+      const mergedInput = {
+        ...existingInput,
+        post_ids: {
+          ...(existingInput.post_ids as Record<string, string> | undefined),
+          ...postIds,
+        },
+      };
+
       await supabase
         .from("dev_content_queue")
         .update({
           status: "posted",
           posted_at: new Date().toISOString(),
+          input_data: mergedInput,
         })
         .eq("id", item.id);
 
@@ -679,6 +783,93 @@ async function handlePost(): Promise<{
   const successCount = results.filter((r) => r.success).length;
   console.log(`[DEV SCHEDULER] Post complete: ${successCount}/${results.length} successful`);
   return { posted: successCount, results };
+}
+
+// ──────────────────────────────────────────────────────────
+// Step 6: PULL METRICS — learn half of learn-and-adapt
+// ──────────────────────────────────────────────────────────
+
+async function handlePullMetrics(): Promise<{ pulled: number; items: number }> {
+  console.log("[DEV SCHEDULER] Pulling engagement metrics for posted videos...");
+
+  const appUrl = getAppUrl();
+  const cronSecret = getCronSecret();
+
+  try {
+    const res = await fetch(`${appUrl}/api/dev/pull-metrics`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": cronSecret,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        `[DEV SCHEDULER] Pull-metrics endpoint returned ${res.status}: ${text}`,
+      );
+      return { pulled: 0, items: 0 };
+    }
+
+    const data = await res.json();
+    console.log(
+      `[DEV SCHEDULER] Metrics pulled for ${data.pulled}/${data.items} posted items`,
+    );
+    return { pulled: data.pulled || 0, items: data.items || 0 };
+  } catch (err) {
+    console.error("[DEV SCHEDULER] Pull-metrics call failed:", err);
+    return { pulled: 0, items: 0 };
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// Step 7: ANALYZE — adapt half of learn-and-adapt
+// ──────────────────────────────────────────────────────────
+
+async function handleAnalyze(): Promise<{
+  analyzed: number;
+  winners: unknown[];
+  learned_pillar_boost: Record<string, number>;
+}> {
+  console.log("[DEV SCHEDULER] Analyzing engagement performance...");
+
+  const appUrl = getAppUrl();
+  const cronSecret = getCronSecret();
+
+  try {
+    const res = await fetch(`${appUrl}/api/dev/analyze-performance`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": cronSecret,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        `[DEV SCHEDULER] Analyze endpoint returned ${res.status}: ${text}`,
+      );
+      return { analyzed: 0, winners: [], learned_pillar_boost: {} };
+    }
+
+    const data = await res.json();
+    console.log(
+      `[DEV SCHEDULER] Analyzed ${data.analyzed} items; learned boosts:`,
+      JSON.stringify(data.learned_pillar_boost || {}),
+    );
+    return {
+      analyzed: data.analyzed || 0,
+      winners: data.winners || [],
+      learned_pillar_boost: data.learned_pillar_boost || {},
+    };
+  } catch (err) {
+    console.error("[DEV SCHEDULER] Analyze call failed:", err);
+    return { analyzed: 0, winners: [], learned_pillar_boost: {} };
+  }
 }
 
 // ──────────────────────────────────────────────────────────
@@ -747,42 +938,78 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // ---- Pull metrics (learn) ----
+      case "pull_metrics": {
+        const result = await handlePullMetrics();
+        return NextResponse.json({
+          action: "pull_metrics",
+          success: true,
+          ...result,
+        });
+      }
+
+      // ---- Analyze (adapt) ----
+      case "analyze": {
+        const result = await handleAnalyze();
+        return NextResponse.json({
+          action: "analyze",
+          success: true,
+          ...result,
+        });
+      }
+
       // ---- Full Pipeline ----
       case "full": {
-        console.log("[DEV SCHEDULER] Running FULL automated pipeline...");
+        console.log("[DEV SCHEDULER] Running FULL learn-and-adapt pipeline...");
         const stepResults: Record<string, unknown> = {};
+
+        // Step 0: Pull metrics from previously-posted videos (learn)
+        //          — must run BEFORE generate so adaptive weights are fresh.
+        const pulled = await handlePullMetrics();
+        stepResults.pull_metrics = pulled;
+        console.log(
+          `[DEV SCHEDULER] Full pipeline [1/7]: metrics pulled for ${pulled.pulled}/${pulled.items} items`,
+        );
+
+        // Step 0b: Analyze performance, write back tiers, compute boosts
+        const analyzed = await handleAnalyze();
+        stepResults.analyze = analyzed;
+        console.log(
+          `[DEV SCHEDULER] Full pipeline [2/7]: analyzed ${analyzed.analyzed} items`,
+        );
 
         // Step 1: Fetch trends
         const trends = await handleFetchTrends();
         stepResults.fetch_trends = { count: trends.count };
-        console.log(`[DEV SCHEDULER] Full pipeline [1/5]: ${trends.count} trends fetched`);
+        console.log(`[DEV SCHEDULER] Full pipeline [3/7]: ${trends.count} trends fetched`);
 
-        // Step 2: Smart content rotation
+        // Step 2: Smart content rotation (now uses learned boosts)
         const generated = await handleGenerate();
         stepResults.generate = { queued: generated.queued, entries: generated.entries };
-        console.log(`[DEV SCHEDULER] Full pipeline [2/5]: ${generated.queued} items queued`);
+        console.log(`[DEV SCHEDULER] Full pipeline [4/7]: ${generated.queued} items queued`);
 
         // Step 3: Trigger Brain Studio production
         const produced = await handleProduce();
         stepResults.produce = produced;
-        console.log(`[DEV SCHEDULER] Full pipeline [3/5]: ${produced.triggered} production(s) triggered`);
+        console.log(`[DEV SCHEDULER] Full pipeline [5/7]: ${produced.triggered} production(s) triggered`);
 
         // Step 4: Poll assembly for any in-progress work from previous cycles
         const polled = await handlePollAssembly();
         stepResults.poll = polled;
-        console.log(`[DEV SCHEDULER] Full pipeline [4/5]: ${polled.polled} production(s) polled`);
+        console.log(`[DEV SCHEDULER] Full pipeline [6/7]: ${polled.polled} production(s) polled`);
 
         // Step 5: Post any ready videos from previous cycles
         const posted = await handlePost();
         stepResults.post = posted;
-        console.log(`[DEV SCHEDULER] Full pipeline [5/5]: ${posted.posted} video(s) posted`);
+        console.log(`[DEV SCHEDULER] Full pipeline [7/7]: ${posted.posted} video(s) posted`);
 
-        console.log("[DEV SCHEDULER] Full pipeline complete.");
+        console.log("[DEV SCHEDULER] Full learn-and-adapt pipeline complete.");
 
         return NextResponse.json({
           action: "full",
           success: true,
-          pipeline: "fetch -> generate -> produce -> poll -> post",
+          pipeline:
+            "pull_metrics -> analyze -> fetch -> generate -> produce -> poll -> post",
           steps: stepResults,
         });
       }
@@ -790,7 +1017,7 @@ export async function POST(req: NextRequest) {
       default:
         return NextResponse.json(
           {
-            error: `Invalid action: ${action}. Use: fetch_trends, generate, produce, poll, post, or full`,
+            error: `Invalid action: ${action}. Use: fetch_trends, generate, produce, poll, post, pull_metrics, analyze, or full`,
           },
           { status: 400 },
         );

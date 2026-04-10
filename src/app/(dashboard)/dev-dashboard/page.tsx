@@ -218,6 +218,159 @@ async function fetchRecentErrors() {
   }
 }
 
+interface PerformancePost {
+  id: string;
+  page_id: string;
+  pillar: string;
+  topic_title: string;
+  posted_at: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  engagement_rate: number;
+  performance_tier: "top" | "mid" | "low" | "unranked";
+}
+
+interface PillarAggregate {
+  key: string;
+  samples: number;
+  mean_engagement: number;
+  total_views: number;
+}
+
+/**
+ * Pull the last 30 days of posted items that have latest_metrics,
+ * return top-posts list + per-pillar and per-page aggregates.
+ */
+async function fetchEngagementInsights(): Promise<{
+  posts: PerformancePost[];
+  byPillar: PillarAggregate[];
+  byPage: PillarAggregate[];
+}> {
+  try {
+    const supabase = createSupabaseAdmin();
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("dev_content_queue")
+      .select("id, page_id, pillar, posted_at, input_data")
+      .eq("status", "posted")
+      .gte("posted_at", since)
+      .order("posted_at", { ascending: false })
+      .limit(200);
+
+    if (error || !data) return { posts: [], byPillar: [], byPage: [] };
+
+    const posts: PerformancePost[] = [];
+    const pillarBuckets: Record<
+      string,
+      { engagement: number[]; views: number[] }
+    > = {};
+    const pageBuckets: Record<
+      string,
+      { engagement: number[]; views: number[] }
+    > = {};
+
+    for (const row of data) {
+      const input = (row.input_data as Record<string, unknown>) || {};
+      const latest = input.latest_metrics as
+        | {
+            combined?: {
+              views?: number;
+              likes?: number;
+              comments?: number;
+              shares?: number;
+              engagement_rate?: number;
+            };
+          }
+        | undefined;
+      const combined = latest?.combined;
+      if (!combined) continue;
+
+      const views = Number(combined.views || 0);
+      const likes = Number(combined.likes || 0);
+      const comments = Number(combined.comments || 0);
+      const shares = Number(combined.shares || 0);
+      const er = Number(combined.engagement_rate || 0);
+      const tier =
+        (input.performance_tier as PerformancePost["performance_tier"]) ||
+        "unranked";
+
+      posts.push({
+        id: row.id as string,
+        page_id: row.page_id as string,
+        pillar: row.pillar as string,
+        topic_title: (input.topic_title as string) || "(untitled)",
+        posted_at: row.posted_at as string | null,
+        views,
+        likes,
+        comments,
+        shares,
+        engagement_rate: er,
+        performance_tier: tier,
+      });
+
+      const pillarKey = (row.pillar as string) || "unknown";
+      (pillarBuckets[pillarKey] ||= { engagement: [], views: [] }).engagement.push(er);
+      pillarBuckets[pillarKey].views.push(views);
+
+      const pageKey = (row.page_id as string) || "unknown";
+      (pageBuckets[pageKey] ||= { engagement: [], views: [] }).engagement.push(er);
+      pageBuckets[pageKey].views.push(views);
+    }
+
+    const toAggregate = (
+      buckets: Record<string, { engagement: number[]; views: number[] }>,
+    ): PillarAggregate[] =>
+      Object.entries(buckets)
+        .map(([key, b]) => ({
+          key,
+          samples: b.engagement.length,
+          mean_engagement:
+            b.engagement.reduce((a, c) => a + c, 0) / (b.engagement.length || 1),
+          total_views: b.views.reduce((a, c) => a + c, 0),
+        }))
+        .sort((a, b) => b.mean_engagement - a.mean_engagement);
+
+    return {
+      posts: posts.sort((a, b) => b.engagement_rate - a.engagement_rate),
+      byPillar: toAggregate(pillarBuckets),
+      byPage: toAggregate(pageBuckets),
+    };
+  } catch (err) {
+    console.error("[DEV] Dashboard engagement insights fetch failed:", err);
+    return { posts: [], byPillar: [], byPage: [] };
+  }
+}
+
+async function fetchStuckItems(): Promise<
+  Array<{ id: string; page_id: string; pillar: string; minutes_stuck: number }>
+> {
+  try {
+    const supabase = createSupabaseAdmin();
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("dev_content_queue")
+      .select("id, page_id, pillar, created_at")
+      .eq("status", "generating")
+      .lt("created_at", thirtyMinAgo)
+      .order("created_at", { ascending: true })
+      .limit(20);
+    if (error || !data) return [];
+    return data.map((r) => ({
+      id: r.id as string,
+      page_id: r.page_id as string,
+      pillar: r.pillar as string,
+      minutes_stuck: Math.round(
+        (Date.now() - new Date(r.created_at as string).getTime()) / 60000,
+      ),
+    }));
+  } catch (err) {
+    console.error("[DEV] Dashboard stuck items fetch failed:", err);
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -280,6 +433,8 @@ export default async function DevDashboardPage() {
     engineUsage,
     pageStatuses,
     recentErrors,
+    engagement,
+    stuckItems,
   ] = await Promise.all([
     fetchTrendingTopics(),
     fetchQueueStatusCounts(),
@@ -288,6 +443,8 @@ export default async function DevDashboardPage() {
     fetchEngineUsage(),
     fetchPageStatuses(),
     fetchRecentErrors(),
+    fetchEngagementInsights(),
+    fetchStuckItems(),
   ]);
 
   const totalEngineUsage = Object.values(engineUsage).reduce(
@@ -312,6 +469,43 @@ export default async function DevDashboardPage() {
           Refresh
         </a>
       </div>
+
+      {/* Stuck Items Banner — surfaces reconciler-worthy state */}
+      {stuckItems.length > 0 && (
+        <section className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-amber-300">
+                ⚠ {stuckItems.length} production
+                {stuckItems.length === 1 ? "" : "s"} stuck &gt; 30 min
+              </h2>
+              <p className="mt-1 text-xs text-amber-200/70">
+                Run{" "}
+                <code className="rounded bg-amber-900/40 px-1 py-0.5">
+                  ?action=reconcile
+                </code>{" "}
+                on the scheduler to reset them back to pending.
+              </p>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-1 text-sm">
+            {stuckItems.slice(0, 8).map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between text-amber-100/80"
+              >
+                <span className="truncate">
+                  <span className="font-mono text-amber-300">{s.page_id}</span>{" "}
+                  / {s.pillar}
+                </span>
+                <span className="ml-4 shrink-0 text-amber-200/60">
+                  {s.minutes_stuck}m
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Queue Status Counts */}
       <section>
@@ -402,6 +596,143 @@ export default async function DevDashboardPage() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Engagement Insights (Learn & Adapt) */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-zinc-200">
+          Engagement Insights{" "}
+          <span className="ml-2 text-xs font-normal text-zinc-500">
+            last 30 days · learn-and-adapt
+          </span>
+        </h2>
+        {engagement.posts.length === 0 ? (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <p className="text-sm text-zinc-500">
+              No metrics yet — posted content will appear here once{" "}
+              <code className="rounded bg-zinc-800 px-1 py-0.5">
+                ?action=pull_metrics
+              </code>{" "}
+              runs.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {/* Top pillars */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+              <p className="mb-3 text-sm font-semibold text-zinc-300">
+                Winning Pillars
+              </p>
+              <div className="space-y-2">
+                {engagement.byPillar.slice(0, 6).map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="truncate text-zinc-200">{row.key}</span>
+                    <span className="ml-4 shrink-0 font-mono text-zinc-400">
+                      {(row.mean_engagement * 100).toFixed(2)}% ·{" "}
+                      {row.total_views.toLocaleString()} views ·{" "}
+                      {row.samples} posts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top pages */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+              <p className="mb-3 text-sm font-semibold text-zinc-300">
+                Winning Pages
+              </p>
+              <div className="space-y-2">
+                {engagement.byPage.slice(0, 6).map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="truncate font-mono text-zinc-200">
+                      {row.key}
+                    </span>
+                    <span className="ml-4 shrink-0 font-mono text-zinc-400">
+                      {(row.mean_engagement * 100).toFixed(2)}% ·{" "}
+                      {row.total_views.toLocaleString()} views ·{" "}
+                      {row.samples} posts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top posts */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 lg:col-span-2">
+              <p className="mb-3 text-sm font-semibold text-zinc-300">
+                Top 10 Posts by Engagement
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-800 text-zinc-500">
+                      <th className="px-2 py-2 font-medium">Title</th>
+                      <th className="px-2 py-2 font-medium">Page</th>
+                      <th className="px-2 py-2 font-medium">Tier</th>
+                      <th className="px-2 py-2 text-right font-medium">
+                        Views
+                      </th>
+                      <th className="px-2 py-2 text-right font-medium">
+                        Likes
+                      </th>
+                      <th className="px-2 py-2 text-right font-medium">
+                        ER
+                      </th>
+                      <th className="px-2 py-2 font-medium">Posted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {engagement.posts.slice(0, 10).map((post) => (
+                      <tr
+                        key={post.id}
+                        className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
+                      >
+                        <td className="max-w-xs truncate px-2 py-2 text-zinc-200">
+                          {post.topic_title}
+                        </td>
+                        <td className="px-2 py-2 font-mono text-xs text-zinc-400">
+                          {post.page_id}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              post.performance_tier === "top"
+                                ? "bg-green-500/20 text-green-400"
+                                : post.performance_tier === "low"
+                                  ? "bg-red-500/20 text-red-400"
+                                  : "bg-zinc-500/20 text-zinc-400"
+                            }`}
+                          >
+                            {post.performance_tier}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-zinc-300">
+                          {post.views.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-zinc-300">
+                          {post.likes.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-zinc-300">
+                          {(post.engagement_rate * 100).toFixed(2)}%
+                        </td>
+                        <td className="px-2 py-2 text-xs text-zinc-500">
+                          {formatDate(post.posted_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Trending Topics Feed */}

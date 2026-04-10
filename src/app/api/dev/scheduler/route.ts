@@ -1,10 +1,11 @@
 // POST /api/dev/scheduler -- Automated dev content pipeline
-// Query params: ?action=fetch_trends|generate|produce|poll|post|pull_metrics|analyze|full
+// Query params: ?action=fetch_trends|generate|produce|poll|post|pull_metrics|analyze|reconcile|full
 // Auth: CRON_SECRET
 //
-// Pipeline: fetch_trends -> generate -> produce -> poll -> post -> pull_metrics -> analyze
+// Pipeline: reconcile -> pull_metrics -> analyze -> fetch_trends -> generate -> produce -> poll -> post
 //
 // Actions:
+// - reconcile    : Detect + recover stuck productions (no scenes / no progress)
 // - fetch_trends : Aggregate trending topics from all news sources
 // - generate     : Smart niche-scored topic assignment with adaptive learning weights
 // - produce      : Trigger Brain Studio video production for pending queue items
@@ -873,6 +874,60 @@ async function handleAnalyze(): Promise<{
 }
 
 // ──────────────────────────────────────────────────────────
+// Step 0: RECONCILE — unstick productions stalled by silent failures
+// ──────────────────────────────────────────────────────────
+
+async function handleReconcile(): Promise<{
+  actions_taken: number;
+  stuck_items_checked: number;
+  orphan_assemblies: number;
+}> {
+  console.log("[DEV SCHEDULER] Reconciling stuck productions...");
+
+  const appUrl = getAppUrl();
+  const cronSecret = getCronSecret();
+
+  try {
+    const res = await fetch(`${appUrl}/api/dev/reconcile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": cronSecret,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        `[DEV SCHEDULER] Reconcile endpoint returned ${res.status}: ${text}`,
+      );
+      return { actions_taken: 0, stuck_items_checked: 0, orphan_assemblies: 0 };
+    }
+
+    const data = await res.json();
+    if ((data.actions_taken || 0) > 0) {
+      console.warn(
+        `[DEV SCHEDULER] Reconciler recovered ${data.actions_taken} stuck item(s):`,
+        JSON.stringify(data.actions || []),
+      );
+    } else {
+      console.log(
+        `[DEV SCHEDULER] Reconcile clean — no stuck items (checked ${data.stuck_items_checked || 0})`,
+      );
+    }
+    return {
+      actions_taken: data.actions_taken || 0,
+      stuck_items_checked: data.stuck_items_checked || 0,
+      orphan_assemblies: data.orphan_assemblies || 0,
+    };
+  } catch (err) {
+    console.error("[DEV SCHEDULER] Reconcile call failed:", err);
+    return { actions_taken: 0, stuck_items_checked: 0, orphan_assemblies: 0 };
+  }
+}
+
+// ──────────────────────────────────────────────────────────
 // MAIN HANDLER
 // ──────────────────────────────────────────────────────────
 
@@ -958,50 +1013,68 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // ---- Reconcile (unstick stuck productions) ----
+      case "reconcile": {
+        const result = await handleReconcile();
+        return NextResponse.json({
+          action: "reconcile",
+          success: true,
+          ...result,
+        });
+      }
+
       // ---- Full Pipeline ----
       case "full": {
         console.log("[DEV SCHEDULER] Running FULL learn-and-adapt pipeline...");
         const stepResults: Record<string, unknown> = {};
 
-        // Step 0: Pull metrics from previously-posted videos (learn)
+        // Step 0: Reconcile — recover anything stuck from the previous cycle
+        //          BEFORE we try to produce new content.
+        const reconciled = await handleReconcile();
+        stepResults.reconcile = reconciled;
+        console.log(
+          `[DEV SCHEDULER] Full pipeline [1/8]: reconciler recovered ${reconciled.actions_taken} stuck item(s)`,
+        );
+
+        // Step 1: Pull metrics from previously-posted videos (learn)
         //          — must run BEFORE generate so adaptive weights are fresh.
         const pulled = await handlePullMetrics();
         stepResults.pull_metrics = pulled;
         console.log(
-          `[DEV SCHEDULER] Full pipeline [1/7]: metrics pulled for ${pulled.pulled}/${pulled.items} items`,
+          `[DEV SCHEDULER] Full pipeline [2/8]: metrics pulled for ${pulled.pulled}/${pulled.items} items`,
         );
 
-        // Step 0b: Analyze performance, write back tiers, compute boosts
+        // Step 2: Analyze performance, write back tiers, compute boosts
         const analyzed = await handleAnalyze();
         stepResults.analyze = analyzed;
         console.log(
-          `[DEV SCHEDULER] Full pipeline [2/7]: analyzed ${analyzed.analyzed} items`,
+          `[DEV SCHEDULER] Full pipeline [3/8]: analyzed ${analyzed.analyzed} items`,
         );
 
-        // Step 1: Fetch trends
+        // Step 3: Fetch trends
         const trends = await handleFetchTrends();
         stepResults.fetch_trends = { count: trends.count };
-        console.log(`[DEV SCHEDULER] Full pipeline [3/7]: ${trends.count} trends fetched`);
+        console.log(`[DEV SCHEDULER] Full pipeline [4/8]: ${trends.count} trends fetched`);
 
-        // Step 2: Smart content rotation (now uses learned boosts)
+        // Step 4: Smart content rotation (now uses learned boosts)
         const generated = await handleGenerate();
         stepResults.generate = { queued: generated.queued, entries: generated.entries };
-        console.log(`[DEV SCHEDULER] Full pipeline [4/7]: ${generated.queued} items queued`);
+        console.log(`[DEV SCHEDULER] Full pipeline [5/8]: ${generated.queued} items queued`);
 
-        // Step 3: Trigger Brain Studio production
+        // Step 5: Trigger Brain Studio production
         const produced = await handleProduce();
         stepResults.produce = produced;
-        console.log(`[DEV SCHEDULER] Full pipeline [5/7]: ${produced.triggered} production(s) triggered`);
+        console.log(`[DEV SCHEDULER] Full pipeline [6/8]: ${produced.triggered} production(s) triggered`);
 
-        // Step 4: Poll assembly for any in-progress work from previous cycles
+        // Step 6: Poll assembly for any in-progress work from previous cycles
         const polled = await handlePollAssembly();
         stepResults.poll = polled;
-        console.log(`[DEV SCHEDULER] Full pipeline [6/7]: ${polled.polled} production(s) polled`);
+        console.log(`[DEV SCHEDULER] Full pipeline [7/8]: ${polled.polled} production(s) polled`);
 
-        // Step 5: Post any ready videos from previous cycles
+        // Step 7: Post any ready videos from previous cycles
         const posted = await handlePost();
         stepResults.post = posted;
-        console.log(`[DEV SCHEDULER] Full pipeline [7/7]: ${posted.posted} video(s) posted`);
+        console.log(`[DEV SCHEDULER] Full pipeline [8/8]: ${posted.posted} video(s) posted`);
 
         console.log("[DEV SCHEDULER] Full learn-and-adapt pipeline complete.");
 
@@ -1009,7 +1082,7 @@ export async function POST(req: NextRequest) {
           action: "full",
           success: true,
           pipeline:
-            "pull_metrics -> analyze -> fetch -> generate -> produce -> poll -> post",
+            "reconcile -> pull_metrics -> analyze -> fetch -> generate -> produce -> poll -> post",
           steps: stepResults,
         });
       }
@@ -1017,7 +1090,7 @@ export async function POST(req: NextRequest) {
       default:
         return NextResponse.json(
           {
-            error: `Invalid action: ${action}. Use: fetch_trends, generate, produce, poll, post, pull_metrics, analyze, or full`,
+            error: `Invalid action: ${action}. Use: fetch_trends, generate, produce, poll, post, pull_metrics, analyze, reconcile, or full`,
           },
           { status: 400 },
         );

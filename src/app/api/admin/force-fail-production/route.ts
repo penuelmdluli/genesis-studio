@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   const { data: assembling, error } = await supabase
     .from("productions")
-    .select("id, user_id, total_credits, status, progress, updated_at, assembly_state")
+    .select("id, user_id, total_credits, status, progress, started_at, assembly_state")
     .eq("status", "assembling")
     .order("created_at", { ascending: true })
     .limit(200);
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     .map((p) => {
       const state = p.assembly_state as Record<string, unknown> | null;
       const phase = (state?.phase as string | undefined) || null;
-      const updatedMs = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+      const updatedMs = p.started_at ? new Date(p.started_at).getTime() : 0;
       const ageMinutes = Math.round((Date.now() - updatedMs) / 60000);
       const reasons: string[] = [];
       if (!state) reasons.push("no assembly_state");
@@ -121,14 +121,14 @@ export async function POST(req: NextRequest) {
     const staleCutoff = Date.now() - staleMinutes * 60 * 1000;
     const { data } = await supabaseDisc
       .from("productions")
-      .select("id, assembly_state, updated_at")
+      .select("id, assembly_state, started_at")
       .eq("status", "assembling")
       .limit(200);
     const auto = (data || [])
       .filter((p) => {
         const state = p.assembly_state as Record<string, unknown> | null;
         const phase = state?.phase as string | undefined;
-        const updatedMs = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+        const updatedMs = p.started_at ? new Date(p.started_at).getTime() : 0;
         return !state || !phase || (updatedMs > 0 && updatedMs < staleCutoff);
       })
       .map((p) => p.id as string);

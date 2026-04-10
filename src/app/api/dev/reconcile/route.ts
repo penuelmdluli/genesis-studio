@@ -23,6 +23,56 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { refundCredits } from "@/lib/credits";
+
+/**
+ * Fails a production AND refunds credits to the user (idempotent).
+ * Never throws — logs errors so reconciler can continue.
+ */
+async function failAndRefund(
+  productionId: string,
+  reason: string
+): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  try {
+    const { data: prod } = await supabase
+      .from("productions")
+      .select("id, user_id, total_credits, status")
+      .eq("id", productionId)
+      .maybeSingle();
+
+    if (!prod) return;
+    // Already failed — skip to avoid double-refund
+    if (prod.status === "failed" || prod.status === "completed") return;
+
+    await supabase
+      .from("productions")
+      .update({
+        status: "failed",
+        error_message: `[reconciler] ${reason}`,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", productionId)
+      .neq("status", "failed"); // Extra guard
+
+    const credits = Number(prod.total_credits || 0);
+    if (credits > 0 && prod.user_id) {
+      try {
+        await refundCredits(
+          prod.user_id as string,
+          credits,
+          productionId,
+          `Reconciler auto-refund: ${reason.slice(0, 120)}`
+        );
+        console.log(`[RECONCILE] Refunded ${credits} credits to ${prod.user_id} for ${productionId}`);
+      } catch (refundErr) {
+        console.error(`[RECONCILE] Refund failed for ${productionId}:`, refundErr);
+      }
+    }
+  } catch (err) {
+    console.error(`[RECONCILE] failAndRefund error for ${productionId}:`, err);
+  }
+}
 
 export const maxDuration = 120;
 
@@ -131,15 +181,9 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // If we decided to give up, also mark the production as failed
+          // If we decided to give up, also mark the production as failed + refund credits
           if (shouldReset && !dryRun) {
-            await supabase
-              .from("productions")
-              .update({
-                status: "failed",
-                error_message: `[reconciler] ${reason}`,
-              })
-              .eq("id", productionId);
+            await failAndRefund(productionId, reason);
           }
         }
       }
@@ -200,13 +244,10 @@ export async function POST(req: NextRequest) {
     for (const prod of assemblingProductions || []) {
       orphanAssemblyIds.push(prod.id as string);
       if (!dryRun) {
-        await supabase
-          .from("productions")
-          .update({
-            status: "failed",
-            error_message: `[reconciler] assembly stalled > ${STALE_MINUTES}m`,
-          })
-          .eq("id", prod.id);
+        await failAndRefund(
+          prod.id as string,
+          `assembly stalled > ${STALE_MINUTES}m`
+        );
       }
     }
 

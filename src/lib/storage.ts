@@ -158,16 +158,51 @@ export async function persistExternalVideo(
   externalUrl: string,
   storageKey: string
 ): Promise<string> {
-  const res = await fetch(externalUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to download video: ${res.status} ${res.statusText}`);
+  // Retry logic: FAL/RunPod URLs can be transiently flaky. We retry on
+  // network errors and 5xx responses, but fail fast on 403/404/410 which
+  // indicate a truly expired URL.
+  const MAX_ATTEMPTS = 3;
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s hard timeout
+      const res = await fetch(externalUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        // Fast-fail on expiry codes — retry won't help
+        if (res.status === 403 || res.status === 404 || res.status === 410) {
+          throw new Error(
+            `External video URL expired (${res.status} ${res.statusText}): ${externalUrl.slice(0, 80)}`
+          );
+        }
+        throw new Error(`Failed to download video: ${res.status} ${res.statusText}`);
+      }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length < 5000) {
+        throw new Error(`Downloaded video too small: ${buffer.length} bytes`);
+      }
+      await uploadVideo(storageKey, buffer);
+      if (attempt > 1) {
+        console.log(
+          `[STORAGE] persistExternalVideo succeeded on attempt ${attempt}: ${storageKey}`
+        );
+      }
+      return storageKey;
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      // Don't retry expiry errors
+      if (lastErr.message.includes("expired")) throw lastErr;
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
+        console.warn(
+          `[STORAGE] persistExternalVideo attempt ${attempt} failed: ${lastErr.message} — retrying in ${delay}ms`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
   }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.length < 5000) {
-    throw new Error(`Downloaded video too small: ${buffer.length} bytes`);
-  }
-  await uploadVideo(storageKey, buffer);
-  return storageKey;
+  throw lastErr || new Error("persistExternalVideo failed after retries");
 }
 
 export function exploreVideoStorageKey(exploreId: string): string {

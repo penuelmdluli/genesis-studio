@@ -28,11 +28,46 @@ import {
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
+import { refundCredits } from "@/lib/credits";
 import { extractThumbnailFromUrl, extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { AI_MODELS } from "@/lib/constants";
 import { ModelId, SoundDesign, AspectRatio, AssemblyState, Production } from "@/types";
 import { randomUUID } from "crypto";
 import { fal } from "@fal-ai/client";
+
+/**
+ * Centralized failure handler — marks production failed AND refunds credits.
+ * Every assembly failure MUST go through this to prevent credit leaks.
+ */
+async function failAssembly(
+  productionId: string,
+  errorMsg: string
+): Promise<void> {
+  try {
+    const prod = await getProduction(productionId);
+    await updateProduction(productionId, {
+      status: "failed",
+      error_message: errorMsg,
+      completed_at: new Date().toISOString(),
+    });
+    // Refund credits on assembly failure (idempotent: only if not already refunded)
+    if (prod && prod.totalCredits > 0 && prod.userId) {
+      try {
+        await refundCredits(
+          prod.userId,
+          prod.totalCredits,
+          productionId,
+          `Brain Studio assembly failed — automatic refund: ${errorMsg.slice(0, 120)}`
+        );
+        console.log(`[ASSEMBLY] Refunded ${prod.totalCredits} credits to ${prod.userId} for ${productionId}`);
+      } catch (refundErr) {
+        console.error(`[ASSEMBLY] Refund FAILED for ${productionId}:`, refundErr);
+      }
+    }
+  } catch (err) {
+    console.error(`[ASSEMBLY] failAssembly error for ${productionId}:`, err);
+  }
+}
 
 // ---- PHASE 1: START ASSEMBLY (called once) ----
 
@@ -50,11 +85,7 @@ export async function startAssembly(
       .sort((a, b) => a.sceneNumber - b.sceneNumber);
 
     if (completedScenes.length === 0) {
-      await updateProduction(productionId, {
-        status: "failed",
-        error_message: "No scene videos available for assembly",
-        completed_at: new Date().toISOString(),
-      });
+      await failAssembly(productionId, "No scene videos available for assembly");
       return;
     }
 
@@ -245,11 +276,10 @@ export async function startAssembly(
     console.log(`[ASSEMBLY] startAssembly complete for ${productionId} — phase: ${state.phase}`);
   } catch (err) {
     console.error(`[ASSEMBLY] startAssembly error for ${productionId}:`, err);
-    await updateProduction(productionId, {
-      status: "failed",
-      error_message: `Assembly start failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-      completed_at: new Date().toISOString(),
-    });
+    await failAssembly(
+      productionId,
+      `Assembly start failed: ${err instanceof Error ? err.message : "Unknown error"}`
+    );
   }
 }
 
@@ -340,11 +370,10 @@ export async function pollAssembly(productionId: string): Promise<void> {
     if (pollErrors >= 5) {
       const errMsg = err instanceof Error ? err.message : "Unknown assembly error";
       console.error(`[ASSEMBLY POLL] 5 consecutive errors — failing production ${productionId}: ${errMsg}`);
-      await updateProduction(productionId, {
-        status: "failed",
-        error_message: `Assembly failed after 5 poll errors: ${errMsg}`,
-        completed_at: new Date().toISOString(),
-      });
+      await failAssembly(
+        productionId,
+        `Assembly failed after 5 poll errors: ${errMsg}`
+      );
     } else {
       // Save error count for next poll
       await supabase
@@ -749,11 +778,7 @@ async function pollConcatPhase(
     const validUrls = state.processedSceneUrls.filter(u => u && u.length > 0);
     if (validUrls.length === 0) {
       // No valid scene URLs — fail
-      await updateProduction(productionId, {
-        status: "failed",
-        error_message: "No valid scene URLs for concatenation",
-        completed_at: new Date().toISOString(),
-      });
+      await failAssembly(productionId, "No valid scene URLs for concatenation");
       return false;
     }
 
@@ -1631,11 +1656,7 @@ async function finalizeAssembly(
   const sourceUrl = state.burnCaptionsJob?.videoUrl || state.trimFinalJob?.videoUrl || state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl || state.processedSceneUrls[0];
 
   if (!sourceUrl) {
-    await updateProduction(productionId, {
-      status: "failed",
-      error_message: "Assembly produced no output video",
-      completed_at: new Date().toISOString(),
-    });
+    await failAssembly(productionId, "Assembly produced no output video");
     return;
   }
 

@@ -701,10 +701,63 @@ export async function getFalQueueResult(
 }
 
 /**
+ * Trim a media file (audio or video) to an exact duration using FAL compose.
+ * This is synchronous (awaits completion) and is used to pre-trim audio
+ * sources BEFORE the final compose call — preventing FAL's compose API
+ * from extending the final output to match the longest audio source.
+ *
+ * Fixes the "duration bloat" and "black video tail" bugs where a 60s music
+ * track would extend a 20s video's output to 60s with 40s of black padding.
+ */
+export async function trimMediaToDuration(
+  mediaUrl: string,
+  durationMs: number
+): Promise<string> {
+  if (!mediaUrl || !durationMs || durationMs <= 0) return mediaUrl;
+  try {
+    // Use compose with a single video-type track — FAL treats audio files as
+    // media and produces an output of exactly the keyframe duration.
+    const result = await fal.subscribe("fal-ai/ffmpeg-api/compose", {
+      input: {
+        tracks: [
+          {
+            id: "trim-media",
+            type: "video",
+            keyframes: [{ timestamp: 0, duration: durationMs, url: mediaUrl }],
+          },
+        ],
+      },
+      logs: false,
+    });
+    const data = result.data as Record<string, unknown>;
+    const trimmed =
+      (data?.video_url as string) ||
+      (data?.video as { url?: string })?.url ||
+      "";
+    if (trimmed) {
+      console.log(
+        `[AUDIO] Pre-trimmed media to ${(durationMs / 1000).toFixed(1)}s: ${trimmed.slice(0, 60)}...`
+      );
+      return trimmed;
+    }
+    return mediaUrl;
+  } catch (err) {
+    console.warn("[AUDIO] trimMediaToDuration failed, using original:", err);
+    return mediaUrl;
+  }
+}
+
+/**
  * Submit a compose job that layers video + voiceover + music into a single output.
  * Uses fal-ai/ffmpeg-api/compose with multiple tracks.
  * This replaces the broken amix approach — compose natively supports
  * layering multiple audio tracks on top of a video.
+ *
+ * CRITICAL: FAL's compose API extends the output timeline to match the
+ * LONGEST source track. If a 60s music file is passed for a 20s video,
+ * the output becomes 60s with 40s of black video padding. To prevent this,
+ * we pre-trim any audio source that exceeds the target duration via
+ * trimMediaToDuration() before building the compose tracks.
  *
  * @param videoUrl - Concatenated scene video
  * @param voiceoverUrl - Voiceover audio (full volume)
@@ -725,6 +778,34 @@ export async function submitComposeVideoJob(
   },
   soundBedUrl?: string // Pre-mixed + loudnormed sound design audio (already at -35 LUFS)
 ): Promise<{ requestId: string }> {
+  // ── BUG FIX: Pre-trim oversized audio sources to prevent output bloat ──
+  // FAL compose extends output to longest track, so we must ensure no audio
+  // track exceeds durationMs. Music and sound bed are the common culprits.
+  if (musicUrl && musicDurationMs && musicDurationMs > durationMs + 500) {
+    console.log(
+      `[AUDIO] Music is ${(musicDurationMs / 1000).toFixed(1)}s but video is only ${(durationMs / 1000).toFixed(1)}s — pre-trimming to prevent bloat`
+    );
+    const trimmedMusic = await trimMediaToDuration(musicUrl, durationMs);
+    if (trimmedMusic && trimmedMusic !== musicUrl) {
+      musicUrl = trimmedMusic;
+      musicDurationMs = durationMs; // Force the downstream loop logic to treat it as exact-fit
+    }
+  }
+  if (soundBedUrl) {
+    // Sound bed should always fit — if we can measure it and it's too long, trim
+    try {
+      const bedDur = await getMediaDuration(soundBedUrl);
+      if (bedDur * 1000 > durationMs + 500) {
+        console.log(
+          `[AUDIO] Sound bed is ${bedDur.toFixed(1)}s — pre-trimming to ${(durationMs / 1000).toFixed(1)}s`
+        );
+        const trimmedBed = await trimMediaToDuration(soundBedUrl, durationMs);
+        if (trimmedBed) soundBedUrl = trimmedBed;
+      }
+    } catch {
+      // If we can't measure, proceed as-is
+    }
+  }
   const tracks: Array<{ id: string; type: string; keyframes: Array<{ timestamp: number; duration: number; url: string }> }> = [
     {
       id: "video-main",

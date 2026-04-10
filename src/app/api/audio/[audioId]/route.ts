@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  GetObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 
@@ -15,8 +20,16 @@ const R2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
+const PRESIGN_TTL_SECONDS = 60 * 60;
+
+/**
+ * GET /api/audio/{audioId}
+ * 302-redirects to a presigned R2 URL for the user's audio file.
+ * Bytes flow R2 → browser directly (zero fastOriginTransfer).
+ * Range requests are handled natively by R2 on the redirected URL.
+ */
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ audioId: string }> }
 ) {
   try {
@@ -32,73 +45,43 @@ export async function GET(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Look for audio file in R2
     const key = `audio/${user.id}/${audioId}.mp3`;
 
+    // Verify the file exists
     try {
-      const head = await R2.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
-      const totalSize = head.ContentLength ?? 0;
-
-      if (totalSize === 0) {
-        return NextResponse.json({ error: "Audio file not found" }, { status: 404 });
+      const head = await R2.send(
+        new HeadObjectCommand({ Bucket: BUCKET, Key: key })
+      );
+      if ((head.ContentLength ?? 0) === 0) {
+        return NextResponse.json(
+          { error: "Audio file not found" },
+          { status: 404 }
+        );
       }
-
-      // Support range requests for audio streaming
-      const rangeHeader = req.headers.get("range");
-      if (rangeHeader) {
-        const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-        if (match) {
-          const start = parseInt(match[1], 10);
-          const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
-          const contentLength = end - start + 1;
-
-          const response = await R2.send(
-            new GetObjectCommand({
-              Bucket: BUCKET,
-              Key: key,
-              Range: `bytes=${start}-${end}`,
-            })
-          );
-
-          if (!response.Body) {
-            return NextResponse.json({ error: "Audio not found" }, { status: 404 });
-          }
-
-          const byteArray = await response.Body.transformToByteArray();
-          return new NextResponse(Buffer.from(byteArray), {
-            status: 206,
-            headers: {
-              "Content-Type": "audio/mpeg",
-              "Content-Length": contentLength.toString(),
-              "Content-Range": `bytes ${start}-${end}/${totalSize}`,
-              "Accept-Ranges": "bytes",
-              "Cache-Control": "public, max-age=86400",
-            },
-          });
-        }
-      }
-
-      // Full file
-      const response = await R2.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
-      if (!response.Body) {
-        return NextResponse.json({ error: "Audio not found" }, { status: 404 });
-      }
-
-      const byteArray = await response.Body.transformToByteArray();
-      return new NextResponse(Buffer.from(byteArray), {
-        headers: {
-          "Content-Type": "audio/mpeg",
-          "Content-Length": totalSize.toString(),
-          "Accept-Ranges": "bytes",
-          "Cache-Control": "public, max-age=86400",
-          "Content-Disposition": `inline; filename="voiceover-${audioId}.mp3"`,
-        },
-      });
     } catch {
-      return NextResponse.json({ error: "Audio file not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Audio file not found" },
+        { status: 404 }
+      );
     }
+
+    const signedUrl = await getSignedUrl(
+      R2,
+      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+      { expiresIn: PRESIGN_TTL_SECONDS }
+    );
+
+    return NextResponse.redirect(signedUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": `private, max-age=${PRESIGN_TTL_SECONDS - 60}`,
+      },
+    });
   } catch (error) {
     console.error("Audio stream error:", error);
-    return NextResponse.json({ error: "Failed to stream audio" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to stream audio" },
+      { status: 500 }
+    );
   }
 }

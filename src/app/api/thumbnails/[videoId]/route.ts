@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  GetObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 const R2 = new S3Client({
@@ -14,13 +19,15 @@ const R2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
+// Thumbnails are public images; max-out the AWS sigv4 TTL (7 days).
+const PRESIGN_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 /**
  * GET /api/thumbnails/{videoId}
- * Serves video thumbnail images from R2.
- * Public endpoint, heavily cached (1 week).
+ * 302-redirects to a presigned R2 URL for the thumbnail.
+ * Bytes flow R2 → browser directly (zero fastOriginTransfer).
  *
  * R2 key format: thumbnails/{userId}/{videoId}.jpg
- * We look up userId from the videos table.
  */
 export async function GET(
   _req: NextRequest,
@@ -29,7 +36,6 @@ export async function GET(
   try {
     const { videoId } = await params;
 
-    // Look up video to get userId for the R2 key
     const supabase = createSupabaseAdmin();
     const { data: video } = await supabase
       .from("videos")
@@ -43,27 +49,30 @@ export async function GET(
 
     const key = `thumbnails/${video.user_id}/${videoId}.jpg`;
 
+    // Verify file exists
     try {
-      const response = await R2.send(
-        new GetObjectCommand({ Bucket: BUCKET, Key: key })
+      const head = await R2.send(
+        new HeadObjectCommand({ Bucket: BUCKET, Key: key })
       );
-
-      if (!response.Body) {
+      if ((head.ContentLength ?? 0) === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-
-      const byteArray = await response.Body.transformToByteArray();
-
-      return new NextResponse(Buffer.from(byteArray), {
-        headers: {
-          "Content-Type": response.ContentType || "image/jpeg",
-          "Content-Length": byteArray.length.toString(),
-          "Cache-Control": "public, max-age=604800, immutable",
-        },
-      });
     } catch {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    const signedUrl = await getSignedUrl(
+      R2,
+      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+      { expiresIn: PRESIGN_TTL_SECONDS }
+    );
+
+    return NextResponse.redirect(signedUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": "public, max-age=518400, immutable",
+      },
+    });
   } catch (error) {
     console.error("[THUMBNAILS] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

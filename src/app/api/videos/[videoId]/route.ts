@@ -5,6 +5,7 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { getUserByClerkId, deleteVideo } from "@/lib/db";
@@ -21,10 +22,14 @@ const R2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
-async function findVideoInR2(
+// Presigned URL TTL — 1 hour is plenty for a video session and short enough
+// that links don't leak permanently. Browsers will re-fetch on expiry.
+const PRESIGN_TTL_SECONDS = 60 * 60;
+
+async function findVideoKeyInR2(
   userId: string,
   jobId: string
-): Promise<{ key: string; size: number; contentType: string } | null> {
+): Promise<string | null> {
   // Try possible key formats in order of likelihood
   const candidates = [
     `videos/${userId}/${jobId}.mp4`,
@@ -38,95 +43,14 @@ async function findVideoInR2(
       const head = await R2.send(
         new HeadObjectCommand({ Bucket: BUCKET, Key: key })
       );
-      const size = head.ContentLength ?? 0;
-      if (size > 0) {
-        return {
-          key,
-          size,
-          contentType: head.ContentType || "video/mp4",
-        };
+      if ((head.ContentLength ?? 0) > 0) {
+        return key;
       }
     } catch {
       // Key doesn't exist, try next
     }
   }
   return null;
-}
-
-async function streamFromR2(
-  req: NextRequest,
-  key: string,
-  totalSize: number,
-  contentType: string
-): Promise<NextResponse> {
-  const rangeHeader = req.headers.get("range");
-
-  if (rangeHeader) {
-    const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-    if (!match) {
-      return new NextResponse("Invalid Range header", { status: 416 });
-    }
-
-    const start = parseInt(match[1], 10);
-    const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
-
-    if (start >= totalSize || end >= totalSize || start > end) {
-      return new NextResponse("Range Not Satisfiable", {
-        status: 416,
-        headers: { "Content-Range": `bytes */${totalSize}` },
-      });
-    }
-
-    const contentLength = end - start + 1;
-    const command = new GetObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Range: `bytes=${start}-${end}`,
-    });
-    const response = await R2.send(command);
-
-    if (!response.Body) {
-      return NextResponse.json(
-        { error: "Video file not found in storage" },
-        { status: 404 }
-      );
-    }
-
-    const byteArray = await response.Body.transformToByteArray();
-    return new NextResponse(Buffer.from(byteArray), {
-      status: 206,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": contentLength.toString(),
-        "Content-Range": `bytes ${start}-${end}/${totalSize}`,
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "public, max-age=86400",
-        "Content-Disposition": "inline",
-      },
-    });
-  }
-
-  // No Range header — return full file
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-  const response = await R2.send(command);
-
-  if (!response.Body) {
-    return NextResponse.json(
-      { error: "Video file not found in storage" },
-      { status: 404 }
-    );
-  }
-
-  const byteArray = await response.Body.transformToByteArray();
-  return new NextResponse(Buffer.from(byteArray), {
-    headers: {
-      "Content-Type": contentType,
-      "Content-Length": totalSize.toString(),
-      "Accept-Ranges": "bytes",
-      "Cache-Control": "public, max-age=86400",
-      "Content-Disposition": "inline",
-    },
-  });
 }
 
 export async function GET(
@@ -148,7 +72,9 @@ export async function GET(
     }
 
     // Auth check: allow if video is public, has valid cron secret, or require owner
-    const cronSecret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
+    const cronSecret =
+      req.headers.get("x-cron-secret") ||
+      req.headers.get("authorization")?.replace("Bearer ", "");
     const hasCronAccess = cronSecret === process.env.CRON_SECRET;
 
     if (!video.is_public && !hasCronAccess) {
@@ -165,15 +91,32 @@ export async function GET(
     // Find the video file in R2 (tries multiple key formats)
     // For Brain Studio videos, job_id is null — use videoId as R2 key instead
     const r2LookupId = video.job_id || videoId;
-    const found = await findVideoInR2(video.user_id, r2LookupId);
-    if (!found) {
+    const key = await findVideoKeyInR2(video.user_id, r2LookupId);
+    if (!key) {
       return NextResponse.json(
         { error: "Video file not found in storage" },
         { status: 404 }
       );
     }
 
-    return streamFromR2(req, found.key, found.size, found.contentType);
+    // Issue a presigned URL and 302-redirect.
+    // The browser then fetches bytes DIRECTLY from R2 — they never pass
+    // through this Vercel function, so fastOriginTransfer stays at zero.
+    // Range requests are handled natively by R2 on the redirected URL.
+    const signedUrl = await getSignedUrl(
+      R2,
+      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+      { expiresIn: PRESIGN_TTL_SECONDS }
+    );
+
+    return NextResponse.redirect(signedUrl, {
+      status: 302,
+      headers: {
+        // Tell browsers/CDNs not to cache the redirect itself for too long —
+        // the URL inside expires after PRESIGN_TTL_SECONDS.
+        "Cache-Control": `private, max-age=${PRESIGN_TTL_SECONDS - 60}`,
+      },
+    });
   } catch (error) {
     console.error("Video stream error:", error);
     return NextResponse.json(

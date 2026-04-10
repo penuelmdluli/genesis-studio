@@ -3,7 +3,7 @@ import { requireStudioOwner } from "@/lib/studio/auth";
 import { updateStudioPost } from "@/lib/studio/db";
 import { createSupabaseAdmin } from "@/lib/supabase";
 
-const PINNED_COMMENT_TEXT = "Made with Genesis Studio \u26A1\u{1F525}";
+const PINNED_COMMENT_TEXT = "Follow for more \u26A1\u{1F525}";
 const VIEW_THRESHOLD = 50;
 
 /**

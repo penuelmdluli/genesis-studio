@@ -56,7 +56,7 @@ export function selectEngine(
   // PRIORITY: Use RunPod models (user has credits there)
 
   // HERO content - best RunPod model
-  if (pillar === "genesis_demo" || contentType === "hero") {
+  if (contentType === "hero") {
     return {
       modelId: "wan-2.2" as ModelId,
       provider: "runpod-hub",

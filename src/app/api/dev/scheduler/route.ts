@@ -184,8 +184,6 @@ function buildVideoPrompt(
       "World map with highlighted regions, military and diplomatic imagery, dramatic documentary style, cinematic tension.",
     african_folklore:
       "African folklore animation, traditional art style, mystical atmosphere, rich earth tones.",
-    genesis_demo:
-      "AI-generated cinematic footage, sleek technology showcase, professional quality, 4K detail.",
     ai_news:
       "Tech news visualization, AI and robots, digital neural networks, blue and white futuristic color scheme.",
     tech:
@@ -745,7 +743,7 @@ async function handlePost(): Promise<{
 
     // Build caption with page hashtags
     const hashtagStr = (page.hashtags || []).join(" ");
-    const caption = `${topicTitle}\n\n${hashtagStr}\n\n#Trending #Viral #MadeWithAI`;
+    const caption = `${topicTitle}\n\n${hashtagStr}\n\n#Trending #Viral #ForYou`;
 
     // Queue Facebook post
     if (page.facebook_page_key) {

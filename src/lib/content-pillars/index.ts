@@ -3,7 +3,6 @@ export { generateAfrofuturismPrompt, type AfrofuturismInput } from "./afrofuturi
 export { generateMBSPrompt, type MBSCharacter, type MBSInput } from "./mbs-episode";
 export { generateNewsAnimatedPrompt, type NewsAnimatedInput } from "./news-animated";
 export { generateFolklorePrompt, type FolkloreInput } from "./african-folklore";
-export { generateDemoPrompt, type GenesisDemoInput } from "./genesis-demo";
 
 export interface PillarOutput {
   video_prompt: string;

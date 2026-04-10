@@ -619,24 +619,59 @@ async function handlePost(): Promise<{
   const cronSecret = getCronSecret();
 
   // Find queue items that are "ready" (production completed) and not yet posted
-  const { data: readyItems, error } = await supabase
+  const { data: allReady, error } = await supabase
     .from("dev_content_queue")
     .select("*")
     .eq("status", "ready")
-    .order("created_at", { ascending: true })
-    .limit(20);
+    .order("generated_at", { ascending: false, nullsFirst: false })
+    .limit(200);
 
   if (error) {
     console.error("[DEV SCHEDULER] Failed to fetch ready items:", error.message);
     throw new Error(`Failed to fetch ready items: ${error.message}`);
   }
 
-  if (!readyItems || readyItems.length === 0) {
+  if (!allReady || allReady.length === 0) {
     console.log("[DEV SCHEDULER] No completed videos ready for posting");
     return { posted: 0, results: [] };
   }
 
-  console.log(`[DEV SCHEDULER] Found ${readyItems.length} ready item(s) to post`);
+  // Round-robin best-per-page selection: from all ready items, pick the
+  // single highest-scored / freshest one per page so every page gets ONE
+  // post this cycle (and the strongest topic per page is the one that
+  // actually goes out).
+  const bestPerPage = new Map<string, (typeof allReady)[number]>();
+  for (const row of allReady) {
+    const score = Number(
+      ((row.input_data as Record<string, unknown> | null) || {}).niche_score || 0,
+    );
+    const current = bestPerPage.get(row.page_id);
+    const currentScore = current
+      ? Number(
+          ((current.input_data as Record<string, unknown> | null) || {}).niche_score || 0,
+        )
+      : -1;
+    const currentGen = (current?.generated_at as string) || "";
+    const rowGen = (row.generated_at as string) || "";
+    if (
+      !current ||
+      score > currentScore ||
+      (score === currentScore && rowGen > currentGen)
+    ) {
+      bestPerPage.set(row.page_id, row);
+    }
+  }
+
+  // Highest score first → strongest content goes out before weaker
+  const readyItems = [...bestPerPage.values()].sort((a, b) => {
+    const sa = Number(((a.input_data as Record<string, unknown> | null) || {}).niche_score || 0);
+    const sb = Number(((b.input_data as Record<string, unknown> | null) || {}).niche_score || 0);
+    return sb - sa;
+  });
+
+  console.log(
+    `[DEV SCHEDULER] Posting ${readyItems.length} item(s) (best-per-page from ${allReady.length} total ready)`,
+  );
 
   const pages = getAllDevPages();
   const results: Array<{

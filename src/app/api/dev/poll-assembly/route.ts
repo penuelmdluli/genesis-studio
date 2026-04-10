@@ -17,6 +17,7 @@ import {
   updateProduction,
 } from "@/lib/genesis-brain/orchestrator";
 import { startAssembly, pollAssembly } from "@/lib/genesis-brain/assembly";
+import { resubmitStuckScenes } from "@/lib/genesis-brain/orchestrator";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { ModelId } from "@/types";
 
@@ -68,10 +69,31 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        const scenes = await getProductionScenes(pid);
+        let scenes = await getProductionScenes(pid);
 
         // If generating: check if all scenes are done
         if (production.status === "generating") {
+          // Recovery: resubmit any scenes that were left in 'queued' with no
+          // runpodJobId (Vercel after() died before submission completed).
+          // Without this, the dev pipeline can't self-heal and productions
+          // sit at 0% forever waiting for a webhook that will never come.
+          const stuckQueued = scenes.filter(
+            (s) => s.status === "queued" && !s.runpodJobId,
+          );
+          if (stuckQueued.length > 0) {
+            try {
+              const resubmitted = await resubmitStuckScenes(pid);
+              if (resubmitted > 0) {
+                console.log(
+                  `[DEV POLL] Resubmitted ${resubmitted} stuck scenes for ${pid}`,
+                );
+                scenes = await getProductionScenes(pid);
+              }
+            } catch (resubmitErr) {
+              console.warn(`[DEV POLL] resubmitStuckScenes error for ${pid}:`, resubmitErr);
+            }
+          }
+
           // Poll RunPod for any processing scenes
           for (const scene of scenes) {
             if (scene.status !== "processing" || !scene.runpodJobId) continue;

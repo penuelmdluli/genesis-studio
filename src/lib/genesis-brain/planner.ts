@@ -250,7 +250,7 @@ export async function planProduction(input: BrainInput): Promise<ScenePlan> {
   // final scene's narration and match the tone exactly.
   if (input.voiceover && input.engagementCTA) {
     try {
-      await applyPremiumEngagementCTA(plan, apiKey);
+      await applyPremiumEngagementCTA(plan, apiKey, input.ctaPatternHint);
     } catch (ctaErr) {
       console.warn("[BRAIN PLANNER] Premium CTA generation failed, using rotating fallback:", ctaErr);
       enforceEngagementCTA(plan);
@@ -352,6 +352,10 @@ Your ONLY job: write a single bespoke closing line for a video's narrator that e
 You write in the NARRATOR'S voice as a natural continuation of the emotional beat they just delivered.
 The line must invite the viewer to LIKE, COMMENT, and SHARE (all three actions), but the WORDING is varied and pattern-matched to the content's emotional tone.
 
+OUTPUT FORMAT (strict):
+First line: PATTERN=<one of: authority, intimacy, curiosity, community, fomo, gratitude>
+Second line onward: the raw CTA line itself (no quotes, no markdown, no explanation).
+
 ENGAGEMENT PATTERNS — pick the ONE that fits the content:
 
 1. AUTHORITY
@@ -393,9 +397,15 @@ RULES:
 - Vary phrasing completely between runs — no templates, no repeats
 - NEVER start with "Remember to" or "Make sure to" — those kill engagement
 
-OUTPUT: Return ONLY the CTA line. No JSON. No markdown. No explanation. No quotes around it. Just the raw line the narrator will speak.`;
+OUTPUT (exact format, two parts):
+PATTERN=<lowercase pattern name>
+<the raw CTA line on the next line — no quotes, no markdown, no explanation>`;
 
-async function applyPremiumEngagementCTA(plan: ScenePlan, apiKey: string): Promise<void> {
+async function applyPremiumEngagementCTA(
+  plan: ScenePlan,
+  apiKey: string,
+  patternHint?: BrainInput["ctaPatternHint"],
+): Promise<void> {
   if (!plan.scenes || plan.scenes.length === 0) return;
   const lastScene = plan.scenes[plan.scenes.length - 1];
 
@@ -410,13 +420,19 @@ async function applyPremiumEngagementCTA(plan: ScenePlan, apiKey: string): Promi
     `FINAL SCENE DESCRIPTION: "${lastScene.description || ""}"`,
   ].join("\n");
 
+  const hintLine = patternHint
+    ? `\nLEARNED HINT: Past engagement data suggests the "${patternHint}" pattern performs best on this page. Prefer it IF the content emotionally fits — otherwise pick the best pattern for the content.\n`
+    : "";
+
   const userPrompt = `Write ONE bespoke engagement CTA line to append to the narrator's closing.
 It must flow as a natural continuation of the emotional beat of the final scene.
 Pick the engagement pattern that best fits this content.
-
+${hintLine}
 ${content}
 
-Return ONLY the CTA line (no JSON, no quotes, no explanation).`;
+Return in the exact format:
+PATTERN=<pattern name>
+<the CTA line>`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -437,7 +453,19 @@ Return ONLY the CTA line (no JSON, no quotes, no explanation).`;
     throw new Error(`CTA Claude call failed: ${res.status}`);
   }
   const data = await res.json();
-  let cta = (data.content?.[0]?.text || "").trim();
+  const rawText = (data.content?.[0]?.text || "").trim();
+
+  // Extract PATTERN= line + the actual CTA body
+  let detectedPattern: ScenePlan["ctaPattern"] | undefined;
+  let cta = rawText;
+  const patternMatch = rawText.match(
+    /PATTERN\s*=\s*(authority|intimacy|curiosity|community|fomo|gratitude)/i,
+  );
+  if (patternMatch) {
+    detectedPattern = patternMatch[1].toLowerCase() as ScenePlan["ctaPattern"];
+    // Remove the PATTERN= line (and any leading blank lines) from the CTA body
+    cta = rawText.replace(/^.*PATTERN\s*=\s*[a-z]+\s*/i, "").trim();
+  }
 
   // Strip any stray quotes or markdown
   cta = cta.replace(/^["'`]+|["'`]+$/g, "").replace(/^```[a-z]*\n?|```$/g, "").trim();
@@ -450,6 +478,11 @@ Return ONLY the CTA line (no JSON, no quotes, no explanation).`;
   const hits = signals.filter((rx) => rx.test(cta)).length;
   if (!cta || cta.length < 15 || cta.length > 220 || hits < 2) {
     throw new Error(`CTA validation failed (length=${cta.length}, hits=${hits}): "${cta.slice(0, 80)}"`);
+  }
+
+  // Tag the plan with the detected pattern so produce/scheduler can persist it.
+  if (detectedPattern) {
+    plan.ctaPattern = detectedPattern;
   }
 
   // Append to final scene voiceoverLine with a soft separator so TTS pauses naturally

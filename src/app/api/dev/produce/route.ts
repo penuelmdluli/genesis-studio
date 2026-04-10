@@ -17,10 +17,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { planProduction } from "@/lib/genesis-brain/planner";
-import { createProduction, executeProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
+import { createProduction, executeProduction } from "@/lib/genesis-brain/orchestrator";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
 import { BrainInput, ScenePlan } from "@/types";
 import { after } from "next/server";
+import {
+  computeAdaptiveHints,
+  preferredCtaPatternFor,
+} from "@/lib/dev-adaptive-hints";
 
 const FAL_API_KEY = process.env.FAL_KEY || "";
 
@@ -214,6 +218,16 @@ export async function POST(req: NextRequest) {
 
     // ── SYNCHRONOUS: Plan + i2v image (within function timeout) ──
 
+    // Learn-and-adapt: compute hints before planning so the planner can
+    // use the winning CTA pattern for this page (if we have enough data).
+    const adaptiveHints = await computeAdaptiveHints();
+    const ctaPatternHint = preferredCtaPatternFor(adaptiveHints, item.page_id);
+    if (ctaPatternHint) {
+      console.log(
+        `[DEV PRODUCE] Adaptive CTA hint for ${pageName}: "${ctaPatternHint}" (samples=${adaptiveHints.samples})`,
+      );
+    }
+
     const brainInput: BrainInput = {
       concept: videoPrompt,
       targetDuration: 20,
@@ -226,6 +240,7 @@ export async function POST(req: NextRequest) {
       captions: true,
       soundEffects: true,
       engagementCTA: true, // Narrator always closes with like/comment/share
+      ctaPatternHint, // Learn-and-adapt: prefer the winning pattern for this page
     };
 
     // Step 1: Plan with Hollywood cinematography prompt (~10-15s)
@@ -245,12 +260,18 @@ export async function POST(req: NextRequest) {
     const production = await createProduction(DEV_USER_ID, brainInput, plan);
     console.log(`[DEV PRODUCE] Production ${production.id} created for ${pageName}`);
 
-    // Link queue item to production
+    // Link queue item to production and persist the CTA pattern (for learn-and-adapt)
     await supabase
       .from("dev_content_queue")
       .update({
         status: "generating",
-        input_data: { ...item.input_data, production_id: production.id },
+        input_data: {
+          ...item.input_data,
+          production_id: production.id,
+          engagement_cta: true,
+          cta_pattern: plan.ctaPattern || null,
+          cta_pattern_hint_used: ctaPatternHint || null,
+        },
       })
       .eq("id", item.id);
 

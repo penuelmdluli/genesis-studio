@@ -118,6 +118,9 @@ export async function POST(req: NextRequest) {
       off: [],
       unknown: [],
     };
+    const byCtaPattern: Record<string, number[]> = {};
+    const byPostingHour: Record<number, number[]> = {};
+    const bySource: Record<string, number[]> = {};
     const byPagePillar: Record<string, number[]> = {};
 
     // Per-item list for percentile tier assignment
@@ -162,6 +165,20 @@ export async function POST(req: NextRequest) {
       (byPage[pageId] ||= []).push(engagement);
       (byEngine[engine] ||= []).push(engagement);
       byCTA[ctaKey].push(engagement);
+
+      // Learn-and-adapt: tag-level aggregation
+      const ctaPattern = input.cta_pattern as string | undefined;
+      if (ctaPattern) {
+        (byCtaPattern[ctaPattern] ||= []).push(engagement);
+      }
+      const source = input.topic_source as string | undefined;
+      if (source) {
+        (bySource[source] ||= []).push(engagement);
+      }
+      if (item.posted_at) {
+        const hour = new Date(item.posted_at as string).getUTCHours();
+        (byPostingHour[hour] ||= []).push(engagement);
+      }
 
       const pagePillarKey = `${pageId}::${pillar}`;
       (byPagePillar[pagePillarKey] ||= []).push(engagement);
@@ -239,6 +256,21 @@ export async function POST(req: NextRequest) {
       .filter(([, v]) => v.length > 0)
       .map(([k, v]) => toAggregateRow(k, v));
 
+    const ctaPatternRows = Object.entries(byCtaPattern)
+      .map(([k, v]) => toAggregateRow(k, v))
+      .sort((a, b) => b.mean_engagement - a.mean_engagement);
+
+    const sourceRows = Object.entries(bySource)
+      .map(([k, v]) => toAggregateRow(k, v))
+      .sort((a, b) => b.mean_engagement - a.mean_engagement);
+
+    const postingHourRows = Object.entries(byPostingHour)
+      .map(([hour, v]) => ({
+        hour_utc: Number(hour),
+        ...toAggregateRow(`utc_${hour}`, v),
+      }))
+      .sort((a, b) => b.mean_engagement - a.mean_engagement);
+
     const pagePillarRows = Object.entries(byPagePillar)
       .map(([k, v]) => {
         const row = toAggregateRow(k, v);
@@ -288,6 +320,9 @@ export async function POST(req: NextRequest) {
         by_page: pageRows,
         by_engine: engineRows,
         by_cta: ctaRows,
+        by_cta_pattern: ctaPatternRows,
+        by_source: sourceRows,
+        by_posting_hour: postingHourRows,
         by_page_pillar: pagePillarRows,
       },
       winners,

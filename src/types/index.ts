@@ -373,6 +373,13 @@ export interface BrainInput {
   music: boolean;
   soundEffects: boolean; // Hollywood Sound Design: ambient, SFX, foley per scene
   engagementCTA?: boolean; // Narrator ends with a like/comment/share call-to-action
+  ctaPatternHint?:
+    | "authority"
+    | "intimacy"
+    | "curiosity"
+    | "community"
+    | "fomo"
+    | "gratitude"; // Learn-and-adapt: preferred CTA rubric pattern for this page
   characterRefs?: string[];
   brandKit?: BrandKit;
   outputFormats?: AspectRatio[];
@@ -398,6 +405,15 @@ export interface ScenePlan {
   overallStyle: string;
   voiceoverScript?: string;
   voiceoverTimings?: VoiceoverTiming[];
+  // Learn-and-adapt: which CTA rubric pattern the engagement CTA used.
+  // Populated by applyPremiumEngagementCTA and persisted on the queue item.
+  ctaPattern?:
+    | "authority"
+    | "intimacy"
+    | "curiosity"
+    | "community"
+    | "fomo"
+    | "gratitude";
 }
 
 export interface SceneDefinition {

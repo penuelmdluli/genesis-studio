@@ -30,8 +30,29 @@ const ENGINE_COSTS: Record<string, number> = {
 export function selectEngine(
   pillar: string,
   contentType?: string,
-  preferPremium?: boolean
+  preferPremium?: boolean,
+  learnedOverride?: ModelId,
 ): EngineSelection {
+  // Learn-and-adapt: if the analytics layer has a proven winner for this
+  // pillar, honor it regardless of the static routing below — BUT only when
+  // the override is one of the RunPod models we can afford.
+  const AFFORDABLE = new Set<ModelId>([
+    "wan-2.2" as ModelId,
+    "hunyuan-video" as ModelId,
+    "ltx-video" as ModelId,
+    "wan-2.1-turbo" as ModelId,
+    "mochi-1" as ModelId,
+  ]);
+  if (learnedOverride && AFFORDABLE.has(learnedOverride)) {
+    return {
+      modelId: learnedOverride,
+      provider: "runpod-hub",
+      estimatedCostUsd:
+        ENGINE_COSTS[learnedOverride as string] ?? ENGINE_COSTS["wan-2.2"],
+      reason: `Learn-and-adapt override — ${learnedOverride} is the past winner for pillar "${pillar}"`,
+    };
+  }
+
   // PRIORITY: Use RunPod models (user has credits there)
 
   // HERO content - best RunPod model

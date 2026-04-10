@@ -20,6 +20,10 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { aggregateAllSources, UnifiedNewsItem } from "@/lib/news/aggregator";
 import { getAllDevPages, DevPageConfig } from "@/lib/dev-pages";
 import { selectEngine, createCostEntry } from "@/lib/dev-engine-router";
+import {
+  computeAdaptiveHints,
+  preferredEngineFor,
+} from "@/lib/dev-adaptive-hints";
 
 export const maxDuration = 300;
 
@@ -51,13 +55,14 @@ function getCronSecret(): string {
 /**
  * Score a topic's relevance to a page using niche overlap.
  * Topics MUST have at least one matching niche to score > 0.
- * Score = nicheOverlap * 3 + viralPotential + static + learned weights
+ * Score = nicheOverlap * 3 + viralPotential + static + learned + source weights
  * Learned weights come from recent engagement metrics (learn-and-adapt).
  */
 function scoreTopicForPage(
-  topic: { niches?: string[] | null; viral_potential: number },
+  topic: { niches?: string[] | null; viral_potential: number; source?: string | null },
   page: DevPageConfig,
   learnedBoost: Record<string, number> = {},
+  sourceBoosts: Record<string, number> = {},
 ): number {
   const topicNiches = topic.niches || [];
   const nicheWeights = page.niche_weights || {};
@@ -77,11 +82,14 @@ function scoreTopicForPage(
   // Must have at least 1 niche match
   if (nicheOverlap === 0) return 0;
 
+  const sourceBonus = topic.source ? sourceBoosts[topic.source] || 0 : 0;
+
   return (
     nicheOverlap * 3 +
     (topic.viral_potential || 5) +
     weightBonus +
-    learnedBonus
+    learnedBonus +
+    sourceBonus
   );
 }
 
@@ -279,6 +287,21 @@ async function handleGenerate(): Promise<{
   // 1b. Load adaptive pillar boosts from recent engagement metrics
   const learnedBoost = await computeLearnedPillarBoost();
 
+  // 1c. Load full adaptive hints (engine per pillar, source boosts, etc.)
+  const hints = await computeAdaptiveHints();
+  if (Object.keys(hints.engineByPillar).length > 0) {
+    console.log(
+      `[DEV SCHEDULER] Learned engine overrides:`,
+      JSON.stringify(hints.engineByPillar),
+    );
+  }
+  if (Object.keys(hints.sourceBoosts).length > 0) {
+    console.log(
+      `[DEV SCHEDULER] Learned source boosts:`,
+      JSON.stringify(hints.sourceBoosts),
+    );
+  }
+
   // 2. Greedy niche-scored assignment (no cross-page duplicates)
   const assignedTopicIds = new Set<string>();
   const assignments: Array<{
@@ -296,9 +319,14 @@ async function handleGenerate(): Promise<{
       .filter((t) => !assignedTopicIds.has(t.id))
       .map((t) => {
         const score = scoreTopicForPage(
-          { niches: t.niches, viral_potential: t.viral_potential },
+          {
+            niches: t.niches,
+            viral_potential: t.viral_potential,
+            source: t.source,
+          },
           page,
           learnedBoost,
+          hints.sourceBoosts,
         );
         // Determine which pillar matched best
         const topicNiches: string[] = t.niches || [];
@@ -342,7 +370,8 @@ async function handleGenerate(): Promise<{
   const entries: Array<{ page: string; topic: string; engine: string; score: number }> = [];
 
   for (const { page, topic, pillar, score } of assignments) {
-    const engine = selectEngine(pillar);
+    const learnedEngineOverride = preferredEngineFor(hints, pillar);
+    const engine = selectEngine(pillar, undefined, undefined, learnedEngineOverride);
     const costEntry = createCostEntry(engine, pillar, page.id);
 
     const videoPrompt = buildVideoPrompt(
@@ -360,6 +389,8 @@ async function handleGenerate(): Promise<{
       input_data: {
         page_name: page.name,
         topic_title: topic.title,
+        topic_source: topic.source || "unknown",
+        topic_category: topic.category || null,
         video_prompt: videoPrompt,
         provider: engine.provider,
         reason: engine.reason,

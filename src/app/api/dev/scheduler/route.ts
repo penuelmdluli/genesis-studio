@@ -616,12 +616,37 @@ async function handlePost(): Promise<{
   const appUrl = getAppUrl();
   const cronSecret = getCronSecret();
 
+  // ── Safety reset: recover items wedged in 'posting' state from a crashed
+  //    previous cycle. Without this, a dead Vercel after() can leave rows
+  //    in 'posting' forever and block dedup / re-posting logic.
+  try {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: wedged } = await supabase
+      .from("dev_content_queue")
+      .select("id, generated_at")
+      .eq("status", "posting")
+      .lt("generated_at", fiveMinAgo);
+    if (wedged && wedged.length > 0) {
+      await supabase
+        .from("dev_content_queue")
+        .update({ status: "ready" })
+        .in("id", wedged.map((w) => w.id));
+      console.log(
+        `[DEV SCHEDULER] Recovered ${wedged.length} items wedged in 'posting' state`,
+      );
+    }
+  } catch (resetErr) {
+    console.warn(`[DEV SCHEDULER] posting-reset error:`, resetErr);
+  }
+
   // Find queue items that are "ready" (production completed) and not yet posted
+  // Use ASCENDING order (oldest first) so content is posted in FIFO order and
+  // never re-posted randomly from the same batch.
   const { data: allReady, error } = await supabase
     .from("dev_content_queue")
     .select("*")
     .eq("status", "ready")
-    .order("generated_at", { ascending: false, nullsFirst: false })
+    .order("generated_at", { ascending: true, nullsFirst: false })
     .limit(200);
 
   if (error) {
@@ -684,38 +709,68 @@ async function handlePost(): Promise<{
     return pid ? completedProductionIds.has(pid) : false;
   });
 
-  // Round-robin best-per-page selection — ONLY from items whose production
-  // is verified complete. This guarantees every page with any completed
-  // production gets a post this cycle, not just pages whose #1 ready item
-  // happens to be done.
+  // ── DEDUP: build set of (page_id, production_id) pairs that have ALREADY
+  //    been posted. We NEVER post the same production twice to the same page.
+  const postableProductionIds = Array.from(
+    new Set(
+      postable
+        .map((row) => (row.input_data as Record<string, unknown> | null)?.production_id as string | undefined)
+        .filter((x): x is string => !!x),
+    ),
+  );
+  const alreadyPostedPairs = new Set<string>(); // key = `${page_id}|${production_id}`
+  if (postableProductionIds.length > 0) {
+    const { data: postedRows } = await supabase
+      .from("dev_content_queue")
+      .select("page_id, input_data")
+      .eq("status", "posted")
+      .in("input_data->>production_id", postableProductionIds);
+    for (const p of (postedRows || []) as Array<{ page_id: string; input_data: Record<string, unknown> | null }>) {
+      const pid = (p.input_data || {}).production_id as string | undefined;
+      if (pid) alreadyPostedPairs.add(`${p.page_id}|${pid}`);
+    }
+  }
+
+  // Filter out duplicates AND auto-mark them posted so they exit the ready queue.
+  const dedupedPostable: typeof postable = [];
+  for (const row of postable) {
+    const pid = (row.input_data as Record<string, unknown> | null)?.production_id as string | undefined;
+    const key = `${row.page_id}|${pid}`;
+    if (pid && alreadyPostedPairs.has(key)) {
+      console.log(
+        `[DEV SCHEDULER] DEDUP: production ${pid} already posted to ${row.page_id} — marking duplicate queue row ${row.id} as posted`,
+      );
+      await supabase
+        .from("dev_content_queue")
+        .update({
+          status: "posted",
+          posted_at: new Date().toISOString(),
+          error_message: "Duplicate of earlier post (auto-dedup)",
+        })
+        .eq("id", row.id);
+      continue;
+    }
+    dedupedPostable.push(row);
+  }
+
+  // Round-robin OLDEST-per-page selection. FIFO ordering means every page
+  // with a completed production gets a post, and content rolls through in
+  // a predictable order — never random, never repeated.
   const bestPerPage = new Map<string, (typeof allReady)[number]>();
-  for (const row of postable as unknown as typeof allReady) {
-    const score = Number(
-      ((row.input_data as Record<string, unknown> | null) || {}).niche_score || 0,
-    );
+  for (const row of dedupedPostable as unknown as typeof allReady) {
     const current = bestPerPage.get(row.page_id);
-    const currentScore = current
-      ? Number(
-          ((current.input_data as Record<string, unknown> | null) || {}).niche_score || 0,
-        )
-      : -1;
-    const currentGen = (current?.generated_at as string) || "";
-    const rowGen = (row.generated_at as string) || "";
-    if (
-      !current ||
-      score > currentScore ||
-      (score === currentScore && rowGen > currentGen)
-    ) {
+    const currentGen = (current?.generated_at as string) || "9999";
+    const rowGen = (row.generated_at as string) || "9999";
+    if (!current || rowGen < currentGen) {
       bestPerPage.set(row.page_id, row);
     }
   }
 
-  // Highest score first → strongest content goes out before weaker
-  const readyItems = [...bestPerPage.values()].sort((a, b) => {
-    const sa = Number(((a.input_data as Record<string, unknown> | null) || {}).niche_score || 0);
-    const sb = Number(((b.input_data as Record<string, unknown> | null) || {}).niche_score || 0);
-    return sb - sa;
-  });
+  // Process pages in a stable order (alphabetical by page_id) so the
+  // posting log is reproducible and we fairly touch every page every cycle.
+  const readyItems = [...bestPerPage.values()].sort((a, b) =>
+    String(a.page_id).localeCompare(String(b.page_id)),
+  );
 
   console.log(
     `[DEV SCHEDULER] Posting ${readyItems.length} item(s) (best-per-page from ${postable.length} postable / ${allReady.length} total ready)`,

@@ -8,8 +8,39 @@
  * Sources: NewsAPI, Reddit (20+ subreddits), Google Trends RSS, Gemini AI
  */
 
-import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto";
 import { GeminiNewsItem, fetchGeminiTrends } from "./gemini";
+
+/**
+ * Generate a deterministic topic ID from the title.
+ * Same normalized title → same UUID, so the same news story cannot re-enter
+ * the pipeline as a "new" topic and get posted again on the next cycle.
+ *
+ * Normalization strips BREAKING prefixes, punctuation, casing, and stopwords
+ * so cosmetic differences across sources still collapse to the same id.
+ */
+function normalizeTitleForId(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/^\s*breaking[:\s-]+/i, "")
+    .replace(/^\s*breaking[:\s-]+/i, "") // Strip doubled "BREAKING:" prefix
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function topicIdFromTitle(title: string): string {
+  const normalized = normalizeTitleForId(title);
+  const hash = createHash("sha1").update(normalized).digest("hex");
+  // Format as UUID v5-ish so existing string-UUID columns still accept it
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    "5" + hash.slice(13, 16),
+    "8" + hash.slice(17, 20),
+    hash.slice(20, 32),
+  ].join("-");
+}
 
 export interface UnifiedNewsItem {
   id: string;
@@ -75,7 +106,7 @@ function areSimilarTopics(a: string, b: string): boolean {
 function toUnified(item: GeminiNewsItem): UnifiedNewsItem {
   const niches = detectNiches(item.title, item.summary, item.category);
   return {
-    id: uuidv4(),
+    id: topicIdFromTitle(item.title),
     title: item.title,
     summary: item.summary,
     category: item.category,
@@ -184,7 +215,7 @@ async function fetchFromNewsAPI(): Promise<UnifiedNewsItem[]> {
           const title = a.title.split(" - ")[0].trim(); // Remove source suffix
           const niches = detectNiches(title, a.description || "", cat);
           return {
-            id: uuidv4(),
+            id: topicIdFromTitle(title),
             title,
             summary: a.description || "",
             category: cat === "general" ? "breaking" : cat,
@@ -283,7 +314,7 @@ async function fetchFromReddit(): Promise<UnifiedNewsItem[]> {
             const niches = detectNiches(post.data.title, `r/${post.data.subreddit}`, category);
             const viralScore = Math.min(10, Math.round(Math.log10(Math.max(post.data.score, 100)) * 2) + 3);
             return {
-              id: uuidv4(),
+              id: topicIdFromTitle(post.data.title),
               title: post.data.title,
               summary: `Trending on r/${post.data.subreddit} — ${post.data.score.toLocaleString()} upvotes, ${post.data.num_comments.toLocaleString()} comments`,
               category,
@@ -350,7 +381,7 @@ async function fetchFromGoogleTrends(): Promise<UnifiedNewsItem[]> {
     const items: UnifiedNewsItem[] = titles.map(title => {
       const niches = detectNiches(title, "", "trending");
       return {
-        id: uuidv4(),
+        id: topicIdFromTitle(title),
         title,
         summary: `Trending on Google — millions of searches`,
         category: "trending",

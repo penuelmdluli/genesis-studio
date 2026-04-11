@@ -282,6 +282,55 @@ async function handleGenerate(): Promise<{
 
   console.log(`[DEV SCHEDULER] ${topics.length} pending topics, ${pages.length} active pages`);
 
+  // 1a. TITLE-LEVEL DEDUP: Exclude topics whose normalized title matches ANY
+  //     queue item from the last 7 days (queued / generating / ready / posted).
+  //     This is a belt-and-braces check on top of deterministic topic IDs —
+  //     it catches cases where two aggregator runs produce slightly different
+  //     strings for the same story (e.g. "BREAKING:" prefix variations).
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentQueueRows } = await supabase
+    .from("dev_content_queue")
+    .select("input_data, created_at")
+    .gte("created_at", sevenDaysAgo)
+    .in("status", ["pending", "generating", "ready", "posted", "posting"]);
+
+  const normalizeTitle = (t: string): string =>
+    t
+      .toLowerCase()
+      .replace(/^\s*breaking[:\s-]+/i, "")
+      .replace(/^\s*breaking[:\s-]+/i, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const recentNormalizedTitles = new Set<string>();
+  for (const row of (recentQueueRows || []) as Array<{
+    input_data: Record<string, unknown> | null;
+  }>) {
+    const t = (row.input_data || {}).topic_title as string | undefined;
+    if (t) recentNormalizedTitles.add(normalizeTitle(t));
+  }
+
+  const topicsBefore = topics.length;
+  const filteredTopics = topics.filter((t) => {
+    const norm = normalizeTitle(String(t.title || ""));
+    if (recentNormalizedTitles.has(norm)) {
+      console.log(
+        `[DEV SCHEDULER] TITLE DEDUP: skipping "${String(t.title).slice(0, 60)}" — already in queue within 7d`,
+      );
+      return false;
+    }
+    return true;
+  });
+  // Mutate the pending topic set so scoring loops below see only fresh ones
+  topics.length = 0;
+  topics.push(...filteredTopics);
+  if (topicsBefore !== topics.length) {
+    console.log(
+      `[DEV SCHEDULER] Title-dedup: ${topicsBefore} → ${topics.length} topics (${topicsBefore - topics.length} suppressed)`,
+    );
+  }
+
   // 1b. Load adaptive pillar boosts from recent engagement metrics
   const learnedBoost = await computeLearnedPillarBoost();
 

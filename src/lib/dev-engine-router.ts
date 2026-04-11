@@ -1,7 +1,27 @@
 // ============================================
 // GENESIS STUDIO — Dev Engine Router
-// Smart routing: RunPod models preferred (credits available)
-// FAL.AI models avoided (out of credits)
+// Smart routing: balanced SPEED × QUALITY × COST. All RunPod models.
+//
+// Model comparison (from constants.ts):
+//   model         | avgGen | $/gen  | quality       | use
+//   ltx-video     |  30s   | $0.01  | good (fast)   | breaking news, speed-first
+//   wan-2.1-turbo |  60s   | $0.01  | good          | i2v only (not used here)
+//   hunyuan-video |  75s   | $0.015 | VERY GOOD     | workhorse — best cost/quality/speed ratio
+//   wan-2.2       | ~120s  | $0.02  | FLAGSHIP      | cinematic / character-heavy
+//   mochi-1       | 180s   | $0.02  | photorealistic| slow, only when realism required
+//
+// Strategy — three tiers, chosen for best $/quality/speed balance:
+//  1. hunyuan-video (workhorse) for 80% of content — explicitly described
+//     as "best efficiency/quality ratio" in constants.ts.
+//  2. ltx-video (speed tier) for breaking news + geopolitics where
+//     minutes-old stories need to ship fast, quality is secondary.
+//  3. wan-2.2 (flagship tier) only for pillars where character or cinematic
+//     detail clearly matters (mbs_episodes, afrofuturism, african_folklore).
+//
+// Net effect vs old router (wan-2.2 everywhere):
+//  • ~40% faster generation (wan-2.2 ~120s → hunyuan 75s / ltx 30s)
+//  • ~25–50% cheaper per video ($0.02 → $0.015 / $0.01)
+//  • Quality preserved on the pillars where it actually matters
 // ============================================
 
 import { ModelId } from "@/types";
@@ -55,76 +75,66 @@ export function selectEngine(
 
   // PRIORITY: Use RunPod models (user has credits there)
 
-  // HERO content - best RunPod model
+  // HERO content — explicit flagship override
   if (contentType === "hero") {
     return {
       modelId: "wan-2.2" as ModelId,
       provider: "runpod-hub",
       estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "Hero content — Wan 2.2 flagship (RunPod credits available)",
+      reason: "Hero content — Wan 2.2 flagship (quality over speed)",
     };
   }
 
-  // PREMIUM: Human-heavy cinematic content
+  // TIER 1 — FLAGSHIP: Character-heavy cinematic pillars stay on Wan 2.2.
+  // Baby animation, Afrofuturism, and folklore look noticeably worse on
+  // hunyuan/ltx, so we spend the extra $0.005–$0.01 and extra ~45s here.
   if (
     pillar === "african_folklore" ||
     pillar === "mbs_episodes" ||
+    pillar === "afrofuturism" ||
+    pillar === "african_cities" ||
+    pillar === "baby_scenarios" ||
     contentType === "premium_episode"
   ) {
     return {
       modelId: "wan-2.2" as ModelId,
       provider: "runpod-hub",
       estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "Premium cinematic — Wan 2.2 (best RunPod quality)",
+      reason:
+        "Flagship tier — Wan 2.2 (character/cinematic detail, quality > speed)",
     };
   }
 
-  // FAST: News content needs speed
-  if (pillar === "news_animated" || pillar === "breaking_news" || pillar === "geopolitics" || contentType === "breaking_news") {
+  // TIER 2 — SPEED: Breaking news and geopolitics must ship fast. LTX Video
+  // is 2.5× faster than hunyuan (30s vs 75s) and 4× faster than Wan 2.2,
+  // and the cheapest option at $0.01/gen. Quality is "good enough" for
+  // news-animation style where the story matters more than the render.
+  if (
+    pillar === "breaking_news" ||
+    pillar === "geopolitics" ||
+    pillar === "news_animated" ||
+    contentType === "breaking_news"
+  ) {
     return {
       modelId: "ltx-video" as ModelId,
       provider: "runpod-hub",
       estimatedCostUsd: ENGINE_COSTS["ltx-video"],
-      reason: "Breaking news — LTX Video (fastest, 30s generation)",
+      reason:
+        "Speed tier — LTX Video (30s avg, cheapest, fastest time-to-publish)",
     };
   }
 
-  // ENTERTAINMENT: Celebrity/viral content — good quality
-  if (pillar === "entertainment" || pillar === "celebrity" || pillar === "viral_moments") {
-    return {
-      modelId: "wan-2.2" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "Entertainment content — Wan 2.2 (best visual quality)",
-    };
-  }
-
-  // AI/TECH: AI disruption content
-  if (pillar === "ai_news" || pillar === "ai_disruption" || pillar === "tech") {
-    return {
-      modelId: "wan-2.2" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "AI/Tech content — Wan 2.2 (cinematic quality)",
-    };
-  }
-
-  // AFROFUTURISM: Visual quality matters
-  if (pillar === "afrofuturism" || pillar === "african_cities") {
-    return {
-      modelId: "wan-2.2" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "Visual quality priority — Wan 2.2 flagship",
-    };
-  }
-
-  // DEFAULT: Wan 2.2 for everything else
+  // TIER 3 — WORKHORSE: hunyuan-video for everything else. Per constants.ts
+  // this model is explicitly "best efficiency/quality ratio" — 75s avg, 720p,
+  // $0.015/gen. Covers tech, ai_news, ai_disruption, entertainment, celebrity,
+  // viral_moments, motivation, health_wellness, finance, and any unknown
+  // pillar. Best balance of speed, quality, and cost for the workhorse path.
   return {
-    modelId: "wan-2.2" as ModelId,
+    modelId: "hunyuan-video" as ModelId,
     provider: "runpod-hub",
-    estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-    reason: "Default — Wan 2.2 (reliable, RunPod credits)",
+    estimatedCostUsd: ENGINE_COSTS["hunyuan-video"],
+    reason:
+      "Workhorse tier — HunyuanVideo (best quality/cost/speed ratio: 75s, $0.015, very good)",
   };
 }
 

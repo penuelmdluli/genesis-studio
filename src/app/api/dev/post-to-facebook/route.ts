@@ -185,15 +185,18 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Resolve video download URL — prefer directVideoUrl if caller
-      // already has an HTTP-accessible URL (e.g. scene signed R2 URLs
-      // or CloudFront CDN). Otherwise generate a fresh signed R2 URL.
+      // Resolve video download URL. Three paths:
+      //   1) directVideoUrl is a CDN URL → use as-is
+      //   2) directVideoUrl is an R2 key (starts with "dev/") → sign fresh
+      //   3) No directVideoUrl → use standard R2 key videos/{userId}/{videoId}.mp4
       let videoUrl: string;
-      if (post.directVideoUrl) {
+      if (post.directVideoUrl?.startsWith("http")) {
         videoUrl = post.directVideoUrl;
-        console.log(`[FB POST] Using direct video URL for ${post.pageKey}`);
+        console.log(`[FB POST] Using direct CDN URL for ${post.pageKey}`);
       } else {
-        const r2Key = videoStorageKey(post.userId, post.videoId);
+        const r2Key = post.directVideoUrl?.startsWith("dev/")
+          ? post.directVideoUrl
+          : videoStorageKey(post.userId, post.videoId);
         try {
           videoUrl = await getSignedDownloadUrl(r2Key, 3600); // 1 hour expiry
           console.log(`[FB POST] Generated signed URL for ${r2Key}`);

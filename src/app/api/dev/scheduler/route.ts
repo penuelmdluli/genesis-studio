@@ -903,7 +903,10 @@ async function handlePost(): Promise<{
     if (finalEntry.startsWith("/api/videos/")) {
       videoId = finalEntry.replace("/api/videos/", "");
     } else if (finalEntry.startsWith("http")) {
-      directVideoUrl = finalEntry;
+      // Full URL (CDN or signed R2). If it's a signed R2 URL that might
+      // expire, extract the R2 key so the post handler signs it fresh.
+      const r2Match = finalEntry.match(/\.r2\.cloudflarestorage\.com\/[^/]+\/(.+?)(\?|$)/);
+      directVideoUrl = r2Match ? r2Match[1] : finalEntry;
     } else {
       // No usable "final" — try first scene URL
       const firstSceneUrl = Object.entries(outputUrls)
@@ -912,7 +915,8 @@ async function handlePost(): Promise<{
         .map(([, v]) => v as string)
         .find((u) => u?.startsWith("http"));
       if (firstSceneUrl) {
-        directVideoUrl = firstSceneUrl;
+        const r2Match = firstSceneUrl.match(/\.r2\.cloudflarestorage\.com\/[^/]+\/(.+?)(\?|$)/);
+        directVideoUrl = r2Match ? r2Match[1] : firstSceneUrl;
       }
     }
 

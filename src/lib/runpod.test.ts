@@ -59,7 +59,7 @@ describe("buildRunPodInput", () => {
     expect(input.seed).toBeDefined();
     expect(input.guidance).toBe(7.5);
     expect(input.flow_shift).toBe(5);
-    expect(input.enable_prompt_optimization).toBe(true);
+    expect(input.enable_prompt_optimization).toBe(false);
     expect(input.enable_safety_checker).toBe(false);
   });
 

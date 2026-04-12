@@ -216,7 +216,7 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
         duration: hubDuration,
         flow_shift: 5,
         seed: params.seed ?? -1,
-        enable_prompt_optimization: true,
+        enable_prompt_optimization: false, // DISABLED — was rewriting prompts to add human subjects
         enable_safety_checker: false,
       };
     }

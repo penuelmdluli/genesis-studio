@@ -339,7 +339,8 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
       prompt: scene.prompt || scene.description || "",
       negativePrompt: scene.negativePrompt || getDefaultNegativePrompt(),
       modelId: selectedModel,
-      duration: Math.max(5, Math.min(10, scene.duration || 8)),
+      // Always request 8s (wan-2.2 max) — first 3s trimmed in assembly (anti-face)
+      duration: 8,
       resolution: scene.resolution || "720p",
       cameraMovement: scene.cameraMovement || "slow push-in",
       transitionIn: validTransitions.includes(scene.transitionIn) ? scene.transitionIn : "crossfade",

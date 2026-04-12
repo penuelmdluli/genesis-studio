@@ -42,15 +42,23 @@ COLOR & GRADE:
   "Warm amber vintage film grain, lifted blacks"
   "Vibrant saturated Afrofuturist palette — purple, gold, electric blue"
 
-HUMAN ACTION & EMOTION (the #1 thing that makes video feel ALIVE):
-  NEVER write "a person stands in a room" — that's DEAD footage.
-  ALWAYS write specific ACTIONS and MICRO-MOVEMENTS:
-    "A woman turns her head slowly toward camera, eyes narrowing with suspicion, jaw tightening"
-    "A man walks briskly through the crowd, shoulders hunched, glancing over his shoulder nervously"
-    "A child reaches up with both hands, fingers spread wide, face lit up with pure wonder"
-    "A CEO leans forward across the boardroom table, index finger jabbing the air with each word"
-    "An old woman's weathered hands tremble as she lifts a photograph, her lips pressing together"
-  Include: gait, posture, hand gestures, facial micro-expressions, hair/clothing movement, breath visible in cold air
+SUBJECT RULE — SHOW THE TOPIC, NOT A RANDOM PERSON:
+  ⚠️ CRITICAL: Do NOT invent random human characters unless the topic is specifically about a person.
+  For NEWS, TECH, POLITICS, SCIENCE, FINANCE topics → show ENVIRONMENTS, OBJECTS, LOCATIONS:
+    WAR: "military convoy rolling through dust clouds, helicopter silhouette at sunset"
+    TECH: "close-up of circuit board, blue LED reflections, data center server racks humming"
+    POLITICS: "empty parliament chamber, flags, podium with microphone, dramatic shadows"
+    SCIENCE: "laboratory glassware with glowing liquids, microscope lens racking focus"
+    FINANCE: "stock trading screens, red and green numbers cascading, city skyline at dawn"
+    AFRICA: "modern African city skyline, cranes and solar panels, bustling market streets"
+  For PEOPLE-FOCUSED topics (celebrity, biography) → describe the SCENE around them, not a random face.
+  The #1 rule: A viewer should understand the TOPIC from the visuals alone, even with sound off.
+
+  When you DO include people (crowds, silhouettes, hands), keep them CONTEXTUAL:
+    "A trader's hands grip a phone, knuckles white, screens reflected in glasses"
+    "Silhouette of a soldier against orange smoke, no face visible"
+    "A scientist's gloved hand adjusts equipment under blue UV light"
+  NEVER invent a main character who appears in every scene like a presenter or host.
 
 COMPOSITION RULES:
   - Rule of thirds: place subjects at intersection points, not dead center
@@ -66,22 +74,31 @@ COMPOSITION RULES:
 1. Break the concept into 3-8 scenes (target duration ±10%). Each scene: 3-10 seconds (AI models generate best at 5s).
 
 2. EVERY SCENE PROMPT must contain ALL of these layers (this is non-negotiable):
-   a) SUBJECT — Who/what, with EXACT appearance description (age, ethnicity, clothing, build, hair)
-   b) ACTION — What they are DOING (specific physical movement, gesture, expression change)
+   a) SUBJECT — The TOPIC-RELEVANT visual: an object, environment, location, or action that DIRECTLY
+      illustrates what the news story or concept is about. NOT a random person.
+      - If topic is about AI → show servers, robots, neural network visualizations
+      - If topic is about war → show military hardware, ruins, smoke, maps
+      - If topic is about a product → show the product itself in detail
+      - Only show humans when they are contextual (crowds, silhouettes, hands) — NEVER a main character/host/presenter
+   b) ACTION — What is HAPPENING in the scene (movement, transformation, reveal, impact)
    c) CAMERA — Movement type + speed + lens + angle (e.g. "slow dolly push-in, 85mm f/1.4, low angle")
    d) LIGHTING — Specific setup (e.g. "Rembrandt key light from camera-left, warm fill, blue rim")
    e) ENVIRONMENT — Setting details with depth (foreground, midground, background)
    f) ATMOSPHERE — Particles, weather, haze, bokeh, lens effects
-   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic"
+   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic, no people, no faces, no avatars"
 
-   EXAMPLE of a GOOD prompt:
-   "Slow dolly push-in, 85mm f/1.4, low angle. A young African woman in a flowing white dress walks barefoot across wet sand at golden hour, her braids swaying with each step, one hand trailing through the sea breeze. Warm side-light from setting sun creates long shadow stretching left. Foreground: foam from receding wave. Background: vast ocean, orange and purple sky. Volumetric mist rising from water surface. Cinematic, 4K, anamorphic lens flare, film grain, photorealistic"
+   EXAMPLE of a GOOD news prompt:
+   "Slow dolly push-in, 85mm f/1.4, low angle. Military convoy of armored vehicles rolling through desert dust at golden hour, headlights cutting through haze. Warm side-light from setting sun creates long shadows. Foreground: barbed wire fence, slightly out of focus. Background: distant city skyline with smoke columns. Volumetric dust particles. Cinematic, 4K, anamorphic, film grain, photorealistic, no people visible"
 
-   EXAMPLE of a BAD prompt (never write this):
-   "A woman walking on a beach at sunset, cinematic"
+   EXAMPLE of a GOOD tech prompt:
+   "Crane ascending reveal, 24mm wide-angle. A massive data center interior — rows of server racks extending to vanishing point, blue LED status lights blinking in sequence. Cool fluorescent overhead lighting with warm accent from warning indicators. Foreground: fiber optic cables, sharp focus. Background: fog/cold air from cooling system. Cinematic, 4K, deep focus, photorealistic"
 
-3. CHARACTER CONSISTENCY: Lock the EXACT same description string for any character across ALL scenes.
-   First mention: define fully. Every subsequent scene: copy-paste that EXACT string.
+   EXAMPLE of a BAD prompt (NEVER write this):
+   "A man in a white shirt talks about AI in a studio" ← THIS IS WHAT WE ARE ELIMINATING
+
+3. NO DEFAULT CHARACTERS: Do NOT create a characters[] array unless the topic is specifically about
+   a named real person. For 95% of news/tech/politics content, characters should be an EMPTY array [].
+   Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
 4. ONLY use RunPod models (FAL credits unavailable):
    - "wan-2.2" — hero shots, character scenes, cinematic (best quality)
@@ -139,7 +156,8 @@ VALID RESOLUTIONS: "480p", "720p", "1080p"
 
 OUTPUT FORMAT: Return ONLY valid JSON ScenePlan. No markdown. No explanation.
 Each scene MUST have "soundDesign": { ambientDescription, dialogueLines, sfxCues }.
-Each scene MUST have specific camera movement, lens, lighting, and human action in the prompt.`;
+Each scene MUST have specific camera movement, lens, lighting, and TOPIC-RELEVANT visuals in the prompt.
+CRITICAL: characters array should be EMPTY [] for news/tech/politics topics. NO random people. NO presenters. NO talking heads. Show the SUBJECT of the story.`;
 
 function buildUserPrompt(input: BrainInput): string {
   let prompt = `CONCEPT: "${input.concept}"
@@ -164,6 +182,8 @@ ASPECT RATIO: ${input.aspectRatio === "landscape" ? "16:9" : input.aspectRatio =
   }
   if (input.characterRefs?.length) {
     prompt += `\nCHARACTER REFERENCES: ${input.characterRefs.length} reference image(s) provided — describe characters in detail`;
+  } else {
+    prompt += `\nNO CHARACTER REFERENCES — this is content-driven video. Do NOT create characters[]. Show ENVIRONMENTS, OBJECTS, and LOCATIONS that illustrate the topic. Zero talking heads, zero presenters, zero random people.`;
   }
 
   prompt += `\n\nGenerate the ScenePlan JSON now.`;

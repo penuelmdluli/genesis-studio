@@ -494,7 +494,7 @@ describe("Planner", () => {
       );
     });
 
-    it("sanitizes invalid model IDs to wan-2.2", async () => {
+    it("sanitizes invalid model IDs to ltx-video", async () => {
       const planWithBadModel = {
         ...validPlanResponse,
         scenes: [
@@ -513,10 +513,11 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      expect(plan.scenes[0].modelId).toBe("wan-2.2");
+      // wan-2.2 banned (default human face); ltx-video is the new primary
+      expect(plan.scenes[0].modelId).toBe("ltx-video");
     });
 
-    it("forces all scene durations to 8 seconds (anti-face trim buffer)", async () => {
+    it("clamps scene duration to 5-10 range", async () => {
       const planWithBadDuration = {
         ...validPlanResponse,
         scenes: [
@@ -533,9 +534,8 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      // All scenes forced to 8s (wan-2.2 max) — first 3s trimmed in assembly
-      expect(plan.scenes[0].duration).toBe(8);
-      expect(plan.scenes[1].duration).toBe(8);
+      expect(plan.scenes[0].duration).toBe(5);
+      expect(plan.scenes[1].duration).toBe(10);
     });
 
     it("sanitizes invalid transition types to crossfade", async () => {

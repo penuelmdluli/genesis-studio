@@ -213,13 +213,11 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // ── ANTI-FACE TRIM (server-side ffmpeg) ──
-    // wan-2.2 generates a human face/figure in the opening ~1.5s of every clip
-    // before transitioning to the real content. We trim 1.5s from the start of
-    // each scene using the bundled ffmpeg binary. This is fast (codec copy, no
-    // re-encode) and persists the trimmed URL to the DB so the dashboard
-    // shows the clean version.
-    const TRIM_START_SECONDS = 1.5;
+    // ── LIGHT SAFETY TRIM (server-side ffmpeg) ──
+    // ltx-video (our new primary model) does NOT have the wan-2.2 default-person
+    // issue. We keep a small 0.3s safety trim to cut any compression/warm-up
+    // artifacts at clip boundaries but preserve nearly all content.
+    const TRIM_START_SECONDS = 0.3;
     console.log(`[ASSEMBLY] Trimming first ${TRIM_START_SECONDS}s from ${completedScenes.length} scenes (anti-face, ffmpeg)...`);
     const { trimVideoStart } = await import("./video-trim");
     const prod = await getProduction(productionId);

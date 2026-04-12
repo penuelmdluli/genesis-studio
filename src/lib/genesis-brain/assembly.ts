@@ -213,11 +213,36 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // NOTE: Previously attempted FAL-based trim here, but the
-    // fal-ai/workflow-utilities/trim-video endpoint does not exist (returns 404).
-    // Wan-2.2 outputs are only ~5s clips, so trimming would leave too little content.
-    // Face-flash mitigation happens at the dashboard level via #t=X URL fragments
-    // on all <video> players. The VideoPlayer component seeks past the face frame.
+    // ── ANTI-FACE TRIM (server-side ffmpeg) ──
+    // wan-2.2 generates a human face/figure in the opening ~1.5s of every clip
+    // before transitioning to the real content. We trim 1.5s from the start of
+    // each scene using the bundled ffmpeg binary. This is fast (codec copy, no
+    // re-encode) and persists the trimmed URL to the DB so the dashboard
+    // shows the clean version.
+    const TRIM_START_SECONDS = 1.5;
+    console.log(`[ASSEMBLY] Trimming first ${TRIM_START_SECONDS}s from ${completedScenes.length} scenes (anti-face, ffmpeg)...`);
+    const { trimVideoStart } = await import("./video-trim");
+    const prod = await getProduction(productionId);
+    const userId = prod?.userId || "";
+    const trimPromises = completedScenes.map(async (scene) => {
+      if (!scene.outputVideoUrl || !userId) return;
+      try {
+        const trimmedUrl = await trimVideoStart(scene.outputVideoUrl, TRIM_START_SECONDS, userId);
+        if (trimmedUrl) {
+          scene.outputVideoUrl = trimmedUrl;
+          // Persist to DB so dashboard shows trimmed video in scene cards
+          await supabase
+            .from("production_scenes")
+            .update({ output_video_url: trimmedUrl })
+            .eq("id", scene.id);
+          console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: trimmed and persisted`);
+        }
+      } catch (err) {
+        console.warn(`[ASSEMBLY] Scene ${scene.sceneNumber}: trim failed, using original`, err);
+      }
+    });
+    await Promise.all(trimPromises);
+    console.log(`[ASSEMBLY] Anti-face trim complete`);
 
     let needsMMAudio = false;
 

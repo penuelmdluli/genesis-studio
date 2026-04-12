@@ -16,6 +16,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1024.0",
     "@clerk/nextjs": "^7.0.8",
     "@fal-ai/client": "^1.9.5",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@stripe/stripe-js": "^9.0.1",
     "@supabase/supabase-js": "^2.101.1",
     "@vercel/analytics": "^2.0.1",

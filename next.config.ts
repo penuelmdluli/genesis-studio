@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Include ffmpeg binary in serverless function bundles (for video trimming)
+  outputFileTracingIncludes: {
+    "/api/**": ["./node_modules/@ffmpeg-installer/**/*"],
+  },
   async headers() {
     return [
       {

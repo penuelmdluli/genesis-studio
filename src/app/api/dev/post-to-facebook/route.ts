@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
         userId: string;
         pageKey: string;
         caption: string;
+        directVideoUrl?: string;
       }>;
     };
 
@@ -184,21 +185,28 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Generate signed R2 download URL for the video
-      const r2Key = videoStorageKey(post.userId, post.videoId);
+      // Resolve video download URL — prefer directVideoUrl if caller
+      // already has an HTTP-accessible URL (e.g. scene signed R2 URLs
+      // or CloudFront CDN). Otherwise generate a fresh signed R2 URL.
       let videoUrl: string;
-      try {
-        videoUrl = await getSignedDownloadUrl(r2Key, 3600); // 1 hour expiry
-        console.log(`[FB POST] Generated signed URL for ${r2Key}`);
-      } catch (e) {
-        results.push({
-          videoId: post.videoId,
-          pageKey: post.pageKey,
-          pageName: page.name,
-          success: false,
-          error: `Failed to get R2 URL: ${e instanceof Error ? e.message : String(e)}`,
-        });
-        continue;
+      if (post.directVideoUrl) {
+        videoUrl = post.directVideoUrl;
+        console.log(`[FB POST] Using direct video URL for ${post.pageKey}`);
+      } else {
+        const r2Key = videoStorageKey(post.userId, post.videoId);
+        try {
+          videoUrl = await getSignedDownloadUrl(r2Key, 3600); // 1 hour expiry
+          console.log(`[FB POST] Generated signed URL for ${r2Key}`);
+        } catch (e) {
+          results.push({
+            videoId: post.videoId,
+            pageKey: post.pageKey,
+            pageName: page.name,
+            success: false,
+            error: `Failed to get R2 URL: ${e instanceof Error ? e.message : String(e)}`,
+          });
+          continue;
+        }
       }
 
       console.log(`[FB POST] Posting to ${page.name} (${post.pageKey})...`);

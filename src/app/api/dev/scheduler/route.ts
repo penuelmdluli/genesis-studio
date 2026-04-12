@@ -842,6 +842,7 @@ async function handlePost(): Promise<{
     pageKey: string;
     caption: string;
     queueId: string;
+    directVideoUrl?: string;
   }> = [];
   const ytPosts: Array<{
     videoId: string;
@@ -891,8 +892,30 @@ async function handlePost(): Promise<{
       continue;
     }
 
-    // The final video is served via /api/videos/{videoId} which reads from R2
-    const videoId = outputUrls.final?.replace("/api/videos/", "") || production.id;
+    // Resolve the final video URL. Three cases:
+    //   1) outputUrls.final = "/api/videos/{uuid}" → extract uuid as videoId
+    //   2) outputUrls.final = "https://..." (R2 signed URL / CDN) → pass as directVideoUrl
+    //   3) No final key → use first scene URL from outputUrls, or production.id for R2 lookup
+    let videoId = production.id;
+    let directVideoUrl: string | undefined;
+
+    const finalEntry = (outputUrls.final as string) || "";
+    if (finalEntry.startsWith("/api/videos/")) {
+      videoId = finalEntry.replace("/api/videos/", "");
+    } else if (finalEntry.startsWith("http")) {
+      directVideoUrl = finalEntry;
+    } else {
+      // No usable "final" — try first scene URL
+      const firstSceneUrl = Object.entries(outputUrls)
+        .filter(([k]) => k.startsWith("scene_"))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, v]) => v as string)
+        .find((u) => u?.startsWith("http"));
+      if (firstSceneUrl) {
+        directVideoUrl = firstSceneUrl;
+      }
+    }
+
     const topicTitle = item.input_data?.topic_title || "Trending Now";
 
     // Build caption with page hashtags
@@ -907,6 +930,7 @@ async function handlePost(): Promise<{
         pageKey: page.facebook_page_key,
         caption,
         queueId: item.id,
+        directVideoUrl,
       });
     }
 

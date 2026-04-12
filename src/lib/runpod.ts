@@ -209,7 +209,7 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
       // Text-to-video: wan-2-2-t2v-720 endpoint
       return {
         prompt: params.prompt,
-        negative_prompt: params.negativePrompt || "blurry, low quality, distorted, watermark",
+        negative_prompt: params.negativePrompt || "human face, person, talking head, presenter, avatar, man in shirt, close-up face, human figure, blurry, low quality, distorted, watermark",
         num_inference_steps: params.isDraft ? 15 : steps,
         guidance: guidance,
         size: hubSize,

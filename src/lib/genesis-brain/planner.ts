@@ -87,7 +87,7 @@ COMPOSITION RULES:
    d) LIGHTING — Specific setup (e.g. "Rembrandt key light from camera-left, warm fill, blue rim")
    e) ENVIRONMENT — Setting details with depth (foreground, midground, background)
    f) ATMOSPHERE — Particles, weather, haze, bokeh, lens effects
-   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic, no people, no faces, no avatars"
+   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic, no people, no faces, no avatars, no human figure, no talking head, no presenter, environment only"
 
    EXAMPLE of a GOOD news prompt:
    "Slow dolly push-in, 85mm f/1.4, low angle. Military convoy of armored vehicles rolling through desert dust at golden hour, headlights cutting through haze. Warm side-light from setting sun creates long shadows. Foreground: barbed wire fence, slightly out of focus. Background: distant city skyline with smoke columns. Volumetric dust particles. Cinematic, 4K, anamorphic, film grain, photorealistic, no people visible"
@@ -159,7 +159,8 @@ VALID RESOLUTIONS: "480p", "720p", "1080p"
 OUTPUT FORMAT: Return ONLY valid JSON ScenePlan. No markdown. No explanation.
 Each scene MUST have "soundDesign": { ambientDescription, dialogueLines, sfxCues }.
 Each scene MUST have specific camera movement, lens, lighting, and TOPIC-RELEVANT visuals in the prompt.
-CRITICAL: characters array should be EMPTY [] for news/tech/politics topics. NO random people. NO presenters. NO talking heads. Show the SUBJECT of the story.`;
+CRITICAL: characters array should be EMPTY [] for news/tech/politics topics. NO random people. NO presenters. NO talking heads. NO human faces. NO person wearing a shirt. Show the SUBJECT of the story.
+ABSOLUTE RULE: Every prompt MUST end with "no human face, no person, no avatar" — the video model will generate a face in the opening frame unless explicitly blocked.`;
 
 function buildUserPrompt(input: BrainInput): string {
   let prompt = `CONCEPT: "${input.concept}"
@@ -358,6 +359,13 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
     // Ensure prompt is not empty
     if (!s.prompt.trim()) {
       s.prompt = s.description;
+    }
+
+    // ANTI-FACE ENFORCEMENT: Ensure every scene prompt explicitly blocks human faces
+    // and starts with environment/object visuals. The video model defaults to generating
+    // a human face in the opening frame unless explicitly told not to.
+    if (!s.prompt.toLowerCase().includes("no human face") && !s.prompt.toLowerCase().includes("no people")) {
+      s.prompt = `${s.prompt}. No human face, no person, no avatar, no talking head. Show only environments, objects, and locations.`;
     }
 
     return s;
@@ -620,7 +628,7 @@ function generateTimings(plan: ScenePlan): VoiceoverTiming[] {
 }
 
 function getDefaultNegativePrompt(): string {
-  return "inconsistent lighting, style change, color shift, different person, face change, warped features, blurry, low quality, watermark, text artifacts, morphing, deformed hands, extra fingers, duplicate subjects, floating objects";
+  return "human face, person, talking head, presenter, avatar, man in shirt, woman presenting, close-up face, face in first frame, human figure, portrait of person, inconsistent lighting, style change, color shift, different person, face change, warped features, blurry, low quality, watermark, text artifacts, morphing, deformed hands, extra fingers, duplicate subjects, floating objects";
 }
 
 /**

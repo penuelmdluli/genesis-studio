@@ -33,6 +33,7 @@ const WAN22_ENDPOINT = process.env.RUNPOD_ENDPOINT_WAN22 || "dm5mng5h7034q7";
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 const MAX_SCENES_PER_RUN = 20;
 const MIN_AGE_MS = 3 * 60 * 1000; // 3 min — avoid racing with fresh submissions
+const EXPIRED_AGE_MS = 90 * 60 * 1000; // 90 min — RunPod purges results after ~1h
 
 const R2 = new S3Client({
   region: "auto",
@@ -128,6 +129,7 @@ export async function GET(req: Request) {
 
   let completed = 0;
   let failed = 0;
+  let expired = 0;
   let stillRunning = 0;
   const touchedProductions = new Set<string>();
 
@@ -135,7 +137,23 @@ export async function GET(req: Request) {
   await Promise.all(
     sceneList.map(async (s) => {
       const status = await pollRunPod(s.runpod_job_id!);
+
+      // If RunPod returns null (job not found / purged) AND scene is older
+      // than 90 minutes, mark it expired. RunPod auto-deletes job data after
+      // ~1 hour of completion, so no point polling any further.
       if (!status) {
+        const ageMs = Date.now() - new Date(s.created_at).getTime();
+        if (ageMs > EXPIRED_AGE_MS) {
+          await supabase
+            .from("production_scenes")
+            .update({
+              status: "failed",
+              error_message: `RunPod job expired (age: ${Math.round(ageMs / 60000)}min) — retry from scratch`,
+            })
+            .eq("id", s.id);
+          expired++;
+          touchedProductions.add(s.production_id);
+        }
         return;
       }
 
@@ -267,13 +285,14 @@ export async function GET(req: Request) {
     checked: sceneList.length,
     completed,
     failed,
+    expired,
     stillRunning,
     assembliesTriggered: triggered.length,
     triggeredProductionIds: triggered.map((id) => id.substring(0, 8)),
     durationMs,
   };
   console.log(
-    `[RECOVER-SCENES] Done in ${durationMs}ms: ${completed} completed, ${failed} failed, ${stillRunning} still running, ${triggered.length} assemblies started`
+    `[RECOVER-SCENES] Done in ${durationMs}ms: ${completed} completed, ${failed} failed, ${expired} expired, ${stillRunning} still running, ${triggered.length} assemblies started`
   );
 
   return NextResponse.json(summary);

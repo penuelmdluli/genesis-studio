@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Include ffmpeg binary in serverless function bundles (for video trimming)
+  // ffmpeg-installer uses dynamic platform-specific requires that Turbopack
+  // can't bundle. Mark it as external so it's loaded at runtime from node_modules,
+  // and trace-include the binary so Vercel ships it with the serverless function.
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg"],
   outputFileTracingIncludes: {
     "/api/**": ["./node_modules/@ffmpeg-installer/**/*"],
   },

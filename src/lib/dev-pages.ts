@@ -126,7 +126,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "entertainment_hook",
     hashtags: ["#PopCulture", "#Entertainment", "#CelebNews", "#Trending", "#Viral", "#Breaking"],
     enabled: true,
-    facebook_page_key: "pop_culture_buzz",
+    // Repointed from pop_culture_buzz (no FB page exists) → motivation (active page)
+    facebook_page_key: "motivation",
     youtube_enabled: true,
     topics_per_cycle: 2,
     // Boosted breaking_news + added geopolitics for celebrity-politics crossover

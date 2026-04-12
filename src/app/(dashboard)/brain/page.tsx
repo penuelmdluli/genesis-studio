@@ -82,8 +82,9 @@ const EXAMPLE_CONCEPTS = [
 const TRANSITION_OPTIONS: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out"];
 
 export default function BrainStudioPage() {
-  const { user } = useStore();
+  const { user, isInitialized } = useStore();
   const { toast } = useToast();
+  const isLoading = !isInitialized;
 
   // State
   const [brainState, setBrainState] = useState<BrainState>("input");
@@ -355,6 +356,16 @@ export default function BrainStudioPage() {
     (soundEffects ? scenesEstimate * 30 : 0);
 
   const isLocked = !user || (!user.isOwner && user.plan === "free");
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <GenesisLoader size="lg" text="Loading Brain Studio..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PageTransition>

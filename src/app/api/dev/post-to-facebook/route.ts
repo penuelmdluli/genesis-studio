@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSignedDownloadUrl, videoStorageKey } from "@/lib/storage";
+import { recordPostForLearning } from "@/lib/intelligence/fb-insights-fetcher";
 
 export const maxDuration = 120;
 
@@ -226,6 +227,17 @@ export async function POST(req: NextRequest) {
         pageName: page.name,
         ...result,
       });
+
+      // Record successful posts for the intelligence learning system
+      if (result.success && result.postId) {
+        recordPostForLearning({
+          pageId: post.pageKey,
+          fbPostId: result.postId,
+          fbVideoId: post.videoId,
+          headline: post.caption?.slice(0, 200),
+          hookText: post.caption?.split("\n")[0]?.slice(0, 100),
+        }).catch((err) => console.warn("[FB POST] Failed to record for learning:", err));
+      }
 
       // 3s delay between posts to avoid rate limits
       if (posts.indexOf(post) < posts.length - 1) {

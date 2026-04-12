@@ -2,19 +2,16 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { SkeletonCard, SkeletonVideoCard } from "@/components/ui/skeleton";
-import { PageTransition, StaggerGroup, StaggerItem, AnimatedCounter, MotionSection, GlowCard, motion } from "@/components/ui/motion";
+import { PageTransition, StaggerGroup, StaggerItem, AnimatedCounter, MotionSection, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Sparkles,
   Film,
   Zap,
-  TrendingUp,
   Clock,
   ArrowRight,
   Play,

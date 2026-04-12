@@ -40,8 +40,8 @@ type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
-// Motion control supports 5s or 10s
-const MOTION_DURATIONS = [5, 10];
+// Motion control supported durations
+const MOTION_DURATIONS = [5, 10, 15, 20];
 
 export default function MotionControlPage() {
   const { user, addJob, updateCreditBalance, isInitialized } = useStore();
@@ -65,7 +65,7 @@ export default function MotionControlPage() {
   // Model & quality
   const [model, setModel] = useState<MotionModel>("kling-v3");
   const [quality, setQuality] = useState<MotionQuality>("standard");
-  const [duration, setDuration] = useState(5);
+  const [duration, setDuration] = useState(10);
   const [enableAudio, setEnableAudio] = useState(false);
   const [keepOriginalSound, setKeepOriginalSound] = useState(false);
   const [seed, setSeed] = useState<number | undefined>(undefined);
@@ -78,7 +78,7 @@ export default function MotionControlPage() {
 
   // Credit cost estimation (matches server-side estimateMotionCost)
   const ratePerSec = quality === "pro" ? 0.14 : 0.07;
-  const creditCost = Math.ceil(ratePerSec * duration * 300);
+  const creditCost = Math.ceil(ratePerSec * duration * 400);
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
 
   const filteredEffects = FUN_EFFECTS.filter(
@@ -106,7 +106,7 @@ export default function MotionControlPage() {
         URL.revokeObjectURL(url);
         return;
       }
-      setDuration(videoDur <= 7 ? 5 : 10);
+      setDuration(videoDur <= 7 ? 5 : videoDur <= 12 ? 10 : videoDur <= 17 ? 15 : 20);
       setMotionVideo(file);
       setSelectedEffect(null);
       setMotionVideoPreview(url);

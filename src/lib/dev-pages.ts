@@ -13,6 +13,8 @@ export interface DevPageConfig {
   youtube_enabled?: boolean;        // Whether to post to YouTube Shorts
   topics_per_cycle: number;         // How many unique topics to generate per cycle (default 2)
   niche_weights?: Record<string, number>; // Weight per niche for topic scoring (higher = preferred)
+  voiceoverLanguage?: string;       // African language code (e.g. "en-ZA", "en-NG") — defaults to "en-ZA"
+  voiceoverCountry?: string;        // Country code (e.g. "ZA", "NG") for script validation
 }
 
 export const DEV_PAGES: Record<string, DevPageConfig> = {
@@ -31,6 +33,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 1,
     niche_weights: { mbs_episodes: 5, baby_scenarios: 5, motivation: 2, health_wellness: 1 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   africa_2050: {
     id: "africa_2050_dev",
@@ -49,6 +53,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { breaking_news: 4, geopolitics: 4, afrofuturism: 3, african_cities: 2, tech: 2, ai_disruption: 2 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   afrika_toons: {
     id: "afrika_toons_dev",
@@ -66,6 +72,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { breaking_news: 4, geopolitics: 4, news_animated: 3, african_folklore: 1 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   tech_pulse_africa: {
     id: "tech_pulse_africa_dev",
@@ -83,6 +91,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { ai_news: 4, tech: 3, ai_disruption: 3, breaking_news: 2 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   world_news_animated: {
     id: "world_news_animated_dev",
@@ -100,6 +110,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { geopolitics: 5, breaking_news: 5, news_animated: 3 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   pop_culture_buzz: {
     id: "pop_culture_buzz_dev",
@@ -116,6 +128,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { entertainment: 4, celebrity: 4, viral_moments: 3, breaking_news: 2 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
   ai_revolution: {
     id: "ai_revolution_dev",
@@ -132,6 +146,8 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     youtube_enabled: true,
     topics_per_cycle: 2,
     niche_weights: { ai_news: 4, ai_disruption: 4, tech: 3, breaking_news: 2, geopolitics: 2 },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
   },
 };
 

@@ -15,7 +15,7 @@ import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user } = useStore();
+  const { user, isInitialized } = useStore();
   const { toast } = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);

@@ -47,7 +47,14 @@ const iconStyles: Record<ToastType, string> = {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((message: string, type: ToastType = "info", duration: number = 4000) => {
+  const addToast = useCallback((message: string, type: ToastType = "info", duration?: number) => {
+    const defaultDurations: Record<ToastType, number> = {
+      success: 3000,
+      error: 5000,
+      warning: 5000,
+      info: 4000,
+    };
+    duration = duration ?? defaultDurations[type];
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { id, message, type, duration }]);
     setTimeout(() => {

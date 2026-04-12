@@ -118,7 +118,7 @@ export async function startAssembly(
         try {
           const voResult = await generatePerSceneVoiceover(
             plan.scenes,
-            "en-US" // Default language for recovery
+            (production as unknown as Record<string, unknown>)?.voiceoverLanguage as string || "en-US"
           );
           if (voResult.clips.length > 0) {
             // Store voiceover URL
@@ -247,7 +247,7 @@ export async function startAssembly(
           const { requestId } = await submitMMAudioJob(
             scene.outputVideoUrl!,
             audioPrompt,
-            sceneDef?.duration || 5
+            sceneDef?.duration || 8
           );
           state.mmaudioJobs[scene.id] = { requestId, status: "IN_QUEUE" };
           needsMMAudio = true;
@@ -798,7 +798,7 @@ async function pollConcatPhase(
           const sceneDurations: number[] = [];
           for (const url of validUrls) {
             const dur = await getMediaDuration(url);
-            sceneDurations.push(dur > 0 ? dur : 5); // Default 5s if metadata fails
+            sceneDurations.push(dur > 0 ? dur : 8); // Default 8s if metadata fails
           }
 
           const crossfadeDurationSec = 0.5; // 0.5s overlap between scenes
@@ -1363,7 +1363,7 @@ async function pollMixFinalPhase(
         const sceneDef = planData?.scenes?.find(
           (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === completedScenes[i].sceneNumber
         );
-        sumFromScenes += sceneDef?.duration || 5;
+        sumFromScenes += sceneDef?.duration || 8;
       }
       realDurationSec = sumFromScenes;
       console.log(`[ASSEMBLY] Duration from scene measurement: ${realDurationSec}s`);
@@ -1721,7 +1721,7 @@ async function finalizeAssembly(
       const sceneDef = plan?.scenes?.find(
         (sd: { sceneNumber: number; duration?: number }) => sd.sceneNumber === s.sceneNumber
       );
-      return sum + (sceneDef?.duration || 5);
+      return sum + (sceneDef?.duration || 8);
     }, 0);
   }
 

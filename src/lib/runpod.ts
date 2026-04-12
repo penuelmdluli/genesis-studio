@@ -192,7 +192,7 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
       // RunPod Hub public endpoints: wan-2-2-t2v-720 and wan-2-2-i2v-720-lora
       // Hub constraints: size must be "1280*720" or "720*1280", duration must be 5 or 8
       const hubSize = params.aspectRatio === "portrait" ? "720*1280" : "1280*720";
-      const hubDuration = params.duration >= 7 ? 8 : 5;
+      const hubDuration = params.duration <= 5 ? 5 : 8;
 
       if (params.type === "i2v" && params.inputImageUrl) {
         // Image-to-video: wan-2-2-i2v-720-lora endpoint

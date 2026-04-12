@@ -8,6 +8,9 @@
 import { VoiceoverTiming, SoundDesign } from "@/types";
 import { BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { fal } from "@fal-ai/client";
+import { getAfricanVoiceConfig, isAfricanLanguage } from "@/lib/africa/voice-config";
+import { formatScriptForTTS } from "@/lib/africa/script-formatter";
+import { applyPronunciationCorrections } from "@/lib/africa/pronunciation-guide";
 
 // Configure FAL client (may already be configured elsewhere, but safe to call again)
 fal.config({ credentials: process.env.FAL_KEY || "" });
@@ -85,19 +88,26 @@ export async function generateVoiceover(
     return { type: "voiceover", url: "", duration: estimateVoiceoverDuration(script), metadata: { skipped: true } };
   }
 
-  // Resolve Kokoro endpoint and voice
+  // Resolve Kokoro endpoint and voice — African languages get optimized params
+  const africanConfig = getAfricanVoiceConfig(language);
   const voiceId = voice || getDefaultVoice(language);
-  const kokoroEndpoint = KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
-  const kokoroVoice = KOKORO_VOICES[voiceId] || "af_heart";
+  const kokoroEndpoint = africanConfig?.kokoroEndpoint || KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
+  const kokoroVoice = africanConfig?.voice || KOKORO_VOICES[voiceId] || "af_heart";
+  const kokoroSpeed = africanConfig?.speed || 1;
+
+  // Format script for African TTS: pronunciation corrections, pauses, emphasis
+  const ttsScript = isAfricanLanguage(language)
+    ? formatScriptForTTS(script, language)
+    : script;
 
   try {
-    console.log(`[BRAIN AUDIO] Generating voiceover via Kokoro TTS: ${kokoroEndpoint} voice=${kokoroVoice}`);
+    console.log(`[BRAIN AUDIO] Generating voiceover via Kokoro TTS: ${kokoroEndpoint} voice=${kokoroVoice} speed=${kokoroSpeed}${africanConfig ? " (African optimized)" : ""}`);
 
     const result = await fal.subscribe(kokoroEndpoint, {
       input: {
-        prompt: script,
+        prompt: ttsScript,
         voice: kokoroVoice,
-        speed: 1,
+        speed: kokoroSpeed,
       },
       logs: false,
     });
@@ -184,9 +194,12 @@ export async function generatePerSceneVoiceover(
     return { clips: [], fullUrl: "", fullDuration: 0, sceneAudioDurations: {} };
   }
 
+  // African languages get optimized voice params
+  const africanConfig = getAfricanVoiceConfig(language);
   const voiceId = voice || getDefaultVoice(language);
-  const kokoroEndpoint = KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
-  const kokoroVoice = KOKORO_VOICES[voiceId] || "af_heart";
+  const kokoroEndpoint = africanConfig?.kokoroEndpoint || KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
+  const kokoroVoice = africanConfig?.voice || KOKORO_VOICES[voiceId] || "af_heart";
+  const kokoroSpeed = africanConfig?.speed || 0.9;
 
   // Calculate cumulative offsets
   let offsetMs = 0;
@@ -206,11 +219,16 @@ export async function generatePerSceneVoiceover(
     }
 
     try {
+      // Format for African TTS: pronunciation, pauses, emphasis
+      const ttsLine = isAfricanLanguage(language)
+        ? formatScriptForTTS(scene.voiceoverLine, language)
+        : scene.voiceoverLine;
+
       const result = await fal.subscribe(kokoroEndpoint, {
         input: {
-          prompt: scene.voiceoverLine,
+          prompt: ttsLine,
           voice: kokoroVoice,
-          speed: 0.9, // Slightly slower for cinematic pacing
+          speed: kokoroSpeed,
         },
         logs: false,
       });
@@ -262,8 +280,12 @@ export async function generatePerSceneVoiceover(
   let fullDuration = 0;
   if (fullScript) {
     try {
+      const fullTtsScript = isAfricanLanguage(language)
+        ? formatScriptForTTS(fullScript, language)
+        : fullScript;
+
       const fullResult = await fal.subscribe(kokoroEndpoint, {
-        input: { prompt: fullScript, voice: kokoroVoice, speed: 0.9 },
+        input: { prompt: fullTtsScript, voice: kokoroVoice, speed: kokoroSpeed },
         logs: false,
       });
       const fullData = fullResult.data as Record<string, unknown>;
@@ -308,6 +330,16 @@ function getDefaultVoice(language: string): string {
     "ar-SA": "ar-SA-HamedNeural",
     "zu-ZA": "zu-ZA-ThandoNeural",
     "af-ZA": "af-ZA-WillemNeural",
+    // African language codes (used by Africa engine)
+    "en-ZA": "en-US-GuyNeural",
+    "en-NG": "en-US-GuyNeural",
+    "en-GH": "en-US-GuyNeural",
+    "en-KE": "en-US-GuyNeural",
+    zu: "zu-ZA-ThandoNeural",
+    sw: "en-US-GuyNeural",
+    yo: "en-US-GuyNeural",
+    ig: "en-US-GuyNeural",
+    ha: "en-US-GuyNeural",
   };
   return voiceMap[language] || "en-US-GuyNeural";
 }
@@ -781,7 +813,7 @@ export async function submitComposeVideoJob(
   // ── BUG FIX: Pre-trim oversized audio sources to prevent output bloat ──
   // FAL compose extends output to longest track, so we must ensure no audio
   // track exceeds durationMs. Music and sound bed are the common culprits.
-  if (musicUrl && musicDurationMs && musicDurationMs > durationMs + 500) {
+  if (musicUrl && musicDurationMs && musicDurationMs > durationMs) {
     console.log(
       `[AUDIO] Music is ${(musicDurationMs / 1000).toFixed(1)}s but video is only ${(durationMs / 1000).toFixed(1)}s — pre-trimming to prevent bloat`
     );

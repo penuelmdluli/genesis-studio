@@ -170,7 +170,7 @@ export async function simplifiedFinalize(
         modelId: "wan-2.2" as ModelId,
         url: videoApiUrl,
         thumbnailUrl: "",
-        duration: completedScenes[0].duration || 5,
+        duration: completedScenes[0].duration || 8,
         resolution: "1280x720",
         fps: 24,
         aspectRatio: production.aspectRatio,

@@ -11,7 +11,7 @@ import { PageTransition, StaggerGroup, StaggerItem } from "@/components/ui/motio
 import { Check, Zap, CreditCard, ArrowRight, Sparkles, Gift, Copy, Users } from "lucide-react";
 
 export default function PricingPage() {
-  const { user } = useStore();
+  const { user, isInitialized } = useStore();
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPack, setLoadingPack] = useState<string | null>(null);

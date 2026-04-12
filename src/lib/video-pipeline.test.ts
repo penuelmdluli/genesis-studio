@@ -176,10 +176,9 @@ describe("Video serving endpoint", () => {
 
     // Must use job_id to find the R2 file
     expect(serveSource).toContain("video.job_id");
-    expect(serveSource).toContain("findVideoInR2");
+    expect(serveSource).toContain("findVideoKeyInR2");
 
-    // Must set correct content type
-    expect(serveSource).toContain("Content-Type");
-    expect(serveSource).toContain("Content-Disposition");
+    // Must return a response (presigned URL redirect or streaming)
+    expect(serveSource).toContain("Cache-Control");
   });
 });

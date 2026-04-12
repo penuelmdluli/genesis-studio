@@ -5,6 +5,8 @@
 
 import { BrainInput, ScenePlan, SceneDefinition, CharacterDefinition, VoiceoverTiming, ModelId, TransitionType, VideoStyle } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
+import { isAfricanLanguage } from "@/lib/africa/voice-config";
+import { AFRICAN_SCRIPT_RULES } from "@/lib/africa/script-generator";
 
 const BRAIN_SYSTEM_PROMPT = `You are Genesis Brain — a world-class AI cinematographer, director, and sound designer.
 You think like Roger Deakins shoots: every frame has PURPOSE. Every camera move has MOTIVATION.
@@ -71,7 +73,7 @@ COMPOSITION RULES:
  PRODUCTION RULES
 ═══════════════════════════════════════════
 
-1. Break the concept into 3-8 scenes (target duration ±10%). Each scene: 3-10 seconds (AI models generate best at 5s).
+1. Break the concept into 4-8 scenes (target duration ±10%). Each scene: 5-10 seconds (target 8 seconds per scene for maximum quality). Prefer LONGER scenes (8-10s) over shorter ones to achieve total duration.
 
 2. EVERY SCENE PROMPT must contain ALL of these layers (this is non-negotiable):
    a) SUBJECT — The TOPIC-RELEVANT visual: an object, environment, location, or action that DIRECTLY
@@ -120,12 +122,12 @@ COMPOSITION RULES:
    - NEVER repeat the same transition 3x in a row
 
 7. PACING — the heartbeat of cinema:
-   - SCENE 1 (HOOK): The most ARRESTING visual. Short (3-4s). Grab attention in 1 second.
+   - SCENE 1 (HOOK): The most ARRESTING visual. Punchy (5-6s). Grab attention in 1 second.
      Start in medias res — mid-action, mid-emotion. Never start with a static establishing shot.
-   - MIDDLE: Alternate rhythm — short punchy (3-4s) then longer breathing (6-8s).
+   - MIDDLE: Alternate rhythm — shorter punchy (5-6s) then longer breathing (8-10s).
      Alternate shot scales: wide → close-up → medium → extreme close-up → wide.
      Alternate energy: fast movement → slow contemplative → burst of action.
-   - FINAL SCENE: The RESOLVE — emotional payoff, callback, or cliffhanger. (4-6s).
+   - FINAL SCENE: The RESOLVE — emotional payoff, callback, or cliffhanger. (6-8s).
    - NEVER make all scenes the same length or same shot scale.
 
 8. VOICEOVER (if requested):
@@ -166,7 +168,20 @@ STYLE: ${input.style}
 ASPECT RATIO: ${input.aspectRatio === "landscape" ? "16:9" : input.aspectRatio === "portrait" ? "9:16" : "1:1"}`;
 
   if (input.voiceover) {
-    prompt += `\nVOICEOVER: Yes (language: ${input.voiceoverLanguage || "en-US"})`;
+    const lang = input.voiceoverLanguage || "en-US";
+    prompt += `\nVOICEOVER: Yes (language: ${lang})`;
+
+    // Inject African narration rules when targeting African languages
+    if (isAfricanLanguage(lang)) {
+      const africanRules = AFRICAN_SCRIPT_RULES[lang] || AFRICAN_SCRIPT_RULES["en-ZA"];
+      prompt += `\n\n═══ AFRICAN NARRATION RULES (MANDATORY) ═══
+Write ALL voiceoverLine fields using these EXACT rules. The narrator must sound AUTHENTICALLY AFRICAN — not generic English.
+
+${africanRules}
+
+CRITICAL: Every voiceoverLine MUST follow these rules. Generic English narration will be REJECTED.
+═══════════════════════════════════════════`;
+    }
   }
   if (input.voiceover && input.engagementCTA) {
     prompt += `\nENGAGEMENT CTA: Yes — final scene voiceoverLine MUST end with a varied like/comment/share CTA (see rule 8)`;
@@ -323,7 +338,7 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
       prompt: scene.prompt || scene.description || "",
       negativePrompt: scene.negativePrompt || getDefaultNegativePrompt(),
       modelId: selectedModel,
-      duration: Math.max(3, Math.min(10, scene.duration || 5)),
+      duration: Math.max(5, Math.min(10, scene.duration || 8)),
       resolution: scene.resolution || "720p",
       cameraMovement: scene.cameraMovement || "slow push-in",
       transitionIn: validTransitions.includes(scene.transitionIn) ? scene.transitionIn : "crossfade",

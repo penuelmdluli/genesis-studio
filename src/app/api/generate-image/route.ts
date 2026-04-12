@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
-import { deductCredits, isOwnerClerkId } from "@/lib/credits";
+import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
 
 const CREDIT_COST = 10; // 10 credits per 4 images
@@ -94,7 +94,6 @@ export async function POST(req: NextRequest) {
     if (imageUrls.length === 0) {
       console.error("[IMAGE-GEN] No images in response:", JSON.stringify(result).slice(0, 500));
       if (!ownerAccount) {
-        const { refundCredits } = await import("@/lib/credits");
         await refundCredits(user.id, CREDIT_COST, "", "Image generation returned no images — automatic refund");
       }
       return NextResponse.json({ error: "No images generated. Credits refunded." }, { status: 503 });

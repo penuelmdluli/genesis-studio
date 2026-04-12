@@ -227,7 +227,7 @@ export async function localAssembly(productionId: string): Promise<{
     }
 
     // Get total duration
-    let totalDuration = completedScenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+    let totalDuration = completedScenes.reduce((sum, s) => sum + (s.duration || 8), 0);
     try {
       const probeCmd = process.platform === "win32"
         ? `"${ffmpeg}" -i "${concatOutput}" 2>&1 | findstr /C:"Duration"`
@@ -336,7 +336,7 @@ export async function localAssembly(productionId: string): Promise<{
     const { srtContent } = generateSRT(
       sceneDefs.map((s: { sceneNumber: number; duration: number; voiceoverLine?: string }, i: number) => ({
         sceneNumber: s.sceneNumber || i + 1,
-        duration: s.duration || completedScenes[i]?.duration || 5,
+        duration: s.duration || completedScenes[i]?.duration || 8,
         voiceoverLine: s.voiceoverLine,
       }))
     );

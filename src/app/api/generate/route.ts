@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate credit cost
     const resolution = body.resolution || "720p";
-    const duration = body.duration || 5;
+    const duration = body.duration || 8;
     const creditCost = estimateCreditCost(
       body.modelId,
       resolution,

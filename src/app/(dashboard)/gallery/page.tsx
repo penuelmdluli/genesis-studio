@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,9 +18,7 @@ import {
   Play,
   Grid3x3,
   List,
-  Clock,
   Smartphone,
-  Music,
   ArrowUpDown,
   Wand2,
   ArrowUpRight,

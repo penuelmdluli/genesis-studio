@@ -79,6 +79,7 @@ export function Sidebar() {
     const items = [...baseNavItems];
     if (user?.isOwner) {
       items.push({ href: "/studio", label: "Content Engine", icon: Radio, section: "Automate", badge: "NEW" });
+      items.push({ href: "/intelligence", label: "Intelligence", icon: Brain, section: "Automate", badge: "AI" });
       items.push({ href: "/admin", label: "Admin", icon: Shield });
     }
     return items;

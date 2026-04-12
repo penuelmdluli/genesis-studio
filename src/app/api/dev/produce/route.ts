@@ -21,10 +21,13 @@ import { createProduction, executeProduction } from "@/lib/genesis-brain/orchest
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
 import { BrainInput, ScenePlan } from "@/types";
 import { after } from "next/server";
+import { applyIntelligenceToProduction } from "@/lib/intelligence/decision-engine";
 import {
   computeAdaptiveHints,
   preferredCtaPatternFor,
 } from "@/lib/dev-adaptive-hints";
+import { getDevPage } from "@/lib/dev-pages";
+import { getAfricanVoiceConfig, isAfricanLanguage } from "@/lib/africa/voice-config";
 
 const FAL_API_KEY = process.env.FAL_KEY || "";
 
@@ -34,8 +37,8 @@ export const maxDuration = 300;
 const DEV_USER_ID = "c1fccbb2-86e9-4d34-ae43-4a7cf4fd4a26";
 const DEV_CLERK_ID = process.env.OWNER_CLERK_IDS?.split(",")[0]?.trim() || "";
 
-// Best voice for all content — cinematic male narrator
-const DEFAULT_VOICE = "en-US-GuyNeural"; // Maps to Kokoro "am_adam"
+// Fallback voice for non-African content
+const DEFAULT_VOICE = "en-US-GuyNeural";
 const DEFAULT_LANGUAGE = "en-US";
 
 /**
@@ -248,14 +251,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Apply intelligence decisions to optimize production
+    let smartDuration = 20;
+    try {
+      const fbKey = (item.input_data as Record<string, unknown>)?.facebook_page_key as string || item.page_id;
+      const { config: smartConfig, decisions } = await applyIntelligenceToProduction(fbKey, {
+        category: item.pillar || "",
+        targetDuration: 20,
+      });
+      if (smartConfig.targetDuration && typeof smartConfig.targetDuration === "number") {
+        smartDuration = smartConfig.targetDuration;
+      }
+      if (decisions.length > 0) {
+        console.log(`[DEV PRODUCE] Intelligence applied ${decisions.length} decisions for ${pageName}`);
+      }
+    } catch (err) {
+      console.warn("[DEV PRODUCE] Intelligence engine failed (using defaults):", err);
+    }
+
+    // Look up page config for language — African pages get optimized voice
+    const pageConfig = getDevPage(item.page_id);
+    const pageLanguage = pageConfig?.voiceoverLanguage || DEFAULT_LANGUAGE;
+    const africanVoice = getAfricanVoiceConfig(pageLanguage);
+    const voiceForPage = africanVoice ? DEFAULT_VOICE : DEFAULT_VOICE; // Voice is resolved in audio.ts via language
+    console.log(`[DEV PRODUCE] Language: ${pageLanguage}${isAfricanLanguage(pageLanguage) ? " (African optimized)" : ""}`);
+
     const brainInput: BrainInput = {
       concept: videoPrompt,
-      targetDuration: 20,
+      targetDuration: smartDuration,
       style: "cinematic",
       aspectRatio: "portrait",
       voiceover: true,
-      voiceoverVoice: DEFAULT_VOICE,
-      voiceoverLanguage: DEFAULT_LANGUAGE,
+      voiceoverVoice: voiceForPage,
+      voiceoverLanguage: pageLanguage,
       music: true,
       captions: true,
       soundEffects: true,
@@ -266,8 +294,8 @@ export async function POST(req: NextRequest) {
     // Step 1: Plan with Hollywood cinematography prompt (~10-15s)
     let plan = await planProduction(brainInput);
     plan = consistencyEngine.applyAll(plan);
-    (plan as unknown as Record<string, unknown>).voiceoverVoice = DEFAULT_VOICE;
-    (plan as unknown as Record<string, unknown>).voiceoverLanguage = DEFAULT_LANGUAGE;
+    (plan as unknown as Record<string, unknown>).voiceoverVoice = voiceForPage;
+    (plan as unknown as Record<string, unknown>).voiceoverLanguage = pageLanguage;
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
@@ -329,7 +357,7 @@ export async function POST(req: NextRequest) {
       scenes: plan.scenes.length,
       i2v: !!plan.scenes[0]?.referenceImageUrl,
       pipeline: "Brain Studio Hollywood (Claude plan + FLUX Pro i2v + RunPod + FAL audio)",
-      voice: `${DEFAULT_VOICE} (Kokoro am_adam)`,
+      voice: `${voiceForPage} (${pageLanguage}${africanVoice ? `, Kokoro ${africanVoice.voice} @${africanVoice.speed}x` : ""})`,
       note: "Scenes submitted to RunPod in background. Call again for next item.",
     });
   } catch (error) {

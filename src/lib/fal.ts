@@ -68,7 +68,7 @@ export async function submitFalJob(params: {
   // Build input based on model
   const input: Record<string, unknown> = {
     prompt: params.prompt,
-    duration: String(params.duration || 5),
+    duration: String(params.duration || 10),
     aspect_ratio: toFalAspectRatio(params.aspectRatio),
   };
 

@@ -44,16 +44,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid voiceId" }, { status: 400 });
     }
 
-    // Check cache
+    // Check cache (and clean expired entries)
     const cached = previewCache.get(voiceId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return new NextResponse(new Uint8Array(cached.buffer), {
-        headers: {
-          "Content-Type": "audio/mpeg",
-          "Content-Length": cached.buffer.length.toString(),
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
+    if (cached) {
+      if (Date.now() - cached.timestamp < CACHE_TTL) {
+        return new NextResponse(new Uint8Array(cached.buffer), {
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Content-Length": cached.buffer.length.toString(),
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+      previewCache.delete(voiceId);
     }
 
     const edgeVoice = VOICE_MAP[voiceId];

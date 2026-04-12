@@ -965,39 +965,6 @@ export async function submitTrimVideoJob(
   return { requestId: result.request_id };
 }
 
-/**
- * Trim the first N seconds from a video (removes face fade-in).
- * Synchronous — awaits completion and returns the trimmed video URL.
- * Used before assembly to strip the model's default face opening.
- */
-export async function trimSceneStart(
-  videoUrl: string,
-  trimSeconds: number = 3
-): Promise<string> {
-  if (!videoUrl || trimSeconds <= 0) return videoUrl;
-  try {
-    const result = await fal.subscribe("fal-ai/workflow-utilities/trim-video", {
-      input: {
-        video_url: videoUrl,
-        start_time: trimSeconds,
-        end_time: 9999, // effectively "to end"
-      },
-      logs: false,
-    });
-    const data = result.data as Record<string, unknown>;
-    const video = data?.video as { url: string } | undefined;
-    if (video?.url) {
-      console.log(`[AUDIO] Trimmed ${trimSeconds}s from start: ${video.url.substring(0, 60)}...`);
-      return video.url;
-    }
-    console.warn(`[AUDIO] Trim returned no video URL, using original`);
-    return videoUrl;
-  } catch (err) {
-    console.warn(`[AUDIO] Trim-start failed (using original):`, err);
-    return videoUrl;
-  }
-}
-
 export async function submitSpeedAdjustJob(
   videoUrl: string,
   targetDurationMs: number

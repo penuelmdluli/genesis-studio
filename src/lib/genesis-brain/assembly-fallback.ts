@@ -13,7 +13,6 @@ import {
   getProductionScenes,
   updateProduction,
 } from "./orchestrator";
-import { trimSceneStart } from "./audio";
 import { createVideo } from "@/lib/db";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId } from "@/types";
@@ -135,9 +134,7 @@ export async function simplifiedFinalize(
       return;
     }
 
-    // Trim first 3s from scene (anti-face)
-    const rawUrl = completedScenes[0].outputVideoUrl!;
-    const sourceUrl = await trimSceneStart(rawUrl, 3);
+    const sourceUrl = completedScenes[0].outputVideoUrl!;
     console.log(`[ASSEMBLY FALLBACK] Using scene ${completedScenes[0].sceneNumber} as final video (single-scene fallback)`);
 
     const videoId = randomUUID();

@@ -18,7 +18,6 @@ import {
   submitSpeedAdjustJob,
   submitTrimVideoJob,
   submitLoudnormJob,
-  trimSceneStart,
   getMediaDuration,
   checkFalQueueStatus,
   getFalQueueResult,
@@ -214,25 +213,11 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // ── ANTI-FACE TRIM: Strip first 3 seconds from every scene ──
-    // The video model (wan-2.2) generates a face/person in the opening
-    // frames that fades into the real content. Trimming 3s removes it.
-    const TRIM_START_SECONDS = 3;
-    console.log(`[ASSEMBLY] Trimming first ${TRIM_START_SECONDS}s from ${completedScenes.length} scenes (anti-face)...`);
-    const trimPromises = completedScenes.map(async (scene) => {
-      if (!scene.outputVideoUrl) return;
-      try {
-        const trimmedUrl = await trimSceneStart(scene.outputVideoUrl, TRIM_START_SECONDS);
-        if (trimmedUrl !== scene.outputVideoUrl) {
-          scene.outputVideoUrl = trimmedUrl;
-          console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: trimmed → ${trimmedUrl.substring(0, 50)}...`);
-        }
-      } catch (err) {
-        console.warn(`[ASSEMBLY] Scene ${scene.sceneNumber}: trim failed, using original`, err);
-      }
-    });
-    await Promise.all(trimPromises);
-    console.log(`[ASSEMBLY] Anti-face trim complete`);
+    // NOTE: Previously attempted FAL-based trim here, but the
+    // fal-ai/workflow-utilities/trim-video endpoint does not exist (returns 404).
+    // Wan-2.2 outputs are only ~5s clips, so trimming would leave too little content.
+    // Face-flash mitigation happens at the dashboard level via #t=X URL fragments
+    // on all <video> players. The VideoPlayer component seeks past the face frame.
 
     let needsMMAudio = false;
 

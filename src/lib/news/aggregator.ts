@@ -350,15 +350,15 @@ async function fetchFromReddit(): Promise<UnifiedNewsItem[]> {
 
 function buildContentAngle(category: string, niche: string): string {
   const angles: Record<string, string> = {
-    breaking: "BREAKING — create a dramatic 30-second animated news bulletin with red-alert graphics and urgent atmosphere",
-    technology: "Tech breakthrough — create a sleek, futuristic animated explainer with holographic visuals",
-    entertainment: "Entertainment exclusive — create a glamorous animated celebrity news clip with red carpet energy",
-    culture: "Inspirational story — create an emotional, cinematic animated short that moves hearts",
-    finance: "Market alert — create a high-energy animated financial report with charts and ticker graphics",
-    africa: "African spotlight — create a vibrant, Afrofuturistic animated piece celebrating African innovation",
-    viral: "Viral explosion — create a fast-paced, meme-worthy animated clip with trending energy",
+    breaking: "BREAKING — create a photorealistic cinematic news report showing the actual event with documentary urgency",
+    technology: "Tech revelation — create a sleek photorealistic tech showcase with real devices, labs, and data centers",
+    entertainment: "Entertainment exclusive — create a glamorous photorealistic celebrity moment with red carpet energy",
+    culture: "Powerful story — create an emotional photorealistic cinematic short that captures real human moments",
+    finance: "Market shock — create a dramatic photorealistic financial scene with trading floors and market tension",
+    africa: "African power — create a photorealistic cinematic piece showing modern African innovation and progress",
+    viral: "Viral moment — create a scroll-stopping photorealistic clip capturing the actual trending event",
   };
-  return angles[category] || `Create an engaging animated video about this ${niche} topic`;
+  return angles[category] || `Create a photorealistic cinematic video about this ${niche} topic — show the real subject, not abstract graphics`;
 }
 
 // ── Source: Google Trends RSS ─────────────────────────────────

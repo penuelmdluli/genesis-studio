@@ -160,46 +160,74 @@ async function computeLearnedPillarBoost(): Promise<Record<string, number>> {
 /**
  * Build a video generation prompt from a trending topic + page config.
  */
+/**
+ * Build a video generation prompt that produces REALISTIC, content-focused
+ * visuals — NOT generic animations or talking heads. The viewer should
+ * immediately see what the story is about: tanks for war stories, courtrooms
+ * for legal stories, skylines for economics, labs for tech, etc.
+ *
+ * Key principles:
+ * - Show the SUBJECT of the news, not a presenter or abstract graphics
+ * - Use photorealistic/documentary visual language, not cartoon
+ * - Every frame should be eye-catching enough to stop a scroll
+ * - Dramatic cinematography: low angles, slow motion, volumetric light
+ */
 function buildVideoPrompt(
   topic: UnifiedNewsItem,
   page: DevPageConfig,
   pillar: string,
 ): string {
-  const basePrompt = `${topic.content_angle}: ${topic.title}. ${topic.suggested_hook}`;
-
+  // Core visual direction based on pillar — all push for REALISTIC content
   const styleCues: Record<string, string> = {
-    mbs_episodes:
-      "Animated African babies in colorful outfits, playful expressions, vibrant South African setting.",
-    baby_scenarios:
-      "Cute animated African babies in fun scenarios, bright colors, joyful atmosphere.",
-    afrofuturism:
-      "Afrofuturistic cityscape, advanced technology, African aesthetic, vibrant neon colors, cinematic.",
-    african_cities:
-      "Modern African city skyline, futuristic architecture, bustling streets, golden hour lighting.",
-    news_animated:
-      "Animated news scene, dynamic text overlays, newsroom setting, bold colors, dramatic urgency.",
+    // WAR & POLITICS — the biggest engagement drivers
     breaking_news:
-      "Breaking news animation, red alert graphics, globe spinning, dramatic lighting, urgent atmosphere.",
+      "Hyper-realistic cinematic documentary style. Show the ACTUAL event: if war — show battlefield smoke, ruins, military vehicles, soldiers; if politics — show leaders at podiums, parliament buildings, protest crowds, flags. Dramatic low-angle shots, shallow depth of field, dust particles in golden/red light. No presenters, no text overlays — let the visuals tell the story. 4K cinematic quality, Deakins-level lighting.",
     geopolitics:
-      "World map with highlighted regions, military and diplomatic imagery, dramatic documentary style, cinematic tension.",
-    african_folklore:
-      "African folklore animation, traditional art style, mystical atmosphere, rich earth tones.",
+      "Photorealistic geopolitical thriller style. Show military operations, diplomatic meetings in grand halls, aircraft carriers, missile launches, border checkpoints, UN assembly halls. Aerial drone shots of conflict zones, night-vision style footage, satellite imagery feel. Dark moody color grade with orange/teal contrast. Documentary tension. No cartoon, no animation.",
+    news_animated:
+      "Cinematic news documentary style. Show the real-world setting of the story: courtrooms, city streets, government buildings, hospitals, laboratories. Photorealistic rendering with dramatic lighting — think Netflix documentary quality. Handheld camera feel for urgency, steady dolly shots for gravitas. No generic newsroom graphics.",
+
+    // TECH & AI
     ai_news:
-      "Tech news visualization, AI and robots, digital neural networks, blue and white futuristic color scheme.",
+      "Sleek photorealistic tech visualization. Show real data centers with blinking server racks, robot arms in factories, neural network visualizations overlaid on real cityscapes, holographic displays in dark rooms. Blade Runner meets Silicon Valley. Blue and cyan accent lighting, lens flares, shallow depth of field on circuit boards and chips.",
     tech:
-      "Technology showcase, sleek devices, data centers, digital innovation, modern tech aesthetic.",
+      "Photorealistic technology showcase. Show the actual devices, gadgets, screens, factory floors, lab environments relevant to the story. Close-up macro shots of circuits, wide shots of tech campuses. Clean modern aesthetic, natural light mixed with screen glow. Product-reveal cinematography quality.",
     ai_disruption:
-      "Dramatic visualization of AI replacing workers, robots in offices, before/after tech transformation, cinematic.",
+      "Dramatic documentary style showing AI's real-world impact. Empty office chairs, robots working assembly lines, split-screen before/after of automated vs manual work. Moody cinematic lighting, slow dolly pushes, time-lapse of changing landscapes. Dark undertones, cautionary atmosphere.",
+
+    // ENTERTAINMENT & VIRAL
     entertainment:
-      "Hollywood glamour, red carpet, celebrity lifestyle, vibrant entertainment industry, cinematic close-ups.",
+      "High-energy entertainment industry visuals. Red carpet arrivals, concert stages with dramatic lighting, movie premiere crowds, paparazzi flashes. Glamorous but REAL — photorealistic faces, venues, crowds. Warm golden tones, lens flares, bokeh backgrounds. Celebrity magazine quality.",
     celebrity:
-      "Celebrity portrait style, dramatic lighting, paparazzi flashes, red carpet atmosphere, bold colors.",
+      "Paparazzi documentary style. Photorealistic street scenes, luxury settings, fashion close-ups, dramatic confrontation moments. High contrast, flash photography feel mixed with cinematic slow-motion. Tabloid energy but cinema quality.",
     viral_moments:
-      "Dynamic social media style, trending graphics, reaction shots, bold text overlays, viral energy.",
+      "Social media documentary style. Show the actual moment going viral: street scenes, crowd reactions, dramatic reveals. Handheld camera energy, quick zooms, reaction-shot framing. Saturated colors, high contrast, meme-worthy composition. Scroll-stopping visual.",
+
+    // AFRICA-FOCUSED
+    afrofuturism:
+      "Afrofuturistic photorealism. Modern African cities with advanced infrastructure, solar farms across savannas, tech hubs in Lagos/Nairobi/Joburg, African professionals in cutting-edge labs. Vibrant Afrocentric color palette — gold, green, deep purple. Cinematic drone shots of African skylines. Pride and progress, not poverty.",
+    african_cities:
+      "Photorealistic African urban documentary. Bustling city streets, modern architecture alongside traditional markets, aerial shots of growing skylines. Golden hour lighting, warm earth tones. Show the energy and ambition of African cities. Drone cinematography quality.",
+    african_folklore:
+      "Cinematic African mythology. Photorealistic mystical landscapes — ancient baobab trees, sacred rivers, starlit savannas. Cultural artifacts and masks rendered in dramatic lighting. Rich earth tones with magical amber/gold accents. Miyazaki-meets-Africa visual language.",
+
+    // LIFESTYLE
+    mbs_episodes:
+      "Adorable photorealistic African babies in colorful traditional and modern outfits. Playful expressions, bright South African settings. Warm, joyful, heart-melting close-ups. Soft natural lighting, bokeh backgrounds. Think baby photography studio quality.",
+    baby_scenarios:
+      "Cute photorealistic African babies in fun everyday scenarios. Bright colors, joyful energy, South African cultural touches. Warm sunlight, natural settings. Instagram-worthy baby photography style.",
+    motivation:
+      "Cinematic motivational visuals. Show real people overcoming challenges: athletes training at dawn, entrepreneurs working late, communities building together. Dramatic silhouettes against sunrise/sunset. Inspirational documentary quality with warm golden tones.",
+    health_wellness:
+      "Clean photorealistic health and wellness imagery. Show real bodies in motion: running, yoga, cooking healthy food, meditation in nature. Soft natural light, clean compositions. Wellness-magazine quality with cinematic depth.",
+    finance:
+      "Dramatic financial documentary style. Trading floors, stock tickers, city skylines reflecting market energy, close-ups of charts and data. Dark moody lighting with green/red accent colors. Wolf of Wall Street meets Bloomberg aesthetic.",
   };
 
-  const style = styleCues[pillar] || "Cinematic, high quality, dramatic lighting.";
-  return `${basePrompt} Style: ${style}`;
+  const style = styleCues[pillar] || "Photorealistic cinematic documentary style. Show the actual subject of the story with dramatic lighting, shallow depth of field, 4K quality. No cartoons, no presenters — pure visual storytelling.";
+
+  // Build a prompt that tells the AI WHAT to show, not just how to style it
+  return `Create a photorealistic cinematic video about: ${topic.title}. ${topic.suggested_hook}. Visual direction: ${style}`;
 }
 
 // ──────────────────────────────────────────────────────────

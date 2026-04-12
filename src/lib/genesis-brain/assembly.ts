@@ -213,34 +213,10 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // ── LIGHT SAFETY TRIM (server-side ffmpeg) ──
-    // ltx-video (our new primary model) does NOT have the wan-2.2 default-person
-    // issue. We keep a small 0.3s safety trim to cut any compression/warm-up
-    // artifacts at clip boundaries but preserve nearly all content.
-    const TRIM_START_SECONDS = 0.3;
-    console.log(`[ASSEMBLY] Trimming first ${TRIM_START_SECONDS}s from ${completedScenes.length} scenes (anti-face, ffmpeg)...`);
-    const { trimVideoStart } = await import("./video-trim");
-    const prod = await getProduction(productionId);
-    const userId = prod?.userId || "";
-    const trimPromises = completedScenes.map(async (scene) => {
-      if (!scene.outputVideoUrl || !userId) return;
-      try {
-        const trimmedUrl = await trimVideoStart(scene.outputVideoUrl, TRIM_START_SECONDS, userId);
-        if (trimmedUrl) {
-          scene.outputVideoUrl = trimmedUrl;
-          // Persist to DB so dashboard shows trimmed video in scene cards
-          await supabase
-            .from("production_scenes")
-            .update({ output_video_url: trimmedUrl })
-            .eq("id", scene.id);
-          console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: trimmed and persisted`);
-        }
-      } catch (err) {
-        console.warn(`[ASSEMBLY] Scene ${scene.sceneNumber}: trim failed, using original`, err);
-      }
-    });
-    await Promise.all(trimPromises);
-    console.log(`[ASSEMBLY] Anti-face trim complete`);
+    // NOTE: No anti-face trim needed anymore. We use i2v with FLUX Pro
+    // reference images (see dev/produce/injectReferenceImages). The model
+    // starts from our environment image, eliminating the default face at
+    // generation time. Clips are now clean from frame 0.
 
     let needsMMAudio = false;
 

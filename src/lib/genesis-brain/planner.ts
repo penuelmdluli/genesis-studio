@@ -103,9 +103,9 @@ COMPOSITION RULES:
    Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
 4. ONLY use RunPod models (FAL credits unavailable):
-   - "ltx-video" — PRIMARY MODEL — cinematic quality, fast (~30s), no default-person bias
-   - "hunyuan-video" — fallback for complex scenes
-   - Default EVERYTHING to "ltx-video" (wan-2.2 disabled — injects default human face)
+   - "wan-2.2" — PRIMARY MODEL — cinematic quality (used with i2v reference images
+     to override the model's default-person starting frame)
+   - Default everything to "wan-2.2" — other endpoints have no GPU workers
    - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL disabled)
    - Audio is added via MMAudio post-processing
 
@@ -152,7 +152,7 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "ltx-video" (preferred), "hunyuan-video"
+VALID MODELS: "wan-2.2" (primary, uses i2v with FLUX Pro reference frames)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -316,22 +316,21 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
 
   // FAL models to force-swap to RunPod (FAL credits exhausted)
   const FAL_MODELS: string[] = ["kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"];
-  const RUNPOD_MODELS: ModelId[] = ["ltx-video", "hunyuan-video", "mochi-1", "wan-2.1-turbo"];
-  // wan-2.2 BANNED — injects default human face/presenter into every clip
-  const BANNED_MODELS: string[] = ["wan-2.2"];
+  const RUNPOD_MODELS: ModelId[] = ["wan-2.2", "ltx-video", "hunyuan-video", "mochi-1", "wan-2.1-turbo"];
 
-  // Validate each scene
+  // Validate each scene — force all to wan-2.2 (only endpoint with GPU workers)
   plan.scenes = plan.scenes.map((scene, i) => {
-    // Force-swap FAL AND banned models to ltx-video
-    let selectedModel: ModelId = "ltx-video";
+    let selectedModel: ModelId = "wan-2.2";
     if (validModels.includes(scene.modelId as ModelId)) {
-      if (FAL_MODELS.includes(scene.modelId as string) || BANNED_MODELS.includes(scene.modelId as string)) {
-        console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → ltx-video (wan-2.2 banned: default face / FAL disabled)`);
-        selectedModel = "ltx-video";
-      } else if (RUNPOD_MODELS.includes(scene.modelId as ModelId)) {
-        selectedModel = scene.modelId as ModelId;
+      if (FAL_MODELS.includes(scene.modelId as string)) {
+        console.log(`[BRAIN PLANNER] Swapping FAL model ${scene.modelId} → wan-2.2`);
+        selectedModel = "wan-2.2";
+      } else if (scene.modelId === "ltx-video" || scene.modelId === "hunyuan-video" || scene.modelId === "mochi-1" || scene.modelId === "wan-2.1-turbo") {
+        // Those endpoints have 0 workers — force to wan-2.2
+        console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → wan-2.2 (no workers on other endpoints)`);
+        selectedModel = "wan-2.2";
       } else {
-        selectedModel = "ltx-video"; // Default fallback
+        selectedModel = "wan-2.2";
       }
     }
 

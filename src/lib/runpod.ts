@@ -19,12 +19,20 @@ const ENDPOINT_MAP: Partial<Record<ModelId, string>> = {
   "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
 };
 
-// Wan 2.2 uses separate Hub endpoints for t2v vs i2v
-const WAN22_I2V_ENDPOINT = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
+// Wan 2.2 uses separate Hub endpoints for t2v vs i2v.
+// If the i2v endpoint env var is set to the Hub TEMPLATE NAME (not an endpoint ID),
+// it's not a real endpoint — fall back to the t2v endpoint which accepts `image` param.
+const WAN22_I2V_ENDPOINT_RAW = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
+// Endpoint IDs are typically 14 lowercase-alphanumeric chars. Template names have hyphens.
+const WAN22_I2V_ENDPOINT = /^[a-z0-9]{10,20}$/.test(WAN22_I2V_ENDPOINT_RAW)
+  ? WAN22_I2V_ENDPOINT_RAW
+  : "";
 
 // Get the correct endpoint for a model, considering generation type
 function getEndpointForModel(modelId: ModelId, type?: GenerationType): string {
   if (modelId === "wan-2.2" && (type === "i2v" || type === "motion")) {
+    // Verified: the t2v endpoint accepts `image` input for i2v mode when no
+    // dedicated i2v endpoint is deployed. This is how we route i2v jobs.
     return WAN22_I2V_ENDPOINT || ENDPOINT_MAP["wan-2.2"] || "";
   }
   return ENDPOINT_MAP[modelId] || "";

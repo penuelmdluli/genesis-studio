@@ -61,6 +61,7 @@ async function generateReferenceImage(scenePrompt: string): Promise<string | nul
       .replace(/cinematic,?\s*/gi, "")
       .replace(/4K,?\s*/gi, "")
       .replace(/film grain,?\s*/gi, "")
+      .replace(/No human face.*$/i, "") // strip our anti-face suffix (already enforced below)
       .trim();
 
     const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
@@ -70,7 +71,9 @@ async function generateReferenceImage(scenePrompt: string): Promise<string | nul
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        prompt: `${imagePrompt}, highly detailed, sharp focus, studio quality, photorealistic`,
+        // FLUX Pro only accepts prompt + image_size. No negative_prompt supported.
+        // Bake the "no humans" constraint directly into the positive prompt.
+        prompt: `${imagePrompt}, empty landscape, no people, no person, no human, no face, no figure, environment only, photorealistic, highly detailed, sharp focus, studio quality`,
         image_size: { width: 720, height: 1280 }, // Portrait for Reels
         num_images: 1,
         enable_safety_checker: false,
@@ -101,32 +104,31 @@ async function generateReferenceImage(scenePrompt: string): Promise<string | nul
 }
 
 /**
- * For each scene in the plan, generate a reference image and set referenceImageUrl.
- * Uses scene 1's image as the hero reference for all scenes (character consistency).
+ * Generate a PER-SCENE reference image for each scene in the plan.
+ * Runs in parallel. Used for i2v mode to force wan-2.2 to start from our
+ * environment image instead of its default-person frame.
  */
 async function injectReferenceImages(plan: ScenePlan): Promise<ScenePlan> {
   if (!FAL_API_KEY || plan.scenes.length === 0) return plan;
 
-  console.log(`[DEV PRODUCE] Generating hero reference image for i2v character consistency...`);
+  console.log(`[DEV PRODUCE] Generating ${plan.scenes.length} per-scene reference images (FLUX Pro, parallel)...`);
 
-  // Generate ONE hero reference from scene 1 — used for ALL scenes
-  // This ensures the same character/style appears consistently throughout
-  const heroPrompt = plan.scenes[0].prompt;
-  const heroImageUrl = await generateReferenceImage(heroPrompt);
+  const imagePromises = plan.scenes.map(async (scene) => {
+    const imageUrl = await generateReferenceImage(scene.prompt);
+    if (imageUrl) {
+      scene.referenceImageUrl = imageUrl;
+      console.log(`[DEV PRODUCE] Scene ${scene.sceneNumber} reference image ready`);
+    } else {
+      console.warn(`[DEV PRODUCE] Scene ${scene.sceneNumber} reference image FAILED (falling back to t2v for this scene)`);
+    }
+  });
+  await Promise.all(imagePromises);
 
-  if (!heroImageUrl) {
-    console.warn("[DEV PRODUCE] Hero reference image failed — falling back to t2v");
-    return plan;
-  }
-
-  // Apply hero reference to ALL scenes for maximum consistency
-  for (const scene of plan.scenes) {
-    scene.referenceImageUrl = heroImageUrl;
-  }
-
-  console.log(`[DEV PRODUCE] All ${plan.scenes.length} scenes set to i2v with hero reference image`);
+  const withRef = plan.scenes.filter((s) => s.referenceImageUrl).length;
+  console.log(`[DEV PRODUCE] ${withRef}/${plan.scenes.length} scenes have reference images (i2v mode)`);
   return plan;
 }
+
 
 function validateCronSecret(req: NextRequest): boolean {
   const secret =
@@ -299,9 +301,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-    // Step 1b: i2v disabled — RunPod wan-2-2-i2v-720-lora endpoint not deployed
-    // TODO: Re-enable when i2v endpoint is available
-    // plan = await injectReferenceImages(plan);
+    // Step 1b: i2v with FLUX Pro reference images — forces wan-2.2 to start
+    // from our environment image instead of its default-person frame.
+    // Confirmed: wan-2.2 t2v endpoint accepts `image` input for i2v mode.
+    plan = await injectReferenceImages(plan);
 
     // Step 2: Create production record
     brainInput.concept = concept;

@@ -494,7 +494,7 @@ describe("Planner", () => {
       );
     });
 
-    it("sanitizes invalid model IDs to ltx-video", async () => {
+    it("sanitizes invalid model IDs to wan-2.2", async () => {
       const planWithBadModel = {
         ...validPlanResponse,
         scenes: [
@@ -513,8 +513,7 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      // wan-2.2 banned (default human face); ltx-video is the new primary
-      expect(plan.scenes[0].modelId).toBe("ltx-video");
+      expect(plan.scenes[0].modelId).toBe("wan-2.2");
     });
 
     it("clamps scene duration to 5-10 range", async () => {

@@ -889,15 +889,13 @@ export default function BrainStudioPage() {
                         {/* Video preview / status indicator */}
                         <div className={`w-36 sm:w-48 shrink-0 ${aspectRatio === "portrait" ? "aspect-[9/16]" : "aspect-video"} relative overflow-hidden bg-black/40`}>
                           {isCompleted && scene.outputVideoUrl ? (
-                            // #t=3 URL fragment skips the first 3s (model's default face opening)
                             <video
-                              src={`${scene.outputVideoUrl}#t=3`}
+                              src={scene.outputVideoUrl}
                               className="w-full h-full object-cover"
                               muted
                               playsInline
                               autoPlay
                               loop
-                              preload="metadata"
                             />
                           ) : isProcessing ? (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/20">
@@ -1146,12 +1144,11 @@ export default function BrainStudioPage() {
                       <div key={scene.sceneNumber} className="shrink-0 w-40 sm:w-48 group">
                         <div className="aspect-video rounded-xl bg-black overflow-hidden relative cursor-pointer ring-1 ring-white/[0.06] group-hover:ring-violet-500/30 transition-all">
                           <video
-                            src={`${scene.outputVideoUrl}#t=3`}
+                            src={scene.outputVideoUrl}
                             className="w-full h-full object-cover"
                             muted
                             playsInline
-                            preload="metadata"
-                            onMouseEnter={(e) => { e.currentTarget.currentTime = 3; e.currentTarget.play().catch(() => {}); }}
+                            onMouseEnter={(e) => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
                             onMouseLeave={(e) => e.currentTarget.pause()}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

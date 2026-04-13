@@ -46,61 +46,88 @@ const DEFAULT_LANGUAGE = "en-US";
  * This image is then used for i2v (image-to-video) to get character consistency.
  * Returns the image URL or null on failure.
  */
-async function generateReferenceImage(scenePrompt: string): Promise<string | null> {
+async function generateReferenceImage(
+  scenePrompt: string,
+  sceneNum?: number,
+): Promise<string | null> {
   if (!FAL_API_KEY) {
     console.warn("[DEV PRODUCE] No FAL_KEY — skipping reference image generation");
     return null;
   }
 
-  try {
-    // Build an image-optimized prompt from the video prompt
-    // Strip camera movement/duration language, keep visual description
-    const imagePrompt = scenePrompt
-      .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle/gi, "")
-      .replace(/\d+mm|f\/[\d.]+/gi, "") // remove lens specs
-      .replace(/cinematic,?\s*/gi, "")
-      .replace(/4K,?\s*/gi, "")
-      .replace(/film grain,?\s*/gi, "")
-      .replace(/No human face.*$/i, "") // strip our anti-face suffix (already enforced below)
-      .trim();
+  // Build an image-optimized prompt from the video prompt
+  const imagePrompt = scenePrompt
+    .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle/gi, "")
+    .replace(/\d+mm|f\/[\d.]+/gi, "")
+    .replace(/cinematic,?\s*/gi, "")
+    .replace(/4K,?\s*/gi, "")
+    .replace(/film grain,?\s*/gi, "")
+    .replace(/No human face.*$/i, "")
+    .trim();
 
-    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${FAL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // FLUX Pro only accepts prompt + image_size. No negative_prompt supported.
-        // Bake the "no humans" constraint directly into the positive prompt.
-        prompt: `${imagePrompt}, empty landscape, no people, no person, no human, no face, no figure, environment only, photorealistic, highly detailed, sharp focus, studio quality`,
-        image_size: { width: 720, height: 1280 }, // Portrait for Reels
-        num_images: 1,
-        enable_safety_checker: false,
-        output_format: "jpeg",
-        num_inference_steps: 28,
-        guidance_scale: 3.5,
-      }),
-    });
+  const finalPrompt = `${imagePrompt}, empty landscape, no people, no person, no human, no face, no figure, environment only, photorealistic, highly detailed, sharp focus, studio quality`;
 
-    if (!falRes.ok) {
-      console.error("[DEV PRODUCE] FLUX Pro error:", await falRes.text().catch(() => "unknown"));
+  // Retry up to 3 times with exponential backoff for rate limit resilience
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+        method: "POST",
+        headers: {
+          "Authorization": `Key ${FAL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          image_size: { width: 720, height: 1280 },
+          num_images: 1,
+          enable_safety_checker: false,
+          output_format: "jpeg",
+          num_inference_steps: 28,
+          guidance_scale: 3.5,
+        }),
+      });
+
+      // Rate limited — back off and retry
+      if (falRes.status === 429 || falRes.status === 503) {
+        const waitMs = 2000 * attempt; // 2s, 4s, 6s
+        console.warn(`[DEV PRODUCE] FLUX rate-limited (${falRes.status}), attempt ${attempt}/${MAX_RETRIES}, waiting ${waitMs}ms...`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+
+      if (!falRes.ok) {
+        const errText = await falRes.text().catch(() => "unknown");
+        console.error(`[DEV PRODUCE] FLUX Pro error (${falRes.status}) scene ${sceneNum ?? "?"}: ${errText.slice(0, 200)}`);
+        // Non-rate-limit errors: retry once then give up
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        return null;
+      }
+
+      const result = await falRes.json();
+      const imageUrl = result.images?.[0]?.url;
+      if (!imageUrl) {
+        console.error(`[DEV PRODUCE] FLUX Pro returned no images scene ${sceneNum ?? "?"} attempt ${attempt}`);
+        if (attempt < MAX_RETRIES) continue;
+        return null;
+      }
+
+      console.log(`[DEV PRODUCE] Scene ${sceneNum ?? "?"} ref image (attempt ${attempt}): ${imageUrl.slice(0, 60)}...`);
+      return imageUrl;
+    } catch (err) {
+      console.error(`[DEV PRODUCE] FLUX attempt ${attempt} scene ${sceneNum ?? "?"} error:`, err instanceof Error ? err.message : err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1500 * attempt));
+        continue;
+      }
       return null;
     }
-
-    const result = await falRes.json();
-    const imageUrl = result.images?.[0]?.url;
-    if (!imageUrl) {
-      console.error("[DEV PRODUCE] FLUX Pro returned no images");
-      return null;
-    }
-
-    console.log(`[DEV PRODUCE] Reference image generated: ${imageUrl.slice(0, 80)}...`);
-    return imageUrl;
-  } catch (err) {
-    console.error("[DEV PRODUCE] Reference image generation failed:", err);
-    return null;
   }
+
+  return null;
 }
 
 /**
@@ -111,21 +138,30 @@ async function generateReferenceImage(scenePrompt: string): Promise<string | nul
 async function injectReferenceImages(plan: ScenePlan): Promise<ScenePlan> {
   if (!FAL_API_KEY || plan.scenes.length === 0) return plan;
 
-  console.log(`[DEV PRODUCE] Generating ${plan.scenes.length} per-scene reference images (FLUX Pro, parallel)...`);
+  console.log(`[DEV PRODUCE] Generating ${plan.scenes.length} per-scene reference images (FLUX Pro, SEQUENTIAL to avoid rate limits)...`);
 
-  const imagePromises = plan.scenes.map(async (scene) => {
-    const imageUrl = await generateReferenceImage(scene.prompt);
+  // Sequential to avoid FAL rate limits. FLUX Pro takes ~5s per image,
+  // so 4 scenes ~20s total. Worth it to guarantee every scene has a ref.
+  for (const scene of plan.scenes) {
+    const imageUrl = await generateReferenceImage(scene.prompt, scene.sceneNumber);
     if (imageUrl) {
       scene.referenceImageUrl = imageUrl;
-      console.log(`[DEV PRODUCE] Scene ${scene.sceneNumber} reference image ready`);
     } else {
-      console.warn(`[DEV PRODUCE] Scene ${scene.sceneNumber} reference image FAILED (falling back to t2v for this scene)`);
+      console.warn(`[DEV PRODUCE] Scene ${scene.sceneNumber} reference image FAILED after 3 retries — will fall back to t2v (may show default face)`);
     }
-  });
-  await Promise.all(imagePromises);
+    // Brief pause between requests to be kind to FAL
+    await new Promise((r) => setTimeout(r, 500));
+  }
 
   const withRef = plan.scenes.filter((s) => s.referenceImageUrl).length;
   console.log(`[DEV PRODUCE] ${withRef}/${plan.scenes.length} scenes have reference images (i2v mode)`);
+
+  // CRITICAL: if we didn't get at least one reference image, the whole video
+  // will show the default wan-2.2 face. Log loudly so we notice in Vercel logs.
+  if (withRef === 0) {
+    console.error(`[DEV PRODUCE] ⚠️⚠️⚠️ ALL REFERENCE IMAGES FAILED — video will show default face avatar!`);
+  }
+
   return plan;
 }
 

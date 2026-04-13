@@ -284,7 +284,7 @@ export async function GET(req: Request) {
   // need polling to advance the state machine. Nobody was polling them.
   const { data: assembling } = await supabase
     .from("productions")
-    .select("id, updated_at, created_at")
+    .select("id, created_at")
     .eq("status", "assembling")
     .order("created_at", { ascending: true })
     .limit(15);

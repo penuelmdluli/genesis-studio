@@ -160,9 +160,9 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     id: "seedance-1.5",
     name: "Seedance 1.5 Pro",
     tier: "hollywood",
-    types: ["t2v"],
+    types: ["t2v", "i2v"],
     description:
-      "Multi-scene narrative videos. Great motion quality at lower cost.",
+      "Multi-scene narrative videos. Great motion quality at lower cost. No default-person bias.",
     maxResolution: "1080p",
     avgGenerationTime: 90,
     creditCost: { "720p": 80, "1080p": 120 },
@@ -170,8 +170,9 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     license: "Commercial",
     provider: "fal",
     hasAudio: false,
-    falModelId: "fal-ai/seedance/v1.5/pro",
-    maxDuration: 8,
+    falModelId: "fal-ai/bytedance/seedance/v1/pro/text-to-video",
+    falModelIdI2V: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+    maxDuration: 10,
   },
 };
 

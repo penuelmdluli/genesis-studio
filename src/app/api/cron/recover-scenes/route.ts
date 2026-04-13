@@ -51,6 +51,8 @@ interface SceneRow {
   scene_number: number;
   status: string;
   runpod_job_id: string | null;
+  provider: string | null;
+  model_id: string | null;
   created_at: string;
 }
 
@@ -110,7 +112,7 @@ export async function GET(req: Request) {
   const cutoff = new Date(Date.now() - MIN_AGE_MS).toISOString();
   const { data: scenes, error } = await supabase
     .from("production_scenes")
-    .select("id, production_id, scene_number, status, runpod_job_id, created_at")
+    .select("id, production_id, scene_number, status, runpod_job_id, provider, model_id, created_at")
     .eq("status", "processing")
     .not("runpod_job_id", "is", null)
     .lt("created_at", cutoff)
@@ -136,6 +138,68 @@ export async function GET(req: Request) {
   // Process in parallel (network I/O bound, safe to fan out)
   await Promise.all(
     sceneList.map(async (s) => {
+      // ── FAL PATH: Seedance / Kling / etc ──
+      // If provider is FAL, use FAL client instead of RunPod
+      if (s.provider === "fal") {
+        try {
+          const { fal } = await import("@fal-ai/client");
+          fal.config({ credentials: process.env.FAL_KEY || "" });
+          // Map model_id → FAL endpoint
+          const { AI_MODELS } = await import("@/lib/constants");
+          const falModelId = AI_MODELS[s.model_id as keyof typeof AI_MODELS]?.falModelId;
+          if (!falModelId) {
+            console.warn(`[RECOVER-SCENES] Scene ${s.scene_number}: no FAL endpoint for ${s.model_id}`);
+            return;
+          }
+
+          const falStatus = await fal.queue.status(falModelId, { requestId: s.runpod_job_id! });
+          const falStatusStr = String(falStatus.status);
+          if (falStatusStr === "COMPLETED") {
+            const result = await fal.queue.result(falModelId, { requestId: s.runpod_job_id! });
+            const data = result.data as Record<string, unknown>;
+            const videoUrl = (data?.video as { url?: string })?.url || (data?.video_url as string) || "";
+            if (videoUrl) {
+              await supabase
+                .from("production_scenes")
+                .update({ status: "completed", output_video_url: videoUrl, progress: 100 })
+                .eq("id", s.id);
+              completed++;
+              touchedProductions.add(s.production_id);
+              console.log(`[RECOVER-SCENES] FAL scene ${s.scene_number} of ${s.production_id.substring(0, 8)} recovered`);
+            } else {
+              console.warn(`[RECOVER-SCENES] FAL scene ${s.scene_number}: no video URL in result`);
+            }
+          } else if (falStatusStr === "FAILED" || falStatusStr === "CANCELLED") {
+            await supabase
+              .from("production_scenes")
+              .update({ status: "failed", error_message: "FAL job failed" })
+              .eq("id", s.id);
+            failed++;
+            touchedProductions.add(s.production_id);
+          } else {
+            stillRunning++;
+          }
+        } catch (err) {
+          // FAL result fetch can 404 if job purged — treat as expired if old
+          const ageMs = Date.now() - new Date(s.created_at).getTime();
+          if (ageMs > EXPIRED_AGE_MS) {
+            await supabase
+              .from("production_scenes")
+              .update({
+                status: "failed",
+                error_message: `FAL job expired or unreachable (age: ${Math.round(ageMs / 60000)}min)`,
+              })
+              .eq("id", s.id);
+            expired++;
+            touchedProductions.add(s.production_id);
+          } else {
+            console.warn(`[RECOVER-SCENES] FAL scene ${s.scene_number} poll error:`, err instanceof Error ? err.message : err);
+          }
+        }
+        return;
+      }
+
+      // ── RUNPOD PATH: wan-2.2 / ltx-video / hunyuan / etc ──
       const status = await pollRunPod(s.runpod_job_id!);
 
       // If RunPod returns null (job not found / purged) AND scene is older

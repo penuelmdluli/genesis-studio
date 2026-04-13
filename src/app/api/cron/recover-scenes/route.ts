@@ -279,6 +279,37 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── ASSEMBLY STATE MACHINE POLLING ──
+  // Productions can also get stuck in "assembling" — FAL compose/mix jobs
+  // need polling to advance the state machine. Nobody was polling them.
+  const { data: assembling } = await supabase
+    .from("productions")
+    .select("id, updated_at, created_at")
+    .eq("status", "assembling")
+    .order("created_at", { ascending: true })
+    .limit(15);
+
+  let assemblyAdvanced = 0;
+  let assemblyFailed = 0;
+
+  if (assembling && assembling.length > 0) {
+    const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
+    await Promise.all(
+      assembling.map(async (p) => {
+        try {
+          await pollAssembly(p.id);
+          assemblyAdvanced++;
+        } catch (err) {
+          assemblyFailed++;
+          console.error(
+            `[RECOVER-SCENES] pollAssembly failed for ${p.id.substring(0, 8)}:`,
+            err instanceof Error ? err.message : err
+          );
+        }
+      })
+    );
+  }
+
   const durationMs = Date.now() - startedAt;
   const summary = {
     success: true,
@@ -289,10 +320,13 @@ export async function GET(req: Request) {
     stillRunning,
     assembliesTriggered: triggered.length,
     triggeredProductionIds: triggered.map((id) => id.substring(0, 8)),
+    assembliesPolled: assembling?.length || 0,
+    assemblyAdvanced,
+    assemblyFailed,
     durationMs,
   };
   console.log(
-    `[RECOVER-SCENES] Done in ${durationMs}ms: ${completed} completed, ${failed} failed, ${expired} expired, ${stillRunning} still running, ${triggered.length} assemblies started`
+    `[RECOVER-SCENES] Done in ${durationMs}ms: ${completed} completed, ${failed} failed, ${expired} expired, ${stillRunning} running, ${triggered.length} assemblies started, ${assemblyAdvanced}/${assembling?.length || 0} assemblies polled`
   );
 
   return NextResponse.json(summary);

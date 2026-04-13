@@ -77,8 +77,11 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
       finance: 4,
       entertainment: 3,
     },
-    voiceoverLanguage: "en-ZA",
-    voiceoverCountry: "ZA",
+    // Standard English (en-US) + professional cinematic narrator voice.
+    // am_adam is Kokoro's best broadcast-quality male — deep, authoritative,
+    // documentary/trailer feel. Stops the scroll and makes people listen.
+    voiceoverLanguage: "en-US",
+    voiceoverCountry: "ZA", // still serves SA audience, just with a global English voice
   },
 
   // ── ALL OTHER PAGES DISABLED ──

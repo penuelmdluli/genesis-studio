@@ -337,10 +337,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-    // Step 1b: i2v with FLUX Pro reference images — forces wan-2.2 to start
-    // from our environment image instead of its default-person frame.
-    // Confirmed: wan-2.2 t2v endpoint accepts `image` input for i2v mode.
-    plan = await injectReferenceImages(plan);
+    // Step 1b: i2v disabled — Seedance v1.5 Pro (FAL) is our primary and
+    // has no default-person bias. No reference image needed. If we ever
+    // switch back to wan-2.2, re-enable injectReferenceImages here.
+    // plan = await injectReferenceImages(plan);
 
     // Step 2: Create production record
     brainInput.concept = concept;

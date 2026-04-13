@@ -25,6 +25,13 @@ vi.mock("@/lib/constants", () => ({
       name: "Wan 2.2",
       creditCost: { "480p": 20, "720p": 40, "1080p": 80 },
     },
+    "seedance-1.5": {
+      id: "seedance-1.5",
+      name: "Seedance 1.5 Pro",
+      creditCost: { "720p": 80, "1080p": 120 },
+      provider: "fal",
+      falModelId: "fal-ai/seedance/v1.5/pro",
+    },
     "hunyuan-video": {
       id: "hunyuan-video",
       name: "Hunyuan Video",
@@ -494,7 +501,7 @@ describe("Planner", () => {
       );
     });
 
-    it("sanitizes invalid model IDs to wan-2.2", async () => {
+    it("sanitizes invalid model IDs to seedance-1.5", async () => {
       const planWithBadModel = {
         ...validPlanResponse,
         scenes: [
@@ -513,7 +520,8 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      expect(plan.scenes[0].modelId).toBe("wan-2.2");
+      // Seedance is the new primary — wan-2.2 banned (default human avatar)
+      expect(plan.scenes[0].modelId).toBe("seedance-1.5");
     });
 
     it("clamps scene duration to 5-10 range", async () => {

@@ -213,10 +213,8 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // NOTE: No anti-face trim needed anymore. We use i2v with FLUX Pro
-    // reference images (see dev/produce/injectReferenceImages). The model
-    // starts from our environment image, eliminating the default face at
-    // generation time. Clips are now clean from frame 0.
+    // NOTE: No anti-face trim needed. Seedance v1.5 Pro (FAL) has no
+    // default-person bias. Clips are clean from frame 0.
 
     let needsMMAudio = false;
 

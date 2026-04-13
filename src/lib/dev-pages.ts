@@ -17,18 +17,85 @@ export interface DevPageConfig {
   voiceoverCountry?: string;        // Country code (e.g. "ZA", "NG") for script validation
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// LASER-FOCUS STRATEGY: ONE PAGE, BEST CONTENT
+// Tech Pulse Africa is THE_PAGE (10,166 followers, matches viral strategy).
+// All other pages are DISABLED — no credits spent on them.
+// All credits now fund 4 premium videos/day on Tech Pulse Africa.
+// ═══════════════════════════════════════════════════════════════════════
+
 export const DEV_PAGES: Record<string, DevPageConfig> = {
+  // ── THE ONLY ACTIVE PAGE ──
+  tech_pulse_africa: {
+    id: "tech_pulse_africa_dev",
+    name: "Tech Pulse Africa",
+    // FULL content strategy: AI+jobs, money/rand, power/corruption, wars,
+    // African pride, tech, Elon, shocking stats, breaking news
+    content_pillars: [
+      "ai_news",
+      "ai_disruption",
+      "tech",
+      "breaking_news",
+      "geopolitics",
+      "finance",
+      "entertainment",
+    ],
+    engine: "seedance-1.5", // Primary video model (no avatar)
+    premium_engine: "seedance-1.5",
+    post_times: ["07:00", "12:00", "19:00", "21:00"], // 4x daily SAST
+    watermark: false,
+    caption_style: "tech_shock",
+    hashtags: [
+      "#TechPulseAfrica",
+      "#SouthAfrica",
+      "#Mzansi",
+      "#AI",
+      "#AITech",
+      "#Breaking",
+      "#Viral",
+      "#Trending",
+      "#Eskom",
+      "#Rand",
+      "#Economy",
+      "#Politics",
+      "#AfricaRising",
+      "#Elon",
+      "#TechWar",
+    ],
+    enabled: true,
+    facebook_page_key: "tech_news",
+    youtube_enabled: true,
+    // 4 videos per day instead of 2 — all credits now flow here
+    topics_per_cycle: 4,
+    // All viral categories weighted high. AI + breaking + geopolitics dominate.
+    niche_weights: {
+      ai_news: 5,
+      ai_disruption: 5,
+      breaking_news: 5,
+      geopolitics: 5,
+      tech: 4,
+      finance: 4,
+      entertainment: 3,
+    },
+    voiceoverLanguage: "en-ZA",
+    voiceoverCountry: "ZA",
+  },
+
+  // ── ALL OTHER PAGES DISABLED ──
+  // Paused per laser-focus strategy. Do NOT delete configs — kept for
+  // historical reference and easy re-enablement later.
+
   mzansi_baby_stars: {
     id: "mzansi_baby_stars",
     name: "Mzansi Baby Stars",
     content_pillars: ["mbs_episodes", "baby_scenarios", "motivation", "health_wellness"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["12:00", "18:00"],
     watermark: false,
     caption_style: "mbs_style",
     hashtags: ["#MzansiBabyStars", "#CuteBabies", "#SouthAfrica", "#Mzansi"],
-    enabled: true,
+    enabled: false, // PAUSED — laser-focus on tech_pulse_africa
     facebook_page_key: "blissful_moments",
     youtube_enabled: true,
     topics_per_cycle: 1,
@@ -39,16 +106,14 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   africa_2050: {
     id: "africa_2050_dev",
     name: "Africa 2050",
-    // Broadened: Africa 2050 covers African innovation AND global news that
-    // impacts Africa — wars, geopolitics, tech disruption, breaking news.
     content_pillars: ["afrofuturism", "african_cities", "breaking_news", "geopolitics", "tech", "ai_disruption"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["08:00", "14:00", "19:00"],
     watermark: false,
     caption_style: "pride_curiosity",
-    hashtags: ["#Africa2050", "#AfricaRising", "#FutureAfrica", "#WorldNews", "#Breaking"],
-    enabled: true,
+    hashtags: ["#Africa2050", "#AfricaRising", "#FutureAfrica"],
+    enabled: false, // PAUSED
     facebook_page_key: "limitless_you",
     youtube_enabled: true,
     topics_per_cycle: 2,
@@ -59,15 +124,14 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   afrika_toons: {
     id: "afrika_toons_dev",
     name: "Afrika Toons",
-    // Broadened: animated news coverage of ALL major world events + African stories
     content_pillars: ["news_animated", "breaking_news", "geopolitics", "african_folklore"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["08:00", "14:00", "20:00"],
     watermark: false,
     caption_style: "news_toon",
-    hashtags: ["#AfrikaToons", "#AnimatedNews", "#WorldNews", "#BreakingNews", "#Trending"],
-    enabled: true,
+    hashtags: ["#AfrikaToons", "#AnimatedNews", "#WorldNews"],
+    enabled: false, // PAUSED
     facebook_page_key: "motivation",
     youtube_enabled: true,
     topics_per_cycle: 2,
@@ -75,38 +139,17 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     voiceoverLanguage: "en-ZA",
     voiceoverCountry: "ZA",
   },
-  tech_pulse_africa: {
-    id: "tech_pulse_africa_dev",
-    name: "Tech Pulse Africa",
-    // Tech + geopolitics crossover (cyberwar, sanctions on chips, AI arms race)
-    content_pillars: ["ai_news", "tech", "ai_disruption", "breaking_news", "geopolitics"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
-    post_times: ["09:00", "14:00", "19:00"],
-    watermark: false,
-    caption_style: "tech_shock",
-    hashtags: ["#TechPulseAfrica", "#AITech", "#Innovation", "#BreakingNews", "#Trending", "#TechWar"],
-    enabled: true,
-    facebook_page_key: "tech_news",
-    youtube_enabled: true,
-    topics_per_cycle: 2,
-    // Boosted: breaking_news + geopolitics promoted for viral engagement
-    niche_weights: { ai_news: 4, tech: 3, ai_disruption: 3, breaking_news: 4, geopolitics: 3 },
-    voiceoverLanguage: "en-ZA",
-    voiceoverCountry: "ZA",
-  },
   world_news_animated: {
     id: "world_news_animated_dev",
     name: "World News Animated",
-    // Primary war/politics/breaking news channel — highest weight on geopolitics
     content_pillars: ["breaking_news", "geopolitics", "news_animated"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["07:00", "12:00", "17:00", "21:00"],
     watermark: false,
     caption_style: "news_urgent",
-    hashtags: ["#WorldNews", "#BreakingNews", "#War", "#Politics", "#Trending", "#Viral"],
-    enabled: true,
+    hashtags: ["#WorldNews", "#BreakingNews", "#War", "#Politics"],
+    enabled: false, // PAUSED
     facebook_page_key: "health_wellness",
     youtube_enabled: true,
     topics_per_cycle: 2,
@@ -117,20 +160,17 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   pop_culture_buzz: {
     id: "pop_culture_buzz_dev",
     name: "Pop Culture Buzz",
-    // Celebrities + war/politics scandals drive massive viral engagement
     content_pillars: ["entertainment", "celebrity", "viral_moments", "breaking_news", "geopolitics"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["10:00", "15:00", "20:00"],
     watermark: false,
     caption_style: "entertainment_hook",
-    hashtags: ["#PopCulture", "#Entertainment", "#CelebNews", "#Trending", "#Viral", "#Breaking"],
-    enabled: true,
-    // Repointed from pop_culture_buzz (no FB page exists) → motivation (active page)
+    hashtags: ["#PopCulture", "#Entertainment", "#CelebNews"],
+    enabled: false, // PAUSED
     facebook_page_key: "motivation",
     youtube_enabled: true,
     topics_per_cycle: 2,
-    // Boosted breaking_news + added geopolitics for celebrity-politics crossover
     niche_weights: { entertainment: 4, celebrity: 4, viral_moments: 3, breaking_news: 4, geopolitics: 2 },
     voiceoverLanguage: "en-ZA",
     voiceoverCountry: "ZA",
@@ -138,19 +178,17 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
   ai_revolution: {
     id: "ai_revolution_dev",
     name: "AI Revolution",
-    // AI + wars/politics is massive: AI arms race, deepfake warfare, autonomous weapons
     content_pillars: ["ai_news", "tech", "ai_disruption", "breaking_news", "geopolitics"],
-    engine: "wan-2.2",
-    premium_engine: "wan-2.2",
+    engine: "seedance-1.5",
+    premium_engine: "seedance-1.5",
     post_times: ["08:00", "14:00", "18:00"],
     watermark: false,
     caption_style: "tech_shock",
-    hashtags: ["#AIRevolution", "#AI", "#FutureOfWork", "#TechNews", "#Breaking", "#AIWar"],
-    enabled: true,
+    hashtags: ["#AIRevolution", "#AI", "#FutureOfWork", "#TechNews"],
+    enabled: false, // PAUSED
     facebook_page_key: "ai_money",
     youtube_enabled: true,
     topics_per_cycle: 2,
-    // Boosted breaking_news + geopolitics to match viral trends (AI warfare, chip bans)
     niche_weights: { ai_news: 4, ai_disruption: 4, tech: 3, breaking_news: 4, geopolitics: 4 },
     voiceoverLanguage: "en-ZA",
     voiceoverCountry: "ZA",

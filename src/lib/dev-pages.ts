@@ -196,7 +196,10 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
 };
 
 export function getDevPage(pageId: string): DevPageConfig | undefined {
-  return DEV_PAGES[pageId];
+  // Direct key lookup first
+  if (DEV_PAGES[pageId]) return DEV_PAGES[pageId];
+  // Fallback: match by `id` field (queue items use the _dev suffix form)
+  return Object.values(DEV_PAGES).find((p) => p.id === pageId);
 }
 
 export function getAllDevPages(): DevPageConfig[] {

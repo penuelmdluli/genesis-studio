@@ -221,15 +221,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Guard: bail early if FAL is down (saves compute + Claude API call)
-    const falHealth = await checkFalHealth();
-    if (!falHealth.ok) {
-      console.error(`[DEV PRODUCE] FAL health check FAILED: ${falHealth.reason}`);
-      return NextResponse.json(
-        { error: falHealth.reason, falDown: true, success: false },
-        { status: 503 }
-      );
-    }
+    // RUNPOD-ONLY MODE: no FAL health check — we don't need FAL for video.
+    // Voiceover uses Edge TTS, music uses built-in library, assembly uses
+    // local ffmpeg. FAL is entirely bypassed.
 
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };

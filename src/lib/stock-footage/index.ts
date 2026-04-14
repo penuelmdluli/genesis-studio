@@ -261,6 +261,61 @@ export async function findStockClip(params: {
 }
 
 /**
+ * Download a stock clip server-side and re-upload to our R2 bucket.
+ * This solves two problems:
+ *   1. Pexels/Pixabay CDNs sometimes block hotlinking (403 from some IPs)
+ *   2. We get a stable URL we own (no expiration)
+ *
+ * Returns a signed R2 URL, or the original URL if upload fails.
+ */
+export async function mirrorClipToR2(clip: StockClip, productionId: string, sceneNumber: number): Promise<string> {
+  try {
+    const { S3Client, PutObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+
+    const R2 = new S3Client({
+      region: "auto",
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      },
+      forcePathStyle: true,
+    });
+    const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+
+    // Use API-key auth on download when possible (Pexels rejects some unauth IPs)
+    const downloadHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (compatible; Genesis-Studio/1.0)",
+      Accept: "video/mp4,video/*;q=0.9,*/*;q=0.8",
+    };
+    if (clip.source === "library-a" && process.env.PEXELS_API_KEY) {
+      downloadHeaders.Authorization = process.env.PEXELS_API_KEY;
+    }
+
+    const dlRes = await fetch(clip.url, { headers: downloadHeaders });
+    if (!dlRes.ok) {
+      console.warn(`[STOCK] Download failed ${dlRes.status} for ${clip.url.substring(0, 60)} — returning original URL`);
+      return clip.url;
+    }
+    const buf = Buffer.from(await dlRes.arrayBuffer());
+    if (buf.length < 10_000) {
+      console.warn(`[STOCK] Download suspiciously small: ${buf.length}B — returning original URL`);
+      return clip.url;
+    }
+
+    const key = `stock-scenes/${productionId.substring(0, 8)}/${sceneNumber}.mp4`;
+    await R2.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buf, ContentType: "video/mp4" }));
+    const signedUrl = await getSignedUrl(R2, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 86400 });
+    console.log(`[STOCK] Mirrored ${(buf.length / 1024 / 1024).toFixed(1)}MB to R2: ${key}`);
+    return signedUrl;
+  } catch (err) {
+    console.warn(`[STOCK] mirror-to-R2 failed:`, err instanceof Error ? err.message : err);
+    return clip.url;
+  }
+}
+
+/**
  * Check if stock footage is available (any API key configured).
  */
 export function isStockFootageAvailable(): boolean {

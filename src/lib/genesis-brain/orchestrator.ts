@@ -239,9 +239,9 @@ export async function executeProduction(
 
       // ─── STOCK FOOTAGE FAST-PATH ───
       // If stock footage APIs are configured, try to find a real clip first.
-      // This eliminates the AI avatar problem AND is free+instant.
-      // Falls through to AI generation only if no clip found.
-      const { findStockClip, isStockFootageAvailable } = await import("@/lib/stock-footage");
+      // Download + re-upload to R2 so we own the URL (Pexels CDN sometimes
+      // blocks hotlinking). Free + instant + no avatar.
+      const { findStockClip, isStockFootageAvailable, mirrorClipToR2 } = await import("@/lib/stock-footage");
       if (isStockFootageAvailable()) {
         try {
           const clip = await findStockClip({
@@ -250,10 +250,11 @@ export async function executeProduction(
             minDuration: Math.max(3, sceneDef.duration - 2),
           });
           if (clip) {
-            // Mark scene as completed with the stock clip URL — no AI generation needed
+            // Mirror to R2 so we own the URL (avoid 403 hotlink blocks)
+            const hostedUrl = await mirrorClipToR2(clip, productionId, sceneDef.sceneNumber);
             await updateProductionScene(scene.id, {
               status: "completed",
-              output_video_url: clip.url,
+              output_video_url: hostedUrl,
               progress: 100,
             });
             const supabase = createSupabaseAdmin();
@@ -261,7 +262,7 @@ export async function executeProduction(
               .from("production_scenes")
               .update({ provider: "stock", model_id: "stock-footage" })
               .eq("id", scene.id);
-            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK CLIP used (${clip.width}x${clip.height} ${clip.duration}s) — no AI gen needed`);
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK CLIP used (${clip.width}x${clip.height} ${clip.duration}s) — mirrored to R2`);
             return;
           }
           console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — falling back to AI generation`);

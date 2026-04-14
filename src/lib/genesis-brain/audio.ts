@@ -853,26 +853,35 @@ export async function submitComposeVideoJob(
   },
   soundBedUrl?: string // Pre-mixed + loudnormed sound design audio (already at -35 LUFS)
 ): Promise<{ requestId: string }> {
-  // ── BUG FIX: Pre-trim oversized audio sources to prevent output bloat ──
-  // FAL compose extends output to longest track, so we must ensure no audio
-  // track exceeds durationMs. Music and sound bed are the common culprits.
-  if (musicUrl && musicDurationMs && musicDurationMs > durationMs) {
-    console.log(
-      `[AUDIO] Music is ${(musicDurationMs / 1000).toFixed(1)}s but video is only ${(durationMs / 1000).toFixed(1)}s — pre-trimming to prevent bloat`
-    );
-    const trimmedMusic = await trimMediaToDuration(musicUrl, durationMs);
-    if (trimmedMusic && trimmedMusic !== musicUrl) {
-      musicUrl = trimmedMusic;
-      musicDurationMs = durationMs; // Force the downstream loop logic to treat it as exact-fit
+  // ── MASTER CLOCK ENFORCEMENT ──
+  // Music must be pre-trimmed to EXACT durationMs. FAL compose extends output
+  // to the longest track, so even a 1-second overrun would leave music playing
+  // after the voiceover ends. Measure if we don't know the duration.
+  if (musicUrl) {
+    if (!musicDurationMs || musicDurationMs <= 0) {
+      try {
+        const mDur = await getMediaDuration(musicUrl);
+        if (mDur > 0) musicDurationMs = Math.ceil(mDur * 1000);
+      } catch { /* ignore */ }
+    }
+    if (musicDurationMs && musicDurationMs > durationMs) {
+      console.log(
+        `[AUDIO] Music is ${(musicDurationMs / 1000).toFixed(2)}s > master clock ${(durationMs / 1000).toFixed(2)}s — pre-trimming to exact match`
+      );
+      const trimmedMusic = await trimMediaToDuration(musicUrl, durationMs);
+      if (trimmedMusic && trimmedMusic !== musicUrl) {
+        musicUrl = trimmedMusic;
+        musicDurationMs = durationMs; // Force the downstream loop logic to treat it as exact-fit
+      }
     }
   }
   if (soundBedUrl) {
-    // Sound bed should always fit — if we can measure it and it's too long, trim
+    // Sound bed trimmed to EXACT master-clock duration (no tolerance buffer).
     try {
       const bedDur = await getMediaDuration(soundBedUrl);
-      if (bedDur * 1000 > durationMs + 500) {
+      if (bedDur * 1000 > durationMs) {
         console.log(
-          `[AUDIO] Sound bed is ${bedDur.toFixed(1)}s — pre-trimming to ${(durationMs / 1000).toFixed(1)}s`
+          `[AUDIO] Sound bed is ${bedDur.toFixed(2)}s — pre-trimming to exact ${(durationMs / 1000).toFixed(2)}s`
         );
         const trimmedBed = await trimMediaToDuration(soundBedUrl, durationMs);
         if (trimmedBed) soundBedUrl = trimmedBed;

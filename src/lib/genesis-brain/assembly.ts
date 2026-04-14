@@ -1334,12 +1334,35 @@ async function pollMixFinalPhase(
       return true;
     }
 
-    // Determine output duration = CONCAT VIDEO LENGTH.
-    // We use ALL generated video clips — no cutting. Voiceover plays naturally
-    // over the visuals; when narration ends, the remaining clips play with
-    // just music/ambient. This keeps every scene the user paid for.
-    let totalDurationMs: number;
+    // ── MASTER CLOCK = VOICEOVER DURATION ──
+    // The narrator sets the length of the final video. Music, video, and
+    // sound bed all get trimmed to match. When the voiceover ends, the
+    // video ends — no trailing music, no silent tail.
+    //
+    // Priority order for VO duration:
+    //   1. Sum of per-scene voiceover clips (startMs + durationMs of last clip)
+    //   2. Measured duration of single voiceoverUrl
+    //   3. Fall back to concat video length (audio-less production)
+    let voDurationMs = 0;
+    if (voiceoverClips && voiceoverClips.length > 0) {
+      // Find the end of the last clip (startMs + durationMs)
+      for (const c of voiceoverClips) {
+        const clipEnd = (c.startMs || 0) + (c.durationMs || 0);
+        if (clipEnd > voDurationMs) voDurationMs = clipEnd;
+      }
+      console.log(`[ASSEMBLY] VO master clock from ${voiceoverClips.length} per-scene clips: ${(voDurationMs / 1000).toFixed(2)}s`);
+    } else if (voiceoverUrl) {
+      const voSec = await getMediaDuration(voiceoverUrl);
+      if (voSec > 0) {
+        voDurationMs = Math.ceil(voSec * 1000);
+        console.log(`[ASSEMBLY] VO master clock from single voiceover file: ${voSec.toFixed(2)}s`);
+      }
+    }
 
+    // Measure concat video as a sanity bound — final output can't exceed the
+    // available video footage. If VO is longer than the video, we'll extend
+    // by freezing the last frame instead (compose handles this naturally).
+    let concatVideoMs = 0;
     let realDurationSec = await getMediaDuration(videoUrl);
     if (realDurationSec <= 0) {
       console.log(`[ASSEMBLY] First duration check returned 0, retrying...`);
@@ -1371,10 +1394,27 @@ async function pollMixFinalPhase(
       realDurationSec = sumFromScenes;
       console.log(`[ASSEMBLY] Duration from scene measurement: ${realDurationSec}s`);
     }
-    totalDurationMs = Math.ceil(realDurationSec * 1000);
-    // Store concat duration for trim phase (trim music padding, not video)
+    concatVideoMs = Math.ceil(realDurationSec * 1000);
+
+    // FINAL DURATION = voiceover length if we have one, else full concat video.
+    // No tolerance buffer — exact match. This guarantees VO and video end
+    // at the same instant.
+    const totalDurationMs = voDurationMs > 0
+      ? voDurationMs
+      : concatVideoMs;
+
+    // Store for trim_final phase — it trims final output to this exact length.
     state.concatDurationMs = totalDurationMs;
-    console.log(`[ASSEMBLY] Output duration: ${(totalDurationMs / 1000).toFixed(1)}s (all ${state.processedSceneUrls.filter(u=>u).length} clips preserved)`);
+
+    if (voDurationMs > 0) {
+      console.log(
+        `[ASSEMBLY] MASTER CLOCK = voiceover: ${(totalDurationMs / 1000).toFixed(2)}s (concat video was ${(concatVideoMs / 1000).toFixed(2)}s — trimming to match VO)`
+      );
+    } else {
+      console.log(
+        `[ASSEMBLY] No voiceover — using concat video length: ${(totalDurationMs / 1000).toFixed(2)}s`
+      );
+    }
 
     // Get music duration so we can loop it if it's shorter than the video
     let musicDurationMs: number | undefined;
@@ -1467,13 +1507,13 @@ async function pollMixFinalPhase(
     }
   }
 
-  // Trim if compose output is longer than the actual concat video
-  // (compose extends to the longest audio track, e.g. 30s music).
-  // We want exactly concat length — all video clips, nothing more.
+  // Trim to MASTER CLOCK (voiceover duration, or concat video if no VO).
+  // compose may have extended output to longest audio track — we clip it
+  // back to the exact master-clock length so VO and video end together.
   if (state.concatDurationMs && state.concatDurationMs > 0) {
     state.phase = "trim_final";
     await updateProduction(productionId, { progress: 94 });
-    console.log(`[ASSEMBLY] Mix-final done → trim_final (trim to ${(state.concatDurationMs / 1000).toFixed(1)}s — all clips preserved)`);
+    console.log(`[ASSEMBLY] Mix-final done → trim_final (trim to master clock: ${(state.concatDurationMs / 1000).toFixed(2)}s)`);
   } else if (production.captions && production.voiceover) {
     // No trim needed but captions requested — go straight to burn
     state.phase = "burn_captions";
@@ -1494,8 +1534,9 @@ async function pollTrimFinalPhase(
   state: AssemblyState,
   production: Production
 ): Promise<boolean> {
-  // Trim to concat video duration — this cuts music padding while keeping ALL video clips.
-  // Voiceover plays naturally; if shorter than video, remaining clips have music/ambient only.
+  // Trim to MASTER CLOCK (voiceover duration). Both video and music get cut
+  // to this exact length so narration and visuals end simultaneously — no
+  // silent-music tail, no silent-video tail.
   const targetSec = (state.concatDurationMs || 0) / 1000;
 
   const videoUrl = state.mixFinalJob?.videoUrl || state.concatJob?.videoUrl;

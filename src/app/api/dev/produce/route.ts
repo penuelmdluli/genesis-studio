@@ -221,16 +221,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Health check: bail early if FAL is down (Seedance primary, avatar-free).
-    // Switching to wan-2.2 would re-introduce the avatar, so we refuse to
-    // generate rather than produce garbage content.
-    const falHealth = await checkFalHealth();
-    if (!falHealth.ok) {
-      console.error(`[DEV PRODUCE] FAL health check FAILED: ${falHealth.reason}`);
-      return NextResponse.json(
-        { error: falHealth.reason, falDown: true, success: false },
-        { status: 503 }
-      );
+    // Health check: if BOTH stock footage AND FAL are down, bail early.
+    // If stock footage APIs are configured, we can produce videos without
+    // FAL at all (just real footage + TTS + local ffmpeg assembly).
+    const { isStockFootageAvailable } = await import("@/lib/stock-footage");
+    if (!isStockFootageAvailable()) {
+      const falHealth = await checkFalHealth();
+      if (!falHealth.ok) {
+        console.error(`[DEV PRODUCE] No stock footage + FAL down: ${falHealth.reason}`);
+        return NextResponse.json(
+          {
+            error: `Pipeline blocked: ${falHealth.reason}. Configure PEXELS_API_KEY or PIXABAY_API_KEY to enable stock footage (free, no FAL needed).`,
+            falDown: true,
+            success: false,
+          },
+          { status: 503 }
+        );
+      }
     }
 
     const body = await req.json().catch(() => ({}));

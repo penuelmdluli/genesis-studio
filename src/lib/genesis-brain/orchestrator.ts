@@ -237,6 +237,39 @@ export async function executeProduction(
       const sceneDef = enhancedPlan.scenes[i];
       if (!sceneDef) return;
 
+      // ─── STOCK FOOTAGE FAST-PATH ───
+      // If stock footage APIs are configured, try to find a real clip first.
+      // This eliminates the AI avatar problem AND is free+instant.
+      // Falls through to AI generation only if no clip found.
+      const { findStockClip, isStockFootageAvailable } = await import("@/lib/stock-footage");
+      if (isStockFootageAvailable()) {
+        try {
+          const clip = await findStockClip({
+            scenePrompt: sceneDef.prompt,
+            aspectRatio: input.aspectRatio === "portrait" ? "portrait" : input.aspectRatio === "square" ? "square" : "landscape",
+            minDuration: Math.max(3, sceneDef.duration - 2),
+          });
+          if (clip) {
+            // Mark scene as completed with the stock clip URL — no AI generation needed
+            await updateProductionScene(scene.id, {
+              status: "completed",
+              output_video_url: clip.url,
+              progress: 100,
+            });
+            const supabase = createSupabaseAdmin();
+            await supabase
+              .from("production_scenes")
+              .update({ provider: "stock", model_id: "stock-footage" })
+              .eq("id", scene.id);
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK CLIP used (${clip.width}x${clip.height} ${clip.duration}s) — no AI gen needed`);
+            return;
+          }
+          console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — falling back to AI generation`);
+        } catch (err) {
+          console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber} stock-footage error, falling back:`, err instanceof Error ? err.message : err);
+        }
+      }
+
       const model = AI_MODELS[sceneDef.modelId];
       const isFalModel = model?.provider === "fal";
 

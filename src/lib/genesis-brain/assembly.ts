@@ -213,36 +213,8 @@ export async function startAssembly(
       console.log(`[ASSEMBLY] Preserved sound design assets for ${(savedSoundAssets as Array<unknown>).length} scenes`);
     }
 
-    // ── ANTI-AVATAR TRIM (3 seconds) ──
-    // RunPod-only mode: wan-2.2 has the default face/avatar in opening ~3s.
-    // Strip it using our bundled ffmpeg binary. Each 8s clip becomes 5s
-    // clean content after trim.
-    const TRIM_START_SECONDS = 3;
-    console.log(`[ASSEMBLY] Trimming first ${TRIM_START_SECONDS}s from ${completedScenes.length} scenes (anti-avatar)...`);
-    try {
-      const { trimVideoStart } = await import("./video-trim");
-      const prodForUserId = await getProduction(productionId);
-      const userId = prodForUserId?.userId || "";
-      await Promise.all(
-        completedScenes.map(async (scene) => {
-          if (!scene.outputVideoUrl || !userId) return;
-          try {
-            const trimmed = await trimVideoStart(scene.outputVideoUrl, TRIM_START_SECONDS, userId);
-            if (trimmed) {
-              scene.outputVideoUrl = trimmed;
-              await supabase
-                .from("production_scenes")
-                .update({ output_video_url: trimmed })
-                .eq("id", scene.id);
-            }
-          } catch (err) {
-            console.warn(`[ASSEMBLY] Scene ${scene.sceneNumber} trim failed:`, err instanceof Error ? err.message : err);
-          }
-        })
-      );
-    } catch (err) {
-      console.warn(`[ASSEMBLY] Trim module failed to load — continuing without trim:`, err);
-    }
+    // No trim needed — Seedance v1.5 Pro (FAL) has no default-person bias.
+    // All scene clips are clean from frame 0.
 
     let needsMMAudio = false;
 

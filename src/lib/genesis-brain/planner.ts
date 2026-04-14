@@ -103,8 +103,8 @@ COMPOSITION RULES:
    Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
 4. ONLY use RunPod models (FAL credits unavailable):
-   - "wan-2.2" — PRIMARY MODEL — RunPod (6 workers always ready), no FAL dependency
-   - Default everything to "wan-2.2". Avatar removed via 3s server-side trim.
+   - "seedance-1.5" — PRIMARY MODEL — FAL, cinematic, no default-face bias
+   - Default everything to "seedance-1.5" for clean content (no avatar)
    - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL disabled)
    - Audio is added via MMAudio post-processing
 
@@ -151,7 +151,7 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "wan-2.2" (primary — RunPod, no FAL needed)
+VALID MODELS: "seedance-1.5" (primary — via FAL, clean output no avatar)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -313,20 +313,20 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   const validModels = Object.keys(AI_MODELS) as ModelId[];
   const validTransitions: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"];
 
-  // RUNPOD-ONLY MODE: wan-2.2 is our primary.
-  // FAL is down too often (balance runs out), so we're fully off FAL for video.
-  // Avatar issue handled via aggressive 3s ffmpeg trim in assembly.
-  // Voice: Edge TTS (free, no FAL). Music: built-in library. Assembly: local ffmpeg.
+  // seedance-1.5 (FAL) is primary — no default avatar issue.
+  // wan-2.2 BANNED because of the default human avatar in opening frames.
+  // If FAL is down AND no clean RunPod workers are configured, produce will
+  // fail explicitly (via health check) rather than silently fall back to wan-2.2.
 
-  // Validate each scene — force all to wan-2.2 (RunPod, 6 workers always ready)
+  // Validate each scene — force all to seedance-1.5
   plan.scenes = plan.scenes.map((scene, i) => {
-    let selectedModel: ModelId = "wan-2.2";
+    let selectedModel: ModelId = "seedance-1.5";
     if (validModels.includes(scene.modelId as ModelId)) {
-      if (scene.modelId === "wan-2.2") {
-        selectedModel = "wan-2.2";
+      if (scene.modelId === "seedance-1.5") {
+        selectedModel = "seedance-1.5";
       } else {
-        console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → wan-2.2 (RunPod-only mode, no FAL)`);
-        selectedModel = "wan-2.2";
+        console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → seedance-1.5 (avatar-free primary)`);
+        selectedModel = "seedance-1.5";
       }
     }
 

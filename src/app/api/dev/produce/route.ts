@@ -221,9 +221,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // RUNPOD-ONLY MODE: no FAL health check — we don't need FAL for video.
-    // Voiceover uses Edge TTS, music uses built-in library, assembly uses
-    // local ffmpeg. FAL is entirely bypassed.
+    // Health check: bail early if FAL is down (Seedance primary, avatar-free).
+    // Switching to wan-2.2 would re-introduce the avatar, so we refuse to
+    // generate rather than produce garbage content.
+    const falHealth = await checkFalHealth();
+    if (!falHealth.ok) {
+      console.error(`[DEV PRODUCE] FAL health check FAILED: ${falHealth.reason}`);
+      return NextResponse.json(
+        { error: falHealth.reason, falDown: true, success: false },
+        { status: 503 }
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };

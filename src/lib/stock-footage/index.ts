@@ -270,64 +270,48 @@ const BLACKLIST_TERMS = [
 ];
 
 /**
- * Convert a scene prompt + topic into 2-4 high-quality stock search terms.
+ * Convert a scene prompt + topic into search terms.
  *
- * Strategy:
- *   1. Match scene text against TOPIC_SEARCH_PHRASES dictionary (best results)
- *   2. If no dictionary match, fall back to noun extraction from cleaned prompt
- *   3. Always include the raw topic title as one search term (if provided)
+ * Dictionary-first strategy: we ONLY use proven search phrases from
+ * TOPIC_SEARCH_PHRASES. No freeform noun extraction (that produced garbage
+ * matches like Revolutionary War reenactments).
+ *
+ * Fallback: if no dictionary hits, just use the topic title as-is.
  */
 export function extractSearchTerms(scenePrompt: string, topicTitle?: string): string[] {
-  const lower = scenePrompt.toLowerCase();
-  const matches = new Set<string>();
+  const combinedLower = `${scenePrompt} ${topicTitle || ""}`.toLowerCase();
+  const matches: string[] = []; // preserve order of addition
 
-  // 1. Dictionary matches (high-quality terms)
+  // Score each topic by # of keyword matches and preserve strongest first
+  const topicHits: Array<{ phrases: string[]; score: number }> = [];
   for (const [key, phrases] of Object.entries(TOPIC_SEARCH_PHRASES)) {
-    if (lower.includes(key)) {
-      // Take 1-2 phrases from this topic
-      for (const phrase of phrases.slice(0, 2)) matches.add(phrase);
+    // Match whole-word (avoid "ai" matching "said")
+    const re = new RegExp(`\\b${key.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+    if (re.test(combinedLower)) {
+      topicHits.push({ phrases, score: phrases.length });
     }
   }
 
-  // 2. Also pull key nouns from the cleaned prompt as fallback
-  const cleaned = scenePrompt
-    .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle|rack focus|rim light|establishing shot/gi, "")
-    .replace(/\d+mm|f\/[\d.]+|\d+fps/gi, "")
-    .replace(/cinematic|photorealistic|anamorphic|4K|film grain|shallow depth of field|golden hour|rembrandt lighting|chiaroscuro|volumetric|bokeh/gi, "")
-    .replace(/No human face.*$/i, "")
-    .replace(/no people|no person|environment only|empty landscape/gi, "")
-    .replace(/[,.]\s*/g, ". ")
-    .trim();
-
-  const stopWords = new Set([
-    "with","from","into","this","that","their","about","very","just","only","over","under","above","below",
-    "through","across","between","during","without","within","among","around","before","after","foreground","background",
-    "scene","shot","frame","view","angle","perspective","light","lighting","color","colour","showing","depicting","featuring",
-  ]);
-
-  if (matches.size < 2) {
-    const sentences = cleaned.split(".").map((s) => s.trim()).filter(Boolean).slice(0, 2);
-    for (const s of sentences) {
-      const words = s
-        .split(/\s+/)
-        .filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()))
-        .slice(0, 3);
-      if (words.length >= 2) matches.add(words.join(" "));
+  // Flatten top-matching phrases (up to 2 per topic, 6 total)
+  for (const hit of topicHits) {
+    for (const phrase of hit.phrases.slice(0, 2)) {
+      if (matches.length < 6 && !matches.includes(phrase)) matches.push(phrase);
     }
   }
 
-  // 3. Topic title as anchor search (strong signal)
-  if (topicTitle) {
+  // If no dictionary hits at all, fall back to topic title
+  if (matches.length === 0 && topicTitle) {
+    // Strip numbers and filler
     const cleanTopic = topicTitle
-      .replace(/["'"'"':;.]+/g, "")
-      .split(/\s+/)
-      .filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()))
-      .slice(0, 4)
-      .join(" ");
-    if (cleanTopic.length > 5) matches.add(cleanTopic);
+      .replace(/^\d+\s*(ways|reasons|jobs|things|tips)/i, "$1")
+      .replace(/[0-9]+%?/g, "")
+      .replace(/\b(is|are|the|a|an|will|has|have|just|now|here|this|that)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleanTopic.length > 5) matches.push(cleanTopic);
   }
 
-  return Array.from(matches).slice(0, 4);
+  return matches.slice(0, 4);
 }
 
 /**
@@ -338,6 +322,7 @@ export function extractSearchTerms(scenePrompt: string, topicTitle?: string): st
 export async function findStockClip(params: {
   scenePrompt: string;
   topicTitle?: string;
+  sceneIndex?: number; // 0-based; used to vary search term selection across scenes
   targetWidth?: number;
   targetHeight?: number;
   minDuration?: number;
@@ -354,12 +339,16 @@ export async function findStockClip(params: {
         ? "square"
         : "landscape";
 
-  const terms = extractSearchTerms(params.scenePrompt, params.topicTitle);
-  if (terms.length === 0) {
+  const allTerms = extractSearchTerms(params.scenePrompt, params.topicTitle);
+  if (allTerms.length === 0) {
     console.warn(`[STOCK] No search terms extracted from prompt`);
     return null;
   }
-  console.log(`[STOCK] Searching for: ${terms.map((t) => `"${t}"`).join(", ")}`);
+  // Rotate terms by scene index so different scenes search different phrases.
+  // e.g. scene 1 starts at term 0, scene 2 starts at term 1, etc.
+  const startIdx = (params.sceneIndex || 0) % allTerms.length;
+  const terms = [...allTerms.slice(startIdx), ...allTerms.slice(0, startIdx)];
+  console.log(`[STOCK scene=${params.sceneIndex ?? 0}] Searching for: ${terms.map((t) => `"${t}"`).join(", ")}`);
 
   const allClips: StockClip[] = [];
   const seen = new Set<string>();

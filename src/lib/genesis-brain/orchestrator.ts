@@ -232,26 +232,34 @@ export async function executeProduction(
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const webhookUrl = `${appUrl}/api/brain/webhook`;
 
-    console.log(`[BRAIN] Submitting ${scenes.length} scenes to generation APIs...`);
-    const sceneSubmissions = scenes.map(async (scene, i) => {
-      const sceneDef = enhancedPlan.scenes[i];
-      if (!sceneDef) return;
+    // ═══ PASS 1: SEQUENTIAL STOCK FOOTAGE LOOKUP ═══
+    // Run sequentially so each scene's dedup set (usedStockUrls) is current.
+    // Running in parallel would cause all scenes to pick the same top clip.
+    const stockHandled = new Set<string>(); // scene IDs that got stock footage
+    const usedStockUrls = new Set<string>();
+    const { findStockClip, isStockFootageAvailable, mirrorClipToR2 } = await import("@/lib/stock-footage");
 
-      // ─── STOCK FOOTAGE FAST-PATH ───
-      // If stock footage APIs are configured, try to find a real clip first.
-      // Download + re-upload to R2 so we own the URL (Pexels CDN sometimes
-      // blocks hotlinking). Free + instant + no avatar.
-      const { findStockClip, isStockFootageAvailable, mirrorClipToR2 } = await import("@/lib/stock-footage");
-      if (isStockFootageAvailable()) {
+    if (isStockFootageAvailable()) {
+      console.log(`[BRAIN] Pass 1: checking stock footage for ${scenes.length} scenes...`);
+      for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i];
+        const sceneDef = enhancedPlan.scenes[i];
+        if (!sceneDef) continue;
         try {
           const clip = await findStockClip({
             scenePrompt: sceneDef.prompt,
-            topicTitle: input.concept, // Use the production concept for topic-aware matching
-            aspectRatio: input.aspectRatio === "portrait" ? "portrait" : input.aspectRatio === "square" ? "square" : "landscape",
+            topicTitle: input.concept,
+            aspectRatio:
+              input.aspectRatio === "portrait"
+                ? "portrait"
+                : input.aspectRatio === "square"
+                  ? "square"
+                  : "landscape",
             minDuration: Math.max(3, sceneDef.duration - 2),
+            excludeUrls: usedStockUrls,
           });
           if (clip) {
-            // Mirror to R2 so we own the URL (avoid 403 hotlink blocks)
+            usedStockUrls.add(clip.url);
             const hostedUrl = await mirrorClipToR2(clip, productionId, sceneDef.sceneNumber);
             await updateProductionScene(scene.id, {
               status: "completed",
@@ -263,14 +271,24 @@ export async function executeProduction(
               .from("production_scenes")
               .update({ provider: "stock", model_id: "stock-footage" })
               .eq("id", scene.id);
-            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK CLIP used (${clip.width}x${clip.height} ${clip.duration}s) — mirrored to R2`);
-            return;
+            stockHandled.add(scene.id);
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK (${clip.width}x${clip.height} ${clip.duration}s) → R2`);
+          } else {
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — will use AI generation`);
           }
-          console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — falling back to AI generation`);
         } catch (err) {
-          console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber} stock-footage error, falling back:`, err instanceof Error ? err.message : err);
+          console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber} stock error, will use AI:`, err instanceof Error ? err.message : err);
         }
       }
+      console.log(`[BRAIN] Pass 1 done: ${stockHandled.size}/${scenes.length} scenes got stock footage`);
+    }
+
+    // ═══ PASS 2: PARALLEL AI GENERATION for scenes without stock ═══
+    console.log(`[BRAIN] Pass 2: submitting ${scenes.length - stockHandled.size} remaining scenes to AI...`);
+    const sceneSubmissions = scenes.map(async (scene, i) => {
+      const sceneDef = enhancedPlan.scenes[i];
+      if (!sceneDef) return;
+      if (stockHandled.has(scene.id)) return; // already done via stock
 
       const model = AI_MODELS[sceneDef.modelId];
       const isFalModel = model?.provider === "fal";

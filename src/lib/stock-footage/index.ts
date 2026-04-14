@@ -243,13 +243,31 @@ const TOPIC_SEARCH_PHRASES: Record<string, string[]> = {
   news: ["news broadcast", "newsroom", "breaking news graphics"],
   breaking: ["news alert", "breaking news studio"],
   // Topics I saw in queue
-  jobs: ["office workers", "job interview", "unemployment line", "workplace"],
-  layoff: ["empty office", "packing boxes", "unemployment"],
-  china: ["china shanghai", "beijing city", "chinese flag"],
-  whatsapp: ["smartphone messaging", "mobile phone chat"],
+  jobs: ["office workers typing", "call center agents", "open plan office", "business people working"],
+  job: ["office workers", "busy office", "employees computer"],
+  layoff: ["empty office desk", "closed business", "unemployment line"],
+  replacing: ["office automation", "robot arm factory", "computer server rack"],
+  automation: ["robotic factory", "automated assembly line", "robot arm"],
+  worker: ["office worker typing", "business professional"],
+  employee: ["office workers", "call center", "business meeting"],
+  china: ["china shanghai skyline", "beijing city", "chinese flag"],
+  whatsapp: ["smartphone messaging", "mobile phone typing"],
   food: ["grocery shopping", "food market", "produce aisle"],
-  price: ["grocery store", "shopping cart", "supermarket"],
+  price: ["grocery store shopping", "shopping cart", "supermarket aisle"],
 };
+
+// Anti-keywords — if the stock clip's URL or metadata hints at these, skip it.
+// Prevents Revolutionary War reenactments, medieval footage, cartoons, etc.
+const BLACKLIST_TERMS = [
+  "revolutionary-war",
+  "civil-war",
+  "medieval",
+  "reenactment",
+  "historical-battle",
+  "cartoon",
+  "animation-kids",
+  "vintage-uniform",
+];
 
 /**
  * Convert a scene prompt + topic into 2-4 high-quality stock search terms.
@@ -324,6 +342,7 @@ export async function findStockClip(params: {
   targetHeight?: number;
   minDuration?: number;
   aspectRatio?: "portrait" | "landscape" | "square";
+  excludeUrls?: Set<string>; // clips already used in this production
 }): Promise<StockClip | null> {
   const targetWidth = params.targetWidth ?? (params.aspectRatio === "portrait" ? 720 : 1280);
   const targetHeight = params.targetHeight ?? (params.aspectRatio === "portrait" ? 1280 : 720);
@@ -353,6 +372,10 @@ export async function findStockClip(params: {
     ]);
     for (const clip of [...a, ...b]) {
       if (seen.has(clip.url)) continue;
+      if (params.excludeUrls?.has(clip.url)) continue;
+      // Skip blacklisted content (historical reenactments, cartoons, etc.)
+      const urlLower = clip.url.toLowerCase();
+      if (BLACKLIST_TERMS.some((t) => urlLower.includes(t))) continue;
       seen.add(clip.url);
       allClips.push(clip);
     }

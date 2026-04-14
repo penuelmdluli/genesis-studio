@@ -190,12 +190,47 @@ interface QueueItem {
   news_topic_id?: string;
 }
 
+/**
+ * Quick FAL health check — detects balance exhaustion early so we don't
+ * trigger a full production flow that will fail halfway through.
+ */
+async function checkFalHealth(): Promise<{ ok: boolean; reason?: string }> {
+  if (!FAL_API_KEY) return { ok: false, reason: "FAL_KEY not set" };
+  try {
+    const r = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+      method: "POST",
+      headers: { Authorization: `Key ${FAL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "x", image_size: { width: 256, height: 256 }, num_images: 1 }),
+    });
+    if (r.status === 403) {
+      const txt = await r.text().catch(() => "");
+      if (txt.includes("Exhausted balance") || txt.includes("locked")) {
+        return { ok: false, reason: "FAL balance exhausted — top up at fal.ai/dashboard/billing" };
+      }
+      return { ok: false, reason: "FAL returned 403: " + txt.substring(0, 100) };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: "FAL unreachable: " + (err instanceof Error ? err.message : "unknown") };
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    // Guard: bail early if FAL is down (saves compute + Claude API call)
+    const falHealth = await checkFalHealth();
+    if (!falHealth.ok) {
+      console.error(`[DEV PRODUCE] FAL health check FAILED: ${falHealth.reason}`);
+      return NextResponse.json(
+        { error: falHealth.reason, falDown: true, success: false },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };
 

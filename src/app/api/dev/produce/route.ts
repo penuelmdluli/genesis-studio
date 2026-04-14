@@ -371,6 +371,7 @@ export async function POST(req: NextRequest) {
       soundEffects: true,
       engagementCTA: true, // Narrator always closes with like/comment/share
       ctaPatternHint, // Learn-and-adapt: prefer the winning pattern for this page
+      pillar: item.pillar || (item.input_data as Record<string, unknown>)?.topic_category as string | undefined, // Drives stock footage fallback query
     };
 
     // Step 1: Plan with Hollywood cinematography prompt (~10-15s)

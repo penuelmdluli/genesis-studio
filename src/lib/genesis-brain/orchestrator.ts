@@ -249,6 +249,7 @@ export async function executeProduction(
           const clip = await findStockClip({
             scenePrompt: sceneDef.prompt,
             topicTitle: input.concept,
+            pillar: input.pillar, // Content pillar drives fallback query (e.g. finance → stock market)
             sceneIndex: i, // Rotate search-term order per scene to get varied footage
             aspectRatio:
               input.aspectRatio === "portrait"

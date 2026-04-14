@@ -384,6 +384,7 @@ export interface BrainInput {
   brandKit?: BrandKit;
   outputFormats?: AspectRatio[];
   template?: string;
+  pillar?: string; // Content pillar (e.g. "finance", "breaking_news") — drives stock footage pillar fallback query
 }
 
 export interface BrandKit {

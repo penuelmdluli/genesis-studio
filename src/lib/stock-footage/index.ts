@@ -269,49 +269,149 @@ const BLACKLIST_TERMS = [
   "vintage-uniform",
 ];
 
+// Pillar → fallback safety-net search phrase. Guarantees at least one
+// topically relevant query even when title extraction is weak.
+const PILLAR_FALLBACK_QUERIES: Record<string, string> = {
+  finance: "stock market trading floor",
+  markets: "stock market trading floor",
+  economy: "financial district skyline",
+  breaking_news: "news broadcast newsroom",
+  news: "news broadcast studio",
+  geopolitics: "world leaders diplomatic meeting",
+  politics: "government parliament building",
+  tech: "modern technology office",
+  technology: "technology data center",
+  ai_news: "artificial intelligence computer",
+  ai: "artificial intelligence robot",
+  ai_disruption: "office automation robot arm",
+  entertainment: "celebrity red carpet event",
+  celebrity: "celebrity paparazzi street",
+  viral_moments: "crowd reaction street scene",
+  wars: "military conflict battlefield",
+  war: "military troops combat",
+  crime: "police crime scene siren",
+  guns: "firearms weapons",
+  health_wellness: "fitness healthy lifestyle",
+  sports: "sports stadium game",
+  africa: "african city skyline",
+  afrofuturism: "modern african city",
+  science: "laboratory research science",
+  space: "space earth satellite orbit",
+};
+
+const STOP_WORDS = new Set([
+  "the","a","an","is","are","was","were","has","have","will","just","now","here","that","this","these","those",
+  "says","said","say","in","on","at","of","to","for","and","or","but","after","before","as","with","by","from",
+  "its","it","be","been","being","so","then","than","when","while","into","over","under","up","down",
+  "—","-","|",":",";","live","exclusive","breaking","updates","update","news","new","new","vs",
+  "amid","per","via","about","against","among","between","during","without","within"
+]);
+
 /**
- * Convert a scene prompt + topic into search terms.
- *
- * Dictionary-first strategy: we ONLY use proven search phrases from
- * TOPIC_SEARCH_PHRASES. No freeform noun extraction (that produced garbage
- * matches like Revolutionary War reenactments).
- *
- * Fallback: if no dictionary hits, just use the topic title as-is.
+ * Extract named entities (proper nouns) from a title — things like
+ * "Dow Futures", "Strait of Hormuz", "Donald Trump", "NASA".
+ * These are the ACTUAL subjects of the news, not generic dictionary matches.
  */
-export function extractSearchTerms(scenePrompt: string, topicTitle?: string): string[] {
+function extractNamedEntities(text: string): string[] {
+  if (!text) return [];
+  // Find runs of capitalized words, allowing connectors (of, de, van, -)
+  const re = /\b([A-Z][A-Za-z0-9]+(?:(?:\s+(?:of|de|van|el|al|the))?\s+[A-Z][A-Za-z0-9]+){0,3})\b/g;
+  const entities: string[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[1].trim();
+    // Skip lone sentence-initial words that are generic
+    if (STOP_WORDS.has(raw.toLowerCase())) continue;
+    // Skip very short acronyms that are too generic (A, An, I)
+    if (raw.length < 3) continue;
+    const low = raw.toLowerCase();
+    if (seen.has(low)) continue;
+    seen.add(low);
+    entities.push(raw);
+  }
+  return entities;
+}
+
+/**
+ * Clean a title into a concise search query by stripping filler words,
+ * numbers, and punctuation. Keeps the meaningful topic nouns in order.
+ */
+function cleanTitleToQuery(title: string, maxWords = 6): string {
+  const cleaned = title
+    .replace(/[""''""]/g, "")
+    .replace(/[|:—–-]+/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b\d+%?\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = cleaned
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !STOP_WORDS.has(w.toLowerCase()));
+  return words.slice(0, maxWords).join(" ");
+}
+
+/**
+ * Convert a scene prompt + topic + pillar into search terms.
+ *
+ * Priority order (most topically specific first):
+ *   1. Named entities from the topic title ("Dow Futures", "Strait of Hormuz")
+ *   2. Cleaned topic title as a compact query
+ *   3. Pillar-based safety-net query (guarantees on-theme footage)
+ *   4. Dictionary matches (supplementary, for known viral categories)
+ *
+ * This fixes "videos not aligned to topics" — the topic itself drives search,
+ * not generic dictionary phrases.
+ */
+export function extractSearchTerms(
+  scenePrompt: string,
+  topicTitle?: string,
+  pillar?: string,
+): string[] {
+  const matches: string[] = [];
+  const push = (q: string) => {
+    const trimmed = q.trim();
+    if (trimmed.length < 3) return;
+    const low = trimmed.toLowerCase();
+    if (matches.some((m) => m.toLowerCase() === low)) return;
+    matches.push(trimmed);
+  };
+
+  // 1. NAMED ENTITIES — the most topically specific queries.
+  //    "Dow futures drop 500 points after Trump announces Strait of Hormuz"
+  //    → ["Dow", "Trump", "Strait of Hormuz"]
+  if (topicTitle) {
+    const entities = extractNamedEntities(topicTitle);
+    for (const e of entities.slice(0, 3)) push(e);
+  }
+
+  // 2. CLEANED TITLE — broad but topically on-point.
+  if (topicTitle) {
+    const compact = cleanTitleToQuery(topicTitle, 6);
+    if (compact.length > 5) push(compact);
+  }
+
+  // 3. PILLAR FALLBACK — always include one on-theme pillar query as safety net.
+  if (pillar && PILLAR_FALLBACK_QUERIES[pillar]) {
+    push(PILLAR_FALLBACK_QUERIES[pillar]);
+  }
+
+  // 4. DICTIONARY MATCHES — only take the TOP phrase per matching keyword,
+  //    and only if we have room. Purely supplementary.
   const combinedLower = `${scenePrompt} ${topicTitle || ""}`.toLowerCase();
-  const matches: string[] = []; // preserve order of addition
-
-  // Score each topic by # of keyword matches and preserve strongest first
-  const topicHits: Array<{ phrases: string[]; score: number }> = [];
   for (const [key, phrases] of Object.entries(TOPIC_SEARCH_PHRASES)) {
-    // Match whole-word (avoid "ai" matching "said")
+    if (matches.length >= 6) break;
     const re = new RegExp(`\\b${key.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
-    if (re.test(combinedLower)) {
-      topicHits.push({ phrases, score: phrases.length });
-    }
+    if (re.test(combinedLower)) push(phrases[0]);
   }
 
-  // Flatten top-matching phrases (up to 2 per topic, 6 total)
-  for (const hit of topicHits) {
-    for (const phrase of hit.phrases.slice(0, 2)) {
-      if (matches.length < 6 && !matches.includes(phrase)) matches.push(phrase);
-    }
+  // 5. LAST RESORT — scene prompt itself as a query (short form).
+  if (matches.length === 0 && scenePrompt) {
+    const compact = cleanTitleToQuery(scenePrompt, 5);
+    if (compact.length > 5) push(compact);
   }
 
-  // If no dictionary hits at all, fall back to topic title
-  if (matches.length === 0 && topicTitle) {
-    // Strip numbers and filler
-    const cleanTopic = topicTitle
-      .replace(/^\d+\s*(ways|reasons|jobs|things|tips)/i, "$1")
-      .replace(/[0-9]+%?/g, "")
-      .replace(/\b(is|are|the|a|an|will|has|have|just|now|here|this|that)\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (cleanTopic.length > 5) matches.push(cleanTopic);
-  }
-
-  return matches.slice(0, 4);
+  return matches.slice(0, 6);
 }
 
 /**
@@ -322,6 +422,7 @@ export function extractSearchTerms(scenePrompt: string, topicTitle?: string): st
 export async function findStockClip(params: {
   scenePrompt: string;
   topicTitle?: string;
+  pillar?: string; // e.g. "finance", "breaking_news" — drives pillar-fallback query
   sceneIndex?: number; // 0-based; used to vary search term selection across scenes
   targetWidth?: number;
   targetHeight?: number;
@@ -339,7 +440,7 @@ export async function findStockClip(params: {
         ? "square"
         : "landscape";
 
-  const allTerms = extractSearchTerms(params.scenePrompt, params.topicTitle);
+  const allTerms = extractSearchTerms(params.scenePrompt, params.topicTitle, params.pillar);
   if (allTerms.length === 0) {
     console.warn(`[STOCK] No search terms extracted from prompt`);
     return null;

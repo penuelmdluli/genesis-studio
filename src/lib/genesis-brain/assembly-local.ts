@@ -30,13 +30,20 @@ import { ModelId } from "@/types";
 // ---- UTILITIES ----
 
 function findFFmpeg(): string {
-  const candidates = [
-    "ffmpeg",
-    "C:\\Users\\PenuelM\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0-full_build\\bin\\ffmpeg.exe",
-    "/usr/bin/ffmpeg",
-    "/usr/local/bin/ffmpeg",
-  ];
+  // Prefer bundled @ffmpeg-installer/ffmpeg (shipped via serverExternalPackages
+  // in next.config.ts — guaranteed to exist on Vercel serverless).
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+    if (ffmpegInstaller?.path) {
+      return ffmpegInstaller.path;
+    }
+  } catch {
+    // Not installed, fall through to system ffmpeg
+  }
 
+  // Fallback: system ffmpeg (local dev on Windows/Linux)
+  const candidates = ["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"];
   for (const cmd of candidates) {
     try {
       execSync(`"${cmd}" -version`, { stdio: "pipe", timeout: 5000 });

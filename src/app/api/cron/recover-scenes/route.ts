@@ -343,6 +343,44 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── ORPHAN PRODUCTION DETECTION ──
+  // Productions where ALL scenes are completed but status is still 'generating'
+  // (happens when all scenes came from stock footage — no RunPod/FAL webhook
+  // to trigger assembly). Move these to 'assembling' to kick off processing.
+  let orphansTriggered = 0;
+  try {
+    const { data: generatingProds } = await supabase
+      .from("productions")
+      .select("id")
+      .eq("status", "generating")
+      .gte("created_at", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+      .limit(20);
+    for (const p of generatingProds || []) {
+      const { data: sceneStatuses } = await supabase
+        .from("production_scenes")
+        .select("status")
+        .eq("production_id", p.id);
+      if (!sceneStatuses || sceneStatuses.length === 0) continue;
+      const allDone = sceneStatuses.every((s) => s.status === "completed" || s.status === "failed");
+      const anyCompleted = sceneStatuses.some((s) => s.status === "completed");
+      if (allDone && anyCompleted) {
+        await supabase.from("productions").update({ status: "assembling", progress: 70 }).eq("id", p.id);
+        try {
+          const { startAssembly } = await import("@/lib/genesis-brain/assembly");
+          startAssembly(p.id).catch((err) =>
+            console.error(`[RECOVER-SCENES] Orphan assembly kickoff failed ${p.id.substring(0, 8)}:`, err)
+          );
+          orphansTriggered++;
+          console.log(`[RECOVER-SCENES] Orphan production ${p.id.substring(0, 8)} → assembling`);
+        } catch (err) {
+          console.error(`[RECOVER-SCENES] Could not import startAssembly:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[RECOVER-SCENES] Orphan detection error:`, err);
+  }
+
   // ── ASSEMBLY STATE MACHINE POLLING ──
   // Productions can also get stuck in "assembling" — FAL compose/mix jobs
   // need polling to advance the state machine. Nobody was polling them.
@@ -384,6 +422,7 @@ export async function GET(req: Request) {
     stillRunning,
     assembliesTriggered: triggered.length,
     triggeredProductionIds: triggered.map((id) => id.substring(0, 8)),
+    orphansTriggered,
     assembliesPolled: assembling?.length || 0,
     assemblyAdvanced,
     assemblyFailed,

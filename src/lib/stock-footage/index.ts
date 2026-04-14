@@ -165,32 +165,151 @@ async function searchProviderB(p: SearchParams): Promise<StockClip[]> {
 // PUBLIC: Find the best clip for a scene description
 // ─────────────────────────────────────────────────────────
 
+// Topic-to-search-terms dictionary for common viral content categories.
+// When scene prompt keywords match any of these keys, we prefer these proven
+// stock-footage search phrases over raw extraction.
+const TOPIC_SEARCH_PHRASES: Record<string, string[]> = {
+  // Money / economy / markets
+  market: ["stock market crash", "wall street trading floor", "bear market", "financial crisis"],
+  stock: ["stock market", "trading screens", "wall street", "stock exchange"],
+  economy: ["economy recession", "inflation", "business district", "city skyline finance"],
+  rand: ["south african currency", "money exchange", "currency crash"],
+  currency: ["money cash", "currency exchange", "banknotes"],
+  inflation: ["rising prices", "grocery store", "money stack"],
+  recession: ["empty office", "closed business", "economic downturn"],
+  crypto: ["bitcoin", "cryptocurrency trading", "digital coins"],
+  bitcoin: ["bitcoin crypto", "digital currency"],
+  // Oil / energy / Middle East
+  oil: ["oil refinery", "oil tanker ship", "gas pump", "oil rig"],
+  pipeline: ["oil pipeline", "energy infrastructure", "desert pipeline"],
+  hormuz: ["oil tanker", "persian gulf ships", "navy warship"],
+  gas: ["gas station", "oil refinery", "natural gas plant"],
+  // Wars / military
+  war: ["war military", "battlefield", "tank desert", "soldiers marching"],
+  military: ["military parade", "army tanks", "soldiers training"],
+  missile: ["missile launch", "rocket fire", "military weapons"],
+  tank: ["military tank", "armored vehicle"],
+  soldier: ["soldiers training", "military troops"],
+  drone: ["military drone", "aerial surveillance"],
+  strike: ["military strike", "airstrike", "explosion"],
+  nato: ["military alliance", "nato troops"],
+  ukraine: ["ukraine war", "destroyed buildings", "refugees"],
+  iran: ["iran middle east", "tehran city"],
+  israel: ["israel flag", "jerusalem", "middle east conflict"],
+  // Politics
+  trump: ["donald trump speech", "white house", "political rally"],
+  politics: ["government building", "politician speech", "congress parliament"],
+  parliament: ["parliament building", "government chamber"],
+  election: ["voting booth", "ballot box", "political rally"],
+  anc: ["south africa government", "parliament cape town"],
+  da: ["south africa parliament"],
+  eskom: ["power station", "electricity grid", "south africa infrastructure"],
+  loadshedding: ["power outage", "city blackout", "power lines"],
+  // Crime
+  crime: ["police car", "crime scene", "handcuffs", "police siren"],
+  police: ["police car siren", "police officer", "patrol vehicle"],
+  robbery: ["security camera", "bank vault", "crime scene"],
+  murder: ["police crime scene", "investigation"],
+  arrested: ["handcuffs", "police arrest", "jail cell"],
+  prison: ["prison bars", "jail cell", "orange jumpsuit"],
+  cartel: ["drug bust", "police raid", "money cash stack"],
+  hijack: ["highway police", "car chase", "emergency sirens"],
+  // Tech / AI
+  ai: ["artificial intelligence", "computer server", "data center", "futuristic tech"],
+  "artificial intelligence": ["ai computer", "robot arm", "data center servers"],
+  robot: ["humanoid robot", "robotic arm factory"],
+  chatgpt: ["computer screen", "typing keyboard", "ai interface"],
+  tech: ["technology data center", "server room", "silicon valley"],
+  startup: ["modern office", "tech workers", "coworking space"],
+  chip: ["semiconductor", "microchip circuit", "silicon wafer"],
+  data: ["data center", "server rack", "network cables"],
+  cyber: ["hacker computer", "cybersecurity", "binary code"],
+  hack: ["computer hacker", "matrix code", "dark room computer"],
+  starlink: ["satellite space", "starlink dish", "satellite orbit"],
+  elon: ["spacex rocket", "tesla car", "technology innovation"],
+  tesla: ["electric car", "tesla factory", "ev charging"],
+  spacex: ["rocket launch", "spacex rocket", "space mission"],
+  // Africa-specific
+  africa: ["african city skyline", "african continent", "africa landscape"],
+  johannesburg: ["johannesburg skyline", "south africa city"],
+  "cape town": ["cape town table mountain", "south africa coast"],
+  durban: ["durban beach", "south africa coast"],
+  soweto: ["township south africa", "johannesburg neighborhood"],
+  mzansi: ["south africa", "johannesburg skyline"],
+  lagos: ["lagos nigeria city", "african metropolis"],
+  nairobi: ["nairobi kenya", "african city"],
+  "south africa": ["south africa landscape", "johannesburg skyline", "south africa flag"],
+  // News generic
+  news: ["news broadcast", "newsroom", "breaking news graphics"],
+  breaking: ["news alert", "breaking news studio"],
+  // Topics I saw in queue
+  jobs: ["office workers", "job interview", "unemployment line", "workplace"],
+  layoff: ["empty office", "packing boxes", "unemployment"],
+  china: ["china shanghai", "beijing city", "chinese flag"],
+  whatsapp: ["smartphone messaging", "mobile phone chat"],
+  food: ["grocery shopping", "food market", "produce aisle"],
+  price: ["grocery store", "shopping cart", "supermarket"],
+};
+
 /**
- * Convert a verbose scene prompt into 2-4 short search terms.
- * Strips camera/lighting/style jargon. Uses the first few nouns + topic.
+ * Convert a scene prompt + topic into 2-4 high-quality stock search terms.
+ *
+ * Strategy:
+ *   1. Match scene text against TOPIC_SEARCH_PHRASES dictionary (best results)
+ *   2. If no dictionary match, fall back to noun extraction from cleaned prompt
+ *   3. Always include the raw topic title as one search term (if provided)
  */
-export function extractSearchTerms(scenePrompt: string): string[] {
-  // Remove cinematography jargon
+export function extractSearchTerms(scenePrompt: string, topicTitle?: string): string[] {
+  const lower = scenePrompt.toLowerCase();
+  const matches = new Set<string>();
+
+  // 1. Dictionary matches (high-quality terms)
+  for (const [key, phrases] of Object.entries(TOPIC_SEARCH_PHRASES)) {
+    if (lower.includes(key)) {
+      // Take 1-2 phrases from this topic
+      for (const phrase of phrases.slice(0, 2)) matches.add(phrase);
+    }
+  }
+
+  // 2. Also pull key nouns from the cleaned prompt as fallback
   const cleaned = scenePrompt
-    .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle|rack focus|rim light/gi, "")
-    .replace(/\d+mm|f\/[\d.]+/gi, "")
-    .replace(/cinematic|photorealistic|anamorphic|4K|film grain|shallow depth of field|golden hour|rembrandt lighting|chiaroscuro|volumetric/gi, "")
+    .replace(/slow dolly|push-in|tracking shot|crane|steadicam|handheld|orbit|drone|jib|whip pan|parallax|locked-off|dutch angle|rack focus|rim light|establishing shot/gi, "")
+    .replace(/\d+mm|f\/[\d.]+|\d+fps/gi, "")
+    .replace(/cinematic|photorealistic|anamorphic|4K|film grain|shallow depth of field|golden hour|rembrandt lighting|chiaroscuro|volumetric|bokeh/gi, "")
     .replace(/No human face.*$/i, "")
+    .replace(/no people|no person|environment only|empty landscape/gi, "")
     .replace(/[,.]\s*/g, ". ")
     .trim();
 
-  // Take first 2 sentences, pull key nouns/phrases
-  const sentences = cleaned.split(".").map((s) => s.trim()).filter(Boolean).slice(0, 3);
-  const terms: string[] = [];
-  for (const s of sentences) {
-    // Grab 2-5 significant words
-    const words = s
-      .split(/\s+/)
-      .filter((w) => w.length > 3 && !/^(with|from|into|this|that|their|about|very|just|only|over|under|above|below)$/i.test(w))
-      .slice(0, 4);
-    if (words.length > 0) terms.push(words.join(" "));
+  const stopWords = new Set([
+    "with","from","into","this","that","their","about","very","just","only","over","under","above","below",
+    "through","across","between","during","without","within","among","around","before","after","foreground","background",
+    "scene","shot","frame","view","angle","perspective","light","lighting","color","colour","showing","depicting","featuring",
+  ]);
+
+  if (matches.size < 2) {
+    const sentences = cleaned.split(".").map((s) => s.trim()).filter(Boolean).slice(0, 2);
+    for (const s of sentences) {
+      const words = s
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()))
+        .slice(0, 3);
+      if (words.length >= 2) matches.add(words.join(" "));
+    }
   }
-  return terms.filter(Boolean);
+
+  // 3. Topic title as anchor search (strong signal)
+  if (topicTitle) {
+    const cleanTopic = topicTitle
+      .replace(/["'"'"':;.]+/g, "")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()))
+      .slice(0, 4)
+      .join(" ");
+    if (cleanTopic.length > 5) matches.add(cleanTopic);
+  }
+
+  return Array.from(matches).slice(0, 4);
 }
 
 /**
@@ -200,6 +319,7 @@ export function extractSearchTerms(scenePrompt: string): string[] {
  */
 export async function findStockClip(params: {
   scenePrompt: string;
+  topicTitle?: string;
   targetWidth?: number;
   targetHeight?: number;
   minDuration?: number;
@@ -215,7 +335,7 @@ export async function findStockClip(params: {
         ? "square"
         : "landscape";
 
-  const terms = extractSearchTerms(params.scenePrompt);
+  const terms = extractSearchTerms(params.scenePrompt, params.topicTitle);
   if (terms.length === 0) {
     console.warn(`[STOCK] No search terms extracted from prompt`);
     return null;

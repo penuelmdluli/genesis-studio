@@ -246,6 +246,7 @@ export async function executeProduction(
         try {
           const clip = await findStockClip({
             scenePrompt: sceneDef.prompt,
+            topicTitle: input.concept, // Use the production concept for topic-aware matching
             aspectRatio: input.aspectRatio === "portrait" ? "portrait" : input.aspectRatio === "square" ? "square" : "landscape",
             minDuration: Math.max(3, sceneDef.duration - 2),
           });

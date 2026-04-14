@@ -88,26 +88,27 @@ export async function generateVoiceover(
     return { type: "voiceover", url: "", duration: estimateVoiceoverDuration(script), metadata: { skipped: true } };
   }
 
-  // Resolve Kokoro endpoint and voice — African languages get optimized params
-  const africanConfig = getAfricanVoiceConfig(language);
-  const voiceId = voice || getDefaultVoice(language);
-  const kokoroEndpoint = africanConfig?.kokoroEndpoint || KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
-  const kokoroVoice = africanConfig?.voice || KOKORO_VOICES[voiceId] || "af_heart";
-  const kokoroSpeed = africanConfig?.speed || 1;
-
   // Format script for African TTS: pronunciation corrections, pauses, emphasis
+  const africanConfig = getAfricanVoiceConfig(language);
   const ttsScript = isAfricanLanguage(language)
     ? formatScriptForTTS(script, language)
     : script;
 
+  // ─── PRIMARY: ElevenLabs multilingual v2 (high-quality, always available) ───
+  // Kokoro was locked by FAL separately from other endpoints, so we use
+  // ElevenLabs as primary. Better quality anyway — natural-sounding voices.
   try {
-    console.log(`[BRAIN AUDIO] Generating voiceover via Kokoro TTS: ${kokoroEndpoint} voice=${kokoroVoice} speed=${kokoroSpeed}${africanConfig ? " (African optimized)" : ""}`);
+    const elevenVoice = "Rachel"; // Default female narrator — warm, clear, professional
+    // Use male voice for authoritative cinematic tone (like am_adam was)
+    const selectedVoice = voice?.toLowerCase().includes("adam") || voice?.toLowerCase().includes("guy") ? "Adam" : elevenVoice;
+    console.log(`[BRAIN AUDIO] Generating voiceover via ElevenLabs: voice=${selectedVoice}`);
 
-    const result = await fal.subscribe(kokoroEndpoint, {
+    const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
       input: {
-        prompt: ttsScript,
-        voice: kokoroVoice,
-        speed: kokoroSpeed,
+        text: ttsScript,
+        voice: selectedVoice,
+        stability: 0.5,
+        similarity_boost: 0.75,
       },
       logs: false,
     });
@@ -116,22 +117,49 @@ export async function generateVoiceover(
     const audioFile = data?.audio as { url: string } | undefined;
 
     if (audioFile?.url) {
-      console.log(`[BRAIN AUDIO] Voiceover generated: ${audioFile.url}`);
+      console.log(`[BRAIN AUDIO] Voiceover generated via ElevenLabs: ${audioFile.url}`);
       return {
         type: "voiceover",
         url: audioFile.url,
         duration: (data?.duration as number) || estimateVoiceoverDuration(script),
         metadata: {
-          voice: kokoroVoice,
+          voice: selectedVoice,
           language,
-          model: kokoroEndpoint,
+          model: "fal-ai/elevenlabs/tts/multilingual-v2",
         },
       };
     }
-
-    console.warn("[BRAIN AUDIO] Kokoro TTS returned no audio URL");
+    console.warn("[BRAIN AUDIO] ElevenLabs returned no audio URL — trying Kokoro fallback");
   } catch (err) {
-    console.error("[BRAIN AUDIO] Kokoro TTS failed:", err);
+    console.warn("[BRAIN AUDIO] ElevenLabs failed (will try Kokoro):", err instanceof Error ? err.message : err);
+  }
+
+  // ─── FALLBACK: Kokoro TTS ───
+  // Kept as fallback in case ElevenLabs fails or gets locked in future.
+  const voiceId = voice || getDefaultVoice(language);
+  const kokoroEndpoint = africanConfig?.kokoroEndpoint || KOKORO_ENDPOINTS[language] || KOKORO_ENDPOINTS["en-US"];
+  const kokoroVoice = africanConfig?.voice || KOKORO_VOICES[voiceId] || "af_heart";
+  const kokoroSpeed = africanConfig?.speed || 1;
+
+  try {
+    console.log(`[BRAIN AUDIO] Trying Kokoro fallback: ${kokoroEndpoint} voice=${kokoroVoice}`);
+    const result = await fal.subscribe(kokoroEndpoint, {
+      input: { prompt: ttsScript, voice: kokoroVoice, speed: kokoroSpeed },
+      logs: false,
+    });
+    const data = result.data as Record<string, unknown>;
+    const audioFile = data?.audio as { url: string } | undefined;
+    if (audioFile?.url) {
+      console.log(`[BRAIN AUDIO] Voiceover generated via Kokoro fallback: ${audioFile.url}`);
+      return {
+        type: "voiceover",
+        url: audioFile.url,
+        duration: (data?.duration as number) || estimateVoiceoverDuration(script),
+        metadata: { voice: kokoroVoice, language, model: kokoroEndpoint, fallback: true },
+      };
+    }
+  } catch (err) {
+    console.error("[BRAIN AUDIO] Kokoro fallback also failed:", err instanceof Error ? err.message : err);
   }
 
   // Fallback: try custom TTS endpoint if configured
@@ -212,26 +240,32 @@ export async function generatePerSceneVoiceover(
   // Track actual TTS audio durations per scene (for alignment)
   const sceneAudioDurations: Record<number, number> = {};
 
-  // Generate TTS for each scene's voiceoverLine in parallel
+  // Generate TTS for each scene's voiceoverLine in parallel (ElevenLabs primary)
+  const elevenVoice = voice?.toLowerCase().includes("adam") || voice?.toLowerCase().includes("guy") ? "Adam" : "Rachel";
   const clipPromises = scenes.map(async (scene, i) => {
     if (!scene.voiceoverLine || !scene.voiceoverLine.trim()) {
       return null;
     }
 
     try {
-      // Format for African TTS: pronunciation, pauses, emphasis
       const ttsLine = isAfricanLanguage(language)
         ? formatScriptForTTS(scene.voiceoverLine, language)
         : scene.voiceoverLine;
 
-      const result = await fal.subscribe(kokoroEndpoint, {
-        input: {
-          prompt: ttsLine,
-          voice: kokoroVoice,
-          speed: kokoroSpeed,
-        },
-        logs: false,
-      });
+      // Try ElevenLabs first (Kokoro is intermittently locked)
+      let result;
+      try {
+        result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
+          input: { text: ttsLine, voice: elevenVoice, stability: 0.5, similarity_boost: 0.75 },
+          logs: false,
+        });
+      } catch (elevenErr) {
+        console.warn(`[BRAIN AUDIO] Scene ${scene.sceneNumber} ElevenLabs failed, trying Kokoro:`, elevenErr instanceof Error ? elevenErr.message : elevenErr);
+        result = await fal.subscribe(kokoroEndpoint, {
+          input: { prompt: ttsLine, voice: kokoroVoice, speed: kokoroSpeed },
+          logs: false,
+        });
+      }
 
       const data = result.data as Record<string, unknown>;
       const audioFile = data?.audio as { url: string } | undefined;
@@ -284,10 +318,19 @@ export async function generatePerSceneVoiceover(
         ? formatScriptForTTS(fullScript, language)
         : fullScript;
 
-      const fullResult = await fal.subscribe(kokoroEndpoint, {
-        input: { prompt: fullTtsScript, voice: kokoroVoice, speed: kokoroSpeed },
-        logs: false,
-      });
+      // Use ElevenLabs first (Kokoro is intermittently locked)
+      let fullResult;
+      try {
+        fullResult = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
+          input: { text: fullTtsScript, voice: elevenVoice, stability: 0.5, similarity_boost: 0.75 },
+          logs: false,
+        });
+      } catch {
+        fullResult = await fal.subscribe(kokoroEndpoint, {
+          input: { prompt: fullTtsScript, voice: kokoroVoice, speed: kokoroSpeed },
+          logs: false,
+        });
+      }
       const fullData = fullResult.data as Record<string, unknown>;
       const fullAudio = fullData?.audio as { url: string } | undefined;
       if (fullAudio?.url) {

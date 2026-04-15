@@ -232,15 +232,40 @@ export async function executeProduction(
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const webhookUrl = `${appUrl}/api/brain/webhook`;
 
-    // ═══ PASS 1: SEQUENTIAL STOCK FOOTAGE LOOKUP ═══
-    // Run sequentially so each scene's dedup set (usedStockUrls) is current.
-    // Running in parallel would cause all scenes to pick the same top clip.
+    // ═══ PASS 1: STOCK FOOTAGE (EMERGENCY FALLBACK ONLY) ═══
+    // Seedance (FAL) is the primary engine — it produces higher-quality,
+    // more brand-aligned videos than stock footage. Stock is used ONLY when
+    // FAL is unreachable / out of credits. This check runs a cheap FAL ping
+    // to decide whether to skip stock entirely and go straight to AI.
     const stockHandled = new Set<string>(); // scene IDs that got stock footage
     const usedStockUrls = new Set<string>();
     const { findStockClip, isStockFootageAvailable, mirrorClipToR2 } = await import("@/lib/stock-footage");
 
-    if (isStockFootageAvailable()) {
-      console.log(`[BRAIN] Pass 1: checking stock footage for ${scenes.length} scenes...`);
+    // Cheap FAL health probe — if it's up, skip stock and let AI handle everything.
+    let falHealthy = false;
+    try {
+      if (process.env.FAL_KEY) {
+        const probe = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+          method: "POST",
+          headers: { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: "x", image_size: { width: 256, height: 256 }, num_images: 1 }),
+          signal: AbortSignal.timeout(5000),
+        });
+        // 403 with "Exhausted balance" or "locked" = FAL unhealthy.
+        // Anything else (200, 422, timeout, etc.) we treat as "probably reachable".
+        if (probe.status === 403) {
+          const txt = await probe.text().catch(() => "");
+          falHealthy = !(txt.includes("Exhausted balance") || txt.includes("locked"));
+        } else {
+          falHealthy = true;
+        }
+      }
+    } catch {
+      falHealthy = false;
+    }
+
+    if (!falHealthy && isStockFootageAvailable()) {
+      console.log(`[BRAIN] Pass 1: FAL unhealthy — falling back to STOCK FOOTAGE for ${scenes.length} scenes`);
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
         const sceneDef = enhancedPlan.scenes[i];
@@ -249,8 +274,8 @@ export async function executeProduction(
           const clip = await findStockClip({
             scenePrompt: sceneDef.prompt,
             topicTitle: input.concept,
-            pillar: input.pillar, // Content pillar drives fallback query (e.g. finance → stock market)
-            sceneIndex: i, // Rotate search-term order per scene to get varied footage
+            pillar: input.pillar,
+            sceneIndex: i,
             aspectRatio:
               input.aspectRatio === "portrait"
                 ? "portrait"
@@ -274,15 +299,17 @@ export async function executeProduction(
               .update({ provider: "stock", model_id: "stock-footage" })
               .eq("id", scene.id);
             stockHandled.add(scene.id);
-            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK (${clip.width}x${clip.height} ${clip.duration}s) → R2`);
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: STOCK fallback (${clip.width}x${clip.height} ${clip.duration}s)`);
           } else {
-            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — will use AI generation`);
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: no stock match — AI generation will be attempted`);
           }
         } catch (err) {
-          console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber} stock error, will use AI:`, err instanceof Error ? err.message : err);
+          console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber} stock error:`, err instanceof Error ? err.message : err);
         }
       }
-      console.log(`[BRAIN] Pass 1 done: ${stockHandled.size}/${scenes.length} scenes got stock footage`);
+      console.log(`[BRAIN] Pass 1 (fallback) done: ${stockHandled.size}/${scenes.length} scenes via stock`);
+    } else {
+      console.log(`[BRAIN] Pass 1 skipped — FAL healthy, using AI (Seedance) for all ${scenes.length} scenes`);
     }
 
     // ═══ PASS 2: PARALLEL AI GENERATION for scenes without stock ═══

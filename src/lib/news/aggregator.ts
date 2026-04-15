@@ -192,35 +192,35 @@ async function fetchFromNewsAPI(): Promise<UnifiedNewsItem[]> {
   const apiKey = process.env.NEWS_API_KEY || process.env.NEWSAPI_KEY;
   if (!apiKey) return [];
 
-  const categories = [
-    { cat: "general", niche: "breaking_news" },
-    { cat: "technology", niche: "tech" },
-    { cat: "business", niche: "finance" },
-    { cat: "entertainment", niche: "entertainment" },
-    { cat: "health", niche: "health_wellness" },
-    { cat: "science", niche: "tech" },
+  // "AI Apocalypse Pulse" strategy — only fetch AI-related stories.
+  // Uses /v2/everything (keyword search) instead of /top-headlines (category).
+  // Sorted by popularity so we get the viral AI stories, not random ones.
+  const queries = [
+    {
+      q: '("artificial intelligence" OR "AI" OR "ChatGPT" OR "OpenAI" OR "Anthropic" OR "Claude AI" OR "deepfake" OR "automation" OR "machine learning" OR "generative AI" OR "humanoid robot")',
+      niche: "ai_disruption",
+      category: "ai",
+    },
   ];
 
   const results = await Promise.allSettled(
-    categories.map(async ({ cat, niche }) => {
-      const res = await fetch(
-        `https://newsapi.org/v2/top-headlines?category=${cat}&language=en&pageSize=8&apiKey=${apiKey}`,
-        { signal: AbortSignal.timeout(10000) }
-      );
+    queries.map(async ({ q, niche, category }) => {
+      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=popularity&pageSize=30&apiKey=${apiKey}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.articles || [])
         .filter((a: { title: string }) => a.title && a.title.length > 15 && !a.title.includes("[Removed]"))
         .map((a: { title: string; description: string | null; source: { name: string } }) => {
           const title = a.title.split(" - ")[0].trim(); // Remove source suffix
-          const niches = detectNiches(title, a.description || "", cat);
+          const niches = detectNiches(title, a.description || "", category);
           return {
             id: topicIdFromTitle(title),
             title,
             summary: a.description || "",
-            category: cat === "general" ? "breaking" : cat,
-            viral_potential: 7,
-            content_angle: `Breaking ${cat} news — create a dramatic animated 30-second video`,
+            category,
+            viral_potential: 8, // AI stories are inherently high-viral
+            content_angle: "AI disruption — create a cinematic tech documentary showing servers, robots, empty offices, and the real impact on South African jobs",
             suggested_hook: title.slice(0, 80),
             region: "GLOBAL",
             source: "newsapi",
@@ -237,58 +237,26 @@ async function fetchFromNewsAPI(): Promise<UnifiedNewsItem[]> {
   const items = results
     .filter((r): r is PromiseFulfilledResult<UnifiedNewsItem[]> => r.status === "fulfilled")
     .flatMap(r => r.value);
-  console.log(`[Aggregator] NewsAPI returned ${items.length} items`);
+  console.log(`[Aggregator] NewsAPI (AI-only) returned ${items.length} items`);
   return items;
 }
 
 // ── Source: Reddit ────────────────────────────────────────────
 
+// "AI Apocalypse Pulse" focus — only AI-specific subreddits.
+// Removed general news, celebrity, finance, Africa, motivation, viral subs
+// because they produced off-theme topics (gaming, celebrity gossip, meteors).
 const REDDIT_SUBS: Array<{ sub: string; niche: string; category: string }> = [
-  // World news & politics
-  { sub: "worldnews", niche: "breaking_news", category: "breaking" },
-  { sub: "news", niche: "news_animated", category: "breaking" },
-  { sub: "geopolitics", niche: "geopolitics", category: "breaking" },
-  // Tech & AI
-  { sub: "technology", niche: "tech", category: "technology" },
-  { sub: "artificial", niche: "ai_news", category: "technology" },
-  { sub: "MachineLearning", niche: "ai_news", category: "technology" },
-  { sub: "singularity", niche: "ai_disruption", category: "technology" },
-  { sub: "Futurology", niche: "ai_disruption", category: "technology" },
-  // Entertainment & pop culture
-  { sub: "entertainment", niche: "entertainment", category: "entertainment" },
-  { sub: "movies", niche: "entertainment", category: "entertainment" },
-  { sub: "television", niche: "entertainment", category: "entertainment" },
-  { sub: "popculture", niche: "celebrity", category: "entertainment" },
-  { sub: "Celebs", niche: "celebrity", category: "entertainment" },
-  // Motivation & wellness
-  { sub: "GetMotivated", niche: "motivation", category: "culture" },
-  { sub: "DecidingToBeBetter", niche: "motivation", category: "culture" },
-  { sub: "selfimprovement", niche: "motivation", category: "culture" },
-  // Finance
-  { sub: "stocks", niche: "finance", category: "finance" },
-  { sub: "CryptoCurrency", niche: "finance", category: "finance" },
-  { sub: "economics", niche: "finance", category: "finance" },
-  // Africa
-  { sub: "Africa", niche: "afrofuturism", category: "africa" },
-  { sub: "southafrica", niche: "mbs_episodes", category: "africa" },
-  // Health & wellness
-  { sub: "Health", niche: "health_wellness", category: "culture" },
-  { sub: "Fitness", niche: "health_wellness", category: "culture" },
-  // Extra finance
-  { sub: "business", niche: "finance", category: "finance" },
-  { sub: "wallstreetbets", niche: "finance", category: "finance" },
-  { sub: "personalfinance", niche: "finance", category: "finance" },
-  // Extra tech & science
-  { sub: "science", niche: "tech", category: "technology" },
-  { sub: "space", niche: "tech", category: "technology" },
-  { sub: "gadgets", niche: "tech", category: "technology" },
-  { sub: "dataisbeautiful", niche: "tech", category: "technology" },
-  // Extra motivation & breaking
-  { sub: "UpliftingNews", niche: "motivation", category: "culture" },
-  { sub: "collapse", niche: "breaking_news", category: "breaking" },
-  // Viral / general
-  { sub: "interestingasfuck", niche: "viral_moments", category: "viral" },
-  { sub: "Damnthatsinteresting", niche: "viral_moments", category: "viral" },
+  { sub: "singularity", niche: "ai_disruption", category: "ai" },
+  { sub: "artificial", niche: "ai_news", category: "ai" },
+  { sub: "MachineLearning", niche: "ai_news", category: "ai" },
+  { sub: "ChatGPT", niche: "ai_news", category: "ai" },
+  { sub: "OpenAI", niche: "ai_news", category: "ai" },
+  { sub: "Anthropic", niche: "ai_news", category: "ai" },
+  { sub: "LocalLLaMA", niche: "ai_news", category: "ai" },
+  { sub: "Futurology", niche: "ai_disruption", category: "ai" },
+  { sub: "aiethics", niche: "ai_disruption", category: "ai" },
+  { sub: "robotics", niche: "ai_disruption", category: "ai" },
 ];
 
 async function fetchFromReddit(): Promise<UnifiedNewsItem[]> {

@@ -13,78 +13,81 @@ try {
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// ──────────────────────────────────────────────────────────────
-// "AI APOCALYPSE PULSE" — 40-topic seed list for Tech Pulse Africa
-// All topics map to the same visual motif bucket (servers, robots,
-// code, data centers, empty offices) so both Seedance and stock
-// footage produce topic-aligned visuals.
-// ──────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// "WAR PULSE" — 40-topic seed list for Tech Pulse Africa
+//
+// Data-driven: our top-performing post was "Iran halts Strait of Hormuz"
+// (1933 reach, 19.5s avg watch, 89 engagement) — clearly war/geopolitics
+// wins on this page. All 40 topics are war, conflict, or military-focused
+// with high visual alignment (tanks, missiles, cities, maps, leaders).
+// ─────────────────────────────────────────────────────────────────────
+
 const TOPICS = [
-  // ═══════════════════════════════════════════════════════
-  // PILLAR 1 — "AI IS REPLACING [JOB]" (12 topics, 3x/week)
-  // ═══════════════════════════════════════════════════════
-  { title: 'AI just replaced 3000 call center agents in Johannesburg', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'This is why junior lawyers in South Africa are panicking', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'AI is replacing graphic designers — and clients do not care', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'Radio DJs in South Africa are being quietly replaced by AI voices', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'AI accountants are now cheaper than human ones in SA', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'Teachers in South Africa will be replaced — here is the proof', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'Your doctor is already being replaced and you did not know', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'AI just wrote a BEE compliance report better than a consultant', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: '5 BPO jobs in South Africa that disappear next year', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'Bank tellers are gone — here is what is replacing them', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: 'AI is taking over journalism in South Africa — no one is talking about it', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: 'Data entry jobs are dead — 100000 South Africans affected', tier: 2, pillar: 'ai_disruption', priority: 8 },
+  // ═══════════════════════════════════════════════════════════
+  // PILLAR 1 — MAJOR CONFLICT HOTSPOTS (12 topics)
+  // ═══════════════════════════════════════════════════════════
+  { title: 'Iran just did something that could spark World War 3', tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: 'China is preparing for war — South Africa must pick a side', tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: "Russia's next move will shock the world — the plan leaked", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: 'Israel just crossed a red line in Gaza', tier: 1, pillar: 'breaking_news', priority: 10 },
+  { title: "Ukraine's hidden weapon is why Russia is losing", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: 'The Taiwan invasion is closer than you think', tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: "North Korea's new missile can reach America", tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "NATO's secret plan if China attacks Taiwan", tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "Iran's oil tanker blockade — world economies at risk", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: "Putin's inner circle is panicking — here is why", tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "Israel's AI-powered drone is changing modern war", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "China's hypersonic missile just broke world records", tier: 2, pillar: 'geopolitics', priority: 8 },
 
-  // ═══════════════════════════════════════════════════════
-  // PILLAR 2 — "AI JUST DID SOMETHING TERRIFYING" (10 topics, 2x/week)
-  // ═══════════════════════════════════════════════════════
-  { title: 'AI just passed the South African bar exam — with a distinction', tier: 1, pillar: 'ai_news', priority: 10 },
-  { title: 'A new AI just cloned a South African voice in 3 seconds', tier: 1, pillar: 'ai_news', priority: 10 },
-  { title: 'This AI can predict which South Africans will get sick next year', tier: 1, pillar: 'ai_news', priority: 9 },
-  { title: 'AI just wrote an entire SONA speech and experts could not tell', tier: 1, pillar: 'ai_news', priority: 9 },
-  { title: 'Deepfake of Cyril Ramaphosa fooled 8 million people in one day', tier: 1, pillar: 'ai_news', priority: 10 },
-  { title: 'A robot just beat the best chess player in Johannesburg', tier: 2, pillar: 'ai_news', priority: 8 },
-  { title: 'AI just read your WhatsApp and knew your next move', tier: 2, pillar: 'ai_news', priority: 8 },
-  { title: 'This AI knows your credit score before you apply for a loan', tier: 2, pillar: 'ai_news', priority: 8 },
-  { title: 'AI trained on South African matric papers — results will shock you', tier: 2, pillar: 'ai_news', priority: 7 },
-  { title: 'A chatbot just diagnosed a rare disease three doctors missed', tier: 2, pillar: 'ai_news', priority: 8 },
+  // ═══════════════════════════════════════════════════════════
+  // PILLAR 2 — AFRICAN CONFLICTS (8 topics)
+  // ═══════════════════════════════════════════════════════════
+  { title: "Sudan's civil war — South Africans are being evacuated", tier: 1, pillar: 'breaking_news', priority: 10 },
+  { title: "Nigeria's military just captured a top jihadist leader", tier: 1, pillar: 'breaking_news', priority: 9 },
+  { title: 'The DRC conflict nobody is talking about', tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "Ethiopia vs Egypt — Africa's next big war over the Nile", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: 'How African mercenaries are fighting in Ukraine', tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "Libya's new civil war — oil prices set to skyrocket", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "Mozambique's secret insurgency — South Africa's neighbor at war", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "Central Africa's silent war — the numbers will shock you", tier: 2, pillar: 'geopolitics', priority: 7 },
 
-  // ═══════════════════════════════════════════════════════
-  // PILLAR 3 — "YOUR AI-PROOF CAREER" (6 topics, 1x/week)
-  // ═══════════════════════════════════════════════════════
-  { title: '3 jobs in South Africa that AI cannot touch — yet', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'How to survive the AI takeover — from a Cape Town developer', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'The one skill every South African must learn before 2027', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'Why plumbers and electricians will outearn software engineers', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: 'The AI-proof side hustle paying R30 000 a month in SA', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: '5 careers that will double in value when AI takes over', tier: 2, pillar: 'ai_disruption', priority: 7 },
+  // ═══════════════════════════════════════════════════════════
+  // PILLAR 3 — MILITARY TECH & WEAPONS (10 topics)
+  // ═══════════════════════════════════════════════════════════
+  { title: 'The new weapon that could end all wars forever', tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "America's stealth bomber that terrifies China", tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: "Russia's nuclear submarine that vanished for 6 months", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: 'This $2 drone just destroyed a $10 million tank', tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: "South Africa's secret weapons program — exposed", tier: 1, pillar: 'geopolitics', priority: 10 },
+  { title: "Israel's Iron Dome — how it really stops missiles", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "China's laser weapon that shoots missiles out of the sky", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "Turkey's killer drone is dominating African wars", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "The world's most dangerous spy satellite — revealed", tier: 2, pillar: 'geopolitics', priority: 7 },
+  { title: 'Hypersonic missiles — the war changers nobody can stop', tier: 2, pillar: 'geopolitics', priority: 8 },
 
-  // ═══════════════════════════════════════════════════════
-  // PILLAR 4 — "AFRICA'S AI MOMENT" (6 topics, 1x/week)
-  // ═══════════════════════════════════════════════════════
-  { title: 'A Kenyan startup just built the AI that Silicon Valley is copying', tier: 1, pillar: 'ai_news', priority: 10 },
-  { title: 'Nigeria now trains more AI engineers than the UK', tier: 1, pillar: 'ai_news', priority: 9 },
-  { title: 'This Johannesburg fintech uses AI to catch fraud in 2 seconds', tier: 1, pillar: 'ai_news', priority: 9 },
-  { title: 'A South African teen built an AI — Microsoft came calling', tier: 2, pillar: 'ai_news', priority: 8 },
-  { title: 'Cape Town is becoming the AI capital of Africa — the data proves it', tier: 2, pillar: 'ai_news', priority: 8 },
-  { title: 'Ghana just launched the first African-owned language AI', tier: 2, pillar: 'ai_news', priority: 7 },
+  // ═══════════════════════════════════════════════════════════
+  // PILLAR 4 — SANCTIONS & ECONOMIC WARFARE (5 topics)
+  // ═══════════════════════════════════════════════════════════
+  { title: "How sanctions are quietly crushing Russia's economy", tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: 'Iran just dumped the US dollar — markets are panicking', tier: 1, pillar: 'breaking_news', priority: 10 },
+  { title: "China's war chest is ready — the numbers are terrifying", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: "South Africa's BRICS bet — risky genius or disaster", tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: 'The oil war nobody is reporting — and who wins', tier: 2, pillar: 'geopolitics', priority: 8 },
 
-  // ═══════════════════════════════════════════════════════
-  // PILLAR 5 — "HOW THE RICH USE AI" (6 topics, 1x/week)
-  // ═══════════════════════════════════════════════════════
-  { title: 'How rich South Africans are using AI to 10x their income', tier: 1, pillar: 'ai_disruption', priority: 10 },
-  { title: 'The AI tool that millionaire traders in Sandton use every day', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'AI is making rich people richer — here is how', tier: 1, pillar: 'ai_disruption', priority: 9 },
-  { title: 'How a Joburg entrepreneur uses AI to run 4 businesses alone', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: 'Wealthy families are hiring AI tutors instead of human ones', tier: 2, pillar: 'ai_disruption', priority: 8 },
-  { title: 'The AI side hustle quietly making R200 000 a month in SA', tier: 2, pillar: 'ai_disruption', priority: 8 },
+  // ═══════════════════════════════════════════════════════════
+  // PILLAR 5 — HISTORY & LESSONS (5 topics)
+  // ═══════════════════════════════════════════════════════════
+  { title: 'Why the Afghanistan war will happen all over again', tier: 2, pillar: 'geopolitics', priority: 7 },
+  { title: '5 wars the United States secretly lost', tier: 2, pillar: 'geopolitics', priority: 8 },
+  { title: 'How Africa became the next great war battleground', tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: 'The Cold War 2.0 is already here — and we are losing', tier: 1, pillar: 'geopolitics', priority: 9 },
+  { title: 'What happens to South Africa if World War 3 starts', tier: 1, pillar: 'geopolitics', priority: 10 },
 ];
 
 async function run() {
-  console.log(`=== PRELOADING ${TOPICS.length} AI-DISRUPTION TOPICS TO tech_pulse_africa ===\n`);
+  console.log(`=== PRELOADING ${TOPICS.length} WAR-PULSE TOPICS TO tech_pulse_africa ===\n`);
 
-  // 1. Cancel any pending items on OTHER pages (laser-focus strategy)
+  // 1. Cancel pending items on OTHER pages (laser-focus strategy)
   const otherPages = [
     'mzansi_baby_stars',
     'africa_2050', 'africa_2050_dev',
@@ -101,34 +104,27 @@ async function run() {
     .select('id', { count: 'exact', head: false });
   console.log(`Cancelled ${cancelCount || 0} pending items from paused pages\n`);
 
-  // 2. Cancel any STALE off-theme pending items on tech_pulse_africa
-  //    (the celebrity / gaming / non-AI topics from the NewsAPI fetcher).
-  //    Only keep existing 'laser-focus-preload' or 'ai' pillar items.
+  // 2. Cancel existing pending items on tech_pulse_africa (both AI-apocalypse seeds
+  //    and NewsAPI-sourced items). We're replacing the whole seed queue.
   const { data: existing } = await supabase
     .from('dev_content_queue')
-    .select('id, input_data, pillar')
+    .select('id')
     .eq('page_id', 'tech_pulse_africa_dev')
     .eq('status', 'pending');
-  const stale = (existing || []).filter((row) => {
-    const pillar = row.pillar || '';
-    const provider = row.input_data?.provider || '';
-    // Keep AI-pillar OR laser-focus-preload items; cancel everything else
-    if (pillar.startsWith('ai_')) return false;
-    if (provider === 'laser-focus-preload') return false;
-    return true;
-  });
-  if (stale.length > 0) {
+  if (existing && existing.length > 0) {
     await supabase
       .from('dev_content_queue')
       .update({ status: 'cancelled' })
-      .in('id', stale.map((s) => s.id));
-    console.log(`Cancelled ${stale.length} stale off-theme pending items on tech_pulse_africa\n`);
+      .in('id', existing.map((r) => r.id));
+    console.log(`Cancelled ${existing.length} existing pending items on tech_pulse_africa\n`);
   }
 
-  // 3. Insert the new 40 topics
+  // 3. Insert 40 war topics with BOOSTED priority (+50 baseline so they beat NewsAPI scores)
   let queued = 0;
   for (const topic of TOPICS) {
     const videoPrompt = buildVideoPrompt(topic.title, topic.pillar);
+    // Boost niche_score so seeds always beat whatever NewsAPI fetches (+50)
+    const boostedScore = 50 + topic.priority;
     const { data: item, error } = await supabase.from('dev_content_queue').insert({
       page_id: 'tech_pulse_africa_dev',
       pillar: topic.pillar,
@@ -137,25 +133,25 @@ async function run() {
         page_name: 'Tech Pulse Africa',
         topic_title: topic.title,
         video_prompt: videoPrompt,
-        provider: 'ai-apocalypse-pulse',
+        provider: 'war-pulse',
         tier: topic.tier,
-        niche_score: topic.priority,
+        niche_score: boostedScore,
       },
       status: 'pending',
     }).select().single();
     if (error) { console.log(`  ✗ ${topic.title.substring(0, 50)}: ${error.message}`); continue; }
     queued++;
-    console.log(`  ✓ [T${topic.tier} p${topic.priority}] ${topic.title.substring(0, 60)} (${item.id.substring(0, 8)})`);
+    console.log(`  ✓ [T${topic.tier} p${boostedScore}] ${topic.title.substring(0, 68)} (${item.id.substring(0, 8)})`);
   }
 
-  console.log(`\n${queued}/${TOPICS.length} topics queued for Tech Pulse Africa`);
-  console.log('\nCron will pick 1 best-scored item per page per cycle (2x/day SAST peaks).');
+  console.log(`\n${queued}/${TOPICS.length} war topics queued for Tech Pulse Africa`);
+  console.log('\nCron runs 1x/day at 17:30 UTC (19:30 SAST) — recovery mode.');
 }
 
 function buildVideoPrompt(title, pillar) {
-  // Visual prompt tailored to the AI-disruption motif bucket.
-  // Every scene gets server racks, robots, code, glowing circuits — never people.
-  const base = 'Cinematic tech documentary style with African context. Server rooms with blinking racks, humanoid robots, neural network overlays, empty open-plan offices, close-ups of AI chatbots on screens, glowing circuit boards, Johannesburg/Cape Town/Lagos skylines with digital overlays. Moody blue-and-cyan lighting, volumetric light, shallow depth of field. No human faces, no presenters, no text — visuals only.';
+  // War-themed visuals — battlefields, tanks, military vehicles, cities,
+  // maps, politicians, aircraft carriers. No specific faces (avatar risk).
+  const base = 'Cinematic war documentary style. Dramatic battlefield footage, military tanks rolling through deserts, fighter jets screaming across skies, naval destroyers at sea, missile launches at dusk, destroyed buildings and smoke, aerial drone shots of conflict zones, war rooms with maps and screens, soldiers in tactical gear, political leaders at press conferences, parliament buildings, flags waving, nuclear submarines, hypersonic missiles, satellite imagery. Dark moody color grade with orange-teal contrast, volumetric light through smoke and dust, slow-motion shots, Deakins-level cinematography. No individual faces visible, no text overlays, no animation — pure photorealistic documentary.';
   return `${title}. ${base}`;
 }
 

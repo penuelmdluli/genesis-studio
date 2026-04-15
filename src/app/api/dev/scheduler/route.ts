@@ -808,6 +808,32 @@ async function handlePost(): Promise<{
     }
   }
 
+  // ── DEDUP 2: topic-title dedup across a 14-day rolling window ──
+  // Prevents the FB algorithm from flagging the page for spam when two similar
+  // headlines land on the same feed close together. Our Iran/Hormuz winner
+  // showed war topics drive 20× the reach of repetitive ones. Normalise
+  // titles (lowercase, strip punctuation) for fuzzy match.
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentPostedRows } = await supabase
+    .from("dev_content_queue")
+    .select("page_id, input_data, posted_at")
+    .eq("status", "posted")
+    .gte("posted_at", fourteenDaysAgo);
+
+  const recentTitlesByPage = new Map<string, Set<string>>();
+  const normTitle = (t: string) =>
+    t.toLowerCase().replace(/[^a-z0-9\s]+/g, "").replace(/\s+/g, " ").trim();
+  for (const rp of (recentPostedRows || []) as Array<{
+    page_id: string;
+    input_data: Record<string, unknown> | null;
+  }>) {
+    const title = (rp.input_data || {}).topic_title as string | undefined;
+    if (!title) continue;
+    const key = rp.page_id;
+    if (!recentTitlesByPage.has(key)) recentTitlesByPage.set(key, new Set());
+    recentTitlesByPage.get(key)!.add(normTitle(title));
+  }
+
   // Filter out duplicates AND auto-mark them posted so they exit the ready queue.
   const dedupedPostable: typeof postable = [];
   for (const row of postable) {
@@ -826,6 +852,26 @@ async function handlePost(): Promise<{
         })
         .eq("id", row.id);
       continue;
+    }
+    // NEW: skip if topic-title was already posted to this page in last 14 days.
+    const rowTitle = (row.input_data as Record<string, unknown> | null)?.topic_title as
+      | string
+      | undefined;
+    if (rowTitle) {
+      const seen = recentTitlesByPage.get(row.page_id as string);
+      if (seen && seen.has(normTitle(rowTitle))) {
+        console.log(
+          `[DEV SCHEDULER] TOPIC DEDUP: "${rowTitle.slice(0, 60)}" already posted to ${row.page_id} in last 14d — skipping queue row ${row.id}`,
+        );
+        await supabase
+          .from("dev_content_queue")
+          .update({
+            status: "failed",
+            error_message: "Same topic posted to this page within last 14 days (auto-dedup)",
+          })
+          .eq("id", row.id);
+        continue;
+      }
     }
     dedupedPostable.push(row);
   }

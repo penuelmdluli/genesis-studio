@@ -539,11 +539,16 @@ export async function executeProduction(
           .single();
         const currentAssemblyState = (currentRow?.assembly_state as Record<string, unknown>) || {};
         const merged: Record<string, unknown> = {
+          // Full state skeleton so pollAssembly has everything it needs if
+          // startAssembly dies before its own state save (e.g. Vercel
+          // serverless timeout). Preserves any fields startAssembly already set.
+          phase: "mmaudio",
+          mmaudioJobs: {},
+          mergeJobs: {},
+          processedSceneUrls: [],
+          sceneOrder: {},
+          nativeAudioScenes: [],
           ...currentAssemblyState,
-          // Always include phase so pollAssembly can recover if startAssembly
-          // dies before its own state save (e.g. Vercel serverless timeout).
-          // Preserves whatever phase startAssembly may have already set.
-          phase: currentAssemblyState.phase || "mmaudio",
           soundAssets: sceneSoundAssets,
           soundDesignAttempted: true,
           soundDesignError: soundDesignError,

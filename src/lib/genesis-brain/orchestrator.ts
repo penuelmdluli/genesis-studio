@@ -235,37 +235,19 @@ export async function executeProduction(
     // ═══ PASS 1: STOCK FOOTAGE (EMERGENCY FALLBACK ONLY) ═══
     // Seedance (FAL) is the primary engine — it produces higher-quality,
     // more brand-aligned videos than stock footage. Stock is used ONLY when
-    // FAL is unreachable / out of credits. This check runs a cheap FAL ping
-    // to decide whether to skip stock entirely and go straight to AI.
+    // FAL_KEY is entirely missing / not configured. We used to probe FAL's
+    // flux-pro endpoint for health but it's unreliable (cold starts, 5s
+    // timeout trips frequently) and would wrongly route us to stock. Now
+    // we trust FAL is up if the key is present; per-scene FAL failures
+    // during Pass 2 will surface as normal scene errors the user can see.
     const stockHandled = new Set<string>(); // scene IDs that got stock footage
     const usedStockUrls = new Set<string>();
     const { findStockClip, isStockFootageAvailable, mirrorClipToR2 } = await import("@/lib/stock-footage");
 
-    // Cheap FAL health probe — if it's up, skip stock and let AI handle everything.
-    let falHealthy = false;
-    try {
-      if (process.env.FAL_KEY) {
-        const probe = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
-          method: "POST",
-          headers: { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: "x", image_size: { width: 256, height: 256 }, num_images: 1 }),
-          signal: AbortSignal.timeout(5000),
-        });
-        // 403 with "Exhausted balance" or "locked" = FAL unhealthy.
-        // Anything else (200, 422, timeout, etc.) we treat as "probably reachable".
-        if (probe.status === 403) {
-          const txt = await probe.text().catch(() => "");
-          falHealthy = !(txt.includes("Exhausted balance") || txt.includes("locked"));
-        } else {
-          falHealthy = true;
-        }
-      }
-    } catch {
-      falHealthy = false;
-    }
+    const falConfigured = !!process.env.FAL_KEY;
 
-    if (!falHealthy && isStockFootageAvailable()) {
-      console.log(`[BRAIN] Pass 1: FAL unhealthy — falling back to STOCK FOOTAGE for ${scenes.length} scenes`);
+    if (!falConfigured && isStockFootageAvailable()) {
+      console.log(`[BRAIN] Pass 1: FAL_KEY not configured — using STOCK FOOTAGE for ${scenes.length} scenes`);
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
         const sceneDef = enhancedPlan.scenes[i];
@@ -309,7 +291,7 @@ export async function executeProduction(
       }
       console.log(`[BRAIN] Pass 1 (fallback) done: ${stockHandled.size}/${scenes.length} scenes via stock`);
     } else {
-      console.log(`[BRAIN] Pass 1 skipped — FAL healthy, using AI (Seedance) for all ${scenes.length} scenes`);
+      console.log(`[BRAIN] Pass 1 skipped — FAL configured, using AI (Seedance) for all ${scenes.length} scenes`);
     }
 
     // ═══ PASS 2: PARALLEL AI GENERATION for scenes without stock ═══

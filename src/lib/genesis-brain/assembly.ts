@@ -128,6 +128,9 @@ export async function startAssembly(
             // stringified values as JSON strings, making properties inaccessible.
             const preState: Record<string, unknown> = {
               ...(existingState || {}),
+              // Always write phase so pollAssembly has a recoverable state
+              // if startAssembly crashes after this point.
+              phase: (existingState || {}).phase || "mmaudio",
               voiceoverClips: voResult.clips.map((c) => ({
                 url: c.url,
                 startMs: c.startMs,

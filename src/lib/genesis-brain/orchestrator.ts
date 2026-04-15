@@ -540,6 +540,10 @@ export async function executeProduction(
         const currentAssemblyState = (currentRow?.assembly_state as Record<string, unknown>) || {};
         const merged: Record<string, unknown> = {
           ...currentAssemblyState,
+          // Always include phase so pollAssembly can recover if startAssembly
+          // dies before its own state save (e.g. Vercel serverless timeout).
+          // Preserves whatever phase startAssembly may have already set.
+          phase: currentAssemblyState.phase || "mmaudio",
           soundAssets: sceneSoundAssets,
           soundDesignAttempted: true,
           soundDesignError: soundDesignError,

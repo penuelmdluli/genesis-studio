@@ -546,6 +546,10 @@ export interface AssemblyState {
   soundPremixJob?: { requestId: string; status: string; audioUrl?: string; phase?: "compose" | "loudnorm" };
   // Request ID for the loudnorm step of sound premix
   soundPremixLoudnormId?: string;
+  // How many poll cycles MMAudio has been stuck IN_QUEUE. After N, force-fallback to silent.
+  mmaudioPollCount?: number;
+  // How many consecutive pollAssembly exceptions. After 5, fail production.
+  pollErrorCount?: number;
 }
 
 export interface Production {

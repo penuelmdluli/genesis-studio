@@ -399,49 +399,91 @@ async function pollMMAudioPhase(
   let anyPending = false;
   let updated = false;
 
-  for (const [sceneId, job] of Object.entries(state.mmaudioJobs)) {
-    if (job.status === "COMPLETED" || job.status === "FAILED") continue;
+  // Track how many times we've polled while jobs are still IN_QUEUE.
+  // Force-fallback to silent after 6 polls (~30 min at 5-min cron interval).
+  // Counter is initialised to 0 if missing so old state objects don't crash.
+  const mmaudioPollCount = (state.mmaudioPollCount || 0) + 1;
+  state.mmaudioPollCount = mmaudioPollCount;
+  const FORCE_FALLBACK_AFTER = 6;
 
-    const result = await checkFalQueueStatus("fal-ai/mmaudio-v2", job.requestId);
+  const mmaudioJobs = state.mmaudioJobs || {};
+  const sceneOrder = state.sceneOrder || {};
+  const processedSceneUrls = state.processedSceneUrls || [];
 
-    if (result.status === "COMPLETED") {
-      const data = await getFalQueueResult("fal-ai/mmaudio-v2", job.requestId);
-      const audioData = data?.audio as { url: string } | undefined;
-      job.status = "COMPLETED";
-      job.audioUrl = audioData?.url || "";
-      updated = true;
+  for (const [sceneId, job] of Object.entries(mmaudioJobs)) {
+    if (!job || job.status === "COMPLETED" || job.status === "FAILED") continue;
 
-      // If MMAudio returned no audio URL, fall back to silent video immediately
-      if (!job.audioUrl) {
-        const idx = state.sceneOrder[sceneId];
+    try {
+      const result = await checkFalQueueStatus("fal-ai/mmaudio-v2", job.requestId);
+
+      if (result.status === "COMPLETED") {
+        let audioUrl = "";
+        try {
+          const data = await getFalQueueResult("fal-ai/mmaudio-v2", job.requestId);
+          const audioData = data?.audio as { url: string } | undefined;
+          audioUrl = audioData?.url || "";
+        } catch (resultErr) {
+          console.warn(`[ASSEMBLY] MMAudio result fetch failed for ${sceneId}:`, resultErr instanceof Error ? resultErr.message : resultErr);
+        }
+        job.status = "COMPLETED";
+        job.audioUrl = audioUrl;
+        updated = true;
+
+        // If MMAudio returned no audio URL, fall back to silent video immediately
+        if (!job.audioUrl) {
+          const idx = sceneOrder[sceneId];
+          if (idx !== undefined) {
+            const scenes = await getProductionScenes(productionId);
+            const scene = scenes.find(s => s.id === sceneId);
+            if (scene?.outputVideoUrl) processedSceneUrls[idx] = scene.outputVideoUrl;
+          }
+          console.warn(`[ASSEMBLY] MMAudio completed but no audio URL for scene ${sceneId}, using silent`);
+        } else {
+          console.log(`[ASSEMBLY] MMAudio completed for scene ${sceneId}: ${job.audioUrl}`);
+        }
+      } else if (result.status === "FAILED") {
+        job.status = "FAILED";
+        updated = true;
+        // Use silent video as fallback
+        const idx = sceneOrder[sceneId];
         if (idx !== undefined) {
           const scenes = await getProductionScenes(productionId);
           const scene = scenes.find(s => s.id === sceneId);
-          if (scene?.outputVideoUrl) {
-            state.processedSceneUrls[idx] = scene.outputVideoUrl;
-          }
+          if (scene?.outputVideoUrl) processedSceneUrls[idx] = scene.outputVideoUrl;
         }
-        console.warn(`[ASSEMBLY] MMAudio completed but no audio URL for scene ${sceneId}, using silent`);
+        console.warn(`[ASSEMBLY] MMAudio failed for scene ${sceneId}, using silent`);
       } else {
-        console.log(`[ASSEMBLY] MMAudio completed for scene ${sceneId}: ${job.audioUrl}`);
+        anyPending = true;
       }
-    } else if (result.status === "FAILED") {
-      job.status = "FAILED";
-      updated = true;
-      // Use silent video as fallback
-      const idx = state.sceneOrder[sceneId];
-      if (idx !== undefined) {
-        const scenes = await getProductionScenes(productionId);
-        const scene = scenes.find(s => s.id === sceneId);
-        if (scene?.outputVideoUrl) {
-          state.processedSceneUrls[idx] = scene.outputVideoUrl;
-        }
-      }
-      console.warn(`[ASSEMBLY] MMAudio failed for scene ${sceneId}, using silent`);
-    } else {
-      anyPending = true;
+    } catch (sceneErr) {
+      // Per-scene isolation: one broken MMAudio job doesn't kill the whole phase.
+      console.warn(`[ASSEMBLY] MMAudio per-scene poll error for ${sceneId}:`, sceneErr instanceof Error ? sceneErr.message : sceneErr);
+      anyPending = true; // try again next cycle
     }
   }
+
+  // FORCE FALLBACK: if we've been polling too long, give up on MMAudio and use silent scenes.
+  // This prevents productions getting stuck forever when FAL's mmaudio-v2 is slow/hung.
+  if (anyPending && mmaudioPollCount >= FORCE_FALLBACK_AFTER) {
+    console.warn(`[ASSEMBLY] MMAudio stuck after ${mmaudioPollCount} polls — force-fallback to silent scenes`);
+    const scenes = await getProductionScenes(productionId);
+    for (const [sceneId, job] of Object.entries(mmaudioJobs)) {
+      if (!job || job.status === "COMPLETED" || job.status === "FAILED") continue;
+      job.status = "FAILED";
+      const idx = sceneOrder[sceneId];
+      if (idx !== undefined) {
+        const scene = scenes.find(s => s.id === sceneId);
+        if (scene?.outputVideoUrl) processedSceneUrls[idx] = scene.outputVideoUrl;
+      }
+    }
+    anyPending = false;
+    updated = true;
+  }
+
+  // Keep state in sync (in case we initialized above from null)
+  state.mmaudioJobs = mmaudioJobs;
+  state.sceneOrder = sceneOrder;
+  state.processedSceneUrls = processedSceneUrls;
 
   // Check if all MMAudio jobs are done
   if (!anyPending && updated) {

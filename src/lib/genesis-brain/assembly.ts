@@ -354,11 +354,15 @@ export async function pollAssembly(productionId: string): Promise<void> {
         return;
     }
 
-    if (updated) {
-      await updateProduction(productionId, {
-        assembly_state: state as unknown as Record<string, unknown>,
-      });
-    }
+    // Always persist assembly_state — even when no phase progression happened.
+    // This is critical for counters like mmaudioPollCount that track
+    // "how many times we've polled while stuck" — if we only saved on
+    // `updated`, those counters never persist and force-fallback never fires.
+    await updateProduction(productionId, {
+      assembly_state: state as unknown as Record<string, unknown>,
+    });
+    // Used to drop the var; keep it to avoid unused-var lint noise.
+    void updated;
   } catch (err) {
     console.error(`[ASSEMBLY POLL] Error for ${productionId}:`, err);
 

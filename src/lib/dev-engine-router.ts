@@ -102,56 +102,15 @@ export function selectEngine(
     };
   }
 
-  // TIER 1b — FLAGSHIP-DOWNGRADED: Character/cinematic pillars now use
-  // hunyuan-video. Same "very good" quality bracket per constants.ts, a lot
-  // faster, and $0.005/gen cheaper than Wan 2.2. Saves ~25% on the largest
-  // share of our spend.
-  if (
-    pillar === "african_folklore" ||
-    pillar === "mbs_episodes" ||
-    pillar === "afrofuturism" ||
-    pillar === "african_cities" ||
-    pillar === "baby_scenarios"
-  ) {
-    return {
-      modelId: "hunyuan-video" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["hunyuan-video"],
-      reason:
-        "Flagship-downgraded tier — HunyuanVideo (~25% cheaper, ~35% faster than Wan 2.2, very good quality)",
-    };
-  }
-
-  // TIER 2 — SPEED: Breaking news and geopolitics must ship fast. LTX Video
-  // is 2.5× faster than hunyuan (30s vs 75s) and 4× faster than Wan 2.2,
-  // and the cheapest option at $0.01/gen. Quality is "good enough" for
-  // news-animation style where the story matters more than the render.
-  if (
-    pillar === "breaking_news" ||
-    pillar === "geopolitics" ||
-    pillar === "news_animated" ||
-    contentType === "breaking_news"
-  ) {
-    return {
-      modelId: "ltx-video" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["ltx-video"],
-      reason:
-        "Speed tier — LTX Video (30s avg, cheapest, fastest time-to-publish)",
-    };
-  }
-
-  // TIER 3 — WORKHORSE: hunyuan-video for everything else. Per constants.ts
-  // this model is explicitly "best efficiency/quality ratio" — 75s avg, 720p,
-  // $0.015/gen. Covers tech, ai_news, ai_disruption, entertainment, celebrity,
-  // viral_moments, motivation, health_wellness, finance, and any unknown
-  // pillar. Best balance of speed, quality, and cost for the workhorse path.
+  // ALL TIERS → wan-2.2 (only endpoint with active workers)
+  // hunyuan-video and ltx-video have 0 workers — jobs queue forever.
+  // wan-2.2 is the flagship with 3 idle workers ready to go.
   return {
-    modelId: "hunyuan-video" as ModelId,
+    modelId: "wan-2.2" as ModelId,
     provider: "runpod-hub",
-    estimatedCostUsd: ENGINE_COSTS["hunyuan-video"],
+    estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
     reason:
-      "Workhorse tier — HunyuanVideo (best quality/cost/speed ratio: 75s, $0.015, very good)",
+      "Wan 2.2 flagship — only RunPod endpoint with active workers",
   };
 }
 

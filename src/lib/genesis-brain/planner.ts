@@ -103,10 +103,11 @@ COMPOSITION RULES:
    Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
 4. ONLY use RunPod models — ALL video generation goes through RunPod:
-   - "hunyuan-video" — PRIMARY MODEL — RunPod, best quality/cost/speed ratio, no avatar bias
+   - "wan-2.2" — PRIMARY MODEL — RunPod flagship, best cinematic quality, active workers
    - "ltx-video" — SPEED MODEL — RunPod, fastest (30fps), use for breaking news scenes
-   - Default everything to "hunyuan-video" for clean cinematic content
+   - Default everything to "wan-2.2" for clean cinematic content
    - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL models — NOT available)
+   - DO NOT use hunyuan-video (no active workers)
    - Audio is added via MMAudio post-processing
 
 5. SOUND DESIGN per scene — "soundDesign" field (drives MMAudio post-processing):
@@ -152,7 +153,7 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "hunyuan-video" (primary — RunPod, best quality/cost/speed), "ltx-video" (speed — RunPod, fastest for breaking news)
+VALID MODELS: "wan-2.2" (primary — RunPod flagship, best cinematic quality), "ltx-video" (speed — RunPod, fastest for breaking news)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -317,7 +318,7 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   // ALL models from RunPod. hunyuan-video is the workhorse (best quality/cost/speed).
   // ltx-video is allowed for speed-tier content. All FAL models are banned.
   const RUNPOD_MODELS = new Set<ModelId>(["hunyuan-video", "ltx-video", "wan-2.2", "wan-2.1-turbo", "mochi-1", "cogvideo-x"] as ModelId[]);
-  const DEFAULT_RUNPOD_MODEL: ModelId = "hunyuan-video" as ModelId;
+  const DEFAULT_RUNPOD_MODEL: ModelId = "wan-2.2" as ModelId;
 
   // Validate each scene — force all to RunPod models
   plan.scenes = plan.scenes.map((scene, i) => {

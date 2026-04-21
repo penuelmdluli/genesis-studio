@@ -102,9 +102,8 @@ export function selectEngine(
     };
   }
 
-  // ALL TIERS → wan-2.2 (only endpoint with active workers)
-  // hunyuan-video and ltx-video have 0 workers — jobs queue forever.
-  // wan-2.2 is the flagship with 3 idle workers ready to go.
+  // wan-2.2 is the only RunPod endpoint with active workers.
+  // Anti-avatar prompts enforced in planner to block default faces.
   return {
     modelId: "wan-2.2" as ModelId,
     provider: "runpod-hub",

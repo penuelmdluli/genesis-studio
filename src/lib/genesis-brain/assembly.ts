@@ -89,29 +89,30 @@ export async function startAssembly(
       return;
     }
 
-    // Check if FAL is available -- if not, use simplified assembly
-    const { checkFalAvailability, simplifiedFinalize } = await import("./assembly-fallback");
-    const falAvailable = await checkFalAvailability();
+    // Always use local assembly (FFmpeg + Edge TTS) — free, no FAL dependency.
+    // Produces complete video: all scenes concatenated + voiceover + music + subtitles.
+    const { simplifiedFinalize } = await import("./assembly-fallback");
+    console.log(`[ASSEMBLY] Using local assembly (FFmpeg + Edge TTS) — free, no FAL needed`);
+    await simplifiedFinalize(productionId);
+    return;
 
-    if (!falAvailable) {
-      console.log(`[ASSEMBLY] FAL credits exhausted -- using simplified assembly (scene videos only)`);
-      // Skip MMAudio, concat, and all FAL-dependent phases.
-      // Use the completed scene videos directly as the final output.
-      await simplifiedFinalize(productionId);
-      return;
-    }
+    // eslint-disable-next-line no-constant-condition -- FAL assembly disabled while credits exhausted
+    if (false as boolean) {
+    // NOTE: FAL-based assembly below is disabled. When FAL credits are restored,
+    // remove the `if (false)` wrapper and the early return above.
 
-    const production = await getProduction(productionId);
-    const plan = production?.plan;
+    const production = (await getProduction(productionId))!;
+    if (!production) return;
+    const plan = production.plan!;
     const supabase = createSupabaseAdmin();
 
     // ---- Audio Recovery ----
     // If after() died before audio generation, generate missing audio now.
     // This is the safety net: scenes are already done, we just need audio.
-    const existingState = production?.assemblyState as Record<string, unknown> | undefined;
+    const existingState = production.assemblyState as Record<string, unknown> | undefined;
 
     // Recover voiceover if requested but missing
-    if (production?.voiceover && !production.voiceoverUrl && plan?.scenes) {
+    if (production.voiceover && !production.voiceoverUrl && plan.scenes) {
       const scenesWithVO = plan.scenes.filter((s: { voiceoverLine?: string }) => s.voiceoverLine?.trim());
       if (scenesWithVO.length > 0) {
         console.log(`[ASSEMBLY] Recovering missing voiceover for ${scenesWithVO.length} scenes...`);
@@ -232,8 +233,8 @@ export async function startAssembly(
         .eq("id", scene.id)
         .single();
 
-      const modelId = sceneRow?.model_id as ModelId | undefined;
-      const model = modelId ? AI_MODELS[modelId] : null;
+      const modelId = sceneRow?.model_id as ModelId | null;
+      const model = modelId ? AI_MODELS[modelId as ModelId] : null;
       const hasNativeAudio = sceneRow?.model_has_audio || model?.hasAudio || false;
 
       if (hasNativeAudio) {
@@ -280,6 +281,7 @@ export async function startAssembly(
     });
 
     console.log(`[ASSEMBLY] startAssembly complete for ${productionId} — phase: ${state.phase}`);
+    } // end if (false) — FAL assembly disabled
   } catch (err) {
     console.error(`[ASSEMBLY] startAssembly error for ${productionId}:`, err);
     await failAssembly(

@@ -102,13 +102,14 @@ COMPOSITION RULES:
    a named real person. For 95% of news/tech/politics content, characters should be an EMPTY array [].
    Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
-4. ONLY use RunPod models — ALL video generation goes through RunPod:
-   - "wan-2.2" — PRIMARY MODEL — RunPod flagship, best cinematic quality, active workers
-   - "ltx-video" — SPEED MODEL — RunPod, fastest (30fps), use for breaking news scenes
-   - Default everything to "wan-2.2" for clean cinematic content
-   - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL models — NOT available)
-   - DO NOT use hunyuan-video (no active workers)
-   - Audio is added via MMAudio post-processing
+4. Use "wan-2.2" for ALL scenes — RunPod flagship with active workers:
+   - "wan-2.2" — PRIMARY MODEL — RunPod, best cinematic quality, active workers
+   - CRITICAL ANTI-AVATAR RULE: wan-2.2 tends to generate a default human face.
+     Every scene prompt MUST end with: "no human face, no person, no avatar, no talking head, environment only"
+     Every scene MUST start with an environment/object/location, NOT a person.
+   - DO NOT use hunyuan-video, ltx-video (no active workers — jobs queue forever)
+   - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL — no credits)
+   - Audio (voiceover + music + subtitles) is added via local FFmpeg + Edge TTS post-processing
 
 5. SOUND DESIGN per scene — "soundDesign" field (drives MMAudio post-processing):
    - "ambientDescription": Rich environmental audio (e.g. "busy Lagos street — honking matatus, distant market chatter, a radio playing Afrobeats, wind between buildings")
@@ -153,7 +154,7 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "wan-2.2" (primary — RunPod flagship, best cinematic quality), "ltx-video" (speed — RunPod, fastest for breaking news)
+VALID MODELS: "wan-2.2" (primary — RunPod flagship, active workers. ALWAYS block faces in prompts.)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -315,18 +316,15 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   const validModels = Object.keys(AI_MODELS) as ModelId[];
   const validTransitions: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"];
 
-  // ALL models from RunPod. hunyuan-video is the workhorse (best quality/cost/speed).
-  // ltx-video is allowed for speed-tier content. All FAL models are banned.
-  const RUNPOD_MODELS = new Set<ModelId>(["hunyuan-video", "ltx-video", "wan-2.2", "wan-2.1-turbo", "mochi-1", "cogvideo-x"] as ModelId[]);
-  const DEFAULT_RUNPOD_MODEL: ModelId = "wan-2.2" as ModelId;
+  // wan-2.2 is the only RunPod endpoint with active workers.
+  // Anti-avatar prompts are enforced below to block the default face.
+  const DEFAULT_MODEL: ModelId = "wan-2.2" as ModelId;
 
-  // Validate each scene — force all to RunPod models
+  // Validate each scene — force all to wan-2.2 (only model with workers)
   plan.scenes = plan.scenes.map((scene, i) => {
-    let selectedModel: ModelId = DEFAULT_RUNPOD_MODEL;
-    if (validModels.includes(scene.modelId as ModelId) && RUNPOD_MODELS.has(scene.modelId as ModelId)) {
-      selectedModel = scene.modelId as ModelId;
-    } else if (scene.modelId !== DEFAULT_RUNPOD_MODEL) {
-      console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → ${DEFAULT_RUNPOD_MODEL} (RunPod only)`);
+    const selectedModel: ModelId = DEFAULT_MODEL;
+    if (scene.modelId !== DEFAULT_MODEL) {
+      console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → wan-2.2 (only endpoint with workers)`);
     }
 
     const s: SceneDefinition = {

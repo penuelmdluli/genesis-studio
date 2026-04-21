@@ -19,6 +19,8 @@ import {
 import { startAssembly, pollAssembly } from "@/lib/genesis-brain/assembly";
 import { resubmitStuckScenes } from "@/lib/genesis-brain/orchestrator";
 import { getRunPodJobStatus } from "@/lib/runpod";
+import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { AI_MODELS } from "@/lib/constants";
 import { uploadVideo, getSignedDownloadUrl } from "@/lib/storage";
 import { ModelId } from "@/types";
 
@@ -160,44 +162,73 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Poll RunPod for any processing scenes
+          // Poll processing scenes — detect provider (FAL vs RunPod)
           for (const scene of scenes) {
             if (scene.status !== "processing" || !scene.runpodJobId) continue;
+
+            const model = AI_MODELS[scene.modelId as ModelId];
+            const isFalScene = model?.provider === "fal";
+
             try {
-              const rpStatus = await getRunPodJobStatus(scene.modelId as ModelId, scene.runpodJobId);
-              if (rpStatus.status === "COMPLETED") {
-                // RunPod returns video in three possible shapes (URL or base64);
-                // resolveRunPodVideo handles all of them and uploads base64 to R2.
-                const rpVideoUrl = await resolveRunPodVideo(
-                  rpStatus.output as Record<string, unknown> | null | undefined,
-                  scene.id,
-                );
-                if (rpVideoUrl) {
-                  await supabase.from("production_scenes").update({
-                    status: "completed",
-                    output_video_url: rpVideoUrl,
-                    progress: 100,
-                  }).eq("id", scene.id);
-                  scene.status = "completed" as typeof scene.status;
-                } else {
-                  console.warn(
-                    `[DEV POLL] Scene ${scene.id} RunPod COMPLETED but no usable video output`,
-                  );
+              if (isFalScene) {
+                // ── FAL scene polling ──
+                const falStatus = await getFalJobStatus(scene.modelId as ModelId, scene.runpodJobId);
+                if (falStatus.status === "COMPLETED") {
+                  const falResult = await getFalJobResult(scene.modelId as ModelId, scene.runpodJobId);
+                  if (falResult.videoUrl) {
+                    await supabase.from("production_scenes").update({
+                      status: "completed",
+                      output_video_url: falResult.videoUrl,
+                      progress: 100,
+                    }).eq("id", scene.id);
+                    scene.status = "completed" as typeof scene.status;
+                    console.log(`[DEV POLL] FAL scene ${scene.id} COMPLETED: ${falResult.videoUrl.slice(0, 60)}...`);
+                  } else {
+                    await supabase.from("production_scenes").update({
+                      status: "failed",
+                      error_message: "FAL completed but no video URL in result",
+                    }).eq("id", scene.id);
+                    scene.status = "failed" as typeof scene.status;
+                  }
+                } else if (falStatus.status === "FAILED") {
                   await supabase.from("production_scenes").update({
                     status: "failed",
-                    error_message: "RunPod completed but output had no video data",
+                    error_message: falStatus.error || "FAL generation failed",
                   }).eq("id", scene.id);
                   scene.status = "failed" as typeof scene.status;
                 }
-              } else if (rpStatus.status === "FAILED") {
-                await supabase.from("production_scenes").update({
-                  status: "failed",
-                  error_message: rpStatus.error || "RunPod failed",
-                }).eq("id", scene.id);
-                scene.status = "failed" as typeof scene.status;
+              } else {
+                // ── RunPod scene polling ──
+                const rpStatus = await getRunPodJobStatus(scene.modelId as ModelId, scene.runpodJobId);
+                if (rpStatus.status === "COMPLETED") {
+                  const rpVideoUrl = await resolveRunPodVideo(
+                    rpStatus.output as Record<string, unknown> | null | undefined,
+                    scene.id,
+                  );
+                  if (rpVideoUrl) {
+                    await supabase.from("production_scenes").update({
+                      status: "completed",
+                      output_video_url: rpVideoUrl,
+                      progress: 100,
+                    }).eq("id", scene.id);
+                    scene.status = "completed" as typeof scene.status;
+                  } else {
+                    await supabase.from("production_scenes").update({
+                      status: "failed",
+                      error_message: "RunPod completed but output had no video data",
+                    }).eq("id", scene.id);
+                    scene.status = "failed" as typeof scene.status;
+                  }
+                } else if (rpStatus.status === "FAILED") {
+                  await supabase.from("production_scenes").update({
+                    status: "failed",
+                    error_message: rpStatus.error || "RunPod failed",
+                  }).eq("id", scene.id);
+                  scene.status = "failed" as typeof scene.status;
+                }
               }
             } catch (e) {
-              console.warn(`[DEV POLL] RunPod poll error for scene ${scene.id}:`, e);
+              console.warn(`[DEV POLL] ${isFalScene ? "FAL" : "RunPod"} poll error for scene ${scene.id}:`, e);
             }
           }
 

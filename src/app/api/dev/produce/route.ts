@@ -221,9 +221,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Video generation is ALL RunPod — no FAL dependency for video.
-    // FAL is only used for audio (TTS/music) which is non-blocking.
-    // Stock footage is an emergency fallback if RunPod is entirely down.
+    // Video: wan-2.2 (RunPod, only endpoint with active workers)
+    // Audio/voiceover/subtitles: local FFmpeg + Edge TTS (free, no FAL needed)
 
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };
@@ -367,8 +366,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-    // Step 1b: i2v disabled — hunyuan-video (RunPod) is our primary.
-    // Prompts explicitly block faces. No reference image needed.
+    // Step 1b: i2v disabled. Anti-avatar prompts enforced in planner.
     // plan = await injectReferenceImages(plan);
 
     // Step 2: Create production record
@@ -424,7 +422,7 @@ export async function POST(req: NextRequest) {
       concept,
       scenes: plan.scenes.length,
       i2v: !!plan.scenes[0]?.referenceImageUrl,
-      pipeline: "Brain Studio Hollywood (Claude plan + RunPod video + FAL audio)",
+      pipeline: "Brain Studio (Claude plan + wan-2.2 RunPod video + local FFmpeg/Edge TTS audio/subtitles)",
       voice: `${voiceForPage} (${pageLanguage}${africanVoice ? `, Kokoro ${africanVoice.voice} @${africanVoice.speed}x` : ""})`,
       note: "Scenes submitted to RunPod in background. Call again for next item.",
     });

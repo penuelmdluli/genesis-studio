@@ -221,24 +221,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Health check: if BOTH stock footage AND FAL are down, bail early.
-    // If stock footage APIs are configured, we can produce videos without
-    // FAL at all (just real footage + TTS + local ffmpeg assembly).
-    const { isStockFootageAvailable } = await import("@/lib/stock-footage");
-    if (!isStockFootageAvailable()) {
-      const falHealth = await checkFalHealth();
-      if (!falHealth.ok) {
-        console.error(`[DEV PRODUCE] No stock footage + FAL down: ${falHealth.reason}`);
-        return NextResponse.json(
-          {
-            error: `Pipeline blocked: ${falHealth.reason}. Configure PEXELS_API_KEY or PIXABAY_API_KEY to enable stock footage (free, no FAL needed).`,
-            falDown: true,
-            success: false,
-          },
-          { status: 503 }
-        );
-      }
-    }
+    // Video generation is ALL RunPod — no FAL dependency for video.
+    // FAL is only used for audio (TTS/music) which is non-blocking.
+    // Stock footage is an emergency fallback if RunPod is entirely down.
 
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };
@@ -382,9 +367,8 @@ export async function POST(req: NextRequest) {
 
     console.log(`[DEV PRODUCE] Plan ready: ${plan.scenes.length} scenes for ${pageName}`);
 
-    // Step 1b: i2v disabled — Seedance v1.5 Pro (FAL) is our primary and
-    // has no default-person bias. No reference image needed. If we ever
-    // switch back to wan-2.2, re-enable injectReferenceImages here.
+    // Step 1b: i2v disabled — hunyuan-video (RunPod) is our primary.
+    // Prompts explicitly block faces. No reference image needed.
     // plan = await injectReferenceImages(plan);
 
     // Step 2: Create production record
@@ -440,7 +424,7 @@ export async function POST(req: NextRequest) {
       concept,
       scenes: plan.scenes.length,
       i2v: !!plan.scenes[0]?.referenceImageUrl,
-      pipeline: "Brain Studio Hollywood (Claude plan + FLUX Pro i2v + RunPod + FAL audio)",
+      pipeline: "Brain Studio Hollywood (Claude plan + RunPod video + FAL audio)",
       voice: `${voiceForPage} (${pageLanguage}${africanVoice ? `, Kokoro ${africanVoice.voice} @${africanVoice.speed}x` : ""})`,
       note: "Scenes submitted to RunPod in background. Call again for next item.",
     });

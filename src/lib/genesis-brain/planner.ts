@@ -102,10 +102,11 @@ COMPOSITION RULES:
    a named real person. For 95% of news/tech/politics content, characters should be an EMPTY array [].
    Never invent a presenter, host, narrator character, or random person to appear in scenes.
 
-4. ONLY use RunPod models (FAL credits unavailable):
-   - "seedance-1.5" — PRIMARY MODEL — FAL, cinematic, no default-face bias
-   - Default everything to "seedance-1.5" for clean content (no avatar)
-   - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL disabled)
+4. ONLY use RunPod models — ALL video generation goes through RunPod:
+   - "hunyuan-video" — PRIMARY MODEL — RunPod, best quality/cost/speed ratio, no avatar bias
+   - "ltx-video" — SPEED MODEL — RunPod, fastest (30fps), use for breaking news scenes
+   - Default everything to "hunyuan-video" for clean cinematic content
+   - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL models — NOT available)
    - Audio is added via MMAudio post-processing
 
 5. SOUND DESIGN per scene — "soundDesign" field (drives MMAudio post-processing):
@@ -151,7 +152,7 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "seedance-1.5" (primary — via FAL, clean output no avatar)
+VALID MODELS: "hunyuan-video" (primary — RunPod, best quality/cost/speed), "ltx-video" (speed — RunPod, fastest for breaking news)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
@@ -313,21 +314,18 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   const validModels = Object.keys(AI_MODELS) as ModelId[];
   const validTransitions: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"];
 
-  // seedance-1.5 (FAL) is primary — no default avatar issue.
-  // wan-2.2 BANNED because of the default human avatar in opening frames.
-  // If FAL is down AND no clean RunPod workers are configured, produce will
-  // fail explicitly (via health check) rather than silently fall back to wan-2.2.
+  // ALL models from RunPod. hunyuan-video is the workhorse (best quality/cost/speed).
+  // ltx-video is allowed for speed-tier content. All FAL models are banned.
+  const RUNPOD_MODELS = new Set<ModelId>(["hunyuan-video", "ltx-video", "wan-2.2", "wan-2.1-turbo", "mochi-1", "cogvideo-x"] as ModelId[]);
+  const DEFAULT_RUNPOD_MODEL: ModelId = "hunyuan-video" as ModelId;
 
-  // Validate each scene — force all to seedance-1.5
+  // Validate each scene — force all to RunPod models
   plan.scenes = plan.scenes.map((scene, i) => {
-    let selectedModel: ModelId = "seedance-1.5";
-    if (validModels.includes(scene.modelId as ModelId)) {
-      if (scene.modelId === "seedance-1.5") {
-        selectedModel = "seedance-1.5";
-      } else {
-        console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → seedance-1.5 (avatar-free primary)`);
-        selectedModel = "seedance-1.5";
-      }
+    let selectedModel: ModelId = DEFAULT_RUNPOD_MODEL;
+    if (validModels.includes(scene.modelId as ModelId) && RUNPOD_MODELS.has(scene.modelId as ModelId)) {
+      selectedModel = scene.modelId as ModelId;
+    } else if (scene.modelId !== DEFAULT_RUNPOD_MODEL) {
+      console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → ${DEFAULT_RUNPOD_MODEL} (RunPod only)`);
     }
 
     const s: SceneDefinition = {

@@ -291,7 +291,7 @@ export async function executeProduction(
       }
       console.log(`[BRAIN] Pass 1 (fallback) done: ${stockHandled.size}/${scenes.length} scenes via stock`);
     } else {
-      console.log(`[BRAIN] Pass 1 skipped — FAL configured, using AI (Seedance) for all ${scenes.length} scenes`);
+      console.log(`[BRAIN] Pass 1 skipped — using RunPod AI for all ${scenes.length} scenes`);
     }
 
     // ═══ PASS 2: PARALLEL AI GENERATION for scenes without stock ═══

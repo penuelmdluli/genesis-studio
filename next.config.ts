@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // ffmpeg-installer uses dynamic platform-specific requires that Turbopack
   // can't bundle. Mark it as external so it's loaded at runtime from node_modules,
   // and trace-include the binary so Vercel ships it with the serverless function.
-  serverExternalPackages: ["@ffmpeg-installer/ffmpeg"],
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "msedge-tts"],
   outputFileTracingIncludes: {
     "/api/**": ["./node_modules/@ffmpeg-installer/**/*"],
   },

@@ -72,12 +72,12 @@ function cleanupDir(dir: string): void {
   } catch { /* ignore */ }
 }
 
-// ---- EDGE TTS VOICEOVER ----
+// ---- EDGE TTS VOICEOVER (Node.js — no Python needed) ----
 
 /**
- * Generate voiceover using Edge TTS (Microsoft free TTS).
- * Uses the same voice style as the Kokoro TTS the platform normally uses.
- * Edge TTS voices: en-US-GuyNeural (male), en-US-AriaNeural (female)
+ * Generate voiceover using msedge-tts (pure Node.js).
+ * Talks directly to Microsoft Edge's TTS WebSocket API — free, no API key.
+ * Works on Vercel serverless without Python.
  */
 async function generateVoiceoverLocal(
   script: string,
@@ -85,24 +85,41 @@ async function generateVoiceoverLocal(
   voice: string = "en-US-GuyNeural"
 ): Promise<boolean> {
   try {
-    // Edge TTS generates an mp3 file from text
-    // Write script to a temp file to avoid shell escaping issues
-    const scriptPath = outputPath + ".txt";
-    writeFileSync(scriptPath, script, "utf-8");
+    const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
 
-    // Use --file flag to read text from file (avoids shell escaping nightmares on Windows)
-    const cmd = `python -m edge_tts --voice "${voice}" --file "${scriptPath}" --write-media "${outputPath}"`;
-    console.log(`[LOCAL ASSEMBLY] Generating voiceover via Edge TTS (${voice})...`);
-    execSync(cmd, { stdio: "pipe", timeout: 30000 });
+    console.log(`[LOCAL ASSEMBLY] Generating voiceover via msedge-tts (${voice})...`);
 
-    // Cleanup temp text file
-    try { unlinkSync(scriptPath); } catch { /* ignore */ }
+    // toFile takes a DIRECTORY and writes audio.mp3 inside it
+    const outputDir = join(outputPath, "..");
+    if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
 
-    if (existsSync(outputPath) && statSync(outputPath).size > 1000) {
-      console.log(`[LOCAL ASSEMBLY] Voiceover generated: ${(statSync(outputPath).size / 1024).toFixed(0)} KB`);
+    // Create a dedicated dir for TTS output
+    const ttsDir = outputPath + "_tts";
+    if (!existsSync(ttsDir)) mkdirSync(ttsDir, { recursive: true });
+
+    const result = await tts.toFile(ttsDir, script);
+    const audioFilePath = (result as { audioFilePath: string }).audioFilePath;
+    tts.close();
+
+    if (!audioFilePath || !existsSync(audioFilePath)) {
+      console.warn(`[LOCAL ASSEMBLY] Edge TTS returned no audio file`);
+      return false;
+    }
+
+    // Move to expected output path
+    const audioBuffer = readFileSync(audioFilePath);
+    writeFileSync(outputPath, audioBuffer);
+
+    // Cleanup TTS temp dir
+    try { unlinkSync(audioFilePath); } catch { /* ignore */ }
+
+    if (audioBuffer.length > 1000) {
+      console.log(`[LOCAL ASSEMBLY] Voiceover generated: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
       return true;
     }
-    console.warn(`[LOCAL ASSEMBLY] Edge TTS output too small or missing`);
+    console.warn(`[LOCAL ASSEMBLY] Edge TTS output too small (${audioBuffer.length} bytes)`);
     return false;
   } catch (err) {
     console.error(`[LOCAL ASSEMBLY] Edge TTS failed:`, err instanceof Error ? err.message : err);

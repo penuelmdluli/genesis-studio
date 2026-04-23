@@ -162,34 +162,42 @@ function buildWorkflow(opts: {
   };
 }
 
+interface ExtractedOutput {
+  url?: string;
+  base64Data?: string;
+  filename?: string;
+}
+
 /**
- * Extract video URL from RunPod ComfyUI worker output.
+ * Extract video/image output from RunPod ComfyUI worker response.
  *
  * The worker returns output in one of these shapes:
- * - { images: [{ url: "..." }] } (S3 mode)
- * - { images: [{ data: "base64...", filename: "..." }] } (base64 mode)
- * - { message: "..." } (error or info)
- *
- * For video workflows, VHS_VideoCombine produces video files that
- * appear in the images array (ComfyUI treats all outputs as "images").
+ * - { images: [{ url: "..." }] } — S3 mode (URL ready to download)
+ * - { images: [{ data: "base64...", type: "base64", filename: "..." }] } — base64 mode
+ * - { message: "..." } — error or info string
  */
-function extractOutputUrl(output: unknown): string | null {
+function extractOutput(output: unknown): ExtractedOutput | null {
   if (!output || typeof output !== "object") return null;
   const o = output as Record<string, unknown>;
 
-  // S3 URL mode (preferred — configured via worker env vars)
   if (Array.isArray(o.images)) {
     for (const img of o.images) {
-      if (typeof img === "object" && img !== null) {
-        const item = img as Record<string, unknown>;
-        if (typeof item.url === "string") return item.url;
+      if (typeof img !== "object" || img === null) continue;
+      const item = img as Record<string, unknown>;
+      // S3 URL mode
+      if (typeof item.url === "string") {
+        return { url: item.url, filename: item.filename as string | undefined };
+      }
+      // Base64 mode
+      if (typeof item.data === "string" && item.data.length > 100) {
+        return { base64Data: item.data, filename: item.filename as string | undefined };
       }
     }
   }
 
-  // Direct URL in message (some worker versions)
+  // Direct URL in message
   if (typeof o.message === "string" && o.message.startsWith("http")) {
-    return o.message;
+    return { url: o.message };
   }
 
   return null;
@@ -263,11 +271,27 @@ export async function submitRunPodComfyUIJob(
     }
 
     if (statusData.status === "COMPLETED") {
-      const videoUrl = extractOutputUrl(statusData.output);
-      if (!videoUrl) {
+      const extracted = extractOutput(statusData.output);
+      if (!extracted) {
         throw new Error(
-          `RunPod ComfyUI job ${jobId} completed but no video URL. Output: ${JSON.stringify(statusData.output).slice(0, 500)}`
+          `RunPod ComfyUI job ${jobId} completed but no output found. Raw: ${JSON.stringify(statusData.output).slice(0, 500)}`
         );
+      }
+
+      let videoUrl: string;
+
+      if (extracted.url) {
+        videoUrl = extracted.url;
+      } else if (extracted.base64Data) {
+        // Base64 mode: upload to R2 directly
+        const { uploadVideo } = await import("@/lib/storage");
+        const buffer = Buffer.from(extracted.base64Data, "base64");
+        const ext = extracted.filename?.endsWith(".mp4") ? "mp4" : extracted.filename?.endsWith(".png") ? "png" : "mp4";
+        const key = `comfyui/${jobId}.${ext}`;
+        videoUrl = await uploadVideo(key, buffer, ext === "png" ? "image/png" : "video/mp4");
+        console.log(`[RunPod-ComfyUI] Base64 output uploaded to R2: ${key} (${buffer.length} bytes)`);
+      } else {
+        throw new Error(`RunPod ComfyUI job ${jobId}: output has neither URL nor base64 data`);
       }
 
       const elapsedMs = Date.now() - startTime;

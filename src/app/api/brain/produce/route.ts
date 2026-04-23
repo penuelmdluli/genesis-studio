@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     // which terminates audio generation (TTS + music) mid-flight.
     after(async () => {
       try {
-        await executeProduction(productionId, user.id, clerkId, plan, input);
+        await executeProduction(productionId, user.id, clerkId, plan, input, user.plan);
         console.log(`[BRAIN] Production ${productionId} execution completed successfully`);
       } catch (err) {
         console.error(`[BRAIN] Production ${productionId} execution failed:`, err);

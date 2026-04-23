@@ -26,7 +26,7 @@ export type ModelTier =
   | "motion"
   | "hollywood";
 
-export type VideoProvider = "runpod-hub" | "runpod-custom" | "fal";
+export type VideoProvider = "runpod-hub" | "runpod-custom" | "fal" | "runpod-comfyui";
 
 export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
 

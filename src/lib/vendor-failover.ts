@@ -7,7 +7,7 @@
 import { ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 
-export type VendorProvider = "fal" | "runpod" | "replicate";
+export type VendorProvider = "fal" | "runpod" | "replicate" | "runpod-comfyui";
 
 interface ProviderHealth {
   provider: VendorProvider;
@@ -22,6 +22,7 @@ const providerHealth: Record<VendorProvider, ProviderHealth> = {
   fal: { provider: "fal", healthy: true, lastChecked: 0, failCount: 0 },
   runpod: { provider: "runpod", healthy: true, lastChecked: 0, failCount: 0 },
   replicate: { provider: "replicate", healthy: true, lastChecked: 0, failCount: 0 },
+  "runpod-comfyui": { provider: "runpod-comfyui", healthy: true, lastChecked: 0, failCount: 0 },
 };
 
 const HEALTH_CHECK_INTERVAL = 60_000; // 1 minute

@@ -10,6 +10,9 @@ import { generateVoiceover, generatePerSceneVoiceover, selectMusic, generateCapt
 import { generateAllSceneSounds } from "./sound-effects";
 import { submitRunPodJob, buildRunPodInput, getRunPodJobStatus } from "@/lib/runpod";
 import { submitFalJob } from "@/lib/fal";
+import { submitRunPodComfyUIJob, isRunPodComfyUIAvailable } from "@/lib/runpod-comfyui";
+import { selectProviderChain } from "@/lib/provider-router";
+import { persistExternalVideo } from "@/lib/storage";
 import { AI_MODELS } from "@/lib/constants";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { createSupabaseAdmin } from "@/lib/supabase";
@@ -189,7 +192,8 @@ export async function executeProduction(
   userId: string,
   clerkId: string,
   plan: ScenePlan,
-  input: BrainInput
+  input: BrainInput,
+  userPlan?: string
 ): Promise<void> {
   try {
     // Step 1: Apply consistency passes + Claude visual harmonization
@@ -322,6 +326,49 @@ export async function executeProduction(
       }
 
       try {
+        // Check if this user's tier should use RunPod ComfyUI for cost savings
+        const providerChain = selectProviderChain(userPlan || "free");
+        const useComfyUI = providerChain[0] === "runpod-comfyui"
+          && isRunPodComfyUIAvailable()
+          && generationType === "t2v"
+          && !isFalModel; // Don't override explicit FAL models (Kling/Veo with audio)
+
+        if (useComfyUI) {
+          console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: using RunPod ComfyUI (cost-optimized)`);
+          try {
+            const comfyResult = await submitRunPodComfyUIJob({
+              prompt: scenePrompt,
+              negativePrompt: sceneDef.negativePrompt,
+              durationSeconds: sceneDef.duration,
+              aspectRatio: input.aspectRatio,
+            });
+
+            // Persist to R2 (RunPod URLs expire)
+            const storageKey = `productions/${productionId}/scene-${sceneDef.sceneNumber}.mp4`;
+            await persistExternalVideo(comfyResult.videoUrl, storageKey);
+
+            await updateProductionScene(scene.id, {
+              status: "completed",
+              output_video_url: storageKey,
+              runpod_job_id: comfyResult.jobId,
+              gpu_time: comfyResult.executionMs / 1000,
+              progress: 100,
+            });
+
+            const supabase = createSupabaseAdmin();
+            await supabase
+              .from("production_scenes")
+              .update({ provider: "runpod-comfyui" })
+              .eq("id", scene.id);
+
+            console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: ComfyUI completed ($${comfyResult.costUsd.toFixed(4)})`);
+            return;
+          } catch (comfyErr) {
+            console.warn(`[BRAIN] Scene ${sceneDef.sceneNumber}: ComfyUI failed, falling back: ${comfyErr instanceof Error ? comfyErr.message : comfyErr}`);
+            // Fall through to existing RunPod/FAL path
+          }
+        }
+
         if (isFalModel) {
           const falResult = await submitFalJob({
             modelId: sceneDef.modelId,

@@ -1,0 +1,67 @@
+{
+  "_comment": "Wan 2.2 T2V workflow for RunPod ComfyUI worker. Parameters injected at runtime by the Genesis adapter: nodes 6 (prompt), 7 (negative), 5 (dimensions+length), 3 (seed). Model files loaded from network volume.",
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 42,
+      "steps": 25,
+      "cfg": 7.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "WanVideoModelLoader",
+    "inputs": {
+      "model": "wan2.2_t2v_14B_fp8_e4m3fn.safetensors",
+      "base_precision": "fp8_e4m3fn",
+      "quantization": "fp8_e4m3fn"
+    }
+  },
+  "5": {
+    "class_type": "WanVideoEmptyLatent",
+    "inputs": {
+      "width": 720,
+      "height": 1280,
+      "length": 81,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "a cute baby dancing joyfully on a sunlit street, golden hour, cinematic bokeh",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "blurry, low quality, deformed, watermark, text, ugly",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "WanVideoDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["8", 0],
+      "frame_rate": 16,
+      "format": "video/h264-mp4",
+      "crf": 19,
+      "save_output": true,
+      "filename_prefix": "genesis_wan22"
+    }
+  }
+}

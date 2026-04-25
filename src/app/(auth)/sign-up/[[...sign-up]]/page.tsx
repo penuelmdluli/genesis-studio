@@ -55,6 +55,7 @@ export default function SignUpPage() {
           </div>
 
           <SignUp
+            forceRedirectUrl="/onboarding/first-video"
             appearance={{
               elements: {
                 rootBox: "mx-auto w-full",

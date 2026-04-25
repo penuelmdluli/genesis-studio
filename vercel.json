@@ -9,40 +9,12 @@
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/retention",
-      "schedule": "0 10 * * 1"
-    },
-    {
-      "path": "/api/cron/content-pipeline",
-      "schedule": "30 5,17 * * *"
-    },
-    {
-      "path": "/api/cron/fetch-insights",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/run-analysis",
-      "schedule": "0 */12 * * *"
-    },
-    {
-      "path": "/api/cron/outcome-tracker",
-      "schedule": "0 2 * * *"
-    },
-    {
       "path": "/api/cron/recover-scenes",
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/auto-seed",
-      "schedule": "0 6 * * *"
-    },
-    {
       "path": "/api/cron/purge-stale",
       "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/auto-rebalance",
-      "schedule": "0 8 * * 1"
     }
   ]
 }

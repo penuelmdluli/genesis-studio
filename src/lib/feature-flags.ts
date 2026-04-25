@@ -28,3 +28,15 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
 export function isRouteVisibleAtLaunch(href: string): boolean {
   return LAUNCH_VISIBLE_ROUTES[href] ?? true;
 }
+
+/**
+ * Filter model list to only launch-available models.
+ * Used by model selectors in generate and brain pages.
+ */
+export function filterLaunchModels<T extends { launchAvailable?: boolean }>(
+  models: Record<string, T>
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(models).filter(([, m]) => m.launchAvailable)
+  );
+}

@@ -103,6 +103,7 @@ export interface AIModel {
   falModelId?: string;      // FAL.AI model ID for t2v
   falModelIdI2V?: string;   // FAL.AI model ID for i2v
   maxDuration?: number;     // max duration in seconds
+  launchAvailable?: boolean; // visible in model selector at launch
 }
 
 // --- Users & Auth ---

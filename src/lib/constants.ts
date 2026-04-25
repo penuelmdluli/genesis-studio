@@ -10,6 +10,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     id: "wan-2.2",
     name: "Wan 2.2 (A14B)",
     tier: "flagship",
+    launchAvailable: true,
     types: ["t2v", "i2v"],
     description:
       "MoE architecture. Best cinematic quality. Complex motion & camera movements.",
@@ -93,6 +94,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     id: "kling-2.6",
     name: "Kling 2.6 Pro",
     tier: "hollywood",
+    launchAvailable: true,
     types: ["t2v", "i2v"],
     description:
       "Hollywood-grade video with native audio — dialogue, sound effects, ambient sound. Best audio+video sync.",
@@ -111,6 +113,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     id: "kling-3.0",
     name: "Kling 3.0 Pro",
     tier: "hollywood",
+    launchAvailable: true,
     types: ["t2v", "i2v"],
     description:
       "Latest Kling — multi-shot narrative, native audio, best character consistency.",

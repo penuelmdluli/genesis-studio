@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,27 @@ const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; d
 export default function GeneratePage() {
   const { form, setFormField, user, addJob, updateCreditBalance, setCreditPurchaseOpen, isInitialized } = useStore();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+
+  // Seed from explore video — pre-fill prompt when arriving via ?seed_from={videoId}
+  const [seedLoaded, setSeedLoaded] = useState(false);
+  useEffect(() => {
+    const seedFrom = searchParams.get("seed_from");
+    if (!seedFrom || seedLoaded) return;
+    setSeedLoaded(true);
+    fetch(`/api/explore/${seedFrom}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const video = data?.video;
+        if (video?.prompt) {
+          setFormField("prompt", video.prompt);
+          if (video.modelId) setFormField("modelId", video.modelId);
+          if (video.duration) setFormField("duration", video.duration);
+          toast("Prompt loaded from Explore. Feel free to tweak it!", "info");
+        }
+      })
+      .catch(() => {});
+  }, [searchParams, seedLoaded, setFormField, toast]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const generateLockRef = useRef(false);

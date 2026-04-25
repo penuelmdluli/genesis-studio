@@ -5,6 +5,7 @@
 import { createSupabaseAdmin } from "./supabase";
 import { CreditTransactionType } from "@/types";
 import { sendLowCreditsEmail } from "./email";
+import { assertWithinDailyBudget, DailySpendCapExceeded } from "./spend-guard";
 
 function getSupabase() {
   return createSupabaseAdmin();
@@ -42,11 +43,23 @@ export async function deductCredits(
   // requests could both read a sufficient balance and both deduct.
   const { data: user, error: userError } = await getSupabase()
     .from("users")
-    .select("credit_balance")
+    .select("credit_balance, plan")
     .eq("id", userId)
     .single();
 
   if (userError) throw new Error(`Failed to get user: ${userError.message}`);
+
+  // Daily spend cap — defense-in-depth against runaway costs
+  try {
+    await assertWithinDailyBudget(userId, user.plan || "free");
+  } catch (err) {
+    if (err instanceof DailySpendCapExceeded) {
+      console.warn(`[CREDITS] ${err.message}`);
+      return { success: false, newBalance: user.credit_balance };
+    }
+    // Non-spend-cap errors: log and allow through (fail-open on infra errors)
+    console.error("[CREDITS] Spend guard error, allowing through:", err);
+  }
 
   if (user.credit_balance < amount) {
     return { success: false, newBalance: user.credit_balance };

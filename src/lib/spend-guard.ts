@@ -5,6 +5,7 @@
 // ============================================
 
 import { createSupabaseAdmin } from "./supabase";
+import { sendSlackAlert } from "./alerts";
 
 const CREDIT_TO_USD = 0.024;
 
@@ -56,6 +57,12 @@ export async function assertWithinDailyBudget(
   const spentUsd = spentCredits * CREDIT_TO_USD;
 
   if (spentUsd >= cap) {
+    sendSlackAlert({
+      level: "warning",
+      title: "Daily spend cap reached",
+      message: `User ${userId} (${tier}) hit $${spentUsd.toFixed(2)} / $${cap.toFixed(2)} cap`,
+      context: { userId, tier, spentUsd, cap },
+    }).catch(() => {});
     throw new DailySpendCapExceeded(userId, tier, spentUsd, cap);
   }
 }

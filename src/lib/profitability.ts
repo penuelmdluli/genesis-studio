@@ -18,7 +18,6 @@ export const GPU_RATES: Record<string, number> = {
 
 // Model → GPU mapping (cheapest GPU that can run each model)
 export const MODEL_GPU_MAP: Record<string, string> = {
-  "cogvideo-x": "RTX_4090",
   "ltx-video": "RTX_4090",
   "hunyuan-video": "RTX_4090",
   "wan-2.1-turbo": "RTX_4090",

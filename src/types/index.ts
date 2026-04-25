@@ -9,7 +9,6 @@ export type ModelId =
   | "ltx-video"
   | "wan-2.1-turbo"
   | "mochi-1"
-  | "cogvideo-x"
   | "mimic-motion"
   | "kling-2.6"
   | "kling-3.0"

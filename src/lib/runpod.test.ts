@@ -214,20 +214,6 @@ describe("buildRunPodInput", () => {
     expect(wf["10"].inputs.image).toBe("https://example.com/image.jpg");
   });
 
-  // --- CogVideoX: flat params format ---
-  it("caps cogvideo-x frames at 49", () => {
-    const input = buildRunPodInput({
-      modelId: "cogvideo-x",
-      type: "t2v",
-      prompt: "Test",
-      resolution: "480p",
-      duration: 5,
-      fps: 24,
-    });
-
-    expect(input.num_frames).toBe(49);
-  });
-
   // --- MimicMotion: ComfyUI workflow format ---
   it("builds mimic-motion input as ComfyUI workflow with motion transfer nodes", () => {
     const input = buildRunPodInput({

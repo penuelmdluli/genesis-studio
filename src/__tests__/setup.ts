@@ -12,7 +12,6 @@ process.env.RUNPOD_ENDPOINT_HUNYUAN = "ep-hunyuan";
 process.env.RUNPOD_ENDPOINT_LTX = "ep-ltx";
 process.env.RUNPOD_ENDPOINT_WAN21_TURBO = "ep-wan21turbo";
 process.env.RUNPOD_ENDPOINT_MOCHI = "ep-mochi";
-process.env.RUNPOD_ENDPOINT_COGVIDEO = "ep-cogvideo";
 process.env.R2_ACCOUNT_ID = "test-r2-account";
 process.env.R2_ACCESS_KEY_ID = "test-r2-key";
 process.env.R2_SECRET_ACCESS_KEY = "test-r2-secret";

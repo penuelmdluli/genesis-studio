@@ -47,7 +47,6 @@ export async function GET(req: NextRequest) {
           "ltx-video": 30,
           "wan-2.1-turbo": 60,
           "mochi-1": 180,
-          "cogvideo-x": 90,
           "mimic-motion": 120,
           "kling-2.6": 120,
           "kling-3.0": 150,

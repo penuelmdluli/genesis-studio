@@ -73,20 +73,6 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     gpuRequirement: "48GB+ (A6000/H100)",
     license: "Apache 2.0",
   },
-  "cogvideo-x": {
-    id: "cogvideo-x",
-    name: "CogVideoX-5B",
-    tier: "budget",
-    types: ["t2v"],
-    description:
-      "Lightweight. 6-sec clips at 720×480. Perfect for quick previews.",
-    maxResolution: "480p",
-    avgGenerationTime: 90,
-    creditCost: { "480p": 10 },
-    gpuRequirement: "16GB+",
-    license: "Apache 2.0",
-    comingSoon: true,
-  },
   "mimic-motion": {
     id: "mimic-motion",
     name: "MimicMotion",
@@ -602,7 +588,6 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "hunyuan-video",
     "wan-2.1-turbo",
     "mochi-1",
-    "cogvideo-x",
   ],
   pro: [
     "wan-2.2",
@@ -615,7 +600,6 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "hunyuan-video",
     "wan-2.1-turbo",
     "mochi-1",
-    "cogvideo-x",
   ],
   studio: [
     "wan-2.2",
@@ -628,7 +612,6 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "hunyuan-video",
     "wan-2.1-turbo",
     "mochi-1",
-    "cogvideo-x",
   ],
 };
 

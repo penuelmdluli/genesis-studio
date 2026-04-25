@@ -15,7 +15,6 @@ const ENDPOINT_MAP: Partial<Record<ModelId, string>> = {
   "ltx-video": process.env.RUNPOD_ENDPOINT_LTX || "",
   "wan-2.1-turbo": process.env.RUNPOD_ENDPOINT_WAN21_TURBO || "",
   "mochi-1": process.env.RUNPOD_ENDPOINT_MOCHI || "",
-  "cogvideo-x": process.env.RUNPOD_ENDPOINT_COGVIDEO || "",
   "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
 };
 
@@ -414,19 +413,6 @@ export function buildRunPodInput(params: BuildRunPodInputParams): Record<string,
             },
           }),
         },
-      };
-
-    case "cogvideo-x":
-      return {
-        prompt: params.prompt,
-        negative_prompt: params.negativePrompt || "",
-        width,
-        height,
-        num_frames: Math.min(numFrames, 49), // CogVideoX max 49 frames
-        num_inference_steps: steps,
-        guidance_scale: guidance,
-        fps: params.fps,
-        seed: params.seed ?? Math.floor(Math.random() * 2147483647),
       };
 
     case "mimic-motion":

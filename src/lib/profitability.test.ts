@@ -32,7 +32,7 @@ describe("profitability", () => {
     });
 
     it("maps every model to a GPU", () => {
-      expect(MODEL_GPU_MAP["cogvideo-x"]).toBe("RTX_4090");
+      expect(MODEL_GPU_MAP["ltx-video"]).toBe("RTX_4090");
       expect(MODEL_GPU_MAP["wan-2.2"]).toBe("L40S");
       expect(MODEL_GPU_MAP["mochi-1"]).toBe("A6000");
     });
@@ -53,7 +53,7 @@ describe("profitability", () => {
 
   describe("estimateGpuCostUsd", () => {
     it("returns a positive number for valid models", () => {
-      const cost = estimateGpuCostUsd("cogvideo-x", 5, "480p");
+      const cost = estimateGpuCostUsd("ltx-video", 5, "480p");
       expect(cost).toBeGreaterThan(0);
     });
 
@@ -117,8 +117,8 @@ describe("profitability", () => {
 
   describe("isProfitable", () => {
     it("returns profitable for cheap models with correct pricing", () => {
-      // CogVideoX at 15 credits should be profitable (net revenue > full cost)
-      const result = isProfitable(15, "cogvideo-x", 5, "480p");
+      // LTX-Video at 15 credits should be profitable (net revenue > full cost)
+      const result = isProfitable(15, "ltx-video", 5, "480p");
       expect(result.netRevenue).toBeGreaterThan(result.fullCost);
     });
 

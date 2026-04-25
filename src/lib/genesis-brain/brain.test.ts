@@ -52,11 +52,6 @@ vi.mock("@/lib/constants", () => ({
       name: "Mochi 1",
       creditCost: { "480p": 20, "720p": 35, "1080p": 70 },
     },
-    "cogvideo-x": {
-      id: "cogvideo-x",
-      name: "CogVideo X",
-      creditCost: { "480p": 10 },
-    },
   },
   BUILT_IN_AUDIO_TRACKS: [
     {
@@ -178,7 +173,7 @@ function makeScenePlan(overrides: Partial<ScenePlan> = {}): ScenePlan {
     scenes: [
       makeScene({ sceneNumber: 1 }),
       makeScene({ sceneNumber: 2, modelId: "ltx-video", duration: 5 }),
-      makeScene({ sceneNumber: 3, modelId: "cogvideo-x", duration: 5, resolution: "480p" }),
+      makeScene({ sceneNumber: 3, modelId: "mochi-1", duration: 5, resolution: "480p" }),
     ],
     characters: [],
     musicMood: "ambient",
@@ -268,11 +263,11 @@ describe("Planner", () => {
       // Planning: 2
       // Scene 1: wan-2.2 @ 720p = 40, dur=5 => multiplier=1 => 40
       // Scene 2: ltx-video @ 720p = 15, dur=5 => multiplier=1 => 15
-      // Scene 3: cogvideo-x @ 480p = 10, dur=5 => multiplier=1 => 10
+      // Scene 3: mochi-1 @ 480p = 20, dur=5 => multiplier=1 => 20
       // MMAudio: all 3 scenes are silent (no hasAudio) => 3 * 2 = 6
       // Assembly: 5
-      // Total: 2 + 40 + 15 + 10 + 6 + 5 = 78
-      expect(credits).toBe(78);
+      // Total: 2 + 40 + 15 + 20 + 6 + 5 = 88
+      expect(credits).toBe(88);
     });
 
     it("applies duration multiplier for scenes longer than 5 seconds", () => {
@@ -321,18 +316,18 @@ describe("Planner", () => {
       expect(credits).toBe(17);
     });
 
-    it("uses 720p fallback cost when resolution is not in creditCost map", () => {
+    it("uses default fallback cost when resolution is not in creditCost map", () => {
       const plan = makeScenePlan({
-        scenes: [makeScene({ modelId: "cogvideo-x", resolution: "720p" })],
+        scenes: [makeScene({ modelId: "wan-2.1-turbo", resolution: "1080p" })],
       });
       const input = makeBrainInput();
       const credits = calculateBrainCredits(plan, input);
 
-      // cogvideo-x only has 480p cost (3). 720p is not available.
-      // Fallback chain: creditCost["720p"] || creditCost["720p"] || 8
-      // Neither exists, so falls back to 8
-      // Planning: 2 + 8 + MMAudio: 1*2=2 + Assembly: 5 = 17
-      expect(credits).toBe(17);
+      // wan-2.1-turbo only has 480p=10 and 720p=20 cost. 1080p is not available.
+      // Fallback chain: creditCost["1080p"] || creditCost["720p"] || 8
+      // 720p exists = 20
+      // Planning: 2 + 20 + MMAudio: 1*2=2 + Assembly: 5 = 29
+      expect(credits).toBe(29);
     });
   });
 

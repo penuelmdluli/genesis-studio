@@ -2,15 +2,14 @@ import { describe, it, expect } from "vitest";
 import { AI_MODELS, PLANS, CREDIT_PACKS, RESOLUTIONS, DURATIONS, FPS_OPTIONS, MODEL_ACCESS } from "./constants";
 
 describe("AI_MODELS", () => {
-  it("has all 11 models defined", () => {
+  it("has all 10 models defined", () => {
     const modelIds = Object.keys(AI_MODELS);
-    expect(modelIds).toHaveLength(11);
+    expect(modelIds).toHaveLength(10);
     expect(modelIds).toContain("wan-2.2");
     expect(modelIds).toContain("hunyuan-video");
     expect(modelIds).toContain("ltx-video");
     expect(modelIds).toContain("wan-2.1-turbo");
     expect(modelIds).toContain("mochi-1");
-    expect(modelIds).toContain("cogvideo-x");
     expect(modelIds).toContain("mimic-motion");
     expect(modelIds).toContain("kling-2.6");
     expect(modelIds).toContain("kling-3.0");
@@ -151,10 +150,10 @@ describe("MODEL_ACCESS", () => {
     expect(MODEL_ACCESS.free).toEqual(["wan-2.2", "seedance-1.5", "mimic-motion"]);
   });
 
-  it("creator has 9, pro has 11, studio has 11 models", () => {
-    expect(MODEL_ACCESS.creator).toHaveLength(9);
-    expect(MODEL_ACCESS.pro).toHaveLength(11);
-    expect(MODEL_ACCESS.studio).toHaveLength(11);
+  it("creator has 8, pro has 10, studio has 10 models", () => {
+    expect(MODEL_ACCESS.creator).toHaveLength(8);
+    expect(MODEL_ACCESS.pro).toHaveLength(10);
+    expect(MODEL_ACCESS.studio).toHaveLength(10);
   });
 
   it("all model IDs in access lists are valid", () => {

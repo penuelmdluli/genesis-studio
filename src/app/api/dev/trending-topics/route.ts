@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { aggregateAllSources } from "@/lib/news/aggregator";
+import { blockInProduction } from "@/lib/dev-only";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret =
@@ -21,6 +22,9 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -58,6 +62,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

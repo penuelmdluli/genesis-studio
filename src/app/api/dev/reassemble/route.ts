@@ -18,10 +18,14 @@ import { getProduction, getProductionScenes, updateProduction } from "@/lib/gene
 import { createVideo } from "@/lib/db";
 import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
 import { ModelId } from "@/types";
+import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   const secret =
     req.headers.get("x-cron-secret") ||
     req.headers.get("authorization")?.replace("Bearer ", "");

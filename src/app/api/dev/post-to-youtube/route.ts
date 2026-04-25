@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSignedDownloadUrl, videoStorageKey } from "@/lib/storage";
+import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 120;
 
@@ -136,6 +137,9 @@ async function uploadToYouTube(
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   const secret =
     req.headers.get("x-cron-secret") ||
     req.headers.get("authorization")?.replace("Bearer ", "");

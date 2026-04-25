@@ -24,6 +24,7 @@ import {
   computeAdaptiveHints,
   preferredEngineFor,
 } from "@/lib/dev-adaptive-hints";
+import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 300;
 
@@ -1316,6 +1317,9 @@ async function handleReconcile(): Promise<{
 // ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   try {
     if (!validateCronSecret(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

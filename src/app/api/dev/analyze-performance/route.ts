@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 120;
 
@@ -75,6 +76,9 @@ function toAggregateRow(key: string, bucket: number[]): Aggregate {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   const secret =
     req.headers.get("x-cron-secret") ||
     req.headers.get("authorization")?.replace("Bearer ", "");

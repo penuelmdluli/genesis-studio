@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { refundCredits } from "@/lib/credits";
+import { blockInProduction } from "@/lib/dev-only";
 
 /**
  * Fails a production AND refunds credits to the user (idempotent).
@@ -95,6 +96,9 @@ function validateCronSecret(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!validateCronSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

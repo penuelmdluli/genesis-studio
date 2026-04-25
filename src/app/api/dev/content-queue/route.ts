@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { selectEngine, createCostEntry } from "@/lib/dev-engine-router";
+import { blockInProduction } from "@/lib/dev-only";
 
 // ---------------------------------------------------------------------------
 // Auth helper
@@ -31,6 +32,9 @@ function isAuthorized(req: NextRequest): boolean {
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -92,6 +96,9 @@ interface QueueInsertBody {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -188,6 +195,9 @@ interface QueueUpdateBody {
 }
 
 export async function PATCH(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

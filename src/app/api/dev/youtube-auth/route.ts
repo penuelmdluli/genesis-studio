@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { blockInProduction } from "@/lib/dev-only";
 
 const REDIRECT_URI = "http://localhost:3099/api/dev/youtube-auth";
 const SCOPES = [
@@ -18,6 +19,9 @@ const SCOPES = [
 ].join(" ");
 
 export async function GET(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   const clientId = process.env.YOUTUBE_CLIENT_ID;
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
 

@@ -28,6 +28,7 @@ import {
 } from "@/lib/dev-adaptive-hints";
 import { getDevPage } from "@/lib/dev-pages";
 import { getAfricanVoiceConfig, isAfricanLanguage } from "@/lib/africa/voice-config";
+import { blockInProduction } from "@/lib/dev-only";
 
 const FAL_API_KEY = process.env.FAL_KEY || "";
 
@@ -216,6 +217,9 @@ async function checkFalHealth(): Promise<{ ok: boolean; reason?: string }> {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!validateCronSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

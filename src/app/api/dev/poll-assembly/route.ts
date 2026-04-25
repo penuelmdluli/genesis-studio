@@ -23,6 +23,7 @@ import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
 import { AI_MODELS } from "@/lib/constants";
 import { uploadVideo, getSignedDownloadUrl } from "@/lib/storage";
 import { ModelId } from "@/types";
+import { blockInProduction } from "@/lib/dev-only";
 
 /**
  * Resolve RunPod job output into a fetchable video URL.
@@ -99,6 +100,9 @@ function validateCronSecret(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   if (!validateCronSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

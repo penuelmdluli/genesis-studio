@@ -10,6 +10,7 @@ import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
+import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 
 export async function POST(req: NextRequest) {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Rate limiting
+    // Rate limiting (in-memory per-instance)
     const rateCategory = user.plan === "free" ? "generate:free" : "generate:paid";
     const rateCheck = checkRateLimit(user.id, rateCategory);
     if (!rateCheck.allowed) {
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
     }
+
+    // Distributed rate limiting (Upstash — cross-instance, persists across cold starts)
+    const distributedBlock = await enforceDistributedRateLimit(user.id, user.plan);
+    if (distributedBlock) return distributedBlock;
 
     const rawBody = await req.json();
     const parsed = generateSchema.safeParse(rawBody);

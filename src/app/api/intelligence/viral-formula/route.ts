@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { requireOwnerOrNotFound } from "@/lib/owner-only";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { extractViralFormula } from "@/lib/intelligence";
 
 export async function GET(req: NextRequest) {
+  const ownerCheck = await requireOwnerOrNotFound();
+  if (ownerCheck instanceof NextResponse) return ownerCheck;
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -26,6 +30,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const ownerCheck2 = await requireOwnerOrNotFound();
+  if (ownerCheck2 instanceof NextResponse) return ownerCheck2;
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

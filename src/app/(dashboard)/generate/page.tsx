@@ -28,6 +28,7 @@ import { CreditUpsell, useUpsellContext } from "@/components/ui/credit-upsell";
 import { ModelId, GenerationType, VideoFormat } from "@/types";
 import { uploadFile } from "@/lib/upload-client";
 import { PROMPT_SUGGESTIONS, PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate } from "@/lib/prompt-templates";
+import { getOnePerCategory, type SamplePrompt } from "@/lib/sample-prompts";
 import { PLATFORM_PRESETS, PLATFORM_NAMES } from "@/lib/platform-presets";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { Switch } from "@/components/ui/switch";
@@ -82,6 +83,17 @@ export default function GeneratePage() {
   const [showPresets, setShowPresets] = useState(false);
   const [presetPlatform, setPresetPlatform] = useState<string>("All");
   const [isTranslating, setIsTranslating] = useState(false);
+
+  // Sample prompt chips for new users (< 5 generations)
+  const [sampleChips] = useState<SamplePrompt[]>(() => getOnePerCategory());
+  const showSampleChips = (user?.monthlyCreditsUsed ?? 0) < 5 * 40; // rough proxy: < 5 generations
+
+  const applySamplePrompt = useCallback((p: SamplePrompt) => {
+    setFormField("prompt", p.prompt);
+    setFormField("modelId", p.recommendedModel);
+    setFormField("duration", p.recommendedDuration);
+    setModerationWarning(null);
+  }, [setFormField]);
 
   const handlePreviewTrack = useCallback((trackId: string, trackUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -499,6 +511,24 @@ export default function GeneratePage() {
                 rows={4}
                 className="text-base"
               />
+
+              {/* Sample prompt chips — shown for new users */}
+              {showSampleChips && !form.prompt.trim() && (
+                <div className="space-y-2">
+                  <span className="text-xs text-zinc-500">Try a sample prompt:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sampleChips.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => applySamplePrompt(p)}
+                        className="px-2.5 py-1.5 rounded-lg bg-violet-500/[0.06] border border-violet-500/20 text-xs text-violet-300 hover:text-violet-200 hover:bg-violet-500/10 hover:border-violet-500/30 transition-all"
+                      >
+                        {p.thumbnailHint} {p.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Prompt Suggestions — shown when prompt is empty */}
               {!form.prompt.trim() && (

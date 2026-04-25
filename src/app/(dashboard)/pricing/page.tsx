@@ -7,8 +7,56 @@ import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { PLANS, CREDIT_PACKS, ANNUAL_PLANS, REFERRAL_REWARDS } from "@/lib/constants";
-import { PageTransition, StaggerGroup, StaggerItem } from "@/components/ui/motion";
-import { Check, Zap, CreditCard, ArrowRight, Sparkles, Gift, Copy, Users } from "lucide-react";
+import { PageTransition } from "@/components/ui/motion";
+import { Check, X, Zap, CreditCard, Sparkles, Gift, Copy, Users } from "lucide-react";
+
+const TIER_COPY: Record<string, { headline: string; subheading: string; outcome: string; bestFor: string }> = {
+  free: {
+    headline: "Try Genesis",
+    subheading: "Free forever",
+    outcome: "Around 1 short video a month to test the platform",
+    bestFor: "Curious creators kicking the tyres",
+  },
+  creator: {
+    headline: "For solo creators",
+    subheading: "Most popular for individuals",
+    outcome: "Around 60 short-form videos a month for TikTok, Reels, and Shorts",
+    bestFor: "Solo content creators, hobbyists, side hustles",
+  },
+  pro: {
+    headline: "For serious content",
+    subheading: "Hollywood-tier audio",
+    outcome: "Around 240 videos a month with Kling 2.6 Pro for cinematic motion and native audio",
+    bestFor: "Full-time creators, small agencies, course makers",
+  },
+  studio: {
+    headline: "For agencies and brands",
+    subheading: "Top-tier quality",
+    outcome: "Around 800 videos a month with Kling 3.0 Pro at 1080p",
+    bestFor: "Agencies, production studios, brand teams",
+  },
+};
+
+const FEATURE_ROWS: { label: string; free: string; creator: string; pro: string; studio: string }[] = [
+  { label: "Videos per month (approx.)", free: "1", creator: "60", pro: "240", studio: "800" },
+  { label: "Wan 2.2 (open-source)", free: "check", creator: "check", pro: "check", studio: "check" },
+  { label: "Kling 2.6 Pro (Hollywood audio)", free: "x", creator: "x", pro: "check", studio: "check" },
+  { label: "Kling 3.0 Pro (top-tier 1080p)", free: "x", creator: "x", pro: "x", studio: "check" },
+  { label: "Brain Studio (multi-scene)", free: "x", creator: "check", pro: "check", studio: "check" },
+  { label: "Voiceover (built-in)", free: "check", creator: "check", pro: "check", studio: "check" },
+  { label: "Auto-captions", free: "check", creator: "check", pro: "check", studio: "check" },
+  { label: "Max video length", free: "5s", creator: "10s", pro: "10s", studio: "10s" },
+  { label: "Resolution", free: "720p", creator: "720p", pro: "720p", studio: "1080p" },
+  { label: "Priority queue", free: "x", creator: "x", pro: "check", studio: "check" },
+  { label: "Email support", free: "x", creator: "check", pro: "check", studio: "check" },
+  { label: "Priority support", free: "x", creator: "x", pro: "check", studio: "check" },
+];
+
+function FeatureCell({ value }: { value: string }) {
+  if (value === "check") return <Check className="w-4 h-4 text-violet-400 mx-auto" />;
+  if (value === "x") return <X className="w-4 h-4 text-zinc-700 mx-auto" />;
+  return <span className="text-sm text-zinc-300 font-medium">{value}</span>;
+}
 
 export default function PricingPage() {
   const { user, isInitialized } = useStore();
@@ -19,6 +67,7 @@ export default function PricingPage() {
   const [currency, setCurrency] = useState<"USD" | "ZAR">("ZAR");
   const [referralData, setReferralData] = useState<{ code: string; shareUrl: string; referralCount: number; creditsEarned: number } | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   const formatPrice = (usd: number, zar?: number) => {
     if (currency === "ZAR" && zar) return `R${zar.toLocaleString()}`;
@@ -31,10 +80,7 @@ export default function PricingPage() {
     setReferralLoading(true);
     try {
       const res = await fetch("/api/referral");
-      if (res.ok) {
-        const data = await res.json();
-        setReferralData(data);
-      }
+      if (res.ok) setReferralData(await res.json());
     } catch { /* ignore */ }
     setReferralLoading(false);
   };
@@ -50,13 +96,9 @@ export default function PricingPage() {
         body: JSON.stringify({ planId, provider: getProvider() }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error) {
-        toast(data.error, "error");
-      }
-    } catch (err) {
-      console.error("Subscribe failed:", err);
+      if (data.url) window.location.href = data.url;
+      else if (data.error) toast(data.error, "error");
+    } catch {
       toast("Failed to start checkout", "error");
     } finally {
       setLoadingPlan(null);
@@ -72,42 +114,48 @@ export default function PricingPage() {
         body: JSON.stringify({ packId, provider: getProvider() }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error) {
-        toast(data.error, "error");
-      }
-    } catch (err) {
-      console.error("Buy pack failed:", err);
+      if (data.url) window.location.href = data.url;
+      else if (data.error) toast(data.error, "error");
+    } catch {
       toast("Failed to start checkout", "error");
     } finally {
       setLoadingPack(null);
     }
   };
 
-  const planStyles: Record<string, { border: string; gradient: string; badge: string }> = {
-    free: { border: "border-white/[0.06]", gradient: "from-white/[0.02] to-transparent", badge: "default" },
-    creator: { border: "border-emerald-500/20", gradient: "from-emerald-500/[0.04] to-transparent", badge: "emerald" },
-    pro: { border: "border-violet-500/30 ring-1 ring-violet-500/20", gradient: "from-violet-500/[0.06] to-transparent", badge: "violet" },
-    studio: { border: "border-amber-500/20", gradient: "from-amber-500/[0.04] to-transparent", badge: "amber" },
+  const planStyles: Record<string, { border: string; gradient: string }> = {
+    free: { border: "border-white/[0.06]", gradient: "from-white/[0.02] to-transparent" },
+    creator: { border: "border-emerald-500/20", gradient: "from-emerald-500/[0.04] to-transparent" },
+    pro: { border: "border-violet-500/30 ring-1 ring-violet-500/20", gradient: "from-violet-500/[0.06] to-transparent" },
+    studio: { border: "border-amber-500/20", gradient: "from-amber-500/[0.04] to-transparent" },
   };
 
+  const faqs = [
+    { q: "What is a credit?", a: "Credits are the currency you spend to generate videos. Different models cost different amounts. Wan 2.2 uses about 40 credits per 5-second video, while Hollywood models like Kling 2.6 Pro use around 100. Credits never expire." },
+    { q: "Can I cancel anytime?", a: "Yes. Cancel anytime from your Settings page with no penalties. Your remaining credits stay in your account and never expire." },
+    { q: "What happens to unused credits?", a: "They roll over forever. Credits from subscriptions and packs never expire, even if you cancel." },
+    { q: "Can I upgrade or downgrade mid-month?", a: "Yes. Upgrading takes effect immediately and prorates the charge. Downgrading takes effect at the end of the current billing period." },
+    { q: "Is my content really mine?", a: "Yes. You own all videos you generate on Genesis Studio. Use them commercially, post them anywhere, edit them however you like." },
+    { q: "Do you offer team plans?", a: "Not yet. Studio plan supports agency workflows today. Dedicated team features are coming in a future update." },
+    { q: "What payment methods do you accept?", a: "We accept all major credit and debit cards worldwide via Stripe. For South African users, we also support Paystack for local card payments." },
+    { q: "Do you offer refunds?", a: "Failed generations are automatically refunded. For subscription refunds, contact us within 14 days of your charge for a full refund." },
+  ];
+
   return (
-    <PageTransition className="space-y-10 max-w-5xl mx-auto">
+    <PageTransition className="space-y-12 max-w-6xl mx-auto">
       {/* Header */}
       <div className="text-center relative">
         <div className="absolute inset-0 bg-glow-top opacity-50 -z-10" />
         <Badge variant="violet" className="mb-4">Pricing</Badge>
         <h1 className="text-3xl sm:text-4xl font-bold text-zinc-100 mb-3">
-          Simple, transparent pricing
+          How many videos will you make?
         </h1>
         <p className="text-zinc-400 max-w-lg mx-auto">
-          Credits never expire. No watermarks on paid plans. API access on every tier.
+          Every plan includes voiceover, captions, and the core AI engine. Upgrade for Hollywood-tier models and multi-scene Brain Studio.
         </p>
 
         {/* Currency + Billing Toggles */}
         <div className="flex flex-col items-center gap-3 mt-6">
-          {/* Currency selector */}
           <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
             <button
               onClick={() => setCurrency("ZAR")}
@@ -123,32 +171,28 @@ export default function PricingPage() {
             </button>
           </div>
 
-          {/* Billing cycle toggle */}
           <div className="flex items-center gap-3">
             <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-500"}`}>Monthly</span>
             <button
               onClick={() => setBillingCycle((prev) => prev === "monthly" ? "annual" : "monthly")}
               className={`relative w-12 h-6 rounded-full transition-colors ${billingCycle === "annual" ? "bg-violet-600" : "bg-white/10"}`}
             >
-              <div
-                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`}
-              />
+              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`} />
             </button>
-            <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>
-              Annual
-            </span>
-            {billingCycle === "annual" && (
-              <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>
-            )}
+            <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>Annual</span>
+            {billingCycle === "annual" && <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>}
           </div>
         </div>
       </div>
 
-      {/* Plans */}
+      {/* Tier Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {PLANS.map((plan) => {
           const isCurrentPlan = user?.plan === plan.id;
           const style = planStyles[plan.id] || planStyles.free;
+          const copy = TIER_COPY[plan.id];
+          const isAnnual = billingCycle === "annual" && ANNUAL_PLANS[plan.id];
+
           return (
             <Card
               key={plan.id}
@@ -161,11 +205,12 @@ export default function PricingPage() {
                   </Badge>
                 </div>
               )}
-              <CardContent className="p-5 space-y-5 pt-6">
+              <CardContent className="p-5 space-y-4 pt-6">
                 <div>
-                  <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">{plan.name}</h3>
+                  <h3 className="text-base font-bold text-zinc-100">{copy.headline}</h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">{copy.subheading}</p>
                   <div className="mt-3">
-                    {billingCycle === "annual" && ANNUAL_PLANS[plan.id] ? (
+                    {isAnnual ? (
                       <>
                         <span className="text-3xl sm:text-4xl font-extrabold text-zinc-100">
                           {currencySymbol}{currency === "ZAR" && plan.priceZAR
@@ -174,9 +219,9 @@ export default function PricingPage() {
                         </span>
                         <span className="text-sm text-zinc-500">/mo</span>
                         <div className="text-xs text-emerald-400 mt-1">
-                          {currencySymbol}{currency === "ZAR" && plan.priceZAR
+                          Billed {currencySymbol}{currency === "ZAR" && plan.priceZAR
                             ? Math.round(plan.priceZAR * 12 * 0.8).toLocaleString()
-                            : ANNUAL_PLANS[plan.id].annualPrice}/yr — save 20%
+                            : ANNUAL_PLANS[plan.id].annualPrice}/yr
                         </div>
                       </>
                     ) : (
@@ -184,20 +229,14 @@ export default function PricingPage() {
                         <span className="text-3xl sm:text-4xl font-extrabold text-zinc-100">
                           {formatPrice(plan.price, plan.priceZAR)}
                         </span>
-                        <span className="text-sm text-zinc-500">/mo</span>
+                        {plan.price > 0 && <span className="text-sm text-zinc-500">/mo</span>}
                       </>
                     )}
                   </div>
                 </div>
 
-                <div className="space-y-2.5">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                      <span className="text-zinc-400">{feature}</span>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-zinc-300 leading-relaxed min-h-[3rem]">{copy.outcome}</p>
+                <p className="text-xs text-zinc-600 italic">{copy.bestFor}</p>
 
                 <Button
                   variant={plan.popular ? "primary" : plan.id === "free" ? "ghost" : "secondary"}
@@ -206,31 +245,88 @@ export default function PricingPage() {
                   loading={loadingPlan === plan.id}
                   onClick={() => handleSubscribe(plan.id)}
                 >
-                  {isCurrentPlan
-                    ? "Current Plan"
-                    : plan.id === "free"
-                    ? "Free Forever"
-                    : plan.id === "studio"
-                    ? "Contact Us"
-                    : `Upgrade to ${plan.name}`}
+                  {isCurrentPlan ? "Current Plan" : plan.id === "free" ? "Free Forever" : `Get ${plan.name}`}
                 </Button>
+
+                <p className="text-[10px] text-zinc-600 text-center">
+                  {plan.credits.toLocaleString()} credits/mo
+                </p>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
+      {/* Feature Comparison Grid */}
+      <div>
+        <h2 className="text-xl font-bold text-zinc-100 text-center mb-6">Compare plans</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                <th className="text-left py-3 px-4 text-zinc-400 font-medium">Feature</th>
+                <th className="text-center py-3 px-2 text-zinc-400 font-medium w-20">Free</th>
+                <th className="text-center py-3 px-2 text-zinc-400 font-medium w-20">Creator</th>
+                <th className="text-center py-3 px-2 text-violet-400 font-medium w-20">Pro</th>
+                <th className="text-center py-3 px-2 text-zinc-400 font-medium w-20">Studio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FEATURE_ROWS.map((row) => (
+                <tr key={row.label} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                  <td className="py-2.5 px-4 text-zinc-300">{row.label}</td>
+                  <td className="py-2.5 px-2 text-center"><FeatureCell value={row.free} /></td>
+                  <td className="py-2.5 px-2 text-center"><FeatureCell value={row.creator} /></td>
+                  <td className="py-2.5 px-2 text-center"><FeatureCell value={row.pro} /></td>
+                  <td className="py-2.5 px-2 text-center"><FeatureCell value={row.studio} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Competitor Comparison */}
+      <Card className="border-white/[0.06]">
+        <CardContent className="p-6 sm:p-8">
+          <h3 className="text-lg font-bold text-zinc-100 mb-2">How we compare</h3>
+          <p className="text-sm text-zinc-500 mb-6">Genesis Studio is the only platform with full multi-scene production from a single prompt.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th className="text-left py-2 px-3 text-zinc-400 font-medium">Tool</th>
+                  <th className="text-left py-2 px-3 text-zinc-400 font-medium">Cheapest plan</th>
+                  <th className="text-left py-2 px-3 text-zinc-400 font-medium">Approx. $/video</th>
+                  <th className="text-left py-2 px-3 text-zinc-400 font-medium">Genesis equivalent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { tool: "Runway Gen-4", plan: "$15/mo", cost: "~$0.85", equiv: "Creator ($12/mo, ~$0.20/video)" },
+                  { tool: "Veo 3 (API)", plan: "API only", cost: "$7.50/10s", equiv: "Studio ($79/mo) — Veo coming soon" },
+                  { tool: "Sora (ChatGPT Pro)", plan: "$200/mo", cost: "~$1.00", equiv: "Studio ($79/mo, ~$0.10/video)" },
+                  { tool: "Pika Labs Standard", plan: "$10/mo", cost: "~$0.07", equiv: "Free tier comparable" },
+                ].map((row) => (
+                  <tr key={row.tool} className="border-b border-white/[0.03]">
+                    <td className="py-2.5 px-3 text-zinc-300">{row.tool}</td>
+                    <td className="py-2.5 px-3 text-zinc-400">{row.plan}</td>
+                    <td className="py-2.5 px-3 text-zinc-400">{row.cost}</td>
+                    <td className="py-2.5 px-3 text-emerald-400 font-medium">{row.equiv}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Credit Packs */}
       <div>
         <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-zinc-100 mb-2">
-            Credit Packs
-          </h2>
-          <p className="text-sm text-zinc-500">
-            One-time purchase. Never expire. Stack with your subscription.
-          </p>
+          <h2 className="text-xl font-bold text-zinc-100 mb-2">Need more credits?</h2>
+          <p className="text-sm text-zinc-500">One-time purchase. Never expire. Stack with your subscription.</p>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           {CREDIT_PACKS.map((pack) => (
             <Card key={pack.id} hover className="cursor-pointer">
@@ -239,27 +335,18 @@ export default function PricingPage() {
                   <Zap className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-bold text-zinc-100">
-                    {pack.credits.toLocaleString()}
-                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-zinc-100">{pack.credits.toLocaleString()}</div>
                   <div className="text-xs text-zinc-500 mt-0.5">credits</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-emerald-400">
-                    {formatPrice(pack.price, pack.priceZAR)}
-                  </div>
+                  <div className="text-xl font-bold text-emerald-400">{formatPrice(pack.price, pack.priceZAR)}</div>
                   <div className="text-xs text-zinc-500 mt-0.5">
                     {currency === "ZAR" && pack.priceZAR
                       ? `${(pack.priceZAR / pack.credits).toFixed(1)}c per credit`
                       : `${(pack.price / pack.credits * 100).toFixed(1)}\u00A2 per credit`}
                   </div>
                 </div>
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  loading={loadingPack === pack.id}
-                  onClick={() => handleBuyPack(pack.id)}
-                >
+                <Button variant="secondary" className="w-full" loading={loadingPack === pack.id} onClick={() => handleBuyPack(pack.id)}>
                   <CreditCard className="w-4 h-4" /> Buy Pack
                 </Button>
               </CardContent>
@@ -282,53 +369,26 @@ export default function PricingPage() {
               </p>
             </div>
             {!referralData && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadReferral}
-                loading={referralLoading}
-              >
+              <Button variant="outline" size="sm" onClick={loadReferral} loading={referralLoading}>
                 <Users className="w-4 h-4" /> Get My Link
               </Button>
             )}
           </div>
-
           {referralData && (
             <div className="grid sm:grid-cols-3 gap-4">
-              {/* Referral Link */}
               <div className="sm:col-span-2 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 <label className="text-xs text-zinc-500 font-medium mb-2 block">Your Referral Link</label>
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={referralData.shareUrl}
-                    className="flex-1 bg-white/[0.03] rounded-lg px-3 py-2 text-sm text-zinc-300 border border-white/[0.06] truncate"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(referralData.shareUrl);
-                      toast("Link copied!", "success");
-                    }}
-                  >
+                  <input type="text" readOnly value={referralData.shareUrl} className="flex-1 bg-white/[0.03] rounded-lg px-3 py-2 text-sm text-zinc-300 border border-white/[0.06] truncate" />
+                  <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(referralData.shareUrl); toast("Link copied!", "success"); }}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
                 <p className="text-xs text-zinc-600 mt-2">Code: {referralData.code}</p>
               </div>
-
-              {/* Stats */}
               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
-                <div>
-                  <div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div>
-                  <div className="text-xs text-zinc-500">Referrals</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-emerald-300">{referralData.creditsEarned}</div>
-                  <div className="text-xs text-zinc-500">Credits Earned</div>
-                </div>
+                <div><div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div><div className="text-xs text-zinc-500">Referrals</div></div>
+                <div><div className="text-2xl font-bold text-emerald-300">{referralData.creditsEarned}</div><div className="text-xs text-zinc-500">Credits Earned</div></div>
               </div>
             </div>
           )}
@@ -338,29 +398,20 @@ export default function PricingPage() {
       {/* FAQ */}
       <Card>
         <CardContent className="p-6 sm:p-8">
-          <h3 className="text-lg font-bold text-zinc-100 mb-6">Frequently Asked</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-            {[
-              {
-                q: "Do credits expire?",
-                a: "Never. Your credits are yours forever, whether from subscription or one-time packs.",
-              },
-              {
-                q: "What if a generation fails?",
-                a: "Full refund. Every time. Failed generations are automatically refunded to your account.",
-              },
-              {
-                q: "Can I use the API on the free plan?",
-                a: "Yes! API access is available on every plan, including free. No gatekeeping.",
-              },
-              {
-                q: "Can I cancel anytime?",
-                a: "Yes. Cancel anytime with no penalties. Your remaining credits stay in your account.",
-              },
-            ].map((faq) => (
-              <div key={faq.q}>
-                <p className="font-semibold text-zinc-200 mb-1.5">{faq.q}</p>
-                <p className="text-zinc-500 leading-relaxed">{faq.a}</p>
+          <h3 className="text-lg font-bold text-zinc-100 mb-6">Frequently asked questions</h3>
+          <div className="space-y-0 divide-y divide-white/[0.06]">
+            {faqs.map((faq, i) => (
+              <div key={i}>
+                <button
+                  onClick={() => setExpandedFaq(expandedFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between py-4 text-left text-sm font-semibold text-zinc-200 hover:text-zinc-100 transition-colors"
+                >
+                  {faq.q}
+                  <span className={`text-zinc-500 transition-transform ${expandedFaq === i ? "rotate-45" : ""}`}>+</span>
+                </button>
+                {expandedFaq === i && (
+                  <p className="text-sm text-zinc-500 leading-relaxed pb-4 -mt-1">{faq.a}</p>
+                )}
               </div>
             ))}
           </div>

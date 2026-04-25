@@ -1,0 +1,21 @@
+# Launch Followups
+
+## BLOCKING (must complete before launch)
+
+(Populated as Phase 5-6 execute)
+
+## POST-LAUNCH MONTH 1
+
+### Phase 1 deferral: FAL assembly removal
+- `src/lib/genesis-brain/assembly.ts` lines 99-291 contain ~190 lines of disabled FAL assembly code inside `startAssembly()`, wrapped in `if (false as boolean)`.
+- Local FFmpeg assembly via `assembly-fallback.ts` is the active path.
+- Safe to delete the `if(false)` block once the team confirms FAL assembly won't be re-enabled. The `pollAssembly()` function (line 300+) and all assembly state machine logic must be preserved.
+
+### Pre-existing test failure: brain.test.ts DEFAULT_MODEL mismatch
+- `src/lib/genesis-brain/brain.test.ts:519` expects `seedance-1.5` but planner forces `wan-2.2`. Test comment says "Seedance is primary" which is outdated. Fix the test to expect `wan-2.2` or update if the default model changes.
+
+## POST-LAUNCH MONTH 2
+
+## POST-LAUNCH MONTH 3+
+
+## DEFERRED / WON'T FIX

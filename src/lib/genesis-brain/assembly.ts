@@ -2,6 +2,11 @@
 // GENESIS BRAIN — Async Cinematic Assembly
 // State-machine design: submit FAL jobs, poll
 // each step, advance phases. No timeouts.
+//
+// NOTE: FAL multi-phase assembly (lines 99-291 inside startAssembly)
+// is disabled in favour of local FFmpeg (assembly-fallback.ts).
+// See audit/reports/04-PIPELINES.md. The dead code is preserved
+// for future re-enablement if FAL credits are restored.
 // ============================================
 
 import {

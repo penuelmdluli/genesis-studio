@@ -43,9 +43,15 @@
 
 ## POST-LAUNCH MONTH 2
 
-### Explore acquisition funnel
-- Make `/explore` the primary acquisition funnel. "Recreate this" button drives sign-up conversion.
-- Pre-fill generate form from explore video's prompt via `?seed_from={id}` query param.
+### Wire signup_attribution to Clerk user.created webhook
+- `signup_attribution` table created in migration `20260425_signup_attribution.sql`
+- Attribution capture (cookie-based first-touch) needs to be implemented in a Clerk `user.created` webhook handler
+- Read attribution from cookie, persist to DB on user creation
+- This completes the explore → sign-up → attribution tracking loop
+
+### Credit guide page
+- Pricing page links to `/docs/credits` which doesn't exist yet
+- Create a page explaining how credits work, model costs, Brain Studio costs
 
 ### Tier-aware Brain Studio model selection
 - Brain Studio planner currently forces all scenes to wan-2.2. Add tier-based model selection: Pro users get Kling 2.6, Studio users get Kling 3.0.

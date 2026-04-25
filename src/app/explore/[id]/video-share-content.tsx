@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth, SignInButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { ShareModal } from "@/components/explore/share-modal";
@@ -107,6 +109,8 @@ export function VideoShareContent({
   relatedVideos,
 }: VideoShareContentProps) {
   const { toast } = useToast();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Video player state
@@ -170,6 +174,7 @@ export function VideoShareContent({
 
   // ── Like ───────────────────────────────────────────────────
   const handleLike = useCallback(() => {
+    if (!isSignedIn) return; // Like button hidden for unauthenticated — this is a safety guard
     const next = !isLiked;
     setIsLiked(next);
     setLikeCount((prev) => (next ? prev + 1 : prev - 1));
@@ -178,7 +183,7 @@ export function VideoShareContent({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ videoId: video.id }),
     }).catch(() => {});
-  }, [isLiked, video.id]);
+  }, [isLiked, isSignedIn, video.id]);
 
   // ── Copy link ──────────────────────────────────────────────
   const handleCopyLink = useCallback(async () => {
@@ -468,20 +473,38 @@ export function VideoShareContent({
 
           {/* ─── CTA Buttons ──────────────────────────────── */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              onClick={() => setRecreateModalOpen(true)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2.5 px-6 py-4 rounded-xl",
-                "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400",
-                "text-white font-semibold text-base",
-                "shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35",
-                "transition-all duration-200 press-effect"
-              )}
-            >
-              <Sparkles className="w-5 h-5" />
-              Recreate This Video
-              <ArrowRight className="w-4 h-4 opacity-60" />
-            </button>
+            {isSignedIn ? (
+              <button
+                onClick={() => router.push(`/generate?seed_from=${video.id}`)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2.5 px-6 py-4 rounded-xl",
+                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400",
+                  "text-white font-semibold text-base",
+                  "shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35",
+                  "transition-all duration-200 press-effect"
+                )}
+              >
+                <Sparkles className="w-5 h-5" />
+                Recreate This Video
+                <ArrowRight className="w-4 h-4 opacity-60" />
+              </button>
+            ) : (
+              <SignInButton mode="modal" forceRedirectUrl={`/generate?seed_from=${video.id}&utm_source=explore`}>
+                <button
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2.5 px-6 py-4 rounded-xl",
+                    "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400",
+                    "text-white font-semibold text-base",
+                    "shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35",
+                    "transition-all duration-200 press-effect"
+                  )}
+                >
+                  <Sparkles className="w-5 h-5" />
+                  Recreate This Video
+                  <ArrowRight className="w-4 h-4 opacity-60" />
+                </button>
+              </SignInButton>
+            )}
 
             <Link
               href="/sign-up"
@@ -555,6 +578,16 @@ export function VideoShareContent({
           </section>
         )}
       </div>
+
+      {/* ─── Attribution for unauthenticated visitors ───── */}
+      {!isSignedIn && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-[#111118]/90 border border-white/[0.08] backdrop-blur-xl shadow-lg">
+          <Link href="/?utm_source=explore_share" className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
+            <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-[10px] font-bold text-white">G</div>
+            Made with Genesis Studio
+          </Link>
+        </div>
+      )}
 
       {/* ─── Modals ────────────────────────────────────────── */}
       <ShareModal

@@ -35,7 +35,6 @@ export function CommandPalette() {
     { id: "generate", label: "Generate New Video", icon: Sparkles, action: () => router.push("/generate"), group: "Actions", shortcut: "G" },
     { id: "dashboard", label: "Go to Dashboard", icon: LayoutDashboard, action: () => router.push("/dashboard"), group: "Navigation" },
     { id: "gallery", label: "Go to Gallery", icon: Film, action: () => router.push("/gallery"), group: "Navigation" },
-    { id: "api-keys", label: "Manage API Keys", icon: Key, action: () => router.push("/api-keys"), group: "Navigation" },
     { id: "pricing", label: "View Pricing", icon: CreditCard, action: () => router.push("/pricing"), group: "Navigation" },
     { id: "settings", label: "Settings", icon: Settings, action: () => router.push("/settings"), group: "Navigation" },
   ];

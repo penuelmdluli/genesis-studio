@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/hooks/use-store";
+import { isRouteVisibleAtLaunch } from "@/lib/feature-flags";
 import {
   LayoutDashboard,
   Sparkles,
@@ -76,7 +77,7 @@ export function Sidebar() {
 
   // Add admin nav item for owners
   const navItems = useMemo(() => {
-    const items = [...baseNavItems];
+    const items = baseNavItems.filter((item) => isRouteVisibleAtLaunch(item.href));
     if (user?.isOwner) {
       items.push({ href: "/studio", label: "Content Engine", icon: Radio, section: "Automate", badge: "NEW" });
       items.push({ href: "/intelligence", label: "Intelligence", icon: Brain, section: "Automate", badge: "AI" });

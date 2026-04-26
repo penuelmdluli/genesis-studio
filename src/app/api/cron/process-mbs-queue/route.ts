@@ -7,6 +7,8 @@ import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
 import { applyMBSBranding } from "@/lib/mbs/branding";
 import { recordSpend } from "@/lib/spend-tracker";
+import { generateCommentSet } from "@/lib/mbs/comment-templates";
+import { postPageComment } from "@/lib/social/facebook-comments";
 import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
 
@@ -329,6 +331,25 @@ export async function GET(req: NextRequest) {
           }).eq("id", job.id);
 
           results.posted++;
+
+          // ── Auto-comments: post 3 engagement comments as the page ──
+          try {
+            let charName = "MBS Star";
+            if (job.character_id) {
+              const { data: ch } = await supabase.from("mbs_characters").select("name").eq("id", job.character_id).single();
+              charName = ch?.name ?? "MBS Star";
+            }
+            const comments = generateCommentSet({ character: charName, age: 2 });
+            for (const comment of comments) {
+              const commentId = await postPageComment(postId, comment);
+              if (commentId) {
+                console.log(`[MBS] Comment on ${postId}: "${comment.slice(0, 40)}..." → ${commentId}`);
+              }
+            }
+          } catch (commentErr) {
+            // Non-fatal — post is already live, comments are a bonus
+            console.error(`[MBS] Auto-comment failed for ${postId}:`, commentErr instanceof Error ? commentErr.message : commentErr);
+          }
 
           sendSlackAlert({
             level: "info",

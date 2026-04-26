@@ -28,6 +28,7 @@ import {
   Loader2,
   Check,
   Video,
+  Share2,
 } from "lucide-react";
 
 const CREDIT_COST = 1500;
@@ -66,7 +67,7 @@ const STATUS_PROGRESS: Record<JobStatus, number> = {
 };
 
 export default function MimicStudioPage() {
-  const { user, updateCreditBalance, isInitialized } = useStore();
+  const { user, updateCreditBalance, addNotification, isInitialized } = useStore();
   const { toast } = useToast();
 
   // Character image
@@ -220,6 +221,22 @@ export default function MimicStudioPage() {
           toast("Your Mimic video is ready!", "success");
           if (pollRef.current) clearInterval(pollRef.current);
           localStorage.removeItem(STORAGE_KEY);
+
+          // In-app notification (bell icon)
+          addNotification({
+            type: "success",
+            title: "Mimic video is ready!",
+            message: "Your character mimic video has finished rendering. View it now.",
+            link: "/mimic",
+          });
+
+          // Browser notification (background tab)
+          if (typeof window !== "undefined" && Notification.permission === "granted") {
+            new Notification("Genesis Studio", {
+              body: "Your Mimic Studio video is ready!",
+              icon: "/icon-192.png",
+            });
+          }
         } else if (data.status === "failed") {
           setJobStatus("failed");
           setError(data.error || "Generation failed");
@@ -227,6 +244,13 @@ export default function MimicStudioPage() {
           toast("Generation failed", "error");
           if (pollRef.current) clearInterval(pollRef.current);
           localStorage.removeItem(STORAGE_KEY);
+
+          addNotification({
+            type: "error",
+            title: "Mimic generation failed",
+            message: "Something went wrong. Your credits have been refunded.",
+            link: "/mimic",
+          });
         } else if (data.status === "in_queue") {
           setJobStatus("in_queue");
         } else if (data.status === "processing") {
@@ -298,6 +322,25 @@ export default function MimicStudioPage() {
     } finally {
       generateLockRef.current = false;
       if (jobStatus === "failed") setIsGenerating(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = jobId ? `https://genesis-studio-hazel.vercel.app/explore/${jobId}` : "https://genesis-studio-hazel.vercel.app";
+    const shareText = "Check out this AI video I made with Genesis Studio Mimic Studio!";
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Mimic Studio Video", text: shareText, url: shareUrl });
+        toast("Shared!", "success");
+        return;
+      } catch { /* cancelled */ }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("Share link copied!", "success");
+    } catch {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText + " " + shareUrl)}`, "_blank");
     }
   };
 
@@ -632,6 +675,12 @@ export default function MimicStudioPage() {
                       >
                         <Download className="w-3.5 h-3.5" /> Download
                       </a>
+                      <button
+                        onClick={handleShare}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors"
+                      >
+                        <Share2 className="w-3.5 h-3.5" /> Share
+                      </button>
                       <a
                         href="/gallery"
                         className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 text-xs font-medium transition-colors"

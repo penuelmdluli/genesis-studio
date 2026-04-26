@@ -25,6 +25,7 @@ import {
   Volume2,
   Sparkles,
   RefreshCw,
+  Share2,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
@@ -88,6 +89,33 @@ export default function GalleryPage() {
       // Fallback: open in new tab for manual download
       window.open(url, "_blank");
       toast("Opening video in new tab for download", "info");
+    }
+  };
+
+  const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
+    const shareUrl = `https://genesis-studio-hazel.vercel.app/explore/${video.id}`;
+    const shareText = `Check out this AI video: "${video.title}" — Made with Genesis Studio`;
+
+    // Native share on mobile (opens WhatsApp, IG, etc.)
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: video.title, text: shareText, url: shareUrl });
+        toast("Shared!", "success");
+        return;
+      } catch {
+        // User cancelled or share failed, fall through to clipboard
+      }
+    }
+
+    // Desktop fallback: copy link
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("Share link copied to clipboard!", "success");
+    } catch {
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(shareText + " " + shareUrl)}`,
+        "_blank"
+      );
     }
   };
 
@@ -299,6 +327,7 @@ export default function GalleryPage() {
                 onSelect={() => setSelectedVideo(video.id)}
                 onDownload={handleDownload}
                 onDelete={handleDeleteClick}
+                onShare={handleShare}
               />
             </StaggerItem>
           ))}
@@ -432,6 +461,13 @@ export default function GalleryPage() {
                   <Download className="w-4 h-4" />
                   Download
                 </button>
+                <button
+                  onClick={() => handleShare(currentVideo)}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 shadow-lg shadow-emerald-600/20"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
                 <a
                   href="/generate"
                   className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white/80 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
@@ -527,6 +563,7 @@ function VideoCard({
   onSelect,
   onDownload,
   onDelete,
+  onShare,
 }: {
   video: {
     id: string;
@@ -545,6 +582,7 @@ function VideoCard({
   onSelect: () => void;
   onDownload: (e: React.MouseEvent, url: string, title: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
+  onShare: (video: { id: string; title: string; prompt: string; url: string }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -664,6 +702,12 @@ function VideoCard({
                 onClick={(e) => onDownload(e, video.url, video.title)}
               >
                 <Download className="w-3.5 h-3.5" />
+              </button>
+              <button
+                className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white/80 hover:text-emerald-400 hover:bg-black/70 transition-all duration-200 active:scale-90"
+                onClick={(e) => { e.stopPropagation(); onShare(video); }}
+              >
+                <Share2 className="w-3.5 h-3.5" />
               </button>
               <button
                 className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white/80 hover:text-red-400 hover:bg-black/70 transition-all duration-200 active:scale-90"

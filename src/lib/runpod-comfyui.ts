@@ -105,55 +105,76 @@ function buildWorkflow(opts: {
   height: number;
   frameCount: number;
 }): Record<string, unknown> {
+  // Workflow matches kijai/ComfyUI-WanVideoWrapper T2V example.
+  // Node IDs and connections derived from wanvideo_2_1_14B_T2V_example_03.json.
   return {
-    "3": {
-      class_type: "KSampler",
-      inputs: {
-        seed: opts.seed,
-        steps: 25,
-        cfg: 7.0,
-        sampler_name: "dpmpp_2m",
-        scheduler: "karras",
-        denoise: 1.0,
-        model: ["4", 0],
-        positive: ["6", 0],
-        negative: ["7", 0],
-        latent_image: ["5", 0],
-      },
-    },
-    "4": {
+    // 1: Model loader — loads the Wan 2.2 diffusion model
+    "1": {
       class_type: "WanVideoModelLoader",
       inputs: {
         model: "wan2.2_t2v_14B_fp8_e4m3fn.safetensors",
-        base_precision: "fp8_e4m3fn",
+        base_precision: "fp16",
         quantization: "fp8_e4m3fn",
+        offload_to: "offload_device",
+        attention_mode: "sdpa",
       },
     },
-    "5": {
-      class_type: "WanVideoEmptyLatent",
+    // 2: Text encoder — encodes prompt into Wan-native embeddings
+    "2": {
+      class_type: "WanVideoTextEncode",
+      inputs: {
+        prompt: opts.prompt,
+        negative_prompt: opts.negativePrompt,
+        force_offload: true,
+        model: ["1", 0],
+      },
+    },
+    // 3: Empty embeds — creates empty image embeds for T2V (no reference image)
+    "3": {
+      class_type: "WanVideoEmptyEmbeds",
       inputs: {
         width: opts.width,
         height: opts.height,
         length: opts.frameCount,
-        batch_size: 1,
       },
     },
-    "6": {
-      class_type: "CLIPTextEncode",
-      inputs: { text: opts.prompt, clip: ["4", 1] },
+    // 4: Sampler — the actual generation
+    "4": {
+      class_type: "WanVideoSampler",
+      inputs: {
+        cfg: 6,
+        shift: 1,
+        steps: 5,
+        seed: opts.seed,
+        seed_mode: "fixed",
+        force_offload: true,
+        sampler: "dpm++_sde",
+        riflex_freq_index: 0,
+        riflex_max_seq_len: 1,
+        teacache: false,
+        teacache_backend: "comfy",
+        teacache_rel_l1_thresh: 0,
+        teacache_max_skip: -1,
+        teacache_force_skip: false,
+        model: ["1", 0],
+        text_embeds: ["2", 0],
+        image_embeds: ["3", 0],
+      },
     },
-    "7": {
-      class_type: "CLIPTextEncode",
-      inputs: { text: opts.negativePrompt, clip: ["4", 1] },
-    },
-    "8": {
+    // 5: Decode latents to video frames
+    "5": {
       class_type: "WanVideoDecode",
-      inputs: { samples: ["3", 0], vae: ["4", 2] },
+      inputs: {
+        samples: ["4", 0],
+        vae: ["1", 2],
+        enable_vae_tiling: false,
+      },
     },
-    "9": {
+    // 6: Combine frames into video file
+    "6": {
       class_type: "VHS_VideoCombine",
       inputs: {
-        images: ["8", 0],
+        images: ["5", 0],
         frame_rate: 16,
         format: "video/h264-mp4",
         crf: 19,

@@ -5,9 +5,10 @@ Target launch: **Thursday 14 May 2026**
 ## Operator-required actions before launch
 
 ### Infrastructure
-- [ ] Set up Upstash Redis free tier, populate `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in Vercel
+- [x] Set up Upstash Redis free tier — DONE (awake-guppy-77517.upstash.io, verified PONG + rate limiter working)
 - [ ] Set up BetterUptime monitor on `/api/health` (60s interval, alert after 2 failures)
-- [ ] Create Slack alerts channel, populate `SLACK_ALERT_WEBHOOK_URL` in Vercel
+- [x] Create Slack alerts channel — DONE (webhook verified, test alerts sent successfully)
+- [ ] Populate `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SLACK_ALERT_WEBHOOK_URL` in **Vercel dashboard** (currently in .env.local only)
 - [ ] Verify `BRAIN_WEBHOOK_SECRET` / `RUNPOD_WEBHOOK_SECRET` is set in production
 - [ ] Verify `FAL_KEY` balance > $50
 - [ ] Verify `ANTHROPIC_API_KEY` balance > $20

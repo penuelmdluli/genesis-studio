@@ -93,7 +93,7 @@ export default function GalleryPage() {
   };
 
   const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
-    const shareUrl = `https://genesis-studio-hazel.vercel.app/explore/${video.id}`;
+    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/explore/${video.id}`;
     const shareText = `Check out this AI video: "${video.title}" — Made with Genesis Studio`;
 
     // Native share on mobile (opens WhatsApp, IG, etc.)

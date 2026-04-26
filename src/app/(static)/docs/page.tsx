@@ -21,7 +21,7 @@ export default function DocsPage() {
           <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
             <h2 className="text-xl font-semibold text-white mb-4">Quick Start</h2>
             <div className="bg-black/50 rounded-xl p-4 font-mono text-sm text-green-400 overflow-x-auto">
-              <pre>{`curl -X POST https://genesis-studio-hazel.vercel.app/api/v1/generate \\
+              <pre>{`curl -X POST https://genesisstudio.app/api/v1/generate \\
   -H "Authorization: Bearer gs_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{

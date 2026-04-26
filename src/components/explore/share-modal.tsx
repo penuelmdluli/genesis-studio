@@ -18,7 +18,7 @@ interface ShareModalProps {
   video: ExploreVideo;
 }
 
-const BASE_URL = "https://genesis-studio-hazel.vercel.app";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
 
 function buildShareUrl(videoId: string): string {
   return `${BASE_URL}/explore/${videoId}`;

@@ -326,7 +326,7 @@ export default function MimicStudioPage() {
   };
 
   const handleShare = async () => {
-    const shareUrl = jobId ? `https://genesis-studio-hazel.vercel.app/explore/${jobId}` : "https://genesis-studio-hazel.vercel.app";
+    const shareUrl = jobId ? `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/explore/${jobId}` : (process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app");
     const shareText = "Check out this AI video I made with Genesis Studio Mimic Studio!";
 
     if (typeof navigator !== "undefined" && navigator.share) {

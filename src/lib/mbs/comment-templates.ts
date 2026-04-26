@@ -1,6 +1,6 @@
 // ============================================
 // MBS Auto-Comment Templates
-// 3 comments per post: engagement bait, community, CTA
+// 4 comments per post: engagement bait, community, CTA, promo
 // ============================================
 
 const ENGAGEMENT_BAIT = [
@@ -34,6 +34,15 @@ const CTA = [
   "If MBS made you smile, comment MBS below",
 ];
 
+const MIMIC_PROMO = [
+  "Want YOUR character to dance like this? Create your own AI video FREE at genesisstudio.app/mimic",
+  "You can make videos like this too! Try Mimic Studio FREE: genesisstudio.app/mimic",
+  "Make ANY character dance to ANY video! Try it free: genesisstudio.app/mimic",
+  "This was made with AI! Create your own dance videos at genesisstudio.app/mimic",
+  "Think you can do better? Make your OWN AI dance video FREE: genesisstudio.app/mimic",
+  "Turn your photo into a dancer! Free AI tool: genesisstudio.app/mimic",
+];
+
 function pick(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -47,5 +56,6 @@ export function generateCommentSet(opts: {
     .replace(/{age}/g, String(opts.age));
   const community = pick(COMMUNITY);
   const cta = pick(CTA);
-  return [bait, community, cta];
+  const promo = pick(MIMIC_PROMO);
+  return [bait, community, cta, promo];
 }

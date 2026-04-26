@@ -5,6 +5,7 @@ import { persistExternalVideo } from "@/lib/storage";
 import { postVideoToFacebookPage } from "@/lib/social/facebook";
 import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
+import { applyMBSBranding } from "@/lib/mbs/branding";
 import { recordSpend } from "@/lib/spend-tracker";
 import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
@@ -201,17 +202,35 @@ export async function GET(req: NextRequest) {
         if (status === "COMPLETED") {
           const result = await getKlingMotionResult(job.fal_request_id);
 
-          // Persist to R2 as backup, but use FAL CDN URL for Facebook posting
-          // (R2 URLs require auth, Facebook can't fetch them)
-          const storageKey = `mbs-finished/${job.id}.mp4`;
-          persistExternalVideo(result.videoUrl, storageKey).catch((e) =>
-            console.error(`[MBS] R2 backup persist failed for ${job.id}:`, e)
+          // Persist raw Kling output to R2
+          const rawKey = `mbs-finished/${job.id}-raw.mp4`;
+          persistExternalVideo(result.videoUrl, rawKey).catch((e) =>
+            console.error(`[MBS] R2 raw persist failed for ${job.id}:`, e)
           );
 
-          // Store FAL CDN URL — publicly accessible for ~24h, sufficient for FB posting
+          // Apply MBS branding overlays (logo, hook, character intro, CTA, footer)
+          let brandedUrl = result.videoUrl; // fallback to raw if branding fails
+          try {
+            let charNameForBranding = "MBS Star";
+            if (job.character_id) {
+              const { data: ch } = await supabase.from("mbs_characters").select("name").eq("id", job.character_id).single();
+              charNameForBranding = ch?.name ?? "MBS Star";
+            }
+            const branded = await applyMBSBranding({
+              inputVideoUrl: result.videoUrl,
+              outputR2Key: `mbs-finished/${job.id}-branded.mp4`,
+              characterName: charNameForBranding,
+            });
+            brandedUrl = branded.publicUrl;
+            console.log(`[MBS] Branded ${job.id}: ${brandedUrl}`);
+          } catch (brandErr) {
+            console.error(`[MBS] Branding failed for ${job.id}, using raw:`, brandErr instanceof Error ? brandErr.message : brandErr);
+            // Fall through with raw URL — better to post unbranded than not post at all
+          }
+
           await supabase.from("mbs_jobs").update({
             status: "quality_check",
-            finished_video_url: result.videoUrl,
+            finished_video_url: brandedUrl,
             cost_usd: result.costUsd,
             completed_at: new Date().toISOString(),
           }).eq("id", job.id);

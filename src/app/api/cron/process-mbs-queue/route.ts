@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
-import { persistExternalVideo } from "@/lib/storage";
+import { persistExternalVideo, getSignedDownloadUrl } from "@/lib/storage";
 import { postVideoToFacebookPage } from "@/lib/social/facebook";
 import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
@@ -90,7 +90,9 @@ export async function GET(req: NextRequest) {
           ? `${character.description}, dancing joyfully, ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`
           : `child dancing joyfully in ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic`;
 
-        const videoUrl = candidate.reference_video_r2_url;
+        // Generate presigned R2 URL so Kling can download the reference video
+        // (R2 keys aren't publicly accessible — Kling needs an HTTPS URL)
+        const videoUrl = await getSignedDownloadUrl(candidate.reference_video_r2_url, 7200);
 
         await supabase.from("mbs_jobs").insert({
           candidate_id: candidate.id,
@@ -134,10 +136,21 @@ export async function GET(req: NextRequest) {
       for (const job of pendingJobs ?? []) {
         try {
           const character = job.mbs_characters;
+
+          // Presign URLs if they're R2 keys (not already https://)
+          let charUrl = character?.portrait_url ?? "";
+          if (charUrl && !charUrl.startsWith("http")) {
+            charUrl = await getSignedDownloadUrl(charUrl, 7200);
+          }
+          let refUrl = job.reference_video_url;
+          if (refUrl && !refUrl.startsWith("http")) {
+            refUrl = await getSignedDownloadUrl(refUrl, 7200);
+          }
+
           const { requestId } = await submitKlingMotion({
             prompt: job.prompt,
-            characterImageUrl: character?.portrait_url ?? "",
-            referenceVideoUrl: job.reference_video_url,
+            characterImageUrl: charUrl,
+            referenceVideoUrl: refUrl,
             characterOrientation: "video",
             keepOriginalSound: true,
           });

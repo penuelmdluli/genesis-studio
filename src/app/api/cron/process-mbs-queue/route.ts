@@ -128,14 +128,19 @@ export async function GET(req: NextRequest) {
     if (slotsAvailable > 0) {
       const { data: pendingJobs } = await supabase
         .from("mbs_jobs")
-        .select("*, mbs_characters(*)")
+        .select("*")
         .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(slotsAvailable);
 
       for (const job of pendingJobs ?? []) {
         try {
-          const character = job.mbs_characters;
+          // Look up character separately (avoid FK join issues)
+          let character: { portrait_url: string; name: string } | null = null;
+          if (job.character_id) {
+            const { data: ch } = await supabase.from("mbs_characters").select("portrait_url, name").eq("id", job.character_id).single();
+            character = ch;
+          }
 
           // Presign URLs if they're R2 keys (not already https://)
           let charUrl = character?.portrait_url ?? "";
@@ -178,7 +183,7 @@ export async function GET(req: NextRequest) {
     // ── STAGE 2: Poll submitted jobs ──
     const { data: submittedJobs } = await supabase
       .from("mbs_jobs")
-      .select("*, mbs_characters(*)")
+      .select("*")
       .eq("status", "submitted")
       .not("fal_request_id", "is", null);
 
@@ -219,7 +224,12 @@ export async function GET(req: NextRequest) {
           recordSpend("fal-kling-i2v", result.costUsd).catch(() => {});
           results.completed++;
 
-          const charName = job.mbs_characters?.name ?? "Unknown";
+          // Look up character name for alert
+          let charName = "Unknown";
+          if (job.character_id) {
+            const { data: ch } = await supabase.from("mbs_characters").select("name").eq("id", job.character_id).single();
+            charName = ch?.name ?? "Unknown";
+          }
           sendSlackAlert({
             level: "info",
             title: "MBS video generated",
@@ -261,7 +271,7 @@ export async function GET(req: NextRequest) {
       const now = new Date().toISOString();
       const { data: readyJobs } = await supabase
         .from("mbs_jobs")
-        .select("*, mbs_characters(*)")
+        .select("*")
         .eq("status", "scheduled")
         .not("finished_video_url", "is", null)
         .or(`scheduled_for.is.null,scheduled_for.lte.${now}`)

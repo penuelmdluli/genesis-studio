@@ -3,6 +3,8 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
 import { persistExternalVideo } from "@/lib/storage";
 import { postVideoToFacebookPage } from "@/lib/social/facebook";
+import { runQualityCheck } from "@/lib/mbs/quality-check";
+import { scheduleJob } from "@/lib/mbs/scheduler";
 import { recordSpend } from "@/lib/spend-tracker";
 import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
@@ -94,11 +96,23 @@ export async function GET(req: NextRequest) {
           const r2Url = `/api/videos/${storageKey}`;
 
           await supabase.from("mbs_jobs").update({
-            status: "completed",
+            status: "quality_check",
             finished_video_url: storageKey,
             cost_usd: result.costUsd,
             completed_at: new Date().toISOString(),
           }).eq("id", job.id);
+
+          // Run quality gate — updates status to scheduled/quality_review/failed
+          try {
+            const qr = await runQualityCheck(job.id);
+            if (qr.verdict === "auto_post") {
+              await scheduleJob(job.id);
+            }
+          } catch (qErr) {
+            console.error(`[MBS] Quality check error for ${job.id}:`, qErr);
+            // On quality check failure, auto-schedule (degrade gracefully)
+            await scheduleJob(job.id);
+          }
 
           recordSpend("fal-kling-i2v", result.costUsd).catch(() => {});
           results.completed++;
@@ -146,9 +160,9 @@ export async function GET(req: NextRequest) {
       const { data: readyJobs } = await supabase
         .from("mbs_jobs")
         .select("*, mbs_characters(*)")
-        .eq("status", "completed")
+        .eq("status", "scheduled")
         .not("finished_video_url", "is", null)
-        .or(`scheduled_post_at.is.null,scheduled_post_at.lte.${now}`)
+        .or(`scheduled_for.is.null,scheduled_for.lte.${now}`)
         .limit(1);
 
       for (const job of readyJobs ?? []) {

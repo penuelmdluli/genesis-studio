@@ -30,6 +30,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/assets/(.*)",
   "/api/loadshedding",
   "/api/share/(.*)",
+  "/api/test/(.*)",
 ]);
 
 // Next.js 16 uses "proxy" convention (renamed from middleware)

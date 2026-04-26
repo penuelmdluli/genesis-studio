@@ -324,3 +324,75 @@ export async function submitRunPodComfyUIJob(
 
   throw new Error(`RunPod ComfyUI job ${jobId} exceeded ${TIMEOUT_MS / 1000}s timeout`);
 }
+
+/**
+ * Submit a ComfyUI job asynchronously with webhook callback.
+ * Returns immediately with the jobId — no polling.
+ * RunPod will POST to webhookUrl when the job completes.
+ *
+ * Also inserts a tracking row into comfyui_jobs table.
+ */
+export async function submitRunPodComfyUIJobAsync(
+  input: RunPodComfyInput & {
+    userId?: string;
+    productionId?: string;
+    sceneId?: string;
+  }
+): Promise<{ jobId: string }> {
+  const { apiKey, endpointId } = getConfig();
+  if (!apiKey || !endpointId) {
+    throw new Error("RunPod ComfyUI not configured: missing API key or endpoint ID");
+  }
+
+  const { width, height } = input.width && input.height
+    ? { width: input.width, height: input.height }
+    : resolveResolution(input.aspectRatio);
+
+  const frameCount = (input.durationSeconds ?? 5) * 16;
+  const seed = input.seed ?? Math.floor(Math.random() * 1_000_000);
+  const negativePrompt = input.negativePrompt ?? "blurry, low quality, deformed, watermark, text, ugly";
+
+  const workflow = buildWorkflow({ prompt: input.prompt, negativePrompt, seed, width, height, frameCount });
+
+  // Build webhook URL
+  const appUrl = envString("APP_URL") || envString("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
+  const webhookUrl = `${appUrl}/api/webhooks/runpod-comfyui`;
+
+  // Submit with webhook — RunPod will call back when done
+  const baseUrl = `${RUNPOD_API_BASE}/${endpointId}`;
+  const submitRes = await fetch(`${baseUrl}/run`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      input: { workflow },
+      webhook: webhookUrl,
+    }),
+  });
+
+  if (!submitRes.ok) {
+    const errText = await submitRes.text();
+    throw new Error(`RunPod ComfyUI submit failed (${submitRes.status}): ${errText}`);
+  }
+
+  const submitData = SubmitResponseSchema.parse(await submitRes.json());
+  const jobId = submitData.id;
+
+  // Insert tracking row
+  const { createSupabaseAdmin } = await import("@/lib/supabase");
+  const supabase = createSupabaseAdmin();
+  await supabase.from("comfyui_jobs").insert({
+    user_id: input.userId || null,
+    production_id: input.productionId || null,
+    scene_id: input.sceneId || null,
+    provider: "runpod-comfyui",
+    runpod_job_id: jobId,
+    status: "pending",
+    prompt: input.prompt?.slice(0, 500),
+  });
+
+  console.log(`[RunPod-ComfyUI] Async job submitted: ${jobId} (webhook: ${webhookUrl})`);
+  return { jobId };
+}

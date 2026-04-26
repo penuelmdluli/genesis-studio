@@ -158,8 +158,9 @@ export default function BrainStudioPage() {
         if (cancelled || !productions?.length) return;
 
         const latest = productions[0];
-        // Only restore if active or recently completed
-        if (!["planning", "generating", "assembling", "review", "completed"].includes(latest.status)) return;
+        // Only resume in-flight productions. Completed/failed stay in Gallery —
+        // landing on a stale finished video instead of the create form is jarring.
+        if (!["planning", "generating", "assembling", "review"].includes(latest.status)) return;
 
         // Fetch full status with plan and scenes
         const statusRes = await fetch(`/api/brain/status?id=${latest.id}`);

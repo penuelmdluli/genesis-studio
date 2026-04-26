@@ -103,8 +103,9 @@ export default function SignUpPage() {
                 headerTitle: "text-white text-lg",
                 headerSubtitle: "text-zinc-400",
                 socialButtonsBlockButton:
-                  "bg-white/[0.05] border-white/[0.1] text-white hover:bg-white/[0.1] transition-all rounded-xl h-11",
-                socialButtonsBlockButtonText: "font-medium",
+                  "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold",
+                socialButtonsBlockButtonText: "font-semibold text-zinc-900",
+                socialButtonsProviderIcon: "w-5 h-5",
                 formFieldInput:
                   "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
                 formButtonPrimary:

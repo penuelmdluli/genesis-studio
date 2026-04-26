@@ -360,7 +360,22 @@ export function Sidebar() {
           <div className="flex items-center gap-3">
             <UserButton
               appearance={{
-                elements: { avatarBox: "w-8 h-8 rounded-lg" },
+                elements: {
+                  avatarBox: "w-8 h-8 rounded-lg",
+                  userButtonPopoverCard:
+                    "bg-[#111118]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40",
+                  userButtonPopoverMain: "bg-transparent",
+                  userButtonPopoverActions: "bg-transparent",
+                  userButtonPopoverActionButton:
+                    "text-zinc-200 hover:bg-white/[0.06] hover:text-white transition-colors",
+                  userButtonPopoverActionButtonText: "text-zinc-200",
+                  userButtonPopoverActionButtonIcon: "text-zinc-400",
+                  userButtonPopoverFooter:
+                    "bg-transparent border-t border-white/[0.06]",
+                  userPreview: "bg-transparent",
+                  userPreviewMainIdentifier: "text-zinc-100 font-medium",
+                  userPreviewSecondaryIdentifier: "text-zinc-400",
+                },
               }}
             />
             {(sidebarOpen || mobileMenuOpen) && (

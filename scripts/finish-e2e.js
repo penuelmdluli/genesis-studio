@@ -75,22 +75,22 @@ async function run() {
   await supabase.from('productions').update({ status: 'generating', progress: 60, error_message: null }).eq('id', prodId);
 
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-10);
-  const trig = await fetch('https://genesis-studio-hazel.vercel.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
+  const trig = await fetch('https://genesisstudio.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
   const td = await trig.json();
   console.log('  Assembly triggered:', td.status, td.progress + '%');
 
   // Poll for completion
   console.log('\n[3/3] Waiting for final video...');
   for (let i = 0; i < 25; i++) {
-    const res = await fetch('https://genesis-studio-hazel.vercel.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
+    const res = await fetch('https://genesisstudio.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
     const d = await res.json();
     console.log('  [' + new Date().toLocaleTimeString() + '] ' + d.status + ' ' + d.progress + '%' + (d.errorMessage ? ' ERR: ' + d.errorMessage : ''));
     if (d.status === 'completed' || d.status === 'failed') {
       console.log('\n========================================');
       console.log('  ' + (d.status === 'completed' ? 'COMPLETE' : 'FAILED'));
       console.log('========================================');
-      if (d.outputVideoUrls?.final) console.log('\nVIDEO: https://genesis-studio-hazel.vercel.app' + d.outputVideoUrls.final);
-      if (d.thumbnailUrl) console.log('THUMB: https://genesis-studio-hazel.vercel.app' + d.thumbnailUrl);
+      if (d.outputVideoUrls?.final) console.log('\nVIDEO: https://genesisstudio.app' + d.outputVideoUrls.final);
+      if (d.thumbnailUrl) console.log('THUMB: https://genesisstudio.app' + d.thumbnailUrl);
 
       const { data: fs } = await supabase.from('production_scenes').select('scene_number, output_video_url').eq('production_id', prodId).order('scene_number');
       console.log('\nScene trim verification:');

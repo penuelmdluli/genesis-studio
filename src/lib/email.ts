@@ -6,7 +6,7 @@
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
 
 interface SendEmailParams {
   to: string;

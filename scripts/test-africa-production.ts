@@ -117,7 +117,7 @@ async function main() {
   });
   console.log(`  Production ID: ${production.id}`);
   console.log(`  Status: planned`);
-  console.log(`  Dashboard URL: https://genesis-studio-hazel.vercel.app/brain\n`);
+  console.log(`  Dashboard URL: https://genesisstudio.app/brain\n`);
 
   // ── STEP 4: Execute (scenes + audio) ──
   console.log("[STEP 4] Executing production (submitting scenes + generating audio)...");
@@ -167,7 +167,7 @@ async function main() {
   console.log(`  Voiceover:       ${refreshed?.voiceoverUrl ? "GENERATED" : "pending (check dashboard)"}`);
   console.log(`  Music:           ${refreshed?.musicUrl ? "GENERATED" : "pending (check dashboard)"}`);
   console.log(`  Credits:         ${totalCredits}`);
-  console.log(`\n  View on dashboard: https://genesis-studio-hazel.vercel.app/brain`);
+  console.log(`\n  View on dashboard: https://genesisstudio.app/brain`);
   console.log(`  Poll status:       /api/brain/status?id=${production.id}`);
   console.log(`${"═".repeat(60)}\n`);
 

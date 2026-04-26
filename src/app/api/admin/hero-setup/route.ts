@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Build permanent video URLs
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app").trim();
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app").trim();
     const heroVideoUrls = videos.map((v) => {
       // If video_url is already a proxy path, make it absolute
       if (v.video_url?.startsWith("/api/")) {

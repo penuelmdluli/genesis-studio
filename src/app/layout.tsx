@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"),
   title: {
     default: "Genesis Studio | AI Video Generation Platform",
     template: "%s | Genesis Studio",

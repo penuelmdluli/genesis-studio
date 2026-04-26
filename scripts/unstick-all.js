@@ -83,7 +83,7 @@ async function unstickProduction(prodId) {
     await supabase.from('productions').update({ status: 'generating', progress: 60, error_message: null }).eq('id', prodId);
     // Trigger assembly
     try {
-      await fetch(`https://genesis-studio-hazel.vercel.app/api/brain/test-run?id=${prodId}&secret=${SUPA_SECRET}`, {
+      await fetch(`https://genesisstudio.app/api/brain/test-run?id=${prodId}&secret=${SUPA_SECRET}`, {
         headers: { 'x-test-secret': SUPA_SECRET },
       });
     } catch {}

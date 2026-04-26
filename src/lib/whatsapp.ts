@@ -54,7 +54,7 @@ export function sendVideoReadyWhatsApp(phone: string, userName: string, videoId:
     templateName: "video_ready",
     parameters: [
       { name: "1", value: userName },
-      { name: "2", value: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app"}/gallery?v=${videoId}` },
+      { name: "2", value: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/gallery?v=${videoId}` },
     ],
   });
 }
@@ -69,7 +69,7 @@ export function sendLowCreditsWhatsApp(phone: string, userName: string, balance:
     parameters: [
       { name: "1", value: userName },
       { name: "2", value: String(balance) },
-      { name: "3", value: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app"}/pricing` },
+      { name: "3", value: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/pricing` },
     ],
   });
 }

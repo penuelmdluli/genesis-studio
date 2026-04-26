@@ -46,7 +46,7 @@ async function run() {
   console.log('  Queue ID:', item.id);
 
   console.log('\n[2/6] Triggering production on live Vercel...');
-  const resp = await fetch('https://genesis-studio-hazel.vercel.app/api/dev/produce', {
+  const resp = await fetch('https://genesisstudio.app/api/dev/produce', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET },
     body: JSON.stringify({ queueItemId: item.id }),
@@ -101,13 +101,13 @@ async function run() {
 
   console.log('\n[5/6] Triggering assembly (ffmpeg trim + audio)...');
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-10);
-  const trigRes = await fetch('https://genesis-studio-hazel.vercel.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
+  const trigRes = await fetch('https://genesisstudio.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
   const trigData = await trigRes.json();
   console.log('  Status:', trigData.status, trigData.progress + '%');
 
   console.log('\n[6/6] Polling until complete...');
   for (let i = 0; i < 25; i++) {
-    const res = await fetch('https://genesis-studio-hazel.vercel.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
+    const res = await fetch('https://genesisstudio.app/api/brain/test-run?id=' + prodId + '&secret=' + secret, { headers: { 'x-test-secret': secret } });
     const d = await res.json();
     const ts = new Date().toLocaleTimeString();
     console.log('  [' + ts + '] ' + d.status + ' ' + d.progress + '%' + (d.errorMessage ? ' ERR: ' + d.errorMessage : ''));
@@ -115,9 +115,9 @@ async function run() {
       console.log('\n============================================');
       console.log('  ' + (d.status === 'completed' ? 'COMPLETE' : 'FAILED'));
       console.log('============================================');
-      if (d.outputVideoUrls?.final) console.log('\nVIDEO: https://genesis-studio-hazel.vercel.app' + d.outputVideoUrls.final);
-      if (d.thumbnailUrl) console.log('THUMB: https://genesis-studio-hazel.vercel.app' + d.thumbnailUrl);
-      console.log('DASH:  https://genesis-studio-hazel.vercel.app/brain');
+      if (d.outputVideoUrls?.final) console.log('\nVIDEO: https://genesisstudio.app' + d.outputVideoUrls.final);
+      if (d.thumbnailUrl) console.log('THUMB: https://genesisstudio.app' + d.thumbnailUrl);
+      console.log('DASH:  https://genesisstudio.app/brain');
 
       const { data: finalScenes } = await supabase.from('production_scenes').select('scene_number, output_video_url').eq('production_id', prodId).order('scene_number');
       console.log('\nScene trim verification:');

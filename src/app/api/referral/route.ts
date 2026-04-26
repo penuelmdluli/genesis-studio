@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       rewardPerReferral: REFERRAL_REWARDS.referrerCredits,
       refereeBonus: REFERRAL_REWARDS.refereeCredits,
       referrals: referrals || [],
-      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app"}/sign-up?ref=${referralCode?.code || ""}`,
+      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/sign-up?ref=${referralCode?.code || ""}`,
     });
   } catch (error) {
     console.error("Referral error:", error);

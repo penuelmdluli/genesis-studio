@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { BLOG_POSTS } from "@/lib/blog-posts";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://genesis-studio-hazel.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
 
   return [
     {

@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-04
 **Auditor:** Claude (AI-assisted)
-**Live URL:** https://genesis-studio-hazel.vercel.app
+**Live URL:** https://genesisstudio.app
 **Competitors Benchmarked:** Runway Gen-3, Kling 3.0, Pika 2.0
 
 ---

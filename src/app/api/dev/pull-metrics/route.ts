@@ -23,7 +23,7 @@ const FB_TOKEN_ENV: Record<string, string> = {
   ai_money: "FB_PAGE_TOKEN_ai_money",
   motivation: "FB_PAGE_TOKEN_motivation",
   health_wellness: "FB_PAGE_TOKEN_health_wellness",
-  blissful_moments: "FB_PAGE_TOKEN_blissful_moments",
+  mzansi_baby_stars: "FB_PAGE_TOKEN_mzansi_baby_stars",
   limitless_you: "FB_PAGE_TOKEN_limitless_you",
   pop_culture_buzz: "FB_PAGE_TOKEN_pop_culture_buzz",
 };

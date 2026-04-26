@@ -28,7 +28,7 @@ async function run() {
   console.log('\n=== Finishing E2E for production ' + prodId + ' ===\n');
 
   const apiKey = process.env.RUNPOD_API_KEY;
-  const endpoint = 'aoy1j9tnxqbgld'; // ltx-video endpoint
+  const endpoint = 'dm5mng5h7034q7'; // wan-2.2 endpoint (only one with workers)
 
   // Wait for RunPod
   console.log('[1/3] Waiting for RunPod...');

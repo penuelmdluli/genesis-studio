@@ -106,40 +106,52 @@ function buildWorkflow(opts: {
   frameCount: number;
 }): Record<string, unknown> {
   // Workflow matches kijai/ComfyUI-WanVideoWrapper T2V example.
-  // Node IDs and connections derived from wanvideo_2_1_14B_T2V_example_03.json.
+  // Wiring verified from wanvideo_2_1_14B_T2V_example_03.json link graph.
+  // Pipeline: T5Encoder → TextEncode → EmptyEmbeds → Sampler → Decode → VideoCombine
   return {
-    // 1: Model loader — loads the Wan 2.2 diffusion model
+    // 1: Load the Wan 2.2 diffusion model (fp8 quantized)
     "1": {
       class_type: "WanVideoModelLoader",
       inputs: {
         model: "wan2.2_t2v_14B_fp8_e4m3fn.safetensors",
         base_precision: "fp16",
         quantization: "fp8_e4m3fn",
-        offload_to: "offload_device",
+        load_device: "offload_device",
         attention_mode: "sdpa",
       },
     },
-    // 2: Text encoder — encodes prompt into Wan-native embeddings
+    // 2: Load T5 text encoder (required by WanVideoTextEncode)
     "2": {
-      class_type: "WanVideoTextEncode",
+      class_type: "LoadWanVideoT5TextEncoder",
       inputs: {
-        prompt: opts.prompt,
-        negative_prompt: opts.negativePrompt,
-        force_offload: true,
-        model: ["1", 0],
+        model_name: "umt5-xxl-enc-bf16.safetensors",
+        precision: "bf16",
+        load_device: "offload_device",
+        quantization: "disabled",
       },
     },
-    // 3: Empty embeds — creates empty image embeds for T2V (no reference image)
+    // 3: Encode positive + negative prompts via T5
     "3": {
+      class_type: "WanVideoTextEncode",
+      inputs: {
+        positive_prompt: opts.prompt,
+        negative_prompt: opts.negativePrompt,
+        t5: ["2", 0],
+        force_offload: true,
+        model_to_offload: ["1", 0],
+      },
+    },
+    // 4: Empty image embeds for T2V (no reference image)
+    "4": {
       class_type: "WanVideoEmptyEmbeds",
       inputs: {
         width: opts.width,
         height: opts.height,
-        length: opts.frameCount,
+        num_frames: opts.frameCount,
       },
     },
-    // 4: Sampler — the actual generation
-    "4": {
+    // 5: Sampler — the actual video generation
+    "5": {
       class_type: "WanVideoSampler",
       inputs: {
         cfg: 6,
@@ -157,29 +169,46 @@ function buildWorkflow(opts: {
         teacache_max_skip: -1,
         teacache_force_skip: false,
         model: ["1", 0],
-        text_embeds: ["2", 0],
-        image_embeds: ["3", 0],
+        text_embeds: ["3", 0],
+        image_embeds: ["4", 0],
       },
     },
-    // 5: Decode latents to video frames
-    "5": {
+    // 6: Load VAE (separate from model loader)
+    "6": {
+      class_type: "WanVideoVAELoader",
+      inputs: {
+        vae_name: "Wan2_1_VAE_bf16.safetensors",
+        precision: "bf16",
+      },
+    },
+    // 7: Decode latents to video frames
+    "7": {
       class_type: "WanVideoDecode",
       inputs: {
-        samples: ["4", 0],
-        vae: ["1", 2],
+        samples: ["5", 0],
+        vae: ["6", 0],
         enable_vae_tiling: false,
+        tile_sample_min_height: 272,
+        tile_sample_min_width: 272,
+        tile_overlap_factor_height: 144,
+        tile_overlap_factor_width: 128,
+        auto_tile_size: "default",
       },
     },
-    // 6: Combine frames into video file
-    "6": {
+    // 8: Combine frames into video file
+    "8": {
       class_type: "VHS_VideoCombine",
       inputs: {
-        images: ["5", 0],
+        images: ["7", 0],
         frame_rate: 16,
+        loop_count: 0,
+        filename_prefix: "genesis_wan22",
         format: "video/h264-mp4",
+        pix_fmt: "yuv420p",
         crf: 19,
         save_output: true,
-        filename_prefix: "genesis_wan22",
+        pingpong: false,
+        save_metadata: false,
       },
     },
   };

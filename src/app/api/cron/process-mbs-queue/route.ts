@@ -28,6 +28,51 @@ export async function GET(req: NextRequest) {
   const results = { submitted: 0, completed: 0, posted: 0, errors: 0 };
 
   try {
+    // ── STAGE 0: Convert approved candidates → pending jobs ──
+    const { data: approvedCandidates } = await supabase
+      .from("mbs_candidates")
+      .select("*, mbs_characters!suggested_character_id(*)")
+      .eq("status", "approved")
+      .not("reference_video_r2_url", "is", null)
+      .order("overall_score", { ascending: false })
+      .limit(3);
+
+    for (const candidate of approvedCandidates ?? []) {
+      try {
+        const character = candidate["mbs_characters"];
+        const prompt = character
+          ? `${character.description}, dancing joyfully, ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`
+          : candidate.suggested_setting
+            ? `child dancing joyfully in ${candidate.suggested_setting}, golden hour, cinematic`
+            : "child dancing joyfully, golden hour, cinematic, high quality";
+
+        const r2PublicUrl = envString("R2_PUBLIC_URL");
+        const videoUrl = r2PublicUrl
+          ? `${r2PublicUrl}/${candidate.reference_video_r2_url}`
+          : candidate.reference_video_r2_url;
+
+        await supabase.from("mbs_jobs").insert({
+          candidate_id: candidate.id,
+          character_id: candidate.suggested_character_id,
+          reference_video_url: videoUrl,
+          reference_video_duration_sec: candidate.duration_sec,
+          prompt,
+          setting: candidate.suggested_setting,
+          caption: candidate.suggested_caption,
+          duration_sec: candidate.duration_sec ?? 10,
+          status: "pending",
+        });
+
+        await supabase.from("mbs_candidates").update({
+          status: "processed",
+        }).eq("id", candidate.id);
+
+        console.log(`[MBS] Candidate ${candidate.id} → job created`);
+      } catch (err) {
+        console.error(`[MBS] Failed to create job from candidate ${candidate.id}:`, err);
+      }
+    }
+
     // ── STAGE 1: Submit pending jobs (max 3 concurrent) ──
     const { data: inFlight } = await supabase
       .from("mbs_jobs")

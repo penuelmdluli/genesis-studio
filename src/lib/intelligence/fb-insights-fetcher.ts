@@ -15,7 +15,7 @@ function getPageTokens(): Record<string, string> {
     ai_money: process.env.FB_PAGE_TOKEN_ai_money || "",
     motivation: process.env.FB_PAGE_TOKEN_motivation || "",
     health_wellness: process.env.FB_PAGE_TOKEN_health_wellness || "",
-    blissful_moments: process.env.FB_PAGE_TOKEN_blissful_moments || "",
+    mzansi_baby_stars: process.env.FB_PAGE_TOKEN_mzansi_baby_stars || "",
     limitless_you: process.env.FB_PAGE_TOKEN_limitless_you || "",
     pop_culture_buzz: process.env.FB_PAGE_TOKEN_pop_culture_buzz || "",
   };
@@ -27,7 +27,7 @@ const PAGE_ID_TO_FB_KEY: Record<string, string> = {
   ai_revolution_dev: "ai_money",
   afrika_toons_dev: "motivation",
   world_news_animated_dev: "health_wellness",
-  mzansi_baby_stars: "blissful_moments",
+  mzansi_baby_stars: "mzansi_baby_stars",
   africa_2050_dev: "limitless_you",
   pop_culture_buzz_dev: "pop_culture_buzz",
 };

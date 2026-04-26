@@ -1,0 +1,11 @@
+{
+  "posts": [
+    {
+      "videoId": "f592134b-82db-488f-a3a4-44a1e53e7b53",
+      "userId": "dev-user",
+      "pageKey": "tech_news",
+      "caption": "TEST — diagnostic post from Genesis pipeline automation\n\n#Tech #AfricaAI",
+      "queueId": "af6c28ac-0000-0000-0000-000000000000"
+    }
+  ]
+}

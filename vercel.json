@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/process-mbs-queue",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/discover-content",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/vet-candidates",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

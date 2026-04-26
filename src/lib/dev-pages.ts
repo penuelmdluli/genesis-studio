@@ -99,7 +99,7 @@ export const DEV_PAGES: Record<string, DevPageConfig> = {
     caption_style: "mbs_style",
     hashtags: ["#MzansiBabyStars", "#CuteBabies", "#SouthAfrica", "#Mzansi"],
     enabled: false, // PAUSED — laser-focus on tech_pulse_africa
-    facebook_page_key: "blissful_moments",
+    facebook_page_key: "mzansi_baby_stars",
     youtube_enabled: true,
     topics_per_cycle: 1,
     niche_weights: { mbs_episodes: 5, baby_scenarios: 5, motivation: 2, health_wellness: 1 },

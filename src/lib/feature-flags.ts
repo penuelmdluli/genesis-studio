@@ -14,6 +14,7 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/captions": true,
   "/pricing": true,
   "/settings": true,
+  "/mimic": true,
   // Hidden for launch — code remains, UI hidden
   "/motion-control": false,
   "/talking-avatar": false,

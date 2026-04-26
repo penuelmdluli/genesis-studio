@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId, createVideo } from "@/lib/db";
 import { getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
 import { persistExternalVideo } from "@/lib/storage";
+import { extractAndUploadThumbnail, extractThumbnailFromUrl } from "@/lib/thumbnails";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { recordSpend } from "@/lib/spend-tracker";
 
@@ -95,6 +96,20 @@ export async function GET(
         r2PersistOk = false;
       }
 
+      // Extract thumbnail for Gallery display
+      let thumbnailUrl = "";
+      try {
+        if (r2PersistOk) {
+          thumbnailUrl = await extractAndUploadThumbnail(r2Key, user.id, job.id);
+        } else {
+          thumbnailUrl = await extractThumbnailFromUrl(result.videoUrl, user.id, job.id);
+        }
+      } catch (thumbErr) {
+        console.error(`[Mimic] Thumbnail extraction failed for ${job.id}:`, thumbErr);
+        // Use character image as fallback poster
+        thumbnailUrl = job.character_image_url || "";
+      }
+
       // Insert into Gallery — id matches mimic_jobs.id so /api/videos/{jobId} resolves
       let galleryVideoId: string | null = null;
       if (r2PersistOk) {
@@ -105,7 +120,7 @@ export async function GET(
             jobId: null,
             title: job.prompt || "Mimic Studio generation",
             url: `/api/videos/${job.id}`,
-            thumbnailUrl: "",
+            thumbnailUrl,
             modelId: "mimic-motion" as any,
             prompt: job.prompt || "Mimic Studio",
             resolution: "720p",

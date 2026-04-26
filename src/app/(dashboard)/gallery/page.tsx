@@ -345,7 +345,9 @@ export default function GalleryPage() {
               onClick={() => setSelectedVideo(video.id)}
             >
               <div className="w-28 h-16 rounded-lg bg-[#0D0D14] overflow-hidden shrink-0 relative">
-                {video.url ? (
+                {video.thumbnailUrl ? (
+                  <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ) : video.url ? (
                   <video
                     src={`${video.url}#t=0.1`}
                     className="w-full h-full object-cover"
@@ -354,8 +356,10 @@ export default function GalleryPage() {
                     preload="metadata"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Film className="w-5 h-5 text-zinc-700" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 to-fuchsia-900/10">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.06]">
+                      <span className="text-[10px] font-bold text-white/40">G</span>
+                    </div>
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -650,12 +654,18 @@ function VideoCard({
           />
         )}
 
-        {/* Shimmer skeleton while no thumbnail and video not loaded */}
+        {/* Professional placeholder while no thumbnail and video not loaded */}
         {!video.thumbnailUrl && !videoLoaded && (
           <div className="absolute inset-0 z-[5]">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/15 via-[#0D0D14] to-fuchsia-900/10" />
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/30 via-[#0D0D14] to-fuchsia-900/20" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/40 to-cyan-500/30 flex items-center justify-center mb-2 border border-white/[0.08]">
+                <span className="text-sm font-bold text-white/60">G</span>
+              </div>
+              <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">Genesis Studio</span>
+            </div>
             <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[shimmer_2s_infinite]" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-[shimmer_3s_infinite]" />
             </div>
           </div>
         )}
@@ -682,8 +692,10 @@ function VideoCard({
             onLoadedData={() => setVideoLoaded(true)}
           />
         ) : !isVisible && !video.thumbnailUrl ? (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/10 to-transparent">
-            <Film className="w-8 h-8 text-zinc-800" />
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.06]">
+              <span className="text-sm font-bold text-white/40">G</span>
+            </div>
           </div>
         ) : null}
 

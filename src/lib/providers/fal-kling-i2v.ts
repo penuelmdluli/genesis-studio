@@ -39,7 +39,7 @@ function getApiKey(): string {
  * Submit a motion control job to the FAL queue.
  * Returns immediately with a request ID for polling.
  */
-export async function submitKlingMotion(input: KlingMotionInput): Promise<{ requestId: string }> {
+export async function submitKlingMotion(input: KlingMotionInput): Promise<{ requestId: string; statusUrl?: string; responseUrl?: string }> {
   const res = await fetch(`${QUEUE_BASE}/${ENDPOINT}`, {
     method: "POST",
     headers: {
@@ -60,22 +60,29 @@ export async function submitKlingMotion(input: KlingMotionInput): Promise<{ requ
     throw new Error(`Kling motion submit failed (${res.status}): ${err}`);
   }
 
-  const data = (await res.json()) as { request_id: string };
-  return { requestId: data.request_id };
+  const data = (await res.json()) as {
+    request_id: string;
+    status_url?: string;
+    response_url?: string;
+  };
+  return { requestId: data.request_id, statusUrl: data.status_url, responseUrl: data.response_url };
 }
 
 /**
  * Check job status on the FAL queue.
+ * Uses the status_url from the submit response (FAL queue uses a
+ * simplified path that drops the version/variant suffix).
  */
 export async function getKlingMotionStatus(requestId: string): Promise<{
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   queuePosition?: number;
 }> {
-  const res = await fetch(
-    `${QUEUE_BASE}/${ENDPOINT}/requests/${requestId}/status`,
-    { headers: { Authorization: `Key ${getApiKey()}` } }
-  );
-  if (!res.ok) throw new Error(`Kling status check failed: ${res.status}`);
+  // FAL queue status URL format: queue.fal.run/fal-ai/kling-video/requests/{id}/status
+  const statusUrl = `${QUEUE_BASE}/fal-ai/kling-video/requests/${requestId}/status`;
+  const res = await fetch(statusUrl, {
+    headers: { Authorization: `Key ${getApiKey()}` },
+  });
+  if (!res.ok) throw new Error(`Kling status check failed: ${res.status} at ${statusUrl}`);
   const data = (await res.json()) as { status: string; queue_position?: number };
   return {
     status: data.status as "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED",
@@ -87,11 +94,11 @@ export async function getKlingMotionStatus(requestId: string): Promise<{
  * Get the completed result from the FAL queue.
  */
 export async function getKlingMotionResult(requestId: string): Promise<KlingMotionOutput> {
-  const res = await fetch(
-    `${QUEUE_BASE}/${ENDPOINT}/requests/${requestId}`,
-    { headers: { Authorization: `Key ${getApiKey()}` } }
-  );
-  if (!res.ok) throw new Error(`Kling result fetch failed: ${res.status}`);
+  const responseUrl = `${QUEUE_BASE}/fal-ai/kling-video/requests/${requestId}`;
+  const res = await fetch(responseUrl, {
+    headers: { Authorization: `Key ${getApiKey()}` },
+  });
+  if (!res.ok) throw new Error(`Kling result fetch failed: ${res.status} at ${responseUrl}`);
   const data = (await res.json()) as {
     video: { url: string; file_size?: number; content_type?: string };
   };

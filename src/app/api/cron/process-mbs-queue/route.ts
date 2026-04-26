@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
-import { persistExternalVideo, getSignedDownloadUrl } from "@/lib/storage";
+import { persistExternalVideo } from "@/lib/storage";
 import { postVideoToFacebookPage } from "@/lib/social/facebook";
 import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
@@ -95,9 +95,11 @@ export async function GET(req: NextRequest) {
           ? `${character.description}, dancing joyfully, ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`
           : `child dancing joyfully in ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic`;
 
-        // Generate presigned R2 URL so Kling can download the reference video
-        // (R2 keys aren't publicly accessible — Kling needs an HTTPS URL)
-        const videoUrl = await getSignedDownloadUrl(candidate.reference_video_r2_url, 7200);
+        // Build public R2 URL for the reference video
+        const r2Pub = envString("R2_PUBLIC_URL") ?? "";
+        const videoUrl = candidate.reference_video_r2_url.startsWith("http")
+          ? candidate.reference_video_r2_url
+          : `${r2Pub}/${candidate.reference_video_r2_url}`;
 
         await supabase.from("mbs_jobs").insert({
           candidate_id: candidate.id,
@@ -147,28 +149,14 @@ export async function GET(req: NextRequest) {
             character = ch;
           }
 
-          // Presign URLs — R2 keys AND raw R2 endpoint URLs both need signing
-          // Raw R2 URLs contain .r2.cloudflarestorage.com and require auth
-          function needsPresign(url: string): boolean {
-            if (!url) return false;
-            if (!url.startsWith("http")) return true; // R2 key without domain
-            if (url.includes(".r2.cloudflarestorage.com")) return true; // Raw R2 URL
-            return false;
-          }
-          function extractR2Key(url: string): string {
-            if (!url.startsWith("http")) return url;
-            // Extract key from R2 URL: https://<account>.r2.cloudflarestorage.com/<key>
-            const match = url.match(/r2\.cloudflarestorage\.com\/(.+)$/);
-            return match ? match[1] : url;
-          }
-
+          // Character portrait URL is already public (stored as full https:// in DB)
           let charUrl = character?.portrait_url ?? "";
-          if (needsPresign(charUrl)) {
-            charUrl = await getSignedDownloadUrl(extractR2Key(charUrl), 7200);
-          }
+
+          // Reference video: if it's an R2 key, prepend public R2 URL
+          const r2Public = envString("R2_PUBLIC_URL") ?? "";
           let refUrl = job.reference_video_url;
-          if (needsPresign(refUrl)) {
-            refUrl = await getSignedDownloadUrl(extractR2Key(refUrl), 7200);
+          if (refUrl && !refUrl.startsWith("http")) {
+            refUrl = `${r2Public}/${refUrl}`;
           }
 
           const { requestId } = await submitKlingMotion({

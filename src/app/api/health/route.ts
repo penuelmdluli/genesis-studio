@@ -49,12 +49,30 @@ export async function GET() {
 
   const allOk = supabase === "ok" && r2 === "ok";
 
+  const comfyuiDiagnostic = {
+    COMFYUI_PROVIDER_ENABLED: process.env.COMFYUI_PROVIDER_ENABLED ?? "UNDEFINED",
+    COMFYUI_PROVIDER_ENABLED_length: (process.env.COMFYUI_PROVIDER_ENABLED ?? "").length,
+    COMFYUI_PROVIDER_ENABLED_charCodes: Array.from(process.env.COMFYUI_PROVIDER_ENABLED ?? "").map(c => c.charCodeAt(0)),
+    COMFYUI_FREE_TIER_PERCENTAGE: process.env.COMFYUI_FREE_TIER_PERCENTAGE ?? "UNDEFINED",
+    COMFYUI_TIER_ROUTING: process.env.COMFYUI_TIER_ROUTING ?? "UNDEFINED",
+    COMFYUI_DAILY_SPEND_CAP_USD: process.env.COMFYUI_DAILY_SPEND_CAP_USD ?? "UNDEFINED",
+    RUNPOD_COMFYUI_ENDPOINT_ID_present: Boolean(process.env.RUNPOD_COMFYUI_ENDPOINT_ID),
+    RUNPOD_COMFYUI_API_KEY_present: Boolean(process.env.RUNPOD_COMFYUI_API_KEY),
+    RUNPOD_API_KEY_present: Boolean(process.env.RUNPOD_API_KEY),
+    UPSTASH_REDIS_REST_URL_present: Boolean(process.env.UPSTASH_REDIS_REST_URL),
+    SLACK_ALERT_WEBHOOK_URL_present: Boolean(process.env.SLACK_ALERT_WEBHOOK_URL),
+    VERCEL_ENV: process.env.VERCEL_ENV ?? "UNDEFINED",
+    NODE_ENV: process.env.NODE_ENV ?? "UNDEFINED",
+    read_at: new Date().toISOString(),
+  };
+
   return NextResponse.json(
     {
       status: allOk ? "ok" : "degraded",
       timestamp: new Date().toISOString(),
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
       checks: { supabase, r2 },
+      comfyui_diagnostic: comfyuiDiagnostic,
     },
     { status: allOk ? 200 : 503 }
   );

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // Only candidates with verified source_creator_id can become jobs
     const { data: approvedCandidates } = await supabase
       .from("mbs_candidates")
-      .select("*, mbs_characters!suggested_character_id(*), mbs_source_creators!source_creator_id(handle, verified)")
+      .select("*")
       .eq("status", "approved")
       .not("reference_video_r2_url", "is", null)
       .not("source_creator_id", "is", null)
@@ -41,8 +41,13 @@ export async function GET(req: NextRequest) {
 
     for (const candidate of approvedCandidates ?? []) {
       try {
-        // Enforce verified creator source
-        const creator = candidate["mbs_source_creators"];
+        // Look up creator separately
+        const { data: creator } = await supabase
+          .from("mbs_source_creators")
+          .select("handle, verified")
+          .eq("id", candidate.source_creator_id)
+          .single();
+
         if (!creator?.verified || !creator?.handle) {
           await supabase.from("mbs_candidates").update({
             status: "rejected",
@@ -51,10 +56,20 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
+        // Look up character
+        let character: { id: string; name: string; description: string; portrait_url: string } | null = null;
+        if (candidate.suggested_character_id) {
+          const { data: charData } = await supabase
+            .from("mbs_characters")
+            .select("id, name, description, portrait_url")
+            .eq("id", candidate.suggested_character_id)
+            .single();
+          character = charData;
+        }
+
         // Enforce caption attribution — reject if no handle
         if (!candidate.suggested_caption) {
           const { buildCaption } = await import("@/lib/mbs/caption-template");
-          const character = candidate["mbs_characters"];
           const caption = buildCaption({
             character: character?.name ?? "MBS Star",
             creatorHandle: creator.handle,
@@ -71,7 +86,6 @@ export async function GET(req: NextRequest) {
           candidate.suggested_caption = caption;
         }
 
-        const character = candidate["mbs_characters"];
         const prompt = character
           ? `${character.description}, dancing joyfully, ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`
           : `child dancing joyfully in ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic`;

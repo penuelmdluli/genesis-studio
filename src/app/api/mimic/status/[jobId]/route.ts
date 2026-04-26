@@ -85,33 +85,39 @@ export async function GET(
 
       // Persist to R2
       const r2Key = `mimic-outputs/${user.id}/${job.id}.mp4`;
-      let outputUrl = result.videoUrl;
+      let outputUrl = `/api/videos/${job.id}`;
+      let r2PersistOk = true;
       try {
-        outputUrl = await persistExternalVideo(result.videoUrl, r2Key);
+        await persistExternalVideo(result.videoUrl, r2Key);
       } catch (e) {
         console.error(`[Mimic] R2 persist failed for ${job.id}, using FAL CDN:`, e);
+        outputUrl = result.videoUrl;
+        r2PersistOk = false;
       }
 
-      // Insert into Gallery
+      // Insert into Gallery — id matches mimic_jobs.id so /api/videos/{jobId} resolves
       let galleryVideoId: string | null = null;
-      try {
-        const video = await createVideo({
-          userId: user.id,
-          jobId: null,
-          title: job.prompt || "Mimic Studio generation",
-          url: `/api/videos/${job.id}`,
-          thumbnailUrl: "",
-          modelId: "mimic-motion" as any,
-          prompt: job.prompt || "Mimic Studio",
-          resolution: "720p",
-          duration: job.duration_sec || 10,
-          fps: 24,
-          fileSize: result.fileSizeBytes || 0,
-          aspectRatio: job.aspect_ratio === "16:9" ? "landscape" : job.aspect_ratio === "1:1" ? "square" : "portrait",
-        });
-        galleryVideoId = video.id;
-      } catch (e) {
-        console.error(`[Mimic] Gallery insert failed for ${job.id}:`, e);
+      if (r2PersistOk) {
+        try {
+          const video = await createVideo({
+            id: job.id,
+            userId: user.id,
+            jobId: null,
+            title: job.prompt || "Mimic Studio generation",
+            url: `/api/videos/${job.id}`,
+            thumbnailUrl: "",
+            modelId: "mimic-motion" as any,
+            prompt: job.prompt || "Mimic Studio",
+            resolution: "720p",
+            duration: job.duration_sec || 10,
+            fps: 24,
+            fileSize: result.fileSizeBytes || 0,
+            aspectRatio: job.aspect_ratio === "16:9" ? "landscape" : job.aspect_ratio === "1:1" ? "square" : "portrait",
+          });
+          galleryVideoId = video.id;
+        } catch (e) {
+          console.error(`[Mimic] Gallery insert failed for ${job.id}:`, e);
+        }
       }
 
       await supabase.from("mimic_jobs").update({

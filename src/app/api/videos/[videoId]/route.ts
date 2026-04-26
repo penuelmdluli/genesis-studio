@@ -36,6 +36,7 @@ async function findVideoKeyInR2(
     `videos/${userId}/${jobId}`,
     `videos/${userId}/${jobId}.webm`,
     `videos/${userId}/${jobId}.mov`,
+    `mimic-outputs/${userId}/${jobId}.mp4`,
   ];
 
   for (const key of candidates) {

@@ -1,13 +1,16 @@
 import { SignIn } from "@clerk/nextjs";
 import Link from "next/link";
+import { AuthBackgroundVideo } from "@/components/auth-background-video";
 
 export default function SignInPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex relative overflow-hidden">
-      {/* Animated background layers */}
-      <div className="absolute inset-0 bg-glow-center opacity-20" />
-      <div className="absolute inset-0 bg-grid opacity-10" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-violet-600/8 rounded-full blur-[120px]" />
+      {/* Live background — looping AI generations from explore picks */}
+      <AuthBackgroundVideo />
+      {/* Subtle layered glow — sits over the video to keep brand color */}
+      <div className="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-violet-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-fuchsia-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Left panel - premium branding */}
       <div className="hidden lg:flex flex-1 items-center justify-center p-12 relative">

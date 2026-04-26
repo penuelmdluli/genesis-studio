@@ -261,7 +261,15 @@ export async function GET(req: NextRequest) {
         }
         // IN_QUEUE / IN_PROGRESS → do nothing, poll again next cycle
       } catch (err) {
-        console.error(`[MBS] Poll error for ${job.id}:`, err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[MBS] Poll error for ${job.id}:`, msg);
+        results.errors++;
+        // Surface errors via Slack so we can see them
+        sendSlackAlert({
+          level: "warning",
+          title: "MBS Stage 2 poll error",
+          message: `Job ${job.id}: ${msg.slice(0, 200)}`,
+        }).catch(() => {});
       }
     }
 

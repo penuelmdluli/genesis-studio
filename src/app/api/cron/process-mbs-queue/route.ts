@@ -24,6 +24,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Emergency pause switch
+  if (envString("MBS_GENERATION_PAUSED") === "true") {
+    return NextResponse.json({ paused: true });
+  }
+
   const supabase = createSupabaseAdmin();
   const results = { submitted: 0, completed: 0, posted: 0, errors: 0 };
 

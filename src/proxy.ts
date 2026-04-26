@@ -1,29 +1,44 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/generate(.*)",
-  "/gallery(.*)",
-  "/api-keys(.*)",
-  "/settings(.*)",
-  "/brain(.*)",
-  "/admin(.*)",
-  "/motion-control(.*)",
-  "/pricing(.*)",
-  "/voiceover(.*)",
-  "/talking-avatar(.*)",
-  "/thumbnails(.*)",
-  "/upscale(.*)",
-  "/captions(.*)",
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/about",
+  "/terms",
+  "/privacy",
+  "/contact",
+  "/blog(.*)",
+  "/changelog",
+  "/docs(.*)",
+  "/tutorials(.*)",
+  "/pricing",
+  "/explore",
+  "/explore/(.*)",
+  "/refund",
+  "/acceptable-use",
+  // API routes with their own auth (webhooks, crons, public endpoints)
+  "/api/health",
+  "/api/explore",
+  "/api/explore/(.*)",
+  "/api/webhooks/(.*)",
+  "/api/cron/(.*)",
+  "/api/brain/webhook",
+  "/api/v1/(.*)",
+  "/api/og",
+  "/api/proxy-image",
+  "/api/assets/(.*)",
+  "/api/loadshedding",
+  "/api/share/(.*)",
 ]);
 
+// Next.js 16 uses "proxy" convention (renamed from middleware)
 const handler = clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
+  if (!isPublicRoute(req)) {
     await auth.protect();
   }
 });
 
-// Next.js 16 uses "proxy" convention (renamed from middleware)
 export const proxy = handler;
 export default handler;
 

@@ -328,7 +328,7 @@ export async function executeProduction(
 
       try {
         // Check if this user's tier should use RunPod ComfyUI for cost savings
-        const providerChain = await selectProviderChain(userPlan || "free");
+        const providerChain = await selectProviderChain(userPlan || "free", userId);
         const useComfyUI = providerChain[0] === "runpod-comfyui"
           && isRunPodComfyUIAvailable()
           && generationType === "t2v"

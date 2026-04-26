@@ -4,17 +4,17 @@
 // Circuit breaker: auto-disables provider when cap hit.
 // ============================================
 
+import { Redis } from "@upstash/redis";
 import { sendSlackAlert } from "./alerts";
 
 const DAILY_CAP_USD = parseFloat(process.env.COMFYUI_DAILY_SPEND_CAP_USD ?? "25");
 
-let redis: { incrbyfloat: (key: string, val: number) => Promise<number>; get: <T>(key: string) => Promise<T | null>; expire: (key: string, seconds: number) => Promise<number> } | null = null;
+let redis: Redis | null = null;
 
-async function getRedis() {
+function getRedis(): Redis | null {
   if (redis) return redis;
   try {
     if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
-    const { Redis } = await import("@upstash/redis");
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -31,7 +31,7 @@ function todayKey(provider: string): string {
 }
 
 export async function recordSpend(provider: string, costUsd: number): Promise<void> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return;
   const key = todayKey(provider);
   await r.incrbyfloat(key, costUsd);
@@ -39,7 +39,7 @@ export async function recordSpend(provider: string, costUsd: number): Promise<vo
 }
 
 export async function getDailySpend(provider: string): Promise<number> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return 0;
   const val = await r.get<string>(todayKey(provider));
   return val ? parseFloat(String(val)) : 0;

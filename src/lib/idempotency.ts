@@ -5,18 +5,14 @@
 // ============================================
 
 import crypto from "crypto";
+import { Redis } from "@upstash/redis";
 
-let redis: {
-  get: <T>(key: string) => Promise<T | null>;
-  set: (key: string, value: unknown, opts?: { ex?: number; nx?: boolean }) => Promise<string | null>;
-  del: (...keys: string[]) => Promise<number>;
-} | null = null;
+let redis: Redis | null = null;
 
-async function getRedis() {
+function getRedis(): Redis | null {
   if (redis) return redis;
   try {
     if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
-    const { Redis } = await import("@upstash/redis");
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -46,20 +42,20 @@ export function buildIdempotencyKey(input: {
 }
 
 export async function checkIdempotent(key: string): Promise<string | null> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return null;
   const cached = await r.get<{ r2Url: string }>(key);
   return cached?.r2Url ?? null;
 }
 
 export async function storeIdempotent(key: string, r2Url: string): Promise<void> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return;
   await r.set(key, JSON.stringify({ r2Url }), { ex: TTL_SECONDS });
 }
 
 export async function lockGeneration(key: string): Promise<boolean> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return true; // No Redis = allow through (no distributed locking)
   const lockKey = `${key}:lock`;
   const acquired = await r.set(lockKey, "1", { ex: LOCK_TTL_SECONDS, nx: true });
@@ -67,7 +63,7 @@ export async function lockGeneration(key: string): Promise<boolean> {
 }
 
 export async function unlockGeneration(key: string): Promise<void> {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) return;
   await r.del(`${key}:lock`);
 }

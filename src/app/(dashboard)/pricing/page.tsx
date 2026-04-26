@@ -137,7 +137,7 @@ export default function PricingPage() {
     { q: "Can I upgrade or downgrade mid-month?", a: "Yes. Upgrading takes effect immediately and prorates the charge. Downgrading takes effect at the end of the current billing period." },
     { q: "Is my content really mine?", a: "Yes. You own all videos you generate on Genesis Studio. Use them commercially, post them anywhere, edit them however you like." },
     { q: "Do you offer team plans?", a: "Not yet. Studio plan supports agency workflows today. Dedicated team features are coming in a future update." },
-    { q: "What payment methods do you accept?", a: "We accept all major credit and debit cards worldwide via Stripe. For South African users, we also support Paystack for local card payments." },
+    { q: "What payment methods do you accept?", a: "We accept all major credit and debit cards via Yoco — South Africa's trusted payment provider. Visa, Mastercard, and local bank cards all supported." },
     { q: "Do you offer refunds?", a: "Failed generations are automatically refunded. For subscription refunds, contact us within 14 days of your charge for a full refund." },
   ];
 

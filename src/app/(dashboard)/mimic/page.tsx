@@ -41,6 +41,8 @@ const ASPECT_RATIOS = [
 type ReferenceTab = "url" | "upload";
 type JobStatus = "idle" | "uploading" | "scraping" | "submitting" | "in_queue" | "processing" | "completed" | "failed";
 
+const STORAGE_KEY = "mimic_active_job";
+
 const STATUS_LABELS: Record<JobStatus, string> = {
   idle: "",
   uploading: "Uploading files...",
@@ -102,6 +104,48 @@ export default function MimicStudioPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
+  }, []);
+
+  // Restore in-flight job on mount (survives refresh)
+  useEffect(() => {
+    const savedJobId = localStorage.getItem(STORAGE_KEY);
+    if (!savedJobId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/mimic/status/${savedJobId}`);
+        if (!res.ok) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+
+        setJobId(savedJobId);
+
+        if (data.status === "completed") {
+          setJobStatus("completed");
+          setOutputVideoUrl(data.outputVideoUrl);
+          setIsGenerating(false);
+          localStorage.removeItem(STORAGE_KEY);
+        } else if (data.status === "failed") {
+          setJobStatus("failed");
+          setError(data.error || "Generation failed");
+          setIsGenerating(false);
+          localStorage.removeItem(STORAGE_KEY);
+        } else {
+          setJobStatus(data.status as JobStatus);
+          setIsGenerating(true);
+          startPolling(savedJobId);
+        }
+      } catch {
+        // Network blip, leave key in place — next mount will retry
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCharacterImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,12 +219,14 @@ export default function MimicStudioPage() {
           setIsGenerating(false);
           toast("Your Mimic video is ready!", "success");
           if (pollRef.current) clearInterval(pollRef.current);
+          localStorage.removeItem(STORAGE_KEY);
         } else if (data.status === "failed") {
           setJobStatus("failed");
           setError(data.error || "Generation failed");
           setIsGenerating(false);
           toast("Generation failed", "error");
           if (pollRef.current) clearInterval(pollRef.current);
+          localStorage.removeItem(STORAGE_KEY);
         } else if (data.status === "in_queue") {
           setJobStatus("in_queue");
         } else if (data.status === "processing") {
@@ -237,6 +283,7 @@ export default function MimicStudioPage() {
       }
 
       setJobId(data.jobId);
+      localStorage.setItem(STORAGE_KEY, data.jobId);
       setJobStatus("in_queue");
       updateCreditBalance(credits - CREDIT_COST);
       toast("Mimic generation started!", "info");
@@ -261,6 +308,7 @@ export default function MimicStudioPage() {
     setError(null);
     setIsGenerating(false);
     if (pollRef.current) clearInterval(pollRef.current);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const isActive = jobStatus !== "idle" && jobStatus !== "completed" && jobStatus !== "failed";

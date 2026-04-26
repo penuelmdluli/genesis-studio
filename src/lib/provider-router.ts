@@ -15,6 +15,7 @@ import crypto from "crypto";
 import { shouldUseRunPodComfyUI } from "./runpod-comfyui";
 import { VendorProvider } from "./vendor-failover";
 import { isOverDailyProviderCap } from "./spend-tracker";
+import { envNumber } from "./env";
 
 export type ProviderChain = VendorProvider[];
 
@@ -38,10 +39,10 @@ function isInRolloutPercentage(userId: string, percentage: number): boolean {
  */
 function getTierPercentage(plan: string): number {
   if (plan === "free") {
-    return parseInt(process.env.COMFYUI_FREE_TIER_PERCENTAGE ?? "100", 10);
+    return envNumber("COMFYUI_FREE_TIER_PERCENTAGE", 100);
   }
   if (plan === "creator") {
-    return parseInt(process.env.COMFYUI_CREATOR_TIER_PERCENTAGE ?? "0", 10);
+    return envNumber("COMFYUI_CREATOR_TIER_PERCENTAGE", 0);
   }
   return 0;
 }

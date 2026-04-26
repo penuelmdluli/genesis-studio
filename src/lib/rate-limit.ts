@@ -9,39 +9,42 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { NextResponse } from "next/server";
+import { envString } from "./env";
 
 let redis: Redis | null = null;
+let redisInitialized = false;
 
-try {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+function getRedis(): Redis | null {
+  if (redisInitialized) return redis;
+  redisInitialized = true;
+  try {
+    const url = envString("UPSTASH_REDIS_REST_URL");
+    const token = envString("UPSTASH_REDIS_REST_TOKEN");
+    if (!url || !token) return null;
+    redis = new Redis({ url, token });
+    return redis;
+  } catch {
+    return null;
   }
-} catch {
-  // Silently fall back to no distributed rate limiting
 }
 
 type WindowSize = `${number} s` | `${number} m` | `${number} h` | `${number} d`;
 
-function makeLimiter(tokens: number, window: WindowSize) {
-  if (!redis) return null;
-  return new Ratelimit({
-    redis,
+const limiterCache = new Map<string, Ratelimit>();
+
+function getLimiter(name: string, tokens: number, window: WindowSize): Ratelimit | null {
+  if (limiterCache.has(name)) return limiterCache.get(name)!;
+  const r = getRedis();
+  if (!r) return null;
+  const limiter = new Ratelimit({
+    redis: r,
     limiter: Ratelimit.slidingWindow(tokens, window),
     analytics: true,
     prefix: "genesis",
   });
+  limiterCache.set(name, limiter);
+  return limiter;
 }
-
-export const limiters = {
-  generation: makeLimiter(10, "1 m"),
-  generationHourly: makeLimiter(100, "1 h"),
-  generationDaily: makeLimiter(500, "1 d"),
-  freeTierDaily: makeLimiter(5, "1 d"),
-  api: makeLimiter(60, "1 m"),
-};
 
 /**
  * Check the distributed rate limiter. Returns a 429 response if exceeded,
@@ -51,7 +54,9 @@ export async function enforceDistributedRateLimit(
   userId: string,
   plan: string
 ): Promise<NextResponse | null> {
-  const limiter = plan === "free" ? limiters.freeTierDaily : limiters.generationDaily;
+  const limiter = plan === "free"
+    ? getLimiter("freeTierDaily", 5, "1 d")
+    : getLimiter("generationDaily", 500, "1 d");
   if (!limiter) return null;
 
   const result = await limiter.limit(userId);

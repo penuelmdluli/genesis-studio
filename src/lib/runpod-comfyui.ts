@@ -11,6 +11,7 @@
 // Cost: ~$0.04-0.06 per 5s video on A100 80GB serverless.
 
 import { z } from "zod";
+import { envFlag, envString, envNumber } from "./env";
 
 // --- RunPod API response schemas ---
 
@@ -60,14 +61,14 @@ const DEFAULT_GPU_RATE = 1.89;
 // --- Helpers ---
 
 function getConfig() {
-  const apiKey = process.env.RUNPOD_COMFYUI_API_KEY || process.env.RUNPOD_API_KEY;
-  const endpointId = process.env.RUNPOD_COMFYUI_ENDPOINT_ID;
+  const apiKey = envString("RUNPOD_COMFYUI_API_KEY") || envString("RUNPOD_API_KEY");
+  const endpointId = envString("RUNPOD_COMFYUI_ENDPOINT_ID");
   return { apiKey: apiKey || null, endpointId: endpointId || null };
 }
 
 /** Check if the RunPod ComfyUI endpoint is configured and enabled */
 export function isRunPodComfyUIAvailable(): boolean {
-  if (process.env.COMFYUI_PROVIDER_ENABLED !== "true") return false;
+  if (!envFlag("COMFYUI_PROVIDER_ENABLED")) return false;
   const { apiKey, endpointId } = getConfig();
   if (!apiKey || !endpointId) {
     console.warn("[RunPod-ComfyUI] Skipped — missing API key or endpoint ID");
@@ -79,7 +80,8 @@ export function isRunPodComfyUIAvailable(): boolean {
 /** Check if a user tier should route to RunPod ComfyUI */
 export function shouldUseRunPodComfyUI(userPlan: string): boolean {
   if (!isRunPodComfyUIAvailable()) return false;
-  const tiers = (process.env.COMFYUI_TIER_ROUTING ?? "free,creator").split(",").map(s => s.trim());
+  const routing = envString("COMFYUI_TIER_ROUTING") ?? "free,creator";
+  const tiers = routing.split(",").map(s => s.trim());
   return tiers.includes(userPlan);
 }
 
@@ -296,7 +298,7 @@ export async function submitRunPodComfyUIJob(
 
       const elapsedMs = Date.now() - startTime;
       const executionMs = statusData.executionTime ?? elapsedMs;
-      const gpuRate = parseFloat(process.env.RUNPOD_COMFYUI_GPU_RATE ?? String(DEFAULT_GPU_RATE));
+      const gpuRate = envNumber("RUNPOD_COMFYUI_GPU_RATE", DEFAULT_GPU_RATE);
       const costUsd = (executionMs / 1000 / 3600) * gpuRate;
 
       console.log(

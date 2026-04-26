@@ -6,17 +6,17 @@
 
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
+import { envString } from "./env";
 
 let redis: Redis | null = null;
 
 function getRedis(): Redis | null {
   if (redis) return redis;
   try {
-    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    const url = envString("UPSTASH_REDIS_REST_URL");
+    const token = envString("UPSTASH_REDIS_REST_TOKEN");
+    if (!url || !token) return null;
+    redis = new Redis({ url, token });
     return redis;
   } catch {
     return null;

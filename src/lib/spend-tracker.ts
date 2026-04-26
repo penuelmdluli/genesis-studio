@@ -6,19 +6,17 @@
 
 import { Redis } from "@upstash/redis";
 import { sendSlackAlert } from "./alerts";
-
-const DAILY_CAP_USD = parseFloat(process.env.COMFYUI_DAILY_SPEND_CAP_USD ?? "25");
+import { envNumber, envString } from "./env";
 
 let redis: Redis | null = null;
 
 function getRedis(): Redis | null {
   if (redis) return redis;
   try {
-    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    const url = envString("UPSTASH_REDIS_REST_URL");
+    const token = envString("UPSTASH_REDIS_REST_TOKEN");
+    if (!url || !token) return null;
+    redis = new Redis({ url, token });
     return redis;
   } catch {
     return null;
@@ -50,6 +48,7 @@ export async function isOverDailyProviderCap(provider: string): Promise<{
   spent: number;
   cap: number;
 }> {
+  const DAILY_CAP_USD = envNumber("COMFYUI_DAILY_SPEND_CAP_USD", 25);
   const spent = await getDailySpend(provider);
   const over = spent >= DAILY_CAP_USD;
 

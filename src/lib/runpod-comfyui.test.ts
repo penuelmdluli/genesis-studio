@@ -79,7 +79,7 @@ describe("Provider Router", () => {
   it("routes free users to runpod-comfyui first", async () => {
     vi.resetModules();
     const { selectProviderChain } = await import("./provider-router");
-    const chain = selectProviderChain("free");
+    const chain = await selectProviderChain("free");
     expect(chain[0]).toBe("runpod-comfyui");
     expect(chain[1]).toBe("runpod");
     expect(chain[2]).toBe("fal");
@@ -88,7 +88,7 @@ describe("Provider Router", () => {
   it("routes pro users to fal first", async () => {
     vi.resetModules();
     const { selectProviderChain } = await import("./provider-router");
-    const chain = selectProviderChain("pro");
+    const chain = await selectProviderChain("pro");
     expect(chain[0]).toBe("fal");
   });
 
@@ -96,7 +96,7 @@ describe("Provider Router", () => {
     process.env.COMFYUI_PROVIDER_ENABLED = "false";
     vi.resetModules();
     const { selectProviderChain } = await import("./provider-router");
-    const chain = selectProviderChain("free");
+    const chain = await selectProviderChain("free");
     expect(chain[0]).toBe("fal");
   });
 });

@@ -12,6 +12,7 @@ import { submitRunPodJob, buildRunPodInput, getRunPodJobStatus } from "@/lib/run
 import { submitFalJob } from "@/lib/fal";
 import { submitRunPodComfyUIJob, isRunPodComfyUIAvailable } from "@/lib/runpod-comfyui";
 import { selectProviderChain } from "@/lib/provider-router";
+import { recordSpend } from "@/lib/spend-tracker";
 import { persistExternalVideo } from "@/lib/storage";
 import { AI_MODELS } from "@/lib/constants";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
@@ -327,7 +328,7 @@ export async function executeProduction(
 
       try {
         // Check if this user's tier should use RunPod ComfyUI for cost savings
-        const providerChain = selectProviderChain(userPlan || "free");
+        const providerChain = await selectProviderChain(userPlan || "free");
         const useComfyUI = providerChain[0] === "runpod-comfyui"
           && isRunPodComfyUIAvailable()
           && generationType === "t2v"
@@ -361,6 +362,8 @@ export async function executeProduction(
               .update({ provider: "runpod-comfyui" })
               .eq("id", scene.id);
 
+            // Track spend for circuit breaker
+            recordSpend("runpod-comfyui", comfyResult.costUsd).catch(() => {});
             console.log(`[BRAIN] Scene ${sceneDef.sceneNumber}: ComfyUI completed ($${comfyResult.costUsd.toFixed(4)})`);
             return;
           } catch (comfyErr) {

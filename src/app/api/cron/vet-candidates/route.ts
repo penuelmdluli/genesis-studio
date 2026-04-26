@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
         r2Key = candidate.reference_video_r2_url;
         durationSec = candidate.duration_sec ?? 10;
       } else {
-        const dl = await downloadAndPersist(candidate.source_url, 30);
+        const dl = await downloadAndPersist(candidate.source_url);
         r2Key = dl.r2Key;
         durationSec = dl.durationSec;
       }

@@ -10,6 +10,7 @@ import { updateUserPlan } from "@/lib/db";
 import { PlanId } from "@/types";
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 import { WebhookResult } from "./types";
+import { sendSlackAlert } from "@/lib/alerts";
 
 const PLAN_CREDITS: Record<PlanId, number> = {
   free: 50,
@@ -119,6 +120,13 @@ export async function processWebhookPayment(
     console.log(
       `[${providerName.toUpperCase()}] Non-success event: ${result.event} (ref: ${result.reference})`
     );
+    if (result.event === "payment.failed") {
+      sendSlackAlert({
+        level: "warning",
+        title: "Payment failed",
+        message: `A ${providerName} payment failed.\nRef: ${result.reference}\nUser: ${result.metadata?.userId || "unknown"}`,
+      }).catch(() => {});
+    }
     return { success: true, message: `Event ${result.event} acknowledged` };
   }
 
@@ -179,6 +187,13 @@ export async function processWebhookPayment(
     console.log(
       `[${providerName.toUpperCase()}] Subscription activated: user ${user.id}, plan ${planId}, ${PLAN_CREDITS[planId]} credits`
     );
+
+    sendSlackAlert({
+      level: "info",
+      title: "New subscription!",
+      message: `${user.name} (${user.email}) subscribed to *${planId.toUpperCase()}* plan via ${providerName}.\n${PLAN_CREDITS[planId]} credits granted.`,
+    }).catch(() => {});
+
     return {
       success: true,
       message: `Subscription ${planId} activated for user ${user.id}`,
@@ -208,6 +223,13 @@ export async function processWebhookPayment(
     console.log(
       `[${providerName.toUpperCase()}] Credit pack purchased: user ${user.id}, ${credits} credits (pack ${packId})`
     );
+
+    sendSlackAlert({
+      level: "info",
+      title: "Credit pack purchased!",
+      message: `${user.name} (${user.email}) bought *${credits.toLocaleString()} credits* via ${providerName}.`,
+    }).catch(() => {});
+
     return {
       success: true,
       message: `${credits} credits added for user ${user.id}`,

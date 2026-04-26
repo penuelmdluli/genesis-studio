@@ -12,6 +12,7 @@ import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
+import { sendSlackAlert } from "@/lib/alerts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -201,6 +202,12 @@ export async function POST(req: NextRequest) {
       // Track provider success
       recordProviderSuccess(model.provider === "fal" ? "fal" : "runpod");
 
+      sendSlackAlert({
+        level: "info",
+        title: "Video generation started",
+        message: `User: ${user.name} (${user.email})\nModel: ${model.name} | ${body.duration}s | ${creditCost} credits`,
+      }).catch(() => {});
+
       return NextResponse.json({
         jobId: job.id,
         status: "queued",
@@ -214,6 +221,12 @@ export async function POST(req: NextRequest) {
       const provider = model.provider === "fal" ? "fal" : "runpod";
       const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
       recordProviderFailure(provider as "fal" | "runpod", errorMsg);
+
+      sendSlackAlert({
+        level: "warning",
+        title: "Video generation failed",
+        message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}`,
+      }).catch(() => {});
 
       const { refundCredits } = await import("@/lib/credits");
       await refundCredits(

@@ -7,6 +7,7 @@ export const maxDuration = 120; // 2 minutes
 import { getUserByClerkId } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getProduction, executeProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
+import { sendSlackAlert } from "@/lib/alerts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,12 +72,28 @@ export async function POST(req: NextRequest) {
     // Use after() to keep the serverless function alive after the response is sent.
     // Without this, Vercel kills the function immediately after the response,
     // which terminates audio generation (TTS + music) mid-flight.
+    sendSlackAlert({
+      level: "info",
+      title: "Brain Studio production started",
+      message: `User: ${user.name} (${user.email})\nConcept: ${production.concept?.slice(0, 80) || "N/A"}\nDuration: ${production.targetDuration}s | Style: ${production.style}`,
+    }).catch(() => {});
+
     after(async () => {
       try {
         await executeProduction(productionId, user.id, clerkId, plan, input, user.plan);
         console.log(`[BRAIN] Production ${productionId} execution completed successfully`);
+        sendSlackAlert({
+          level: "info",
+          title: "Brain Studio production completed",
+          message: `User: ${user.name} (${user.email})\nProduction: ${productionId}`,
+        }).catch(() => {});
       } catch (err) {
         console.error(`[BRAIN] Production ${productionId} execution failed:`, err);
+        sendSlackAlert({
+          level: "warning",
+          title: "Brain Studio production failed",
+          message: `User: ${user.name} (${user.email})\nError: ${err instanceof Error ? err.message : "Unknown"}`,
+        }).catch(() => {});
         await updateProduction(productionId, {
           status: "failed",
           error_message: err instanceof Error ? err.message : "Production execution failed",

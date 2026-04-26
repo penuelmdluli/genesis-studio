@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { getUserByClerkId, createUser } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
 import { sendWelcomeEmail } from "@/lib/email";
+import { sendSlackAlert } from "@/lib/alerts";
 
 export async function GET() {
   try {
@@ -36,6 +37,13 @@ export async function GET() {
           console.error("[USER] Welcome email failed:", err)
         );
       }
+
+      // Notify Slack — new customer
+      sendSlackAlert({
+        level: "info",
+        title: "New customer signed up",
+        message: `${name} (${email}) just joined Genesis Studio with 50 free credits.`,
+      }).catch(() => {});
     }
 
     return NextResponse.json({

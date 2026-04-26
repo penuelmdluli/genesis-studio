@@ -7,6 +7,7 @@ import { downloadAndPersist } from "@/lib/mbs/scraper";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { checkRateLimit } from "@/lib/fraud";
 import { recordSpend } from "@/lib/spend-tracker";
+import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
 
 const CREDIT_COST = 1500;
@@ -136,6 +137,12 @@ export async function POST(req: NextRequest) {
 
       recordSpend("fal-kling-i2v-mimic", 0).catch(() => {}); // actual cost tracked on completion
 
+      sendSlackAlert({
+        level: "info",
+        title: "Mimic Studio generation started",
+        message: `User: ${user.name} (${user.email})\nDuration: ${duration}s | Credits: ${CREDIT_COST}`,
+      }).catch(() => {});
+
       return NextResponse.json({
         jobId: job.id,
         status: "submitted",
@@ -143,6 +150,12 @@ export async function POST(req: NextRequest) {
       });
     } catch (submitErr) {
       console.error("[Mimic] Submission error:", submitErr);
+
+      sendSlackAlert({
+        level: "warning",
+        title: "Mimic Studio generation failed",
+        message: `User: ${user.name} (${user.email})\nError: ${submitErr instanceof Error ? submitErr.message : "Unknown"}\nCredits refunded: ${CREDIT_COST}`,
+      }).catch(() => {});
 
       // Refund credits on failure
       if (!ownerAccount) {

@@ -496,7 +496,7 @@ describe("Planner", () => {
       );
     });
 
-    it("sanitizes invalid model IDs to seedance-1.5", async () => {
+    it("sanitizes invalid model IDs to wan-2.2 (default model)", async () => {
       const planWithBadModel = {
         ...validPlanResponse,
         scenes: [
@@ -515,8 +515,8 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      // Seedance is primary — no avatar (wan-2.2 banned)
-      expect(plan.scenes[0].modelId).toBe("seedance-1.5");
+      // Planner forces all scenes to wan-2.2 (only RunPod endpoint with active workers)
+      expect(plan.scenes[0].modelId).toBe("wan-2.2");
     });
 
     it("clamps scene duration to 5-10 range", async () => {

@@ -4,35 +4,61 @@ import Link from "next/link";
 export default function SignInPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex relative overflow-hidden">
-      {/* Atmospheric background */}
-      <div className="absolute inset-0 bg-glow-center opacity-30" />
-      <div className="absolute inset-0 bg-grid opacity-20" />
+      {/* Animated background layers */}
+      <div className="absolute inset-0 bg-glow-center opacity-20" />
+      <div className="absolute inset-0 bg-grid opacity-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-violet-600/8 rounded-full blur-[120px]" />
 
-      {/* Left panel - branding */}
+      {/* Left panel - premium branding */}
       <div className="hidden lg:flex flex-1 items-center justify-center p-12 relative">
         <div className="max-w-md relative z-10">
-          <Link href="/" className="flex items-center gap-2.5 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-violet-600/30">
+          <Link href="/" className="flex items-center gap-2.5 mb-12">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-violet-600/30">
               G
             </div>
             <span className="text-2xl font-bold gradient-text">Genesis Studio</span>
           </Link>
 
-          <h1 className="text-3xl font-bold text-zinc-100 mb-4 leading-tight">
-            Welcome back to the future of video creation
+          <h1 className="text-4xl font-bold text-zinc-100 mb-4 leading-[1.15]">
+            Welcome back,
+            <br />
+            <span className="gradient-text">creator.</span>
           </h1>
-          <p className="text-zinc-400 leading-relaxed mb-8">
-            Sign in to access your projects, generate new AI videos, and manage your account.
+          <p className="text-zinc-400 leading-relaxed mb-10 text-[15px]">
+            Your projects are waiting. Sign in to generate AI videos, manage your library, and keep creating.
           </p>
 
-          <div className="space-y-3">
+          {/* Social proof */}
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 mb-8">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex -space-x-2">
+                {["violet", "cyan", "fuchsia", "emerald"].map((color) => (
+                  <div key={color} className={`w-7 h-7 rounded-full bg-${color}-500/30 border-2 border-[#0A0A0F] flex items-center justify-center`}>
+                    <span className="text-[9px] font-bold text-white/60">
+                      {color[0].toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs text-zinc-500">2,000+ creators active this week</span>
+            </div>
+            <p className="text-xs text-zinc-500 italic leading-relaxed">
+              &ldquo;I made a full product video in 3 minutes. This tool is insane.&rdquo;
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
             {[
-              "6 open-source AI models",
-              "Credits that never expire",
-              "API access on every plan",
+              "10+ AI video models in one place",
+              "Brain Studio: script to full film",
+              "Mimic Studio: any character, any dance",
             ].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-zinc-400">
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+              <div key={item} className="flex items-center gap-2.5 text-sm text-zinc-400">
+                <div className="w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">
+                  <svg className="w-3 h-3 text-violet-400" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
                 {item}
               </div>
             ))}
@@ -41,37 +67,47 @@ export default function SignInPage() {
       </div>
 
       {/* Right panel - auth */}
-      <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 relative z-10">
+        <div className="w-full max-w-[420px]">
           <div className="lg:hidden text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white">
+            <Link href="/" className="inline-flex items-center gap-2 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white">
                 G
               </div>
-              <span className="text-lg font-bold gradient-text">Genesis Studio</span>
+              <span className="text-xl font-bold gradient-text">Genesis Studio</span>
             </Link>
+            <p className="text-sm text-zinc-500">Sign in to continue creating</p>
           </div>
 
           <SignIn
             appearance={{
               elements: {
                 rootBox: "mx-auto w-full",
-                card: "bg-[#111118] border border-white/[0.06] shadow-2xl shadow-violet-600/5 rounded-2xl",
-                headerTitle: "text-white",
+                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40 rounded-2xl",
+                headerTitle: "text-white text-lg",
                 headerSubtitle: "text-zinc-400",
                 socialButtonsBlockButton:
-                  "bg-white/[0.04] border-white/[0.08] text-white hover:bg-white/[0.08] transition-colors rounded-xl",
+                  "bg-white/[0.05] border-white/[0.1] text-white hover:bg-white/[0.1] transition-all rounded-xl h-11",
+                socialButtonsBlockButtonText: "font-medium",
                 formFieldInput:
-                  "bg-white/[0.03] border-white/[0.08] text-white rounded-lg focus:ring-2 focus:ring-violet-500/40",
+                  "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
                 formButtonPrimary:
-                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 shadow-lg shadow-violet-600/20 rounded-lg",
-                footerActionLink: "text-violet-400 hover:text-violet-300",
-                formFieldLabel: "text-zinc-400",
-                dividerLine: "bg-white/[0.06]",
-                dividerText: "text-zinc-500",
+                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 shadow-lg shadow-violet-600/25 rounded-xl h-11 text-sm font-semibold",
+                footerActionLink: "text-violet-400 hover:text-violet-300 font-medium",
+                formFieldLabel: "text-zinc-400 text-sm",
+                dividerLine: "bg-white/[0.08]",
+                dividerText: "text-zinc-500 text-xs",
+                identityPreviewEditButton: "text-violet-400",
               },
             }}
           />
+
+          <p className="text-center text-xs text-zinc-600 mt-6">
+            Don&apos;t have an account?{" "}
+            <Link href="/sign-up" className="text-violet-400 hover:text-violet-300 font-medium">
+              Sign up free
+            </Link>
+          </p>
         </div>
       </div>
     </div>

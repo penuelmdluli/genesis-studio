@@ -59,20 +59,20 @@ const howItWorksSteps = [
   {
     num: "1",
     icon: Sparkles,
-    title: "Describe it",
-    description: "Type any scene in natural language",
+    title: "Describe your vision",
+    description: "Type a scene, upload a photo, or paste a reference video",
   },
   {
     num: "2",
     icon: Film,
-    title: "AI creates it",
-    description: "10+ models render your vision in seconds",
+    title: "AI brings it to life",
+    description: "10+ models compete to render the best result in seconds",
   },
   {
     num: "3",
     icon: Share2,
-    title: "Share it everywhere",
-    description: "Download, share to TikTok, WhatsApp, or recreate",
+    title: "Post it everywhere",
+    description: "Download HD, share to TikTok, Instagram, WhatsApp instantly",
   },
 ];
 
@@ -82,27 +82,29 @@ const howItWorksSteps = [
 
 const capabilities = [
   {
-    icon: Volume2,
-    title: "Native Audio",
-    description: "Dialogue, SFX, lip sync in one generation. No post-production needed.",
+    icon: Zap,
+    title: "Mimic Studio",
+    description: "Upload any character photo + a dance video. AI makes your character perform the moves. Viral content in minutes.",
     models: [],
-  },
-  {
-    icon: Film,
-    title: "Motion Control",
-    description: "Transfer any dance to any character. Upload reference video, get magic.",
-    models: [],
+    badge: "NEW",
   },
   {
     icon: Brain,
     title: "Brain Studio",
-    description: "Script to multi-scene movie with full audio. One prompt, complete film.",
+    description: "Type one concept, get a full short film with voiceover, music, captions, and transitions. AI directs everything.",
+    models: [],
+    badge: "HOT",
+  },
+  {
+    icon: Volume2,
+    title: "Native Audio",
+    description: "Real dialogue, sound effects, and lip sync generated in the video. No editing or post-production needed.",
     models: [],
   },
   {
-    icon: Zap,
+    icon: Film,
     title: "10+ AI Models",
-    description: "Multiple cutting-edge AI engines, all in one place. Each optimized differently.",
+    description: "From lightning-fast drafts to Hollywood-grade output. Pick the right model for your content, all in one place.",
     models: [],
   },
 ];
@@ -180,15 +182,15 @@ export default function LandingPage() {
         <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 sm:px-6 text-center">
           <MotionSection>
             <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="gradient-text-hero">Create videos that feel real.</span>
+              <span className="gradient-text-hero">The AI video studio<br className="hidden sm:block" /> for creators.</span>
             </h1>
           </MotionSection>
 
           <MotionSection delay={0.1}>
             <p className="text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-              AI video with native audio — dialogue, sound effects,
+              Text to video. Image to video. Dance transfer. Full short films.
               <br className="hidden sm:block" />
-              lip sync, motion control. Hollywood quality.
+              10+ AI models. One platform. Made in South Africa.
             </p>
           </MotionSection>
 
@@ -369,20 +371,20 @@ export default function LandingPage() {
             {capabilities.map((cap) => (
               <StaggerItem key={cap.title}>
                 <GlowCard className="rounded-2xl border border-white/[0.06] bg-[#111118]/80 p-8 h-full">
-                  <div className="w-12 h-12 rounded-xl bg-violet-600/15 flex items-center justify-center mb-5">
-                    <cap.icon className="w-6 h-6 text-violet-400" />
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-xl bg-violet-600/15 flex items-center justify-center">
+                      <cap.icon className="w-6 h-6 text-violet-400" />
+                    </div>
+                    {(cap as { badge?: string }).badge && (
+                      <Badge variant="violet" className="text-[10px] font-bold uppercase">
+                        {(cap as { badge?: string }).badge}
+                      </Badge>
+                    )}
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{cap.title}</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed mb-4">
+                  <p className="text-zinc-400 text-sm leading-relaxed">
                     {cap.description}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {cap.models.map((model) => (
-                      <Badge key={model} variant="violet">
-                        {model}
-                      </Badge>
-                    ))}
-                  </div>
                 </GlowCard>
               </StaggerItem>
             ))}
@@ -514,16 +516,26 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto">
           <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-8 sm:p-12 md:p-16 text-center">
             <MotionSection>
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">
-                Your first video is free.{" "}
-                <span className="gradient-text">Make it now.</span>
+              <h2 className="text-3xl md:text-5xl font-bold mb-4">
+                Your first video is free.
               </h2>
-              <Link href="/sign-up">
-                <Button size="lg" className="text-base px-10 py-4">
-                  <Sparkles className="w-5 h-5" />
-                  Start Creating — It&apos;s Free
-                </Button>
-              </Link>
+              <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
+                50 credits. No credit card. Generate your first AI video in under 60 seconds.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Link href="/sign-up">
+                  <Button size="lg" className="text-base px-10 py-4">
+                    <Sparkles className="w-5 h-5" />
+                    Start Free
+                  </Button>
+                </Link>
+                <Link href="/mimic">
+                  <Button variant="outline" size="lg" className="text-base px-8 py-4">
+                    <Zap className="w-5 h-5" />
+                    Try Mimic Studio
+                  </Button>
+                </Link>
+              </div>
             </MotionSection>
           </div>
         </div>
@@ -546,7 +558,7 @@ export default function LandingPage() {
                 </span>
               </Link>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                AI video creation platform. Open-source models, Hollywood quality.
+                AI video creation platform built in South Africa. 10+ models, Hollywood quality.
               </p>
             </div>
 
@@ -556,8 +568,8 @@ export default function LandingPage() {
               <ul className="space-y-2.5">
                 {[
                   { href: "/generate", label: "Generate" },
-                  { href: "/motion-control", label: "Motion Control" },
-                  { href: "/brain-studio", label: "Brain Studio" },
+                  { href: "/brain", label: "Brain Studio" },
+                  { href: "/mimic", label: "Mimic Studio" },
                   { href: "/explore", label: "Explore" },
                   { href: "/pricing", label: "Pricing" },
                 ].map((link) => (

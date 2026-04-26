@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
-import { downloadAndPersist } from "@/lib/mbs/scraper";
+import { downloadAndPersist, fetchVideoMetadata } from "@/lib/mbs/scraper";
 import { vetCandidate, generateSuggestions } from "@/lib/mbs/brand-safety";
 import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
@@ -62,8 +62,19 @@ export async function GET(req: NextRequest) {
         duration_sec: durationSec,
       }).eq("id", candidate.id);
 
-      // Step 2: Vision check using thumbnail
-      const thumbUrl = candidate.thumbnail_url;
+      // Step 2: Get thumbnail — fetch metadata if missing
+      let thumbUrl = candidate.thumbnail_url;
+      if (!thumbUrl) {
+        try {
+          const meta = await fetchVideoMetadata(candidate.source_url);
+          thumbUrl = meta.thumbnailUrl;
+          if (thumbUrl) {
+            await supabase.from("mbs_candidates").update({ thumbnail_url: thumbUrl }).eq("id", candidate.id);
+          }
+        } catch (metaErr) {
+          console.warn(`[Vet] Metadata fetch failed for ${candidate.id}:`, metaErr);
+        }
+      }
       if (!thumbUrl) {
         await supabase.from("mbs_candidates").update({
           status: "rejected",

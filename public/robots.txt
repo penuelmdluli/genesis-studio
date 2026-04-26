@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /generate
+Disallow: /brain
+Disallow: /mimic
+Disallow: /gallery
+Disallow: /settings
+Disallow: /api-keys
+Disallow: /onboarding
+
+Sitemap: https://genesisstudio.app/sitemap.xml

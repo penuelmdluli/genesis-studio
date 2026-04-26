@@ -1,7 +1,7 @@
 // ============================================
-// MBS Character Picker — Engagement-based selection
-// Prefers characters that perform well for the
-// given dance style, with exploration factor.
+// MBS Character Picker — STRICT ROTATION
+// Never repeats any of the last 3 characters.
+// Cycles through all 10 before allowing reuse.
 // ============================================
 
 import { createSupabaseAdmin } from "@/lib/supabase";
@@ -28,26 +28,24 @@ export async function pickCharacterForStyle(danceStyle?: string): Promise<Charac
     throw new Error("No active MBS characters found");
   }
 
-  // If we have engagement data, weight by performance
-  const withEngagement = characters.filter(c => (c.avg_engagement_per_post ?? 0) > 0);
+  // Get the last 3 characters used (from recent non-cancelled jobs)
+  const { data: recentJobs } = await supabase
+    .from("mbs_jobs")
+    .select("character_id")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(3);
 
-  if (withEngagement.length >= 3 && danceStyle) {
-    // Style-matched characters get bonus
-    const scored = characters.map(c => {
-      let score = c.avg_engagement_per_post ?? 1;
-      if (c.best_for_styles?.includes(danceStyle)) score *= 1.5;
-      return { ...c, score };
-    });
+  const recentCharIds = new Set(
+    (recentJobs ?? []).map(j => j.character_id).filter(Boolean)
+  );
 
-    scored.sort((a, b) => b.score - a.score);
+  // Exclude recently used characters
+  const available = characters.filter(c => !recentCharIds.has(c.id));
 
-    // Weighted random: 60% top, 30% second, 10% rest
-    const r = Math.random();
-    if (r < 0.6) return scored[0];
-    if (r < 0.9 && scored.length > 1) return scored[1];
-    return scored[Math.floor(Math.random() * scored.length)];
-  }
+  // If all are excluded (shouldn't happen with 10 chars, 3 exclusions), use all
+  const pool = available.length > 0 ? available : characters;
 
-  // No engagement data yet — pure random
-  return characters[Math.floor(Math.random() * characters.length)];
+  // Pick randomly from the available pool
+  return pool[Math.floor(Math.random() * pool.length)];
 }

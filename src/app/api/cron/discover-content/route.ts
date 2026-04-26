@@ -6,9 +6,10 @@ import { envString } from "@/lib/env";
 export const maxDuration = 120;
 
 /**
- * Cron: Discover new dance content from monitored creators.
- * Runs every 30 min. Checks each active creator for new posts,
- * inserts eligible ones into mbs_candidates.
+ * Cron: Discover new dance content from verified creators ONLY.
+ * Runs every 30 min. Only pulls from mbs_source_creators where
+ * verified=true AND active=true. No unverified content enters
+ * the auto-approve flow.
  *
  * GET /api/cron/discover-content
  */
@@ -21,13 +22,14 @@ export async function GET(req: NextRequest) {
   const supabase = createSupabaseAdmin();
   const results = { creatorsChecked: 0, candidatesAdded: 0, errors: 0 };
 
-  // Get active source creators
+  // ONLY verified + active creators
   const { data: creators } = await supabase
     .from("mbs_source_creators")
     .select("*")
     .eq("active", true)
+    .eq("verified", true)
     .order("last_checked_at", { ascending: true, nullsFirst: true })
-    .limit(5); // Check 5 per run to stay within timeout
+    .limit(5);
 
   for (const creator of creators ?? []) {
     try {
@@ -35,20 +37,16 @@ export async function GET(req: NextRequest) {
       results.creatorsChecked++;
 
       for (const post of posts) {
-        // Filter: 5-30s duration, posted recently
         if (post.duration < 5 || post.duration > 30) continue;
         if (!post.url) continue;
 
-        // Check not already in candidates
         const { data: existing } = await supabase
           .from("mbs_candidates")
           .select("id")
           .eq("source_url", post.url)
           .maybeSingle();
-
         if (existing) continue;
 
-        // Insert as discovered
         await supabase.from("mbs_candidates").insert({
           source_creator_id: creator.id,
           source_url: post.url,
@@ -58,21 +56,18 @@ export async function GET(req: NextRequest) {
           thumbnail_url: post.thumbnailUrl,
           status: "discovered",
         });
-
         results.candidatesAdded++;
       }
 
-      // Update last checked
       await supabase.from("mbs_source_creators").update({
         last_checked_at: new Date().toISOString(),
       }).eq("id", creator.id);
-
     } catch (err) {
-      console.error(`[Discovery] Error for ${creator.handle}:`, err);
+      console.error(`[Discovery] Error for @${creator.handle}:`, err);
       results.errors++;
     }
   }
 
-  console.log(`[Discovery] Checked ${results.creatorsChecked} creators, added ${results.candidatesAdded} candidates`);
+  console.log(`[Discovery] ${results.creatorsChecked} creators, ${results.candidatesAdded} candidates`);
   return NextResponse.json(results);
 }

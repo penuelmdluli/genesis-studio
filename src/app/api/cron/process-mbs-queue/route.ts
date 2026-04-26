@@ -29,27 +29,54 @@ export async function GET(req: NextRequest) {
 
   try {
     // ── STAGE 0: Convert approved candidates → pending jobs ──
+    // Only candidates with verified source_creator_id can become jobs
     const { data: approvedCandidates } = await supabase
       .from("mbs_candidates")
-      .select("*, mbs_characters!suggested_character_id(*)")
+      .select("*, mbs_characters!suggested_character_id(*), mbs_source_creators!source_creator_id(handle, verified)")
       .eq("status", "approved")
       .not("reference_video_r2_url", "is", null)
+      .not("source_creator_id", "is", null)
       .order("overall_score", { ascending: false })
       .limit(3);
 
     for (const candidate of approvedCandidates ?? []) {
       try {
+        // Enforce verified creator source
+        const creator = candidate["mbs_source_creators"];
+        if (!creator?.verified || !creator?.handle) {
+          await supabase.from("mbs_candidates").update({
+            status: "rejected",
+            rejected_reason: "no_verified_source",
+          }).eq("id", candidate.id);
+          continue;
+        }
+
+        // Enforce caption attribution — reject if no handle
+        if (!candidate.suggested_caption) {
+          const { buildCaption } = await import("@/lib/mbs/caption-template");
+          const character = candidate["mbs_characters"];
+          const caption = buildCaption({
+            character: character?.name ?? "MBS Star",
+            creatorHandle: creator.handle,
+            setting: candidate.suggested_setting,
+            danceStyle: candidate.suggested_dance_style,
+          });
+          if (!caption) {
+            await supabase.from("mbs_candidates").update({
+              status: "rejected",
+              rejected_reason: "no_attribution_possible",
+            }).eq("id", candidate.id);
+            continue;
+          }
+          candidate.suggested_caption = caption;
+        }
+
         const character = candidate["mbs_characters"];
         const prompt = character
           ? `${character.description}, dancing joyfully, ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`
-          : candidate.suggested_setting
-            ? `child dancing joyfully in ${candidate.suggested_setting}, golden hour, cinematic`
-            : "child dancing joyfully, golden hour, cinematic, high quality";
+          : `child dancing joyfully in ${candidate.suggested_setting ?? "vibrant Soweto street"}, golden hour, cinematic`;
 
-        const r2PublicUrl = envString("R2_PUBLIC_URL");
-        const videoUrl = r2PublicUrl
-          ? `${r2PublicUrl}/${candidate.reference_video_r2_url}`
-          : candidate.reference_video_r2_url;
+        const videoUrl = candidate.reference_video_r2_url;
 
         await supabase.from("mbs_jobs").insert({
           candidate_id: candidate.id,
@@ -67,7 +94,7 @@ export async function GET(req: NextRequest) {
           status: "processed",
         }).eq("id", candidate.id);
 
-        console.log(`[MBS] Candidate ${candidate.id} → job created`);
+        console.log(`[MBS] Candidate ${candidate.id} → job (creator: @${creator.handle})`);
       } catch (err) {
         console.error(`[MBS] Failed to create job from candidate ${candidate.id}:`, err);
       }
@@ -135,14 +162,17 @@ export async function GET(req: NextRequest) {
         if (status === "COMPLETED") {
           const result = await getKlingMotionResult(job.fal_request_id);
 
-          // Persist to R2
+          // Persist to R2 as backup, but use FAL CDN URL for Facebook posting
+          // (R2 URLs require auth, Facebook can't fetch them)
           const storageKey = `mbs-finished/${job.id}.mp4`;
-          await persistExternalVideo(result.videoUrl, storageKey);
-          const r2Url = `/api/videos/${storageKey}`;
+          persistExternalVideo(result.videoUrl, storageKey).catch((e) =>
+            console.error(`[MBS] R2 backup persist failed for ${job.id}:`, e)
+          );
 
+          // Store FAL CDN URL — publicly accessible for ~24h, sufficient for FB posting
           await supabase.from("mbs_jobs").update({
             status: "quality_check",
-            finished_video_url: storageKey,
+            finished_video_url: result.videoUrl,
             cost_usd: result.costUsd,
             completed_at: new Date().toISOString(),
           }).eq("id", job.id);
@@ -212,11 +242,8 @@ export async function GET(req: NextRequest) {
 
       for (const job of readyJobs ?? []) {
         try {
-          // Build public R2 URL for Facebook
-          const r2PublicUrl = envString("R2_PUBLIC_URL");
-          const videoUrl = r2PublicUrl
-            ? `${r2PublicUrl}/${job.finished_video_url}`
-            : job.finished_video_url;
+          // finished_video_url contains the FAL CDN URL (publicly accessible)
+          const videoUrl = job.finished_video_url;
 
           const { postId } = await postVideoToFacebookPage({
             videoUrl,

@@ -33,6 +33,16 @@ export async function GET(req: NextRequest) {
 
   for (const candidate of candidates ?? []) {
     try {
+      // Rule 1: Reject candidates without verified creator source
+      if (!candidate.source_creator_id) {
+        await supabase.from("mbs_candidates").update({
+          status: "rejected",
+          rejected_reason: "no_verified_source",
+        }).eq("id", candidate.id);
+        results.rejected++;
+        continue;
+      }
+
       // Step 1: Download video to R2
       let r2Key: string;
       let durationSec: number;
@@ -69,9 +79,9 @@ export async function GET(req: NextRequest) {
       const creatorHandle = candidate.mbs_source_creators?.handle;
       const suggestions = await generateSuggestions(safety.suggestedDanceStyle, creatorHandle);
 
-      // Step 4: Route based on score
+      // Step 4: Route based on score (85+ auto, 60-84 review, <60 reject)
       let status: string;
-      if (safety.overall >= 80) {
+      if (safety.overall >= 85) {
         status = "approved";
         results.approved++;
       } else if (safety.overall >= 50) {
@@ -99,7 +109,7 @@ export async function GET(req: NextRequest) {
         },
         suggested_character_id: suggestions.character.id,
         suggested_setting: suggestions.setting,
-        suggested_caption: suggestions.caption,
+        suggested_caption: suggestions.caption ?? undefined,
         suggested_dance_style: safety.suggestedDanceStyle,
         rejected_reason: status === "rejected" ? safety.reasoning : null,
         updated_at: new Date().toISOString(),
@@ -119,7 +129,7 @@ export async function GET(req: NextRequest) {
                 `Flags: ${safety.flags.join(", ") || "none"}`,
                 `Reasoning: ${safety.reasoning}`,
                 `Suggested: ${suggestions.character.name} in ${suggestions.setting}`,
-                `Caption: ${suggestions.caption.slice(0, 100)}...`,
+                `Caption: ${(suggestions.caption ?? "No caption (missing attribution)").slice(0, 100)}...`,
                 ``,
                 `To approve: update mbs_candidates set status='approved' where id='${candidate.id}'`,
                 `To reject: update mbs_candidates set status='rejected' where id='${candidate.id}'`,

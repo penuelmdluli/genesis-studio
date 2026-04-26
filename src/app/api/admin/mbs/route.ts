@@ -42,8 +42,11 @@ export async function POST(req: NextRequest) {
   const finalPrompt = prompt ??
     `${character.description}, dancing joyfully, ${setting ?? "vibrant Soweto street"}, golden hour, cinematic, high quality`;
 
+  // Admin route requires creatorHandle in body for attribution
+  const { creatorHandle } = body as { creatorHandle?: string };
   const finalCaption = caption ?? buildCaption({
     character: character.name,
+    creatorHandle: creatorHandle ?? null,
     setting,
   });
 

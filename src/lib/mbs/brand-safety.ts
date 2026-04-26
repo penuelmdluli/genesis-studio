@@ -143,10 +143,12 @@ export async function generateSuggestions(danceStyle: string, creatorHandle?: st
 
   const setting = settings[danceStyle] ?? settings.other;
 
+  // Caption requires creator attribution — returns null if missing
   const caption = buildCaption({
     character: character.name,
+    creatorHandle: creatorHandle ?? null,
     setting,
-    hook: creatorHandle ? `Inspired by @${creatorHandle}` : undefined,
+    danceStyle,
   });
 
   return { character, setting, caption };

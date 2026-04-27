@@ -206,29 +206,19 @@ export async function GET(req: NextRequest) {
 
           // Persist raw Kling output to R2
           const rawKey = `mbs-finished/${job.id}-raw.mp4`;
-          persistExternalVideo(result.videoUrl, rawKey).catch((e) =>
-            console.error(`[MBS] R2 raw persist failed for ${job.id}:`, e)
-          );
-
-          // Apply MBS branding overlays (logo, hook, character intro, CTA, footer)
-          let brandedUrl = result.videoUrl; // fallback to raw if branding fails
+          const r2Pub = envString("R2_PUBLIC_URL") ?? "https://pub-891668ae91a142968457a5383e993020.r2.dev";
+          let rawR2Url = `${r2Pub}/${rawKey}`;
           try {
-            let charNameForBranding = "MBS Star";
-            if (job.character_id) {
-              const { data: ch } = await supabase.from("mbs_characters").select("name").eq("id", job.character_id).single();
-              charNameForBranding = ch?.name ?? "MBS Star";
-            }
-            const branded = await applyMBSBranding({
-              inputVideoUrl: result.videoUrl,
-              outputR2Key: `mbs-finished/${job.id}-branded.mp4`,
-              characterName: charNameForBranding,
-            });
-            brandedUrl = branded.publicUrl;
-            console.log(`[MBS] Branded ${job.id}: ${brandedUrl}`);
-          } catch (brandErr) {
-            console.error(`[MBS] Branding failed for ${job.id}, using raw:`, brandErr instanceof Error ? brandErr.message : brandErr);
-            // Fall through with raw URL — better to post unbranded than not post at all
+            await persistExternalVideo(result.videoUrl, rawKey);
+            console.log(`[MBS] Raw persisted ${job.id}: ${rawR2Url}`);
+          } catch (e) {
+            console.error(`[MBS] R2 raw persist failed for ${job.id}:`, e);
+            rawR2Url = result.videoUrl; // fallback to FAL CDN
           }
+
+          // Use raw video directly — branding pipeline produces corrupt output
+          // TODO: fix Railway branding endpoint, then re-enable
+          const brandedUrl = rawR2Url;
 
           await supabase.from("mbs_jobs").update({
             status: "quality_check",

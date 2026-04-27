@@ -58,9 +58,10 @@ export function buildCaption(opts: {
 ${opts.character} feeling the music 🔥
 
 Inspired by @${opts.creatorHandle}
-⭐MBS⭐
 
 ${cta}
+
+🎬 Create YOUR own AI dance video FREE → genesisstudio.app
 
 ${hashtags}${styleTag}`;
 }

@@ -5,7 +5,6 @@ import { persistExternalVideo } from "@/lib/storage";
 import { postVideoToFacebookPage } from "@/lib/social/facebook";
 import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
-import { applyMBSBranding } from "@/lib/mbs/branding";
 import { recordSpend } from "@/lib/spend-tracker";
 import { generateCommentSet } from "@/lib/mbs/comment-templates";
 import { postPageComment } from "@/lib/social/facebook-comments";

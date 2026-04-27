@@ -201,7 +201,32 @@ export async function GET(req: NextRequest) {
         const { status } = await getKlingMotionStatus(job.fal_request_id);
 
         if (status === "COMPLETED") {
-          const result = await getKlingMotionResult(job.fal_request_id);
+          let result;
+          try {
+            result = await getKlingMotionResult(job.fal_request_id);
+          } catch (resultErr) {
+            // Kling reports COMPLETED but result fetch fails (422 = input rejected)
+            const msg = resultErr instanceof Error ? resultErr.message : String(resultErr);
+            console.error(`[MBS] Kling result rejected for ${job.id}: ${msg}`);
+            if (job.retry_count < 2) {
+              await supabase.from("mbs_jobs").update({
+                status: "failed",
+                error_message: `Kling rejected: ${msg.slice(0, 200)}`,
+              }).eq("id", job.id);
+            } else {
+              await supabase.from("mbs_jobs").update({
+                status: "failed",
+                error_message: `Kling rejected after retries: ${msg.slice(0, 200)}`,
+              }).eq("id", job.id);
+            }
+            results.errors++;
+            sendSlackAlert({
+              level: "warning",
+              title: "MBS Kling rejected video",
+              message: `Job ${job.id}: ${msg.slice(0, 150)}`,
+            }).catch(() => {});
+            continue;
+          }
 
           // Persist raw Kling output to R2
           const rawKey = `mbs-finished/${job.id}-raw.mp4`;

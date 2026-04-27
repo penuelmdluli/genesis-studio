@@ -349,7 +349,7 @@ export async function GET(req: NextRequest) {
           sendSlackAlert({
             level: "info",
             title: "MBS post live",
-            message: `${job.mbs_characters?.name ?? "MBS"} → https://www.facebook.com/${postId}\nCost: $${job.cost_usd ?? "?"}`,
+            message: `${job.mbs_characters?.name ?? "MBS"} → https://www.facebook.com/${postId}\nCost: $${job.cost_usd ?? "?"}\n\nShare to your profile: https://www.facebook.com/sharer/sharer.php?u=https://www.facebook.com/${postId}\nShare to MBS2 (30k): https://www.facebook.com/dialog/share?app_id=591543017174198&href=https://www.facebook.com/${postId}&display=popup`,
           }).catch(() => {});
 
           console.log(`[MBS] Posted ${job.id} → FB ${postId}`);

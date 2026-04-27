@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
 import { persistExternalVideo } from "@/lib/storage";
-import { postVideoToFacebookPage } from "@/lib/social/facebook";
+import { postVideoToFacebookPage, crossPostVideo } from "@/lib/social/facebook";
 import { runQualityCheck } from "@/lib/mbs/quality-check";
 import { scheduleJob } from "@/lib/mbs/scheduler";
 import { recordSpend } from "@/lib/spend-tracker";
@@ -320,6 +320,12 @@ export async function GET(req: NextRequest) {
           }).eq("id", job.id);
 
           results.posted++;
+
+          // ── Cross-post to personal profile (non-fatal) ──
+          crossPostVideo({
+            videoUrl,
+            description: job.caption ?? `${job.mbs_characters?.name ?? "MBS"} feeling the music`,
+          }).catch((e) => console.error(`[MBS] Crosspost failed for ${job.id}:`, e));
 
           // ── Auto-comments: post 3 engagement comments as the page ──
           try {

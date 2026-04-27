@@ -41,6 +41,55 @@ export async function postVideoToFacebookPage(opts: {
   };
 }
 
+/**
+ * Cross-post video to additional Facebook profiles/pages.
+ * Uses FB_CROSSPOST_TARGETS env var: comma-separated "id:token" pairs.
+ * Non-fatal — failures are logged but don't block main post.
+ */
+export async function crossPostVideo(opts: {
+  videoUrl: string;
+  description: string;
+}): Promise<{ posted: string[]; failed: string[] }> {
+  const targets = envString("FB_CROSSPOST_TARGETS");
+  if (!targets) return { posted: [], failed: [] };
+
+  const posted: string[] = [];
+  const failed: string[] = [];
+
+  for (const target of targets.split(",").filter(Boolean)) {
+    const [targetId, token] = target.split(":").map(s => s.trim());
+    if (!targetId || !token) continue;
+
+    try {
+      const params = new URLSearchParams({
+        file_url: opts.videoUrl,
+        description: opts.description,
+        access_token: token,
+      });
+
+      const res = await fetch(`https://graph.facebook.com/v25.0/${targetId}/videos`, {
+        method: "POST",
+        body: params,
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { id: string };
+        posted.push(`${targetId}:${data.id}`);
+        console.log(`[FB Crosspost] Posted to ${targetId}: ${data.id}`);
+      } else {
+        const err = await res.text();
+        failed.push(targetId);
+        console.error(`[FB Crosspost] Failed ${targetId}: ${err.slice(0, 150)}`);
+      }
+    } catch (err) {
+      failed.push(targetId);
+      console.error(`[FB Crosspost] Error ${targetId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  return { posted, failed };
+}
+
 export async function getFacebookPostEngagement(postId: string): Promise<{
   views: number;
   reactions: number;

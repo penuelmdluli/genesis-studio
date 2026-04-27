@@ -35,16 +35,31 @@ export async function GET(req: NextRequest) {
   const results = { submitted: 0, completed: 0, posted: 0, errors: 0 };
 
   try {
+    // ── Daily limit check: max 3 videos per day ──
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const { count: todayJobCount } = await supabase
+      .from("mbs_jobs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayStart.toISOString())
+      .not("status", "eq", "failed");
+
+    const maxPerDay = 3;
+    const jobsCreatedToday = todayJobCount ?? 0;
+
     // ── STAGE 0: Convert approved candidates → pending jobs ──
-    // Only candidates with verified source_creator_id can become jobs
-    const { data: approvedCandidates } = await supabase
-      .from("mbs_candidates")
-      .select("*")
-      .eq("status", "approved")
-      .not("reference_video_r2_url", "is", null)
-      .not("source_creator_id", "is", null)
-      .order("overall_score", { ascending: false })
-      .limit(3);
+    // STRICT: Only 1 candidate at a time, only if under daily limit
+    const canCreateMore = jobsCreatedToday < maxPerDay;
+    const { data: approvedCandidates } = canCreateMore
+      ? await supabase
+          .from("mbs_candidates")
+          .select("*")
+          .eq("status", "approved")
+          .not("reference_video_r2_url", "is", null)
+          .not("source_creator_id", "is", null)
+          .order("overall_score", { ascending: false })
+          .limit(1)
+      : { data: [] };
 
     for (const candidate of approvedCandidates ?? []) {
       try {
@@ -125,22 +140,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── STAGE 1: Submit pending jobs (max 3 concurrent) ──
-    const { data: inFlight } = await supabase
+    // ── STAGE 1: Submit pending jobs (STRICT: 1 at a time, max 1 concurrent) ──
+    const { count: inFlightCount } = await supabase
       .from("mbs_jobs")
       .select("id", { count: "exact", head: true })
       .eq("status", "submitted");
 
-    const concurrentLimit = 3;
-    const slotsAvailable = concurrentLimit - (inFlight?.length ?? 0);
+    const hasSlot = (inFlightCount ?? 0) === 0; // only submit if nothing in flight
 
-    if (slotsAvailable > 0) {
+    if (hasSlot) {
       const { data: pendingJobs } = await supabase
         .from("mbs_jobs")
         .select("*")
         .eq("status", "pending")
         .order("created_at", { ascending: true })
-        .limit(slotsAvailable);
+        .limit(1);
 
       for (const job of pendingJobs ?? []) {
         try {

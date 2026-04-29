@@ -756,16 +756,20 @@ async function handlePost(): Promise<{
 
   const completedProductionIds = new Set<string>();
   if (candidateProductionIds.length > 0) {
-    const { data: prodRows } = await supabase
+    console.log(`[DEV SCHEDULER] Checking ${candidateProductionIds.length} candidate production(s):`, candidateProductionIds);
+    const { data: prodRows, error: prodErr } = await supabase
       .from("productions")
       .select("id, status, output_video_urls")
       .in("id", candidateProductionIds)
       .eq("status", "completed");
 
+    console.log(`[DEV SCHEDULER] Production query returned ${prodRows?.length ?? 0} rows (error: ${prodErr?.message ?? "none"})`);
+
     for (const p of (prodRows || []) as Array<{
       id: string;
       output_video_urls: unknown;
     }>) {
+      console.log(`[DEV SCHEDULER] Production ${p.id}: output_video_urls type=${typeof p.output_video_urls}, value=${JSON.stringify(p.output_video_urls)?.slice(0, 200)}`);
       let urls: Record<string, string> = {};
       try {
         urls =
@@ -777,6 +781,8 @@ async function handlePost(): Promise<{
       }
       if (urls.final || Object.keys(urls).length > 0) {
         completedProductionIds.add(p.id);
+      } else {
+        console.log(`[DEV SCHEDULER] Production ${p.id}: NO usable output URLs — skipping`);
       }
     }
   }

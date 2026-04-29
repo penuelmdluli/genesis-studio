@@ -43,22 +43,19 @@ async function scraperFetch(endpoint: string, body: Record<string, unknown>) {
 
 /**
  * List recent posts from a creator's profile via Railway scraper.
- * Uses Graph API for Facebook, yt-dlp for TikTok/other platforms.
+ * Skips Facebook creators (Graph API can't list other users' videos,
+ * yt-dlp can't scrape FB profiles without cookies).
+ * Facebook content must be added manually via the admin endpoint.
  */
 export async function listCreatorPosts(
   profileUrl: string,
   maxItems = 10,
   platform?: string
 ): Promise<CreatorPost[]> {
-  // Use Facebook Graph API for Facebook creators (more reliable than yt-dlp)
+  // Facebook profiles can't be scraped — skip silently
   if (platform === "facebook" || profileUrl.includes("facebook.com")) {
-    const accessToken = envString("FB_PAGE_TOKEN_mzansi_baby_stars") || envString("FB_PAGE_TOKEN_tech_news");
-    const data = await scraperFetch("/list-facebook-videos", {
-      profileUrl,
-      maxItems,
-      accessToken,
-    });
-    return (data.posts ?? []) as CreatorPost[];
+    console.log(`[Scraper] Skipping Facebook profile (not scrapable): ${profileUrl}`);
+    return [];
   }
   const data = await scraperFetch("/list-creator-posts", { profileUrl, maxItems });
   return (data.posts ?? []) as CreatorPost[];
@@ -66,15 +63,22 @@ export async function listCreatorPosts(
 
 /**
  * Download a video and upload to R2 via Railway scraper.
+ * Uses Facebook Graph API for facebook.com URLs, yt-dlp for everything else.
  */
 export async function downloadAndPersist(
   sourceUrl: string
 ): Promise<{ r2Key: string; durationSec: number }> {
+  if (sourceUrl.includes("facebook.com")) {
+    const accessToken = envString("FB_PAGE_TOKEN_mzansi_baby_stars") || envString("FB_PAGE_TOKEN_tech_news");
+    if (!accessToken) throw new Error("No FB page token for Facebook download");
+    const data = await scraperFetch("/download-facebook", {
+      url: sourceUrl,
+      accessToken,
+    });
+    return { r2Key: data.r2Key, durationSec: data.durationSec ?? 0 };
+  }
   const data = await scraperFetch("/download", { url: sourceUrl });
-  return {
-    r2Key: data.r2Key,
-    durationSec: data.durationSec ?? 0,
-  };
+  return { r2Key: data.r2Key, durationSec: data.durationSec ?? 0 };
 }
 
 /**

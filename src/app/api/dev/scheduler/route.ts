@@ -787,6 +787,24 @@ async function handlePost(): Promise<{
     }
   }
 
+  // DEBUG: if no completed productions found, return diagnostic info
+  if (completedProductionIds.size === 0 && candidateProductionIds.length > 0) {
+    // Check ALL statuses of candidate productions for diagnosis
+    const { data: allProdRows } = await supabase
+      .from("productions")
+      .select("id, status, output_video_urls")
+      .in("id", candidateProductionIds);
+    const diagInfo = (allProdRows || []).map((p: Record<string, unknown>) => ({
+      id: (p.id as string)?.slice(0, 12),
+      status: p.status,
+      hasUrls: !!p.output_video_urls,
+      urlType: typeof p.output_video_urls,
+      urlPreview: p.output_video_urls ? String(p.output_video_urls).slice(0, 100) : null,
+    }));
+    console.log(`[DEV SCHEDULER] DIAG: No completed productions with output URLs. Raw data:`, JSON.stringify(diagInfo));
+    return { posted: 0, results: [], _debug: { candidateProductionIds, diagInfo } };
+  }
+
   const postable = (allReady as Array<Record<string, unknown>>).filter((row) => {
     const pid = ((row.input_data as Record<string, unknown> | null) || {})
       .production_id as string | undefined;

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   for (const creator of creators ?? []) {
     try {
-      const posts = await listCreatorPosts(creator.profile_url, 10);
+      const posts = await listCreatorPosts(creator.profile_url, 10, creator.platform);
       results.creatorsChecked++;
 
       const maxDuration = creator.platform === "facebook" ? 60 : 30;

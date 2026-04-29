@@ -43,11 +43,23 @@ async function scraperFetch(endpoint: string, body: Record<string, unknown>) {
 
 /**
  * List recent posts from a creator's profile via Railway scraper.
+ * Uses Graph API for Facebook, yt-dlp for TikTok/other platforms.
  */
 export async function listCreatorPosts(
   profileUrl: string,
-  maxItems = 10
+  maxItems = 10,
+  platform?: string
 ): Promise<CreatorPost[]> {
+  // Use Facebook Graph API for Facebook creators (more reliable than yt-dlp)
+  if (platform === "facebook" || profileUrl.includes("facebook.com")) {
+    const accessToken = envString("FB_PAGE_TOKEN_mzansi_baby_stars") || envString("FB_PAGE_TOKEN_tech_news");
+    const data = await scraperFetch("/list-facebook-videos", {
+      profileUrl,
+      maxItems,
+      accessToken,
+    });
+    return (data.posts ?? []) as CreatorPost[];
+  }
   const data = await scraperFetch("/list-creator-posts", { profileUrl, maxItems });
   return (data.posts ?? []) as CreatorPost[];
 }

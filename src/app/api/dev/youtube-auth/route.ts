@@ -19,7 +19,7 @@ const SCOPES = [
 ].join(" ");
 
 export async function GET(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   const clientId = process.env.YOUTUBE_CLIENT_ID;

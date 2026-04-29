@@ -76,7 +76,7 @@ function toAggregateRow(key: string, bucket: number[]): Aggregate {
 }
 
 export async function POST(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   const secret =

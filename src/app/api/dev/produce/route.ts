@@ -217,7 +217,7 @@ async function checkFalHealth(): Promise<{ ok: boolean; reason?: string }> {
 }
 
 export async function POST(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   if (!validateCronSecret(req)) {

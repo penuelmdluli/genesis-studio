@@ -32,7 +32,7 @@ function isAuthorized(req: NextRequest): boolean {
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   if (!isAuthorized(req)) {
@@ -96,7 +96,7 @@ interface QueueInsertBody {
 }
 
 export async function POST(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   if (!isAuthorized(req)) {
@@ -195,7 +195,7 @@ interface QueueUpdateBody {
 }
 
 export async function PATCH(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   if (!isAuthorized(req)) {

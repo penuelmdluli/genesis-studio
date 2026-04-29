@@ -23,7 +23,7 @@ import { blockInProduction } from "@/lib/dev-only";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   const secret =

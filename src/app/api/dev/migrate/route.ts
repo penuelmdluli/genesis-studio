@@ -3,7 +3,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { blockInProduction } from "@/lib/dev-only";
 
 export async function POST(req: NextRequest) {
-  const blocked = blockInProduction();
+  const blocked = blockInProduction(req);
   if (blocked) return blocked;
 
   const secret = req.headers.get("x-cron-secret") || req.nextUrl.searchParams.get("secret");

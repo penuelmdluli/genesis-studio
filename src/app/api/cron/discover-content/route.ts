@@ -36,8 +36,9 @@ export async function GET(req: NextRequest) {
       const posts = await listCreatorPosts(creator.profile_url, 10);
       results.creatorsChecked++;
 
+      const maxDuration = creator.platform === "facebook" ? 60 : 30;
       for (const post of posts) {
-        if (post.duration < 5 || post.duration > 30) continue;
+        if (post.duration < 5 || post.duration > maxDuration) continue;
         if (!post.url) continue;
 
         const { data: existing } = await supabase

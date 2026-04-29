@@ -687,6 +687,7 @@ async function handlePost(): Promise<{
     postId?: string;
     error?: string;
   }>;
+  _debug?: unknown;
 }> {
   console.log("[DEV SCHEDULER] Posting completed videos...");
 

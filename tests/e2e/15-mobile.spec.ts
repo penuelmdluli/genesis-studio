@@ -1,9 +1,10 @@
-import { test, expect, devices } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "https://genesisstudio.app";
 
+test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+
 test.describe("Mobile-specific", () => {
-  test.use({ ...devices["iPhone 14"] });
 
   test("83: Touch targets are accessible on mobile", async ({ page }) => {
     await page.goto(BASE);

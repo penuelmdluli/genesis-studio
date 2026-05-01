@@ -26,7 +26,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Cape Town coastline at golden hour",
     prompt: "Cinematic aerial drone shot of a rugged coastline at golden hour, waves crashing against dark rocks, warm sunlight, slow forward motion, photorealistic, 4K film grain",
     thumbnailHint: "🌊",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -35,7 +35,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Leopard in dappled sunlight",
     prompt: "A leopard stalking slowly through tall golden grass in dappled afternoon sunlight, shallow depth of field, slow tracking shot, cinematic 4K quality, natural earth tones",
     thumbnailHint: "🐆",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -44,7 +44,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Rain-soaked city street at night",
     prompt: "Neon-lit city street at night during light rain, reflections on wet pavement, distant car lights blurred, cinematic moody atmosphere, slow forward dolly, 4K",
     thumbnailHint: "🌃",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   // ---- Character ----
@@ -54,7 +54,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Focused coder, late night",
     prompt: "A young African coder in a dimly lit room types intently, multiple monitors glow blue and purple, code reflects in their glasses, cyberpunk aesthetic, medium close-up, cinematic 4K",
     thumbnailHint: "💻",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -63,7 +63,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Marketplace stroll",
     prompt: "A confident young woman in colourful traditional African attire walking through a vibrant outdoor marketplace, slow motion, warm afternoon light, market stalls blurred in background, cinematic",
     thumbnailHint: "🛍️",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -72,7 +72,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Genuine laughter portrait",
     prompt: "Cinematic close-up portrait of a person laughing genuinely, warm window light from the left, soft bokeh background, 4K detail, candid moment, shallow depth of field",
     thumbnailHint: "😄",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   // ---- Product ----
@@ -82,7 +82,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Coffee with morning light",
     prompt: "A ceramic coffee cup on a rustic wooden table, steam rising slowly, soft morning sunlight from window, slow zoom in, commercial product shot quality, warm tones, 4K",
     thumbnailHint: "☕",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -91,7 +91,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Sneaker on rotating platform",
     prompt: "A clean white sneaker on a rotating black platform, studio lighting from three sides, slow 360 rotation, minimalist commercial product video, high contrast, 4K",
     thumbnailHint: "👟",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -100,7 +100,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Luxury watch macro",
     prompt: "Macro shot of a luxury wristwatch, second hand ticking, light reflecting on metal, deep blacks, soft fill light, cinematic commercial detail shot, 4K",
     thumbnailHint: "⌚",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   // ---- Abstract ----
@@ -110,7 +110,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Liquid gold flowing",
     prompt: "Liquid gold flowing into geometric crystal forms, macro detail, dark background, slow motion, hypnotic, premium product feel, deep contrasts, 4K",
     thumbnailHint: "✨",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -119,7 +119,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Ink blooming in water",
     prompt: "Black ink blooming into clear water in slow motion, spreading organic tendrils, soft underlit composition, dramatic high contrast, abstract art, 4K",
     thumbnailHint: "🖤",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
   {
@@ -128,7 +128,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
     title: "Particle storm",
     prompt: "Glowing orange particles swirling in a dark void, organic flow patterns, slow drift toward camera, ethereal, deep blacks, cinematic 4K",
     thumbnailHint: "🌟",
-    recommendedModel: "wan-2.2",
+    recommendedModel: "seedance-1.5",
     recommendedDuration: 5,
   },
 ];

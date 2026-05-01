@@ -48,28 +48,27 @@ test.describe("Payments & pricing", () => {
     expect(res.status()).toBe(401);
   });
 
-  test.skip("Stripe checkout Creator", async ({ page }) => {
-    // Needs auth + Stripe test mode — clicks the Creator plan buy button
-    // and verifies redirect to Stripe Checkout.
+  test.skip("Yoco checkout Creator (needs auth + Yoco test card)", async () => {
+    // Clicks Creator plan → redirects to Yoco hosted checkout
+    // Uses test card, completes 3DS challenge, returns to success URL
+    // Verifies credits added via webhook
   });
 
-  test.skip("Stripe checkout Pro", async ({ page }) => {
-    // Needs auth + Stripe test mode — clicks the Pro plan buy button
-    // and verifies redirect to Stripe Checkout.
+  test.skip("Yoco checkout Pro (needs auth + Yoco test card)", async () => {
+    // Same flow for Pro tier
   });
 
-  test.skip("Stripe checkout Studio", async ({ page }) => {
-    // Needs auth + Stripe test mode — clicks the Studio plan buy button
-    // and verifies redirect to Stripe Checkout.
+  test.skip("Yoco checkout Studio (needs auth + Yoco test card)", async () => {
+    // Same flow for Studio tier
   });
 
-  test.skip("Cancel checkout", async ({ page }) => {
-    // Needs auth + Stripe test mode — starts a checkout, navigates back,
-    // and verifies no charge is created.
+  test.skip("Cancel Yoco checkout (needs auth)", async () => {
+    // Starts checkout, navigates back to cancel URL
+    // Verifies no charge, no credits added
   });
 
-  test.skip("Webhook delivery test", async () => {
-    // Needs Stripe CLI — uses `stripe trigger` to send a test webhook
-    // and verifies the app processes it correctly.
+  test.skip("Yoco webhook idempotency (needs test webhook trigger)", async () => {
+    // Sends same webhook event twice
+    // Verifies credits granted only once (webhook_events table check)
   });
 });

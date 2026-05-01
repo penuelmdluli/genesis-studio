@@ -55,13 +55,32 @@ export default function FirstVideoPage() {
     return () => clearInterval(interval);
   }, [step]);
 
+  // Hard timeout — stop polling after 4 minutes
+  useEffect(() => {
+    if (step !== "generating") return;
+    const timer = setTimeout(() => {
+      setStep("error");
+      toast("Generation is taking longer than expected. Check your gallery in a few minutes.", "error");
+    }, 4 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [step, toast]);
+
   // Poll job status
   useEffect(() => {
     if (!jobId || step !== "generating") return;
+    let consecutiveErrors = 0;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors >= 10) {
+            setStep("error");
+            toast("Unable to check generation status. Please try again.", "error");
+          }
+          return;
+        }
+        consecutiveErrors = 0;
         const data = await res.json();
         if (data.status === "completed" && data.outputVideoUrl) {
           setVideoUrl(data.outputVideoUrl);
@@ -69,10 +88,15 @@ export default function FirstVideoPage() {
         } else if (data.status === "failed") {
           setStep("error");
         }
-      } catch { /* continue polling */ }
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors >= 10) {
+          setStep("error");
+        }
+      }
     }, 3000);
     return () => clearInterval(interval);
-  }, [jobId, step]);
+  }, [jobId, step, toast]);
 
   const handleGenerate = useCallback(async (prompt: SamplePrompt) => {
     setSelectedPrompt(prompt);

@@ -1,5 +1,6 @@
 // Genesis Studio Service Worker — PWA support
-const CACHE_NAME = "genesis-v2";
+const SW_VERSION = "v3-2026-05-01";
+const CACHE_NAME = "genesis-v3";
 const STATIC_ASSETS = ["/", "/dashboard", "/generate"];
 
 self.addEventListener("install", (event) => {
@@ -19,39 +20,45 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
+  // Skip non-GET requests — let the browser handle them natively.
+  if (event.request.method !== "GET") return;
 
-  // Skip non-GET, API calls, and external URLs (videos, media, CDN assets)
-  if (
-    event.request.method !== "GET" ||
-    url.includes("/api/") ||
-    !url.startsWith(self.location.origin) // Only cache same-origin requests
-  ) {
-    return;
-  }
+  const url = new URL(event.request.url);
 
-  // Skip media files — never cache videos/audio
-  if (url.match(/\.(mp4|webm|mov|mp3|wav|ogg)$/i)) {
-    return;
-  }
+  // Skip cross-origin requests — never cache external resources.
+  if (url.origin !== self.location.origin) return;
+
+  // Skip API calls — never cache dynamic data.
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Skip media files — never cache videos/audio.
+  if (/\.(mp4|webm|mov|mp3|wav|ogg)$/i.test(url.pathname)) return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() =>
+        caches
+          .match(event.request)
+          .then((cached) => cached || new Response("Offline", { status: 503 }))
+      )
   );
 });
 
 // Push notification support
 self.addEventListener("push", (event) => {
-  const data = event.data ? event.data.json() : {};
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Malformed push payload — use defaults
+  }
   const title = data.title || "Genesis Studio";
   const options = {
     body: data.body || "Your video is ready!",

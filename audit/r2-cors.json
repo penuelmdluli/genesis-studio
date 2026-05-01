@@ -1,0 +1,13 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://genesisstudio.app",
+      "https://www.genesisstudio.app",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Content-Length", "Content-Type", "ETag"],
+    "MaxAgeSeconds": 86400
+  }
+]

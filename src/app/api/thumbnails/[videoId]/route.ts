@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   S3Client,
-  GetObjectCommand,
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { r2PublicUrl } from "@/lib/storage";
 
 const R2 = new S3Client({
   region: "auto",
@@ -19,8 +18,7 @@ const R2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
-// Thumbnails are public images; max-out the AWS sigv4 TTL (7 days).
-const PRESIGN_TTL_SECONDS = 7 * 24 * 60 * 60;
+// Thumbnails are public images.
 
 /**
  * GET /api/thumbnails/{videoId}
@@ -61,16 +59,12 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const signedUrl = await getSignedUrl(
-      R2,
-      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-      { expiresIn: PRESIGN_TTL_SECONDS }
-    );
+    const publicUrl = r2PublicUrl(key);
 
-    return NextResponse.redirect(signedUrl, {
+    return NextResponse.redirect(publicUrl, {
       status: 302,
       headers: {
-        "Cache-Control": "public, max-age=518400, immutable",
+        "Cache-Control": "public, max-age=604800, immutable",
       },
     });
   } catch (error) {

@@ -24,6 +24,20 @@ const R2 = new S3Client({
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
+/**
+ * Build a public URL for an R2 object. Uses the configured R2_PUBLIC_URL
+ * (custom domain or pub-*.r2.dev). Falls back to the API proxy route.
+ * NEVER returns a raw r2.cloudflarestorage.com URL — those lack CORS headers
+ * and cannot be loaded by browsers.
+ */
+export function r2PublicUrl(key: string): string {
+  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
+    return `${PUBLIC_URL.replace(/\/$/, "")}/${encodeURI(key)}`;
+  }
+  // Fallback: serve through the API proxy (works but bytes flow through Vercel)
+  return `/api/r2-proxy/${encodeURI(key)}`;
+}
+
 export async function uploadVideo(
   key: string,
   body: Buffer | ReadableStream,

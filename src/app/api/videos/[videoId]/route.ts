@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   S3Client,
-  GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { getUserByClerkId, deleteVideo } from "@/lib/db";
+import { r2PublicUrl } from "@/lib/storage";
 
 const R2 = new S3Client({
   region: "auto",
@@ -21,10 +20,6 @@ const R2 = new S3Client({
 });
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
-
-// Presigned URL TTL — 1 hour is plenty for a video session and short enough
-// that links don't leak permanently. Browsers will re-fetch on expiry.
-const PRESIGN_TTL_SECONDS = 60 * 60;
 
 async function findVideoKeyInR2(
   userId: string,
@@ -100,22 +95,15 @@ export async function GET(
       );
     }
 
-    // Issue a presigned URL and 302-redirect.
-    // The browser then fetches bytes DIRECTLY from R2 — they never pass
-    // through this Vercel function, so fastOriginTransfer stays at zero.
+    // Redirect to the public R2 URL (custom domain or pub-*.r2.dev).
+    // Bytes flow R2 → browser directly, never through Vercel.
     // Range requests are handled natively by R2 on the redirected URL.
-    const signedUrl = await getSignedUrl(
-      R2,
-      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-      { expiresIn: PRESIGN_TTL_SECONDS }
-    );
+    const publicUrl = r2PublicUrl(key);
 
-    return NextResponse.redirect(signedUrl, {
+    return NextResponse.redirect(publicUrl, {
       status: 302,
       headers: {
-        // Tell browsers/CDNs not to cache the redirect itself for too long —
-        // the URL inside expires after PRESIGN_TTL_SECONDS.
-        "Cache-Control": `private, max-age=${PRESIGN_TTL_SECONDS - 60}`,
+        "Cache-Control": "private, max-age=3540",
       },
     });
   } catch (error) {

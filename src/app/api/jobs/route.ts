@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
 
     const user = await getUserByClerkId(clerkId);
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      // User authenticated via Clerk but no DB record yet (webhook pending).
+      // Return empty list instead of 404 — the record will appear shortly.
+      return NextResponse.json({ jobs: [] });
     }
 
     const { searchParams } = new URL(req.url);

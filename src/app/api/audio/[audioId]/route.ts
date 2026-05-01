@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   S3Client,
-  GetObjectCommand,
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
+import { r2PublicUrl } from "@/lib/storage";
 
 const R2 = new S3Client({
   region: "auto",
@@ -20,13 +19,10 @@ const R2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
-const PRESIGN_TTL_SECONDS = 60 * 60;
-
 /**
  * GET /api/audio/{audioId}
- * 302-redirects to a presigned R2 URL for the user's audio file.
+ * 302-redirects to the public R2 URL for the user's audio file.
  * Bytes flow R2 → browser directly (zero fastOriginTransfer).
- * Range requests are handled natively by R2 on the redirected URL.
  */
 export async function GET(
   _req: NextRequest,
@@ -42,7 +38,7 @@ export async function GET(
 
     const user = await getUserByClerkId(clerkId);
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const key = `audio/${user.id}/${audioId}.mp3`;
@@ -65,16 +61,12 @@ export async function GET(
       );
     }
 
-    const signedUrl = await getSignedUrl(
-      R2,
-      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-      { expiresIn: PRESIGN_TTL_SECONDS }
-    );
+    const publicUrl = r2PublicUrl(key);
 
-    return NextResponse.redirect(signedUrl, {
+    return NextResponse.redirect(publicUrl, {
       status: 302,
       headers: {
-        "Cache-Control": `private, max-age=${PRESIGN_TTL_SECONDS - 60}`,
+        "Cache-Control": "private, max-age=3540",
       },
     });
   } catch (error) {

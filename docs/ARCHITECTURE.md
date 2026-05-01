@@ -2,33 +2,33 @@
 
 ## System Overview
 
-```
-Browser ──> Vercel (Next.js 16) ──> Clerk (auth)
-                │                        │
-                ├── API Routes ──────────┤
-                │       │                │
-                │       ├── Supabase (PostgreSQL + RLS)
-                │       │       └── users, jobs, videos, credits, productions
-                │       │
-                │       ├── FAL.AI (serverless GPU)
-                │       │       ├── Seedance 1.5 (text-to-video)
-                │       │       ├── Kling 2.6 (text/image-to-video)
-                │       │       ├── Kokoro / ElevenLabs (TTS)
-                │       │       └── Fast SDXL (thumbnails)
-                │       │
-                │       ├── RunPod (dedicated GPU endpoints)
-                │       │       ├── Wan 2.2 (text-to-video)
-                │       │       ├── ComfyUI (image generation)
-                │       │       └── Mimic Motion (dance transfer)
-                │       │
-                │       ├── Cloudflare R2 (object storage)
-                │       │       └── pub-*.r2.dev (public CDN)
-                │       │
-                │       ├── Stripe + PayFast + Paystack + Yoco (payments)
-                │       │
-                │       └── Facebook Graph API (auto-posting)
-                │
-                └── Static Pages (SSG/ISR via Vercel)
+```mermaid
+graph TB
+    Browser["Browser / Mobile"]
+    Vercel["Vercel (Next.js 16)"]
+    Clerk["Clerk (Auth)"]
+    Supabase["Supabase (PostgreSQL + RLS)"]
+    R2["Cloudflare R2 (pub-*.r2.dev)"]
+    FAL["FAL.AI (Seedance, Kling, Kokoro)"]
+    RunPod["RunPod (Wan 2.2, ComfyUI, Mimic)"]
+    Stripe["Stripe + PayFast + Yoco"]
+    Facebook["Facebook Graph API"]
+    Resend["Resend (Email)"]
+    Slack["Slack (Alerts)"]
+
+    Browser -->|HTTPS| Vercel
+    Vercel -->|Session| Clerk
+    Vercel -->|Queries| Supabase
+    Vercel -->|Upload/Serve videos| R2
+    Vercel -->|Generate video| FAL
+    Vercel -->|Generate video| RunPod
+    Vercel -->|Payments| Stripe
+    Vercel -->|Auto-post| Facebook
+    Vercel -->|Transactional email| Resend
+    Vercel -->|Alerts| Slack
+    R2 -->|Video playback| Browser
+    Stripe -->|Webhooks| Vercel
+    RunPod -->|Webhooks| Vercel
 ```
 
 ## Data Flow: Video Generation

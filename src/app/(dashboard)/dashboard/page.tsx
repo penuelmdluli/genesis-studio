@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonCard, SkeletonVideoCard } from "@/components/ui/skeleton";
 import { PageTransition, StaggerGroup, StaggerItem, AnimatedCounter, MotionSection, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
+import { useToast } from "@/components/ui/toast";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Sparkles,
@@ -31,7 +32,20 @@ import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { user, activeJobs, videos, isInitialized } = useStore();
+  const { toast } = useToast();
   const isLoading = !isInitialized;
+
+  // Handle payment success/pack_success redirects from Yoco
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      toast("Payment successful! Your plan has been upgraded.", "success");
+      window.history.replaceState({}, "", "/dashboard");
+    } else if (params.get("pack_success") === "true") {
+      toast("Credits added to your account!", "success");
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, [toast]);
 
   const pendingJobs = (activeJobs || []).filter(
     (j) => j.status === "processing" || j.status === "queued"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,15 @@ export default function PricingPage() {
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [currency, setCurrency] = useState<"USD" | "ZAR">("ZAR");
+
+  // Handle payment redirect outcomes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("cancelled") === "true") {
+      toast("Payment was cancelled or declined. Please try again or use a different card.", "error");
+      window.history.replaceState({}, "", "/pricing");
+    }
+  }, [toast]);
   const [referralData, setReferralData] = useState<{ code: string; shareUrl: string; referralCount: number; creditsEarned: number } | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);

@@ -89,6 +89,9 @@ export default function EditPage() {
 
   return (
     <PageTransition className="space-y-6">
+      <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+        This feature is coming soon. Check back for updates.
+      </div>
       <div>
         <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
           <Film className="w-6 h-6 text-violet-400" />

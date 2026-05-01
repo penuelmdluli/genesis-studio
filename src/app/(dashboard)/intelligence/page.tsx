@@ -193,6 +193,9 @@ export default function IntelligencePage() {
   return (
     <PageTransition>
       <div className="max-w-6xl mx-auto space-y-6">
+        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          This feature is coming soon. Check back for updates.
+        </div>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>

@@ -1,12 +1,59 @@
 // ============================================
 // GENESIS STUDIO — Generation Idempotency
 // Prevents duplicate generations from retries.
-// Uses Upstash Redis with 1-hour dedupe window.
+// Uses Upstash Redis with 1-hour dedupe window
+// + Supabase generation_jobs table for header-based keys.
 // ============================================
 
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 import { envString } from "./env";
+import { createSupabaseAdmin } from "@/lib/supabase";
+
+// --------------- Supabase-based idempotency (X-Idempotency-Key header) ---------------
+
+type IdempotencyResult =
+  | { exists: true; jobId: string }
+  | { exists: false };
+
+const IDEMPOTENCY_TTL_HOURS = 24;
+
+/**
+ * Check if a generation job already exists for the given user + idempotency key.
+ * Key is supplied by the client via `X-Idempotency-Key` header (UUID v4).
+ * Window: 24 hours — keys older than that are ignored.
+ */
+export async function checkIdempotencyKey(
+  userId: string,
+  idempotencyKey: string,
+): Promise<IdempotencyResult> {
+  const supabase = createSupabaseAdmin();
+
+  const cutoff = new Date(
+    Date.now() - IDEMPOTENCY_TTL_HOURS * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data, error } = await supabase
+    .from("generation_jobs")
+    .select("id")
+    .eq("idempotency_key", idempotencyKey)
+    .eq("user_id", userId)
+    .gt("created_at", cutoff)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    // Log but don't block — treat as non-existent so the request proceeds
+    console.error("[idempotency] Supabase lookup failed:", error.message);
+    return { exists: false };
+  }
+
+  if (data) {
+    return { exists: true, jobId: data.id };
+  }
+
+  return { exists: false };
+}
 
 let redis: Redis | null = null;
 

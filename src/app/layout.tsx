@@ -7,6 +7,7 @@ import { CookieConsent } from "@/components/ui/cookie-consent";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -100,6 +101,12 @@ export default function RootLayout({
           <RegisterServiceWorker />
           <Analytics />
           <SpeedInsights />
+          <Script
+            defer
+            data-domain="genesisstudio.app"
+            src="https://plausible.io/js/script.js"
+            strategy="afterInteractive"
+          />
         </body>
       </html>
     </ClerkProvider>

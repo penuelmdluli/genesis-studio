@@ -17,21 +17,10 @@ const isPublicRoute = createRouteMatcher([
   "/explore/(.*)",
   "/refund",
   "/acceptable-use",
-  // API routes with their own auth (webhooks, crons, public endpoints)
-  "/api/health",
-  "/api/explore",
-  "/api/explore/(.*)",
-  "/api/webhooks/(.*)",
-  "/api/cron/(.*)",
-  "/api/brain/webhook",
-  "/api/v1/(.*)",
-  "/api/og",
-  "/api/proxy-image",
-  "/api/assets/(.*)",
-  "/api/loadshedding",
-  "/api/share/(.*)",
-  "/api/test/(.*)",
-  "/api/dev/(.*)",
+  // ALL API routes are public at the middleware level.
+  // Each route handler calls auth() internally and returns proper
+  // JSON 401 responses. Blocking here causes HTML 404s instead.
+  "/api/(.*)",
 ]);
 
 // Next.js 16 uses "proxy" convention (renamed from middleware)

@@ -40,7 +40,15 @@ const ASPECT_RATIOS = [
 ];
 
 type ReferenceTab = "url" | "upload";
+type CharacterTab = "upload" | "library";
 type JobStatus = "idle" | "uploading" | "scraping" | "submitting" | "in_queue" | "processing" | "completed" | "failed";
+
+interface MbsCharacter {
+  id: string;
+  name: string;
+  description: string | null;
+  portrait_url: string;
+}
 
 const STORAGE_KEY = "mimic_active_job";
 
@@ -71,8 +79,12 @@ export default function MimicStudioPage() {
   const { toast } = useToast();
 
   // Character image
+  const [characterTab, setCharacterTab] = useState<CharacterTab>("upload");
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterImagePreview, setCharacterImagePreview] = useState<string | null>(null);
+  const [libraryCharacter, setLibraryCharacter] = useState<MbsCharacter | null>(null);
+  const [libraryCharacters, setLibraryCharacters] = useState<MbsCharacter[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   // Reference video
@@ -156,11 +168,38 @@ export default function MimicStudioPage() {
       toast("Image too large (max 10MB)", "error");
       return;
     }
+    setLibraryCharacter(null);
     setCharacterImage(file);
     setError(null);
     const reader = new FileReader();
     reader.onload = () => setCharacterImagePreview(reader.result as string);
     reader.readAsDataURL(file);
+  };
+
+  // Lazy-load the character library when the user switches to the Library tab
+  useEffect(() => {
+    if (characterTab !== "library" || libraryCharacters.length > 0 || libraryLoading) return;
+    let cancelled = false;
+    setLibraryLoading(true);
+    fetch("/api/mbs/characters")
+      .then((res) => (res.ok ? res.json() : { characters: [] }))
+      .then((data) => {
+        if (!cancelled) setLibraryCharacters(data.characters || []);
+      })
+      .catch(() => { /* silent — empty grid handles itself */ })
+      .finally(() => {
+        if (!cancelled) setLibraryLoading(false);
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characterTab]);
+
+  const handleLibrarySelect = (c: MbsCharacter) => {
+    setCharacterImage(null);
+    setCharacterImagePreview(null);
+    if (characterImageRef.current) characterImageRef.current.value = "";
+    setLibraryCharacter(c);
+    setError(null);
   };
 
   const handleReferenceVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,6 +232,7 @@ export default function MimicStudioPage() {
   const clearCharacterImage = () => {
     setCharacterImage(null);
     setCharacterImagePreview(null);
+    setLibraryCharacter(null);
     if (characterImageRef.current) characterImageRef.current.value = "";
   };
 
@@ -204,7 +244,8 @@ export default function MimicStudioPage() {
   };
 
   const hasReference = referenceTab === "url" ? referenceUrl.trim().length > 0 : !!referenceVideo;
-  const canGenerate = !!characterImage && hasReference && hasEnoughCredits && !isGenerating;
+  const hasCharacter = !!characterImage || !!libraryCharacter;
+  const canGenerate = hasCharacter && hasReference && hasEnoughCredits && !isGenerating;
 
   // Poll for job status
   const startPolling = useCallback((id: string) => {
@@ -272,8 +313,10 @@ export default function MimicStudioPage() {
     try {
       setJobStatus("uploading");
 
-      // Upload character image
-      const characterImageUrl = await uploadFile(characterImage!, "image");
+      // Use library character URL directly, or upload the user's file
+      const characterImageUrl = libraryCharacter
+        ? libraryCharacter.portrait_url
+        : await uploadFile(characterImage!, "image");
 
       // Upload reference video if provided directly
       let referenceVideoUrl: string | undefined;
@@ -414,14 +457,41 @@ export default function MimicStudioPage() {
                 Step 1: Your Character
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {characterImagePreview ? (
+            <CardContent className="space-y-4">
+              {/* Tabs — Upload vs Library */}
+              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                {([
+                  { key: "upload" as const, label: "Upload", icon: Upload },
+                  { key: "library" as const, label: "Studio Library", icon: User },
+                ]).map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setCharacterTab(tab.key)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      characterTab === tab.key
+                        ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                    }`}
+                  >
+                    <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selected character preview (works for both upload + library) */}
+              {(characterImagePreview || libraryCharacter) ? (
                 <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
                   <img
-                    src={characterImagePreview}
-                    alt="Character"
+                    src={libraryCharacter?.portrait_url || characterImagePreview || ""}
+                    alt={libraryCharacter?.name || "Character"}
                     className="w-full h-48 object-contain"
                   />
+                  {libraryCharacter && (
+                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm text-xs text-cyan-300 font-medium">
+                      {libraryCharacter.name}
+                    </div>
+                  )}
                   <button
                     onClick={clearCharacterImage}
                     className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-colors"
@@ -429,7 +499,7 @@ export default function MimicStudioPage() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              ) : (
+              ) : characterTab === "upload" ? (
                 <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
                   <input
                     ref={characterImageRef}
@@ -448,6 +518,41 @@ export default function MimicStudioPage() {
                     PNG, JPG, or WEBP — max 10MB. Full body works best.
                   </span>
                 </label>
+              ) : (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                  {libraryLoading ? (
+                    <div className="flex items-center justify-center h-44 text-zinc-500 text-sm gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading characters…
+                    </div>
+                  ) : libraryCharacters.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-44 text-zinc-500 text-sm">
+                      No characters available yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
+                      {libraryCharacters.map((char) => (
+                        <button
+                          key={char.id}
+                          onClick={() => handleLibrarySelect(char)}
+                          className="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/[0.06] hover:border-cyan-500/40 transition-all duration-200"
+                        >
+                          <img
+                            src={char.portrait_url}
+                            alt={char.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 px-2 py-1.5 bg-gradient-to-t from-black/85 to-transparent">
+                            <div className="text-[11px] font-medium text-white truncate">
+                              {char.name}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

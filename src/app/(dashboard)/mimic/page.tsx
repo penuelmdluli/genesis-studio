@@ -312,6 +312,7 @@ export default function MimicStudioPage() {
 
     try {
       setJobStatus("uploading");
+      toast("Uploading files...", "info");
 
       // Use library character URL directly, or upload the user's file
       const characterImageUrl = libraryCharacter

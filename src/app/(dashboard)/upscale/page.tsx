@@ -171,6 +171,7 @@ export default function UpscalePage() {
       let videoUrl: string;
 
       if (videoFile) {
+        toast("Uploading video...", "info");
         const { uploadFile } = await import("@/lib/upload-client");
         videoUrl = await uploadFile(videoFile, "video");
       } else if (selectedGalleryVideo) {

@@ -1,42 +1,37 @@
 /**
  * GENESIS STUDIO — Smart Owner Post Scheduler
  *
- * Rules:
+ * STRICT RULES:
+ * - NEVER post immediately. ALL posts are scheduled to optimal time slots.
  * - Max 3 posts per page per day
- * - Optimal slots: 8am, 1pm, 8pm SA time (UTC+2)
- * - Min 4 hours between posts on the same page
- * - If a slot is taken, queue for the next available slot
- * - If all today's slots are used, schedule for tomorrow
- * - Anti-pattern jitter: ±15 minutes to look natural
- * - Posts that are immediate (first of the day) go out now
- * - Posts that need scheduling use Facebook's scheduled_publish_time
+ * - Slots: 8am, 1pm, 8pm SA time (UTC+2)
+ * - Each slot can only hold 1 post
+ * - If you create 3 videos at once, they go to 8am, 1pm, 8pm
+ * - If today's slots are full, overflow to tomorrow
+ * - Anti-pattern jitter: ±15 minutes so posts look natural
  */
 
 import { createSupabaseAdmin } from "@/lib/supabase";
 
 const SA_OFFSET_HOURS = 2;
 const MAX_POSTS_PER_DAY = 3;
-const MIN_GAP_MINUTES = 240; // 4 hours
 
 // Optimal posting slots (SA local time hours)
 const SLOTS = [
-  { hour: 8, jitter: 30 },   // Morning: 7:30-8:30 SA
-  { hour: 13, jitter: 30 },  // Lunch: 12:30-13:30 SA
-  { hour: 20, jitter: 30 },  // Evening: 19:30-20:30 SA
+  { hour: 8, jitter: 15 },   // Morning
+  { hour: 13, jitter: 15 },  // Lunch
+  { hour: 20, jitter: 15 },  // Evening
 ];
 
-// Table: owner_scheduled_posts — tracks all scheduled/posted owner content
-// If table doesn't exist, scheduling still works (just without history)
-
 interface ScheduleResult {
-  action: "post_now" | "schedule";
-  scheduledFor?: Date;
+  action: "schedule";
+  scheduledFor: Date;
   reason: string;
 }
 
 /**
- * Determine whether to post now or schedule for later.
- * Checks recent posts on the target page to avoid flooding.
+ * Always returns a scheduled slot. Never posts immediately.
+ * Finds the next available slot that isn't already taken.
  */
 export async function getPostingSlot(
   pageId: string,
@@ -45,99 +40,98 @@ export async function getPostingSlot(
   const supabase = createSupabaseAdmin();
   const now = new Date();
 
-  // Count today's owner posts on this page
-  const todayStart = new Date(now);
-  todayStart.setUTCHours(0, 0, 0, 0);
-
-  let todayPostCount = 0;
-  let lastPostTime: Date | null = null;
+  // Get all booked slots for the next 7 days on this page
+  const lookAhead = new Date(now.getTime() + 7 * 86400000);
+  let bookedSlots: Date[] = [];
 
   try {
-    // Check our own tracking table — include both posted AND scheduled/pending records
-    const { data: recentPosts } = await supabase
+    const { data: records } = await supabase
       .from("owner_scheduled_posts")
-      .select("posted_at, scheduled_for, created_at")
+      .select("scheduled_for, posted_at, created_at")
       .eq("page_id", pageId)
-      .gte("created_at", todayStart.toISOString())
+      .gte("created_at", new Date(now.getTime() - 86400000).toISOString())
       .order("created_at", { ascending: false });
 
-    if (recentPosts && recentPosts.length > 0) {
-      todayPostCount = recentPosts.length;
-      // Use the most recent timestamp (posted_at or created_at for pending reservations)
-      const mostRecent = recentPosts[0];
-      lastPostTime = new Date(mostRecent.posted_at || mostRecent.created_at);
+    if (records) {
+      bookedSlots = records.map((r) => {
+        const t = r.scheduled_for || r.posted_at || r.created_at;
+        return new Date(t);
+      });
     }
   } catch {
-    // Table might not exist yet — that's fine, treat as no posts today
-    console.log(`[SCHEDULER] owner_scheduled_posts table not found, proceeding without history`);
+    // Table may not exist — proceed with empty bookings
   }
 
-  // Rule 1: If max posts reached today, schedule for tomorrow
-  if (todayPostCount >= MAX_POSTS_PER_DAY) {
-    const tomorrow = findNextSlot(now, true);
-    return {
-      action: "schedule",
-      scheduledFor: tomorrow,
-      reason: `${pageName}: ${todayPostCount}/${MAX_POSTS_PER_DAY} posts today, scheduled for ${formatSATime(tomorrow)}`,
-    };
-  }
+  // Find the next available slot
+  const slot = findNextAvailableSlot(now, lookAhead, bookedSlots);
 
-  // Rule 2: If last post was less than 4 hours ago, schedule for next slot
-  if (lastPostTime) {
-    const gapMs = now.getTime() - lastPostTime.getTime();
-    const gapMinutes = gapMs / (60 * 1000);
-
-    if (gapMinutes < MIN_GAP_MINUTES) {
-      const nextSlot = findNextSlot(now, false);
-      // Also check the gap from last post to next slot
-      const slotGap = (nextSlot.getTime() - lastPostTime.getTime()) / (60 * 1000);
-      const finalSlot = slotGap >= MIN_GAP_MINUTES ? nextSlot : findNextSlot(nextSlot, false);
-
-      return {
-        action: "schedule",
-        scheduledFor: finalSlot,
-        reason: `${pageName}: last post ${Math.round(gapMinutes)}min ago (min ${MIN_GAP_MINUTES}min), scheduled for ${formatSATime(finalSlot)}`,
-      };
-    }
-  }
-
-  // Rule 3: No recent posts — post immediately
   return {
-    action: "post_now",
-    reason: `${pageName}: no recent posts, posting immediately`,
+    action: "schedule",
+    scheduledFor: slot.time,
+    reason: `${pageName}: scheduled for ${formatSATime(slot.time)} (${slot.label})`,
   };
 }
 
 /**
- * Find the next available posting slot.
+ * Walk through slots day by day until we find one that's not booked.
+ * A slot is "booked" if any existing post is within 2 hours of it.
  */
-function findNextSlot(from: Date, nextDay: boolean): Date {
-  const target = new Date(from);
+function findNextAvailableSlot(
+  now: Date,
+  maxDate: Date,
+  bookedSlots: Date[]
+): { time: Date; label: string } {
+  const current = new Date(now);
 
-  if (nextDay) {
-    target.setUTCDate(target.getUTCDate() + 1);
+  // Start from today, walk forward day by day
+  for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+    const day = new Date(current);
+    day.setUTCDate(day.getUTCDate() + dayOffset);
+
+    // Count how many posts are already booked for this day
+    const dayStart = new Date(day); dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(day); dayEnd.setUTCHours(23, 59, 59, 999);
+    const dayBookings = bookedSlots.filter((b) => b >= dayStart && b <= dayEnd);
+
+    if (dayBookings.length >= MAX_POSTS_PER_DAY) continue; // Day is full
+
+    for (const slot of SLOTS) {
+      const slotTime = new Date(day);
+      slotTime.setUTCHours(slot.hour - SA_OFFSET_HOURS, 0, 0, 0);
+
+      // Skip slots in the past (need at least 10 min in the future for FB API)
+      if (slotTime.getTime() < now.getTime() + 10 * 60 * 1000) continue;
+
+      // Skip if beyond our look-ahead window
+      if (slotTime > maxDate) continue;
+
+      // Check if this slot is already booked (within 2 hours of an existing post)
+      const isBooked = bookedSlots.some(
+        (b) => Math.abs(b.getTime() - slotTime.getTime()) < 2 * 60 * 60 * 1000
+      );
+
+      if (!isBooked) {
+        // Add jitter
+        const jitterMs = (Math.random() * slot.jitter * 2 - slot.jitter) * 60 * 1000;
+        const finalTime = new Date(slotTime.getTime() + jitterMs);
+
+        const dayLabel = dayOffset === 0 ? "today" : dayOffset === 1 ? "tomorrow" : `in ${dayOffset} days`;
+        const timeLabel = `${slot.hour}:00 SA ${dayLabel}`;
+
+        return { time: finalTime, label: timeLabel };
+      }
+    }
   }
 
-  const saHour = target.getUTCHours() + SA_OFFSET_HOURS;
-
-  // Find next slot after current SA time
-  const futureSlots = nextDay ? SLOTS : SLOTS.filter((s) => s.hour > saHour);
-  const slot = futureSlots.length > 0 ? futureSlots[0] : SLOTS[0];
-
-  if (futureSlots.length === 0 && !nextDay) {
-    // No slots left today, go to tomorrow
-    target.setUTCDate(target.getUTCDate() + 1);
-  }
-
-  target.setUTCHours(slot.hour - SA_OFFSET_HOURS, 0, 0, 0);
-
-  // Anti-pattern jitter: ±jitter minutes
-  const jitterMs = (Math.random() * slot.jitter * 2 - slot.jitter) * 60 * 1000;
-  return new Date(target.getTime() + jitterMs);
+  // Fallback: 8am in 3 days (shouldn't reach here)
+  const fallback = new Date(now);
+  fallback.setUTCDate(fallback.getUTCDate() + 3);
+  fallback.setUTCHours(SLOTS[0].hour - SA_OFFSET_HOURS, 0, 0, 0);
+  return { time: fallback, label: "8:00 SA in 3 days (fallback)" };
 }
 
 /**
- * Record a post (immediate or scheduled) for tracking.
+ * Record a scheduled post for tracking.
  */
 export async function recordOwnerPost(
   pageId: string,
@@ -159,8 +153,7 @@ export async function recordOwnerPost(
       scheduled_for: scheduledFor?.toISOString() || null,
     });
   } catch {
-    // Table might not exist — non-critical
-    console.log(`[SCHEDULER] Could not record post (table may not exist)`);
+    console.log(`[SCHEDULER] Could not record post`);
   }
 }
 
@@ -168,6 +161,8 @@ function formatSATime(d: Date): string {
   const sa = new Date(d.getTime() + SA_OFFSET_HOURS * 60 * 60 * 1000);
   return sa.toLocaleString("en-ZA", {
     weekday: "short",
+    day: "numeric",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

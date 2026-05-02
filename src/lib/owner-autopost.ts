@@ -141,7 +141,7 @@ async function postToPage(
   }
 
   try {
-    // Smart scheduling — check if we should post now or queue for later
+    // ALL posts are scheduled — never immediate. Find the next available slot.
     const { getPostingSlot, recordOwnerPost } = await import("@/lib/owner-scheduler");
     const slot = await getPostingSlot(page.pageId, page.name);
     console.log(`[OWNER-AUTOPOST] ${slot.reason}`);
@@ -150,24 +150,22 @@ async function postToPage(
     const reservationId = `pending-${Date.now()}`;
     await recordOwnerPost(
       page.pageId, page.name, reservationId, videoId || "",
-      slot.action === "schedule" ? "scheduled" : "posted",
-      slot.scheduledFor
+      "scheduled", slot.scheduledFor
     ).catch(() => {});
+
+    // Use Facebook's scheduled_publish_time — video uploads now, publishes at the scheduled time
+    const unixTimestamp = Math.floor(slot.scheduledFor.getTime() / 1000);
 
     const params = new URLSearchParams({
       file_url: videoUrl,
       title: pickRandom(VIDEO_TITLES),
       description,
       access_token: token,
+      scheduled_publish_time: String(unixTimestamp),
+      published: "false",
     });
 
-    // If scheduling for later, use Facebook's scheduled_publish_time
-    if (slot.action === "schedule" && slot.scheduledFor) {
-      const unixTimestamp = Math.floor(slot.scheduledFor.getTime() / 1000);
-      params.set("scheduled_publish_time", String(unixTimestamp));
-      params.set("published", "false");
-      console.log(`[OWNER-AUTOPOST] 📅 Scheduling ${page.name} post for ${slot.scheduledFor.toISOString()}`);
-    }
+    console.log(`[OWNER-AUTOPOST] 📅 ${page.name}: uploading now, publishes at ${slot.scheduledFor.toISOString()}`);
 
     const res = await fetch(
       `https://graph.facebook.com/v25.0/${page.pageId}/videos`,
@@ -182,30 +180,14 @@ async function postToPage(
 
     const data = (await res.json()) as { id: string; post_id?: string };
     const postId = data.post_id || data.id;
-    const isScheduled = slot.action === "schedule";
 
-    console.log(`[OWNER-AUTOPOST] ${isScheduled ? "📅 Scheduled" : "✅ Posted"} to ${page.name}: ${postId}`);
-
-    // Update the reservation with the real FB post ID
-    // (reservation was created before the API call to prevent race conditions)
-
-    // Auto-comment (only on immediate posts — scheduled posts get commented when they go live)
-    if (!isScheduled) {
-      try {
-        const { postMarketingComments } = await import("@/lib/social/facebook-comments");
-        postMarketingComments(postId, token).catch((e) =>
-          console.error(`[OWNER-AUTOPOST] Comments failed on ${page.name}:`, e)
-        );
-      } catch {
-        // Comments are non-critical
-      }
-    }
+    console.log(`[OWNER-AUTOPOST] 📅 ${page.name}: scheduled as ${postId}, publishes ${slot.scheduledFor.toISOString()}`);
 
     return {
       success: true,
       postId,
-      scheduled: isScheduled,
-      scheduledFor: slot.scheduledFor?.toISOString(),
+      scheduled: true,
+      scheduledFor: slot.scheduledFor.toISOString(),
     };
   } catch (err) {
     console.error(`[OWNER-AUTOPOST] ${page.name} error:`, err);

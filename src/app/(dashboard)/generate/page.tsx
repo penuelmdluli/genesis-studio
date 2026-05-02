@@ -676,9 +676,9 @@ export default function GeneratePage() {
                   </div>
                 ) : (
                   <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
-                    <Upload className="w-8 h-8 text-zinc-600 mb-3" />
+                    <Upload className="w-8 h-8 text-zinc-500 mb-3" />
                     <span className="text-sm text-zinc-400">Click or drag to upload an image</span>
-                    <span className="text-xs text-zinc-600 mt-1">PNG, JPG up to 10MB</span>
+                    <span className="text-xs text-zinc-500 mt-1">PNG, JPG up to 10MB</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -874,7 +874,7 @@ export default function GeneratePage() {
                 <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <Music className="w-4 h-4 text-violet-400" />
                   Background Audio
-                  <span className="text-zinc-600 text-xs">(optional)</span>
+                  <span className="text-zinc-500 text-xs">(optional)</span>
                 </label>
                 {form.audioTrackId && (
                   <button
@@ -933,7 +933,7 @@ export default function GeneratePage() {
                         {playingTrackId === track.id ? (
                           <Square className={`w-3 h-3 text-white`} />
                         ) : (
-                          <Play className={`w-4 h-4 ml-0.5 ${isSelected ? "text-violet-400" : "text-zinc-600"}`} />
+                          <Play className={`w-4 h-4 ml-0.5 ${isSelected ? "text-violet-400" : "text-zinc-500"}`} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -969,7 +969,7 @@ export default function GeneratePage() {
           <Card>
             <CardContent className="p-4 space-y-2">
               <label className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
-                Negative Prompt <span className="text-zinc-600 text-xs">(optional)</span>
+                Negative Prompt <span className="text-zinc-500 text-xs">(optional)</span>
                 <HelpTip text="Describe what you DON'T want. Helps avoid common artifacts like blur, distortion, or watermarks." side="top" />
               </label>
               <Textarea

@@ -257,7 +257,7 @@ export default function GalleryPage() {
                         <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                           {job.status === "processing" ? "Generating..." : "In Queue"}
                         </Badge>
-                        <span className="text-[11px] text-zinc-600">
+                        <span className="text-[11px] text-zinc-500">
                           AI Video &middot; {job.duration || 5}s
                         </span>
                       </div>
@@ -296,7 +296,7 @@ export default function GalleryPage() {
           <div className="absolute inset-0 bg-glow-center opacity-20" />
           <div className="relative z-10">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
-              <Film className="w-9 h-9 text-zinc-600" />
+              <Film className="w-9 h-9 text-zinc-500" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-300 mb-2">
               {search || filterFormat !== "all" ? "No videos match your filters" : "Your gallery is empty"}
@@ -379,7 +379,7 @@ export default function GalleryPage() {
                 <span className="hidden sm:inline-flex">{video.aspectRatio === "portrait" && <Badge variant="cyan" className="text-[10px]">Reel</Badge>}</span>
                 <span className="hidden sm:inline-flex">{video.audioUrl && <Badge variant="violet" className="text-[10px]"><Volume2 className="w-2.5 h-2.5 mr-1" />Audio</Badge>}</span>
                 <Badge className="text-[10px]">{video.resolution}</Badge>
-                <span className="text-xs text-zinc-600 hidden sm:inline">{formatRelativeTime(video.createdAt)}</span>
+                <span className="text-xs text-zinc-500 hidden sm:inline">{formatRelativeTime(video.createdAt)}</span>
                 <button
                   className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
                   onClick={(e) => handleDownload(e, video.url, video.title)}
@@ -780,10 +780,10 @@ function VideoCard({
       <div className="p-3 bg-[#111118]/80 border-t border-white/[0.04]">
         <p className="text-sm font-medium text-zinc-200 truncate">{video.title}</p>
         <div className="flex items-center justify-between mt-1">
-          <span className="text-[11px] text-zinc-600">
+          <span className="text-[11px] text-zinc-500">
             {formatRelativeTime(video.createdAt)}
           </span>
-          <span className="text-[11px] text-zinc-600">{video.resolution}</span>
+          <span className="text-[11px] text-zinc-500">{video.resolution}</span>
         </div>
       </div>
 

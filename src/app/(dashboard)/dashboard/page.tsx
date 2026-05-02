@@ -292,7 +292,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-zinc-200 truncate font-medium">&ldquo;{job.prompt}&rdquo;</p>
-                        <span className="text-[11px] text-zinc-600">{job.duration || 5}s</span>
+                        <span className="text-[11px] text-zinc-500">{job.duration || 5}s</span>
                       </div>
                       <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                         {job.status === "processing" ? "Generating..." : "In Queue"}
@@ -378,7 +378,7 @@ export default function DashboardPage() {
               transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
             />
           </div>
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-zinc-500">
             Credits reset monthly. Purchased credit packs never expire.
           </p>
         </div>
@@ -415,7 +415,7 @@ export default function DashboardPage() {
               <Film className="w-7 h-7 text-zinc-500" />
             </motion.div>
             <h3 className="text-base font-semibold text-zinc-300 mb-1">No videos yet</h3>
-            <p className="text-sm text-zinc-600 mb-5 max-w-xs mx-auto">
+            <p className="text-sm text-zinc-500 mb-5 max-w-xs mx-auto">
               Create your first AI video and watch the magic happen
             </p>
             <Link href="/generate">

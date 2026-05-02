@@ -470,9 +470,9 @@ export default function CaptionsPage() {
                     placeholder="Paste your video URL here"
                     value={videoUrl}
                     onChange={(e) => handleUrlChange(e.target.value)}
-                    className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200"
+                    className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200"
                   />
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-xs text-zinc-500">
                     Direct link to an MP4, MOV, or WEBM file
                   </p>
                 </div>
@@ -507,11 +507,11 @@ export default function CaptionsPage() {
                     </div>
                   ) : (
                     <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
-                      <Upload className="w-8 h-8 text-zinc-600 mb-3" />
+                      <Upload className="w-8 h-8 text-zinc-500 mb-3" />
                       <span className="text-sm text-zinc-400">
                         Click or drag to upload a video
                       </span>
-                      <span className="text-xs text-zinc-600 mt-1">
+                      <span className="text-xs text-zinc-500 mt-1">
                         MP4, MOV, WEBM up to 500MB
                       </span>
                       <input
@@ -540,9 +540,9 @@ export default function CaptionsPage() {
                     />
                   ) : (
                     <div className="p-6 rounded-xl border border-white/[0.06] bg-white/[0.02] text-center">
-                      <Film className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+                      <Film className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
                       <p className="text-sm text-zinc-400">No videos in your gallery yet</p>
-                      <p className="text-xs text-zinc-600 mt-1">
+                      <p className="text-xs text-zinc-500 mt-1">
                         Generate a video first or paste a URL above
                       </p>
                     </div>
@@ -564,7 +564,7 @@ export default function CaptionsPage() {
                 onChange={(v) => setLanguage(v)}
                 options={LANGUAGES}
               />
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-zinc-500">
                 Select the primary spoken language in your video
               </p>
             </CardContent>
@@ -740,7 +740,7 @@ export default function CaptionsPage() {
                     <span className="text-xs text-zinc-500">credits</span>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-600 mt-1">
+                <p className="text-xs text-zinc-500 mt-1">
                   {CREDITS_PER_MINUTE} credits per minute of video
                 </p>
                 <div className="flex justify-between mt-1.5">

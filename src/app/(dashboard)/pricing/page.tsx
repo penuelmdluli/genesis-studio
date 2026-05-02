@@ -245,7 +245,7 @@ export default function PricingPage() {
                 </div>
 
                 <p className="text-sm text-zinc-300 leading-relaxed min-h-[3rem]">{copy.outcome}</p>
-                <p className="text-xs text-zinc-600 italic">{copy.bestFor}</p>
+                <p className="text-xs text-zinc-500 italic">{copy.bestFor}</p>
 
                 <Button
                   variant={plan.popular ? "primary" : plan.id === "free" ? "ghost" : "secondary"}
@@ -257,7 +257,7 @@ export default function PricingPage() {
                   {isCurrentPlan ? "Current Plan" : plan.id === "free" ? "Free Forever" : `Get ${plan.name}`}
                 </Button>
 
-                <p className="text-[10px] text-zinc-600 text-center">
+                <p className="text-[10px] text-zinc-500 text-center">
                   {plan.credits.toLocaleString()} credits/mo
                 </p>
               </CardContent>
@@ -393,7 +393,7 @@ export default function PricingPage() {
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-zinc-600 mt-2">Code: {referralData.code}</p>
+                <p className="text-xs text-zinc-500 mt-2">Code: {referralData.code}</p>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
                 <div><div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div><div className="text-xs text-zinc-500">Referrals</div></div>

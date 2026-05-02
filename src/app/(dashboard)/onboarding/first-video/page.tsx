@@ -166,7 +166,7 @@ export default function FirstVideoPage() {
               Skip for now
             </Button>
           </div>
-          <p className="text-xs text-zinc-600">You have {user?.creditBalance ?? 50} credits to start</p>
+          <p className="text-xs text-zinc-500">You have {user?.creditBalance ?? 50} credits to start</p>
         </MotionSection>
       )}
 
@@ -218,7 +218,7 @@ export default function FirstVideoPage() {
               <p className="text-sm text-zinc-500 max-w-md mx-auto">&quot;{selectedPrompt.title}&quot;</p>
             )}
           </div>
-          <p className="text-xs text-zinc-600">This usually takes 60-120 seconds</p>
+          <p className="text-xs text-zinc-500">This usually takes 60-120 seconds</p>
         </MotionSection>
       )}
 
@@ -247,7 +247,7 @@ export default function FirstVideoPage() {
               <Brain className="w-5 h-5" /> Try Brain Studio
             </Button>
           </div>
-          <p className="text-center text-xs text-zinc-600">Your video is saved in your Gallery</p>
+          <p className="text-center text-xs text-zinc-500">Your video is saved in your Gallery</p>
         </MotionSection>
       )}
 

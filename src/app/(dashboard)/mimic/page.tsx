@@ -431,7 +431,7 @@ export default function MimicStudioPage() {
               <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium transition-all ${
                 step.done
                   ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                  : "bg-white/[0.03] text-zinc-600 border border-white/[0.06]"
+                  : "bg-white/[0.03] text-zinc-500 border border-white/[0.06]"
               }`}>
                 {step.done ? (
                   <Check className="w-3 h-3 text-violet-400" />
@@ -514,7 +514,7 @@ export default function MimicStudioPage() {
                   <span className="text-sm font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">
                     Upload your character image
                   </span>
-                  <span className="text-xs text-zinc-600 mt-1">
+                  <span className="text-xs text-zinc-500 mt-1">
                     PNG, JPG, or WEBP — max 10MB. Full body works best.
                   </span>
                 </label>
@@ -596,7 +596,7 @@ export default function MimicStudioPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setReferenceUrl(e.target.value); setError(null); }}
                     className="bg-white/[0.03] border-white/[0.08] text-sm"
                   />
-                  <p className="text-[11px] text-zinc-600">
+                  <p className="text-[11px] text-zinc-500">
                     We&apos;ll download the video for you. Max 30 seconds.
                   </p>
                 </div>
@@ -641,7 +641,7 @@ export default function MimicStudioPage() {
                       <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
                         Upload a reference video
                       </span>
-                      <span className="text-xs text-zinc-600 mt-1">
+                      <span className="text-xs text-zinc-500 mt-1">
                         MP4, WebM, or MOV — max 30 seconds, 100MB
                       </span>
                     </label>
@@ -834,13 +834,13 @@ export default function MimicStudioPage() {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Character</span>
-                    <span className={characterImage ? "text-violet-300" : "text-zinc-600"}>
+                    <span className={characterImage ? "text-violet-300" : "text-zinc-500"}>
                       {characterImage ? characterImage.name.slice(0, 20) : "Not uploaded"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Reference</span>
-                    <span className={hasReference ? "text-violet-300" : "text-zinc-600"}>
+                    <span className={hasReference ? "text-violet-300" : "text-zinc-500"}>
                       {referenceTab === "url" && referenceUrl ? "URL provided" : referenceVideo ? referenceVideo.name.slice(0, 20) : "Not provided"}
                     </span>
                   </div>
@@ -912,7 +912,7 @@ export default function MimicStudioPage() {
           <div className="text-xs">
             <span className="text-zinc-500">Cost: </span>
             <span className="font-bold text-violet-300">{CREDIT_COST.toLocaleString()}</span>
-            <span className="text-zinc-600 ml-1.5">Balance: {credits.toLocaleString()}</span>
+            <span className="text-zinc-500 ml-1.5">Balance: {credits.toLocaleString()}</span>
           </div>
           <Button
             variant="primary"

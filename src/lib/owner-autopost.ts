@@ -39,41 +39,94 @@ const PAGES: Record<string, FacebookPage> = {
 };
 
 // ── Marketing Descriptions ──
+// Every post has: emotional hook → content → marketing CTA → link → hashtags
+// The goal: viewers engage with the content AND discover Genesis Studio
+
+const HOOKS = [
+  "🚨 You won't believe this was made by AI",
+  "⚡ This just dropped and the internet isn't ready",
+  "🔥 WATCH THIS — AI just changed the game forever",
+  "💥 BREAKING: This entire video was generated in 60 seconds",
+  "👀 Stop scrolling. You NEED to see this",
+  "🤯 AI just did something that shouldn't be possible",
+  "🚀 The future of content is HERE — and it's African-made",
+  "⚠️ Warning: After seeing this, you'll never create content the same way",
+  "🎬 One prompt. 60 seconds. This is what came out",
+  "💎 This is NOT stock footage. This is 100% AI-generated",
+];
+
+const CTAS = [
+  "👇 Try it yourself — 50 FREE credits, no card needed",
+  "🔗 Make your own at genesisstudio.app — it takes 60 seconds",
+  "💡 Every creator in Africa needs this tool. Share this with someone who creates content",
+  "🚀 Built in South Africa. Used by creators worldwide. Your turn",
+  "✨ Stop paying for stock footage. Start creating with AI",
+  "🎯 The #1 AI video tool for African creators — try it free today",
+];
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 function getMBSDescription(prompt: string): string {
-  const hashtags = "#MzansiBabyStars #BabyDance #CuteKids #SouthAfrica #AIVideo #GenesisStudio #MadeWithAI #ViralVideo #AfricanBabies #DanceChallenge";
-  return `${prompt.slice(0, 200)}
+  const hook = pickRandom(HOOKS);
+  const cta = pickRandom(CTAS);
 
-${hashtags}
+  return `${hook}
 
-🎬 Created with Genesis Studio — AI Video Generation
-🚀 Try it FREE: https://genesisstudio.app
-✨ Make your own AI videos in 60 seconds!`;
+${prompt.slice(0, 200)}
+
+${cta}
+
+🔗 https://genesisstudio.app
+
+#MzansiBabyStars #BabyDance #CuteKids #SouthAfrica #AIVideo #GenesisStudio #MadeWithAI #ViralVideo #DanceChallenge #Mzansi #AIGenerated #FYP`;
 }
 
 function getBrainStudioDescription(concept: string): string {
-  const hashtags = "#TechPulseAfrica #Africa2050 #AIVideo #GenesisStudio #AfricanTech #Innovation #MadeWithAI #AIGenerated #FutureOfAfrica #TechNews";
-  return `${concept.slice(0, 300)}
+  const hook = pickRandom(HOOKS);
+  const cta = pickRandom(CTAS);
 
-${hashtags}
+  return `${hook}
 
-🎬 Full AI production — script, voiceover, music, captions
-🚀 Made with Genesis Studio: https://genesisstudio.app
-🌍 AI video generation for African creators`;
+${concept.slice(0, 300)}
+
+🎬 Full AI production — script, voiceover, music & captions. All generated in minutes, not days.
+
+${cta}
+
+🔗 https://genesisstudio.app
+
+#TechPulseAfrica #Africa2050 #AIVideo #GenesisStudio #AfricanTech #Innovation #MadeWithAI #BreakingNews #FutureOfAfrica #AIGenerated #ContentCreator #FYP`;
 }
 
 function getSingleVideoDescription(prompt: string): string {
-  const hashtags = "#GenesisStudio #AIVideo #MadeWithAI #TextToVideo #AIGenerated #CreatorTools #VideoAI #AfricanCreators";
-  return `${prompt.slice(0, 250)}
+  const hook = pickRandom(HOOKS);
+  const cta = pickRandom(CTAS);
 
-${hashtags}
+  return `${hook}
 
-🎬 Generated with Genesis Studio
-🚀 Create your own: https://genesisstudio.app
-✨ 50 free credits — no card needed`;
+${prompt.slice(0, 250)}
+
+${cta}
+
+🔗 https://genesisstudio.app
+
+#GenesisStudio #AIVideo #MadeWithAI #TextToVideo #AIGenerated #CreatorTools #AfricanCreators #ContentCreation #FYP #Viral`;
 }
 
 // ── Post to Facebook Page ──
+
+const VIDEO_TITLES = [
+  "🚨 This was made by AI in 60 seconds",
+  "🔥 AI just created this — genesisstudio.app",
+  "⚡ Made with Genesis Studio — try it FREE",
+  "💥 AI Video Generation is HERE",
+  "🤯 60 seconds. One prompt. This is the result.",
+  "🎬 Genesis Studio — AI videos for creators",
+  "🚀 The future of content creation is African-made",
+  "👀 This entire video is AI-generated",
+];
 
 async function postToPage(
   page: FacebookPage,
@@ -89,6 +142,7 @@ async function postToPage(
   try {
     const params = new URLSearchParams({
       file_url: videoUrl,
+      title: pickRandom(VIDEO_TITLES),
       description,
       access_token: token,
     });

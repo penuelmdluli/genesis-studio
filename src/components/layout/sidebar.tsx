@@ -83,7 +83,8 @@ export function Sidebar() {
       items.push({ href: "/studio", label: "Content Engine", icon: Radio, section: "Automate", badge: "NEW" });
       items.push({ href: "/intelligence", label: "Intelligence", icon: Brain, section: "Automate", badge: "AI" });
       items.push({ href: "/admin/mbs-config", label: "MBS Config", icon: Users, section: "Automate", badge: "NEW" });
-      items.push({ href: "/admin", label: "Admin", icon: Shield });
+      items.push({ href: "/admin/support", label: "Support Inbox", icon: MessageCircle, section: "Admin", badge: "NEW" });
+      items.push({ href: "/admin", label: "Admin", icon: Shield, section: "Admin" });
     }
     return items;
   }, [user?.isOwner]);

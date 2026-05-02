@@ -146,6 +146,14 @@ async function postToPage(
     const slot = await getPostingSlot(page.pageId, page.name);
     console.log(`[OWNER-AUTOPOST] ${slot.reason}`);
 
+    // RESERVE the slot immediately so parallel posts don't double-book
+    const reservationId = `pending-${Date.now()}`;
+    await recordOwnerPost(
+      page.pageId, page.name, reservationId, videoId || "",
+      slot.action === "schedule" ? "scheduled" : "posted",
+      slot.scheduledFor
+    ).catch(() => {});
+
     const params = new URLSearchParams({
       file_url: videoUrl,
       title: pickRandom(VIDEO_TITLES),
@@ -178,12 +186,8 @@ async function postToPage(
 
     console.log(`[OWNER-AUTOPOST] ${isScheduled ? "📅 Scheduled" : "✅ Posted"} to ${page.name}: ${postId}`);
 
-    // Record the post for future scheduling decisions
-    recordOwnerPost(
-      page.pageId, page.name, postId, videoId || "",
-      isScheduled ? "scheduled" : "posted",
-      slot.scheduledFor
-    ).catch(() => {});
+    // Update the reservation with the real FB post ID
+    // (reservation was created before the API call to prevent race conditions)
 
     // Auto-comment (only on immediate posts — scheduled posts get commented when they go live)
     if (!isScheduled) {

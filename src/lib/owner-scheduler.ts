@@ -53,17 +53,19 @@ export async function getPostingSlot(
   let lastPostTime: Date | null = null;
 
   try {
-    // Check our own tracking table
+    // Check our own tracking table — include both posted AND scheduled/pending records
     const { data: recentPosts } = await supabase
       .from("owner_scheduled_posts")
-      .select("posted_at, scheduled_for")
+      .select("posted_at, scheduled_for, created_at")
       .eq("page_id", pageId)
-      .gte("posted_at", todayStart.toISOString())
-      .order("posted_at", { ascending: false });
+      .gte("created_at", todayStart.toISOString())
+      .order("created_at", { ascending: false });
 
     if (recentPosts && recentPosts.length > 0) {
       todayPostCount = recentPosts.length;
-      lastPostTime = new Date(recentPosts[0].posted_at);
+      // Use the most recent timestamp (posted_at or created_at for pending reservations)
+      const mostRecent = recentPosts[0];
+      lastPostTime = new Date(mostRecent.posted_at || mostRecent.created_at);
     }
   } catch {
     // Table might not exist yet — that's fine, treat as no posts today

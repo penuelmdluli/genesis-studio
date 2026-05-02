@@ -98,6 +98,16 @@ export default function BrainStudioPage() {
   const [captions, setCaptions] = useState(true);
   const [soundEffects, setSoundEffects] = useState(false);
 
+  // Trending war topics (owner only)
+  const [trendingSuggestions, setTrendingSuggestions] = useState<Array<{ title: string; prompt: string; source: string }>>([]);
+
+  useEffect(() => {
+    fetch("/api/brain/trending")
+      .then((r) => r.json())
+      .then((d) => { if (d.suggestions?.length) setTrendingSuggestions(d.suggestions); })
+      .catch(() => {});
+  }, []);
+
   // Production state
   const [productionId, setProductionId] = useState<string | null>(null);
   const [plan, setPlan] = useState<ScenePlan | null>(null);
@@ -435,6 +445,30 @@ export default function BrainStudioPage() {
           <div className="space-y-6">
             <Card className="glass-strong">
               <CardContent className="p-6 space-y-6">
+                {/* Trending War Topics — Owner Only */}
+                {trendingSuggestions.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-red-400">🔥 Trending Now</span>
+                      <span className="text-xs text-zinc-400">Click to use</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {trendingSuggestions.slice(0, 3).map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setConcept(s.prompt)}
+                          className="w-full text-left px-3 py-2.5 rounded-lg bg-red-500/8 border border-red-500/20 hover:bg-red-500/15 hover:border-red-500/30 transition-all group"
+                        >
+                          <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">
+                            🚨 {s.title}
+                          </div>
+                          <div className="text-xs text-zinc-400 mt-0.5">{s.source}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Concept */}
                 <div>
                   <label className="text-sm font-medium text-zinc-300 mb-2 block">

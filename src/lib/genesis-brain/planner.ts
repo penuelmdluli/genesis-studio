@@ -44,25 +44,36 @@ COLOR & GRADE:
   "Warm amber vintage film grain, lifted blacks"
   "Vibrant saturated Afrofuturist palette — purple, gold, electric blue"
 
-SUBJECT RULE — MAKE IT VIRAL:
-  Show what STOPS THE SCROLL. People, emotions, drama, beauty, action — whatever the topic demands.
+SUBJECT RULE — ACTION OVER FACES:
+  ⚠️ THE #1 RULE: Show ACTION, MOTION, and DRAMA — NOT standing people or static faces.
+  Viral content is about WHAT'S HAPPENING, not WHO is there.
+  Static portraits and people just standing/sitting = instant scroll-past.
 
-  PEOPLE ARE POWERFUL — use them when the story calls for it:
-    WAR: "A soldier's face streaked with dust, eyes scanning the horizon, smoke rising behind"
-    TECH: "A young developer's face lit by multiple monitors, code reflecting in her eyes, intense focus"
-    POLITICS: "A leader addressing a crowd, passionate gesture, thousands of faces watching"
-    HUMAN INTEREST: "A grandmother's weathered hands holding a child's tiny fingers, warm light"
-    AFRICA: "A confident young entrepreneur in a modern Johannesburg co-working space, city skyline through glass"
-    DANCE/MUSIC: "A dancer mid-move, sweat catching the light, crowd energy behind"
+  EVERY SCENE MUST HAVE MOVEMENT AND ACTION:
+    WAR: "Missiles streaking across a dark sky, explosions lighting up the horizon, shockwave rippling through smoke"
+    TECH: "Robot arm assembling a circuit at blinding speed, sparks flying, LEDs flickering to life in sequence"
+    POLITICS: "Massive crowd surging through streets waving flags, smoke grenades, helicopter searchlights sweeping"
+    FINANCE: "Stock market numbers cascading in red, trading screens flashing, hands slamming desk in panic"
+    AFRICA: "Cranes swinging over a gleaming new skyline at sunrise, construction sparks raining down, drones flying between towers"
+    NATURE: "Lightning bolt splitting a baobab tree, rain exploding off red earth, wildebeest stampeding through a river crossing"
+    PRODUCT: "Liquid gold pouring into a mold in extreme slow motion, steam rising, light catching every ripple"
 
-  Mix PEOPLE and ENVIRONMENTS for maximum impact:
-    - Scene 1: Wide establishing shot (environment sets the world)
-    - Scene 2: Close-up on a person or detail (emotional hook)
-    - Scene 3: Action/movement (energy)
-    - Scene 4: Reaction/payoff (resolution)
+  PEOPLE IN ACTION (not standing still):
+    ✅ "Hands gripping a steering wheel as car drifts around a corner, sparks from the undercarriage"
+    ✅ "Fighter pilot pulling G-forces, cockpit instruments blurring, clouds ripping past the canopy"
+    ✅ "Chef's knife slicing through ingredients at speed, vegetables flying, oil sizzling in slow motion"
+    ✅ "Dancer mid-backflip, body suspended in air, crowd roaring, confetti exploding"
+    ❌ "A person standing in an office looking at camera" — NEVER DO THIS
+    ❌ "A man in a shirt smiling" — THIS IS WHAT KILLS ENGAGEMENT
+    ❌ "Close-up of a face" — STATIC FACES ARE BORING
 
-  The #1 rule: A viewer should FEEL something in the first 2 seconds. Scroll-stopping visuals.
-  Use faces, emotions, hands, body language — these are what humans connect with.
+  PACING FOR VIRALITY:
+    - Scene 1 (HOOK): The most EXPLOSIVE visual. Something mid-impact. 2 seconds to grab attention.
+    - Scene 2-3 (BUILD): Escalating action. Each scene more intense than the last.
+    - Scene 4 (PEAK): The climax — biggest explosion, fastest motion, most dramatic reveal.
+    - Final scene (RESOLVE): The aftermath or payoff. Slow motion. Dust settling. Emotional beat.
+
+  Think Michael Bay meets National Geographic. Every frame should be a movie poster.
 
 COMPOSITION RULES:
   - Rule of thirds: place subjects at intersection points, not dead center
@@ -88,22 +99,24 @@ COMPOSITION RULES:
    f) ATMOSPHERE — Particles, weather, haze, bokeh, lens effects
    g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic"
 
-   EXAMPLE of a VIRAL news prompt:
-   "Slow dolly push-in, 85mm f/1.4. A soldier's weathered face fills the frame, eyes reflecting distant fire, jaw clenched. Desert dust particles drift through warm golden-hour light. Background: armored convoy rolling through haze, headlights cutting through smoke. Cinematic, 4K, anamorphic, film grain, photorealistic, raw emotion"
+   EXAMPLE — WAR/CONFLICT (raw, real, intense):
+   "Handheld shaky-cam, 24mm wide. Missiles launch from mobile launchers in rapid succession, smoke trails streaking across orange dusk sky. Ground shakes — camera vibrates. Foreground: spent shell casings bouncing off concrete. Background: city skyline silhouetted against fire. Debris raining down. Cinematic, 4K, war documentary, photorealistic, visceral"
 
-   EXAMPLE of a VIRAL tech prompt:
-   "Handheld close-up, 35mm. A young developer's fingers fly across a holographic keyboard, neon code reflections in her eyes, intense concentration. Cool blue monitor glow contrasts warm overhead amber. Data center servers stretch to infinity behind her. Cinematic, 4K, cyberpunk, photorealistic"
+   EXAMPLE — TECH/AI (futuristic, fast, electric):
+   "Whip-pan between server racks, 16mm ultra-wide. Data center alive — thousands of LEDs blinking in cascading patterns, liquid cooling pipes glowing blue, robotic arm swapping a processor at inhuman speed. Camera races through the corridor. Volumetric fog from cooling. Cinematic, 4K, cyberpunk, photorealistic"
 
-   EXAMPLE of a VIRAL lifestyle prompt:
-   "Steadicam follow, 50mm f/1.2. A confident African woman walks through a vibrant Lagos market at golden hour, colorful fabrics flowing, warm smile, crowd energy. Bokeh lights from market stalls. Street food steam rising. Cinematic, 4K, warm tones, shallow depth of field"
+   EXAMPLE — AFRICA/DEVELOPMENT (ambitious, dynamic, bold):
+   "Drone sweeping low over construction site at sunrise. Cranes swing steel beams into place, welding sparks shower down like fireworks, concrete pumps in motion. Camera pulls up to reveal an entire new city district taking shape. Workers in hard hats directing traffic below. Cinematic, 4K, golden hour, epic scale, photorealistic"
 
-3. CHARACTERS — use them freely:
-   - Create characters[] when people would make the video more compelling
-   - Describe: appearance, clothing, emotional state, action
-   - For news/politics: contextual people (leaders, crowds, affected communities)
-   - For lifestyle/product: aspirational characters that the audience relates to
-   - For abstract/tech: optional — environments can work alone too
-   - The AI director decides — no blanket rules against people
+   EXAMPLE — PRODUCT/COMMERCIAL (satisfying, precise, premium):
+   "Macro lens, 100mm. Liquid gold pours in extreme slow motion into a geometric mold — every ripple and splash frozen in time. Steam rises catching backlight. The surface settles into a perfect mirror reflection. Pull focus to reveal the finished product gleaming. Cinematic, 4K, commercial, photorealistic"
+
+3. CHARACTERS — action, never static:
+   - People should be DOING something — running, building, fighting, creating, dancing
+   - Hands, body motion, and context over faces
+   - Crowds in motion over individual portraits
+   - If someone speaks (dialogueLines), they should be mid-action, not standing still
+   - NEVER: person standing, sitting, posing, or looking at camera doing nothing
 
 4. SMART MODEL SELECTION — choose the right model for each scene:
    - "seedance-1.5" — DEFAULT: best for cinematic B-roll, environments, action shots (no dialogue)

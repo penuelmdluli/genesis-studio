@@ -209,10 +209,61 @@ async function postToPage(
   }
 }
 
+// ── Cross-Platform Posting ──
+
+async function postToYouTube(videoUrl: string, prompt: string): Promise<void> {
+  try {
+    const { isYouTubeConfigured, uploadToYouTubeShorts } = await import("@/lib/social/youtube");
+    if (!isYouTubeConfigured()) return;
+
+    const title = prompt.slice(0, 80);
+    const description = getSingleVideoDescription(prompt);
+    const tags = ["GenesisStudio", "AIVideo", "MadeWithAI", "Shorts", "AIGenerated", "AfricanCreators"];
+
+    const result = await uploadToYouTubeShorts({ videoUrl, title, description, tags });
+    if (result.success) {
+      console.log(`[OWNER-AUTOPOST] ✅ YouTube Short: ${result.youtubeVideoId}`);
+    } else {
+      console.warn(`[OWNER-AUTOPOST] YouTube failed: ${result.error}`);
+    }
+  } catch (err) {
+    console.error("[OWNER-AUTOPOST] YouTube error:", err);
+  }
+}
+
+async function postToTikTokPlatform(videoUrl: string, prompt: string): Promise<void> {
+  try {
+    const { isTikTokConfigured, postToTikTok } = await import("@/lib/social/tiktok");
+    if (!isTikTokConfigured()) return;
+
+    const hashtags = ["GenesisStudio", "AIVideo", "MadeWithAI", "FYP", "AIGenerated", "AfricanCreators", "Viral"];
+    const result = await postToTikTok({ videoUrl, title: prompt.slice(0, 100), hashtags });
+    if (result.success) {
+      console.log(`[OWNER-AUTOPOST] ✅ TikTok: ${result.shareId}`);
+    } else {
+      console.warn(`[OWNER-AUTOPOST] TikTok failed: ${result.error}`);
+    }
+  } catch (err) {
+    console.error("[OWNER-AUTOPOST] TikTok error:", err);
+  }
+}
+
+/**
+ * Post to all configured platforms (YouTube + TikTok).
+ * Fire-and-forget — doesn't block Facebook posting.
+ */
+async function crossPostToAllPlatforms(videoUrl: string, prompt: string): Promise<void> {
+  await Promise.allSettled([
+    postToYouTube(videoUrl, prompt),
+    postToTikTokPlatform(videoUrl, prompt),
+  ]);
+}
+
 // ── Public API ──
 
 /**
- * Auto-post a Mimic Motion / MBS video to the Mzansi Baby Stars page.
+ * Auto-post a Mimic Motion / MBS video to all platforms.
+ * Facebook (MBS page) + YouTube Shorts + TikTok.
  * Only for owner accounts.
  */
 export async function autoPostMimicToMBS(
@@ -225,11 +276,16 @@ export async function autoPostMimicToMBS(
   const videoUrl = r2PublicUrl(videoR2Key);
   const description = getMBSDescription(prompt);
 
+  // Facebook (smart scheduled)
   await postToPage(PAGES.mbs, videoUrl, description);
+
+  // YouTube + TikTok (immediate, fire-and-forget)
+  crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});
 }
 
 /**
- * Auto-post a Brain Studio production to Tech Pulse Africa and Africa 2050.
+ * Auto-post a Brain Studio production to all platforms.
+ * Facebook (Tech Pulse + Africa 2050) + YouTube Shorts + TikTok.
  * Only for owner accounts.
  */
 export async function autoPostBrainToPages(
@@ -237,7 +293,6 @@ export async function autoPostBrainToPages(
   videoUrl: string,
   concept: string
 ): Promise<void> {
-  // Look up clerk_id from userId
   const { createSupabaseAdmin } = await import("@/lib/supabase");
   const sb = createSupabaseAdmin();
   const { data } = await sb.from("users").select("clerk_id").eq("id", userId).single();
@@ -245,21 +300,19 @@ export async function autoPostBrainToPages(
 
   const description = getBrainStudioDescription(concept);
 
-  // Post to both pages in parallel
-  const results = await Promise.allSettled([
+  // Facebook pages (smart scheduled)
+  await Promise.allSettled([
     postToPage(PAGES.tech_pulse, videoUrl, description),
     postToPage(PAGES.africa_2050, videoUrl, description),
   ]);
 
-  for (const r of results) {
-    if (r.status === "rejected") {
-      console.error("[OWNER-AUTOPOST] Brain post failed:", r.reason);
-    }
-  }
+  // YouTube + TikTok (immediate, fire-and-forget)
+  crossPostToAllPlatforms(videoUrl, concept).catch(() => {});
 }
 
 /**
- * Auto-post a single generation to Tech Pulse Africa.
+ * Auto-post a single generation to all platforms.
+ * Facebook (Tech Pulse) + YouTube Shorts + TikTok.
  * Only for owner accounts.
  */
 export async function autoPostSingleVideo(
@@ -272,5 +325,9 @@ export async function autoPostSingleVideo(
   const videoUrl = r2PublicUrl(videoR2Key);
   const description = getSingleVideoDescription(prompt);
 
+  // Facebook (smart scheduled)
   await postToPage(PAGES.tech_pulse, videoUrl, description);
+
+  // YouTube + TikTok (immediate, fire-and-forget)
+  crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});
 }

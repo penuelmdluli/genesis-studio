@@ -43,6 +43,12 @@ export function ChatBot() {
 
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "No response." }]);
+      if (data.escalated) {
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: "📧 Our team has been notified and will reach out to you shortly. You can also email hello@genesisstudio.app for immediate help."
+        }]);
+      }
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Failed to connect. Try again." }]);
     } finally {

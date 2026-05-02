@@ -51,6 +51,31 @@ COMMUNITY BUILDING:
 - Mention that others can recreate their videos (social proof)
 - Celebrate milestones: first video, first shared video, etc.
 
+ESCALATION — KNOW WHEN TO HAND OFF TO A HUMAN:
+You are NOT the final line of support. When you can't solve something, escalate IMMEDIATELY.
+Include the exact text "[ESCALATE]" at the START of your response when ANY of these apply:
+
+1. PAYMENT ISSUES: "I was charged but didn't get credits", "refund", "payment failed and I lost money", "double charged"
+2. ACCOUNT PROBLEMS: "can't log in", "account locked", "lost access", "delete my account", "data privacy request"
+3. BUGS/ERRORS: user describes a specific technical error you can't solve (not just "how do I use X")
+4. ANGRY/FRUSTRATED: user uses aggressive language, threatens to leave, mentions legal action
+5. CUSTOM/ENTERPRISE: "bulk pricing", "API access", "white label", "partnership", "enterprise deal"
+6. REPEATED FAILURE: user says they tried your suggestion and it still doesn't work (2nd attempt)
+7. SENSITIVE: anything about DMCA, copyright claims, content takedown, abuse reports
+
+When escalating:
+- Start your response with "[ESCALATE]"
+- Be empathetic: "I completely understand your frustration"
+- Tell the user: "I'm connecting you with our team right now — they'll sort this out personally"
+- Don't try to solve it yourself when it's clearly beyond AI capability
+- Include what the issue is so the human has context
+
+When NOT escalating:
+- General questions about features, pricing, how-to
+- Prompt writing help
+- Model recommendations
+- "My video is still generating" (that's normal, explain the wait)
+
 Keep responses SHORT (2-4 sentences max) but packed with enthusiasm and value. Use emojis sparingly (1-2 per message). Always be helpful first, promotional second.`;
 
 export async function POST(req: NextRequest) {
@@ -117,9 +142,41 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    const reply = data.content?.[0]?.text || "I couldn't generate a response. Please try again.";
+    let reply = data.content?.[0]?.text || "I couldn't generate a response. Please try again.";
 
-    return NextResponse.json({ reply });
+    // Detect escalation — AI flagged this conversation for human attention
+    const needsEscalation = reply.includes("[ESCALATE]");
+    if (needsEscalation) {
+      // Clean the [ESCALATE] tag from user-facing response
+      reply = reply.replace("[ESCALATE]", "").trim();
+
+      // Get user info for the escalation
+      const { getUserByClerkId } = await import("@/lib/db");
+      const user = await getUserByClerkId(userId);
+
+      // Send Slack alert to operator
+      try {
+        const { sendSlackAlert } = await import("@/lib/alerts");
+        await sendSlackAlert({
+          level: "warning",
+          title: "🚨 Chat Escalation — Human Support Needed",
+          message: [
+            `*User:* ${user?.name || "Unknown"} (${user?.email || userId})`,
+            `*Plan:* ${user?.plan || "free"} | Credits: ${user?.creditBalance ?? "?"}`,
+            `*Their message:* "${message.slice(0, 300)}"`,
+            `*AI response:* "${reply.slice(0, 300)}"`,
+            `*Action needed:* Reply to this user directly`,
+          ].join("\n"),
+        });
+      } catch {
+        // Slack alert failed — non-critical
+      }
+
+      // Also log for email follow-up
+      console.warn(`[CHAT ESCALATION] User: ${user?.email || userId} | Message: ${message.slice(0, 200)}`);
+    }
+
+    return NextResponse.json({ reply, escalated: needsEscalation });
   } catch (err) {
     console.error("[chat] Error:", err);
     return NextResponse.json({

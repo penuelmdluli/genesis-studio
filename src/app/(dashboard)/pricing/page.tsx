@@ -94,7 +94,8 @@ export default function PricingPage() {
     setReferralLoading(false);
   };
 
-  const getProvider = () => currency === "ZAR" ? "yoco" : undefined;
+  // Yoco for ZAR (South Africa), Paystack for USD (international)
+  const getProvider = () => currency === "ZAR" ? "yoco" : "paystack";
 
   const handleSubscribe = async (planId: string) => {
     setLoadingPlan(planId);
@@ -102,7 +103,7 @@ export default function PricingPage() {
       const res = await fetch("/api/credits/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, provider: getProvider() }),
+        body: JSON.stringify({ planId, provider: getProvider(), currency }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -120,7 +121,7 @@ export default function PricingPage() {
       const res = await fetch("/api/credits/buy-pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packId, provider: getProvider() }),
+        body: JSON.stringify({ packId, provider: getProvider(), currency }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;

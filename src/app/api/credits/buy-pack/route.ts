@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { packId, provider: providerName } = await req.json();
+    const { packId, provider: providerName, currency: requestCurrency } = await req.json();
     const pack = CREDIT_PACKS.find((p) => p.id === packId);
 
     if (!pack) {
@@ -34,20 +34,24 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
     const webhookBaseUrl = process.env.APP_URL || appUrl;
 
-    // --- SA payment providers (Yoco, PayFast, Paystack) ---
+    // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
       const paymentProvider = getProvider(providerName);
-      const priceZAR = pack.priceZAR;
-      if (!priceZAR) {
+
+      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      const amount = useUSD ? pack.price * 100 : (pack.priceZAR || 0) * 100;
+      const currency = useUSD ? "USD" : "ZAR";
+
+      if (amount <= 0) {
         return NextResponse.json(
-          { error: "ZAR pricing not available for this pack" },
+          { error: `${currency} pricing not available for this pack` },
           { status: 400 }
         );
       }
 
       const checkout = await paymentProvider.createCheckout({
-        amount: priceZAR * 100, // cents
-        currency: "ZAR",
+        amount,
+        currency,
         email: user.email,
         userId: user.id,
         description: `Genesis Studio ${pack.credits} Credit Pack`,

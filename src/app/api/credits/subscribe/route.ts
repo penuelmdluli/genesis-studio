@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { planId, provider: providerName } = await req.json();
+    const { planId, provider: providerName, currency: requestCurrency } = await req.json();
     const plan = PLANS.find((p) => p.id === planId);
 
     if (!plan || plan.id === "free") {
@@ -28,20 +28,25 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
     const webhookBaseUrl = process.env.APP_URL || appUrl;
 
-    // --- SA payment providers (Yoco, PayFast, Paystack) ---
+    // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
       const paymentProvider = getProvider(providerName);
-      const priceZAR = plan.priceZAR;
-      if (!priceZAR) {
+
+      // Determine currency and amount based on provider
+      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      const amount = useUSD ? plan.price * 100 : (plan.priceZAR || 0) * 100; // cents
+      const currency = useUSD ? "USD" : "ZAR";
+
+      if (amount <= 0) {
         return NextResponse.json(
-          { error: "ZAR pricing not available for this plan" },
+          { error: `${currency} pricing not available for this plan` },
           { status: 400 }
         );
       }
 
       const checkout = await paymentProvider.createCheckout({
-        amount: priceZAR * 100, // cents
-        currency: "ZAR",
+        amount,
+        currency,
         email: user.email,
         userId: user.id,
         description: `Genesis Studio ${plan.name} Plan`,

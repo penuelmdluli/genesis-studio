@@ -146,3 +146,23 @@ export async function sendPlanUpgradeEmail(email: string, name: string, plan: st
     `),
   });
 }
+
+export async function sendSupportReply(email: string, name: string, reply: string, originalMessage: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Re: Your Genesis Studio support request",
+    html: wrap(`
+      <h1 style="color: white; font-size: 24px; margin-bottom: 8px;">We've got you covered 🙌</h1>
+      <p style="color: #a1a1aa; margin-bottom: 16px;">Hey ${name}, thanks for reaching out. Here's our response:</p>
+      <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+        <p style="color: #e4e4e7; font-size: 15px; line-height: 1.6; margin: 0;">${reply.replace(/\n/g, '<br>')}</p>
+      </div>
+      <p style="color: #71717a; font-size: 13px; margin-bottom: 8px;">Your original message:</p>
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; margin-bottom: 24px;">
+        <p style="color: #a1a1aa; font-size: 13px; margin: 0;">"${originalMessage.slice(0, 500)}"</p>
+      </div>
+      <p style="color: #a1a1aa; margin-bottom: 24px;">If you need more help, just reply to this email or use the chat on <a href="${APP_URL}" style="color: #8b5cf6;">genesisstudio.app</a>.</p>
+      <a href="${APP_URL}/dashboard" style="${buttonStyle}">Back to Genesis Studio</a>
+    `),
+  });
+}

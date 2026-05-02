@@ -172,7 +172,24 @@ export async function POST(req: NextRequest) {
         // Slack alert failed — non-critical
       }
 
-      // Also log for email follow-up
+      // Save ticket to database for admin support inbox
+      try {
+        const { createSupabaseAdmin } = await import("@/lib/supabase");
+        const sb = createSupabaseAdmin();
+        await sb.from("support_tickets").insert({
+          user_id: user?.id || userId,
+          user_email: user?.email || null,
+          user_name: user?.name || null,
+          user_plan: user?.plan || "free",
+          message: message.slice(0, 2000),
+          ai_response: reply.slice(0, 2000),
+          status: "open",
+          source: "chat",
+        });
+      } catch {
+        // DB insert failed — Slack alert is the fallback
+      }
+
       console.warn(`[CHAT ESCALATION] User: ${user?.email || userId} | Message: ${message.slice(0, 200)}`);
     }
 

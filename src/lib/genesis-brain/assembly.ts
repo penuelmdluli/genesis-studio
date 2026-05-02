@@ -107,8 +107,23 @@ export async function startAssembly(
     // This is the safety net: scenes are already done, we just need audio.
     const existingState = production.assemblyState as Record<string, unknown> | undefined;
 
-    // Recover voiceover if requested but missing
+    // Recover voiceover if requested but missing.
+    // IMPORTANT: Skip voiceover for scenes with native audio (kling/veo lip-sync).
+    // Those scenes have character dialogue baked into the video — narration would clash.
     if (production.voiceover && !production.voiceoverUrl && plan.scenes) {
+      // Clear voiceoverLine on scenes that have native audio models (lip-sync dialogue)
+      const freshScenes = await getProductionScenes(productionId);
+      for (const scene of plan.scenes) {
+        const dbScene = freshScenes.find((s) => s.sceneNumber === scene.sceneNumber);
+        if (dbScene) {
+          const sceneModel = AI_MODELS[dbScene.modelId as ModelId];
+          if (sceneModel?.hasAudio) {
+            console.log(`[ASSEMBLY] Scene ${scene.sceneNumber}: native audio model (${dbScene.modelId}) — skipping voiceover narration`);
+            scene.voiceoverLine = ""; // Silence during this scene — let character dialogue be heard
+          }
+        }
+      }
+
       const scenesWithVO = plan.scenes.filter((s: { voiceoverLine?: string }) => s.voiceoverLine?.trim());
       if (scenesWithVO.length > 0) {
         console.log(`[ASSEMBLY] Recovering missing voiceover for ${scenesWithVO.length} scenes...`);

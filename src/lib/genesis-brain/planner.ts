@@ -316,15 +316,17 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   const validModels = Object.keys(AI_MODELS) as ModelId[];
   const validTransitions: TransitionType[] = ["cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"];
 
-  // wan-2.2 is the only RunPod endpoint with active workers.
-  // Anti-avatar prompts are enforced below to block the default face.
-  const DEFAULT_MODEL: ModelId = "wan-2.2" as ModelId;
+  // Default to seedance-1.5 (FAL — always warm, managed infrastructure).
+  // RunPod endpoints (wan-2.2) are unreliable with cold starts/timeouts.
+  const DEFAULT_MODEL: ModelId = "seedance-1.5" as ModelId;
 
-  // Validate each scene — force all to wan-2.2 (only model with workers)
+  // Validate each scene — use FAL models only for reliable generation
   plan.scenes = plan.scenes.map((scene, i) => {
-    const selectedModel: ModelId = DEFAULT_MODEL;
-    if (scene.modelId !== DEFAULT_MODEL) {
-      console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → wan-2.2 (only endpoint with workers)`);
+    // Allow explicitly selected FAL models (kling, veo, seedance); swap RunPod models to default
+    const model = AI_MODELS[scene.modelId as ModelId];
+    const selectedModel: ModelId = (model?.provider === "fal") ? scene.modelId as ModelId : DEFAULT_MODEL;
+    if (scene.modelId !== selectedModel) {
+      console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → ${selectedModel} (FAL only for reliability)`);
     }
 
     const s: SceneDefinition = {

@@ -59,14 +59,14 @@ export function WhatsNewBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#12121A] shadow-2xl shadow-black/40 z-50">
-          <div className="p-4 border-b border-white/[0.06]">
+        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-2xl border border-white/[0.12] bg-[#12121A] shadow-2xl shadow-black/40 z-50">
+          <div className="p-4 border-b border-white/[0.10]">
             <h3 className="text-sm font-semibold text-zinc-100">What&apos;s New</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Latest updates and features</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Latest updates and features</p>
           </div>
           <div className="divide-y divide-white/[0.04]">
             {CHANGELOG.map((entry) => (
-              <div key={entry.id} className="p-4 hover:bg-white/[0.02] transition-colors">
+              <div key={entry.id} className="p-4 hover:bg-white/[0.04] transition-colors">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${typeColors[entry.type]}`}>
                     {entry.type}
@@ -76,10 +76,10 @@ export function WhatsNewBell() {
                       {entry.badge}
                     </span>
                   )}
-                  <span className="text-[10px] text-zinc-600 ml-auto">{entry.date}</span>
+                  <span className="text-[10px] text-zinc-400 ml-auto">{entry.date}</span>
                 </div>
                 <h4 className="text-sm font-medium text-zinc-200">{entry.title}</h4>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{entry.description}</p>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{entry.description}</p>
               </div>
             ))}
           </div>

@@ -266,7 +266,7 @@ export default function UpscalePage() {
           <ArrowUpCircle className="w-7 h-7 text-violet-400" />
           Video Upscaler
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Enhance your videos to higher resolutions with AI-powered upscaling.
         </p>
       </div>
@@ -281,7 +281,7 @@ export default function UpscalePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {videoPreviewUrl ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.06]">
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.10]">
                   <video
                     src={videoPreviewUrl}
                     controls
@@ -306,14 +306,14 @@ export default function UpscalePage() {
                   className={`flex flex-col items-center justify-center p-12 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200 ${
                     isDragging
                       ? "border-violet-500/50 bg-violet-500/[0.06]"
-                      : "border-white/[0.08] hover:border-violet-500/30 bg-white/[0.01]"
+                      : "border-white/[0.12] hover:border-violet-500/30 bg-white/[0.01]"
                   }`}
                 >
-                  <Upload className="w-10 h-10 text-zinc-600 mb-3" />
+                  <Upload className="w-10 h-10 text-zinc-400 mb-3" />
                   <span className="text-sm text-zinc-400">
                     Drag & drop a video or click to upload
                   </span>
-                  <span className="text-xs text-zinc-600 mt-1">
+                  <span className="text-xs text-zinc-400 mt-1">
                     MP4, MOV, WebM up to 500MB
                   </span>
                   <input
@@ -338,7 +338,7 @@ export default function UpscalePage() {
                   <select
                     value={selectedGalleryVideoId}
                     onChange={(e) => handleGallerySelect(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.06] bg-white/[0.02] text-zinc-300 text-sm px-3 py-2.5 focus:outline-none focus:border-violet-500/40 transition-colors"
+                    className="w-full rounded-xl border border-white/[0.10] bg-white/[0.04] text-zinc-300 text-sm px-3 py-2.5 focus:outline-none focus:border-violet-500/40 transition-colors"
                   >
                     <option value="" className="bg-[#0A0A0F]">
                       Choose a video...
@@ -374,7 +374,7 @@ export default function UpscalePage() {
                           ? "opacity-40 cursor-not-allowed border-white/[0.04]"
                           : isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -391,7 +391,7 @@ export default function UpscalePage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-zinc-400">
                         {opt.value === "1080p" ? "1920x1080 pixels" : "3840x2160 pixels"}
                       </div>
                     </button>
@@ -421,7 +421,7 @@ export default function UpscalePage() {
                           ? "opacity-40 cursor-not-allowed border-white/[0.04]"
                           : isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -439,7 +439,7 @@ export default function UpscalePage() {
                         )}
                       </div>
                       {isLocked && opt.value !== "none" && (
-                        <div className="text-[10px] text-zinc-600 mt-1">Studio plan</div>
+                        <div className="text-[10px] text-zinc-400 mt-1">Studio plan</div>
                       )}
                     </button>
                   );
@@ -458,7 +458,7 @@ export default function UpscalePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+                <div className="rounded-xl overflow-hidden border border-white/[0.10]">
                   <video
                     src={resultUrl}
                     controls
@@ -486,7 +486,7 @@ export default function UpscalePage() {
             <CardContent className="space-y-4">
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Source</span>
+                  <span className="text-zinc-400">Source</span>
                   <span className="text-zinc-200 truncate ml-2 max-w-[160px]">
                     {videoFile
                       ? videoFile.name
@@ -496,17 +496,17 @@ export default function UpscalePage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Duration</span>
+                  <span className="text-zinc-400">Duration</span>
                   <span className="text-zinc-200">{videoDuration}s</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Target</span>
+                  <span className="text-zinc-400">Target</span>
                   <span className="text-zinc-200">
                     {targetResolution === "4k" ? "4K Ultra HD" : "1080p HD"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Interpolation</span>
+                  <span className="text-zinc-400">Interpolation</span>
                   <span className="text-zinc-200">
                     {frameInterpolation === "none"
                       ? "None"
@@ -516,12 +516,12 @@ export default function UpscalePage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Est. Time</span>
+                  <span className="text-zinc-400">Est. Time</span>
                   <span className="text-zinc-200">~{estimatedTime}s</span>
                 </div>
               </div>
 
-              <div className="border-t border-white/[0.06] pt-4">
+              <div className="border-t border-white/[0.10] pt-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-zinc-300">Cost</span>
                   <div className="flex items-center gap-1.5">
@@ -529,14 +529,14 @@ export default function UpscalePage() {
                     <span className="text-xl font-bold text-violet-300">
                       {creditCost}
                     </span>
-                    <span className="text-xs text-zinc-500">credits</span>
+                    <span className="text-xs text-zinc-400">credits</span>
                   </div>
                 </div>
-                <div className="text-[10px] text-zinc-600 mt-1">
+                <div className="text-[10px] text-zinc-400 mt-1">
                   5 credits per 5 seconds of video
                 </div>
                 <div className="flex justify-between mt-1.5">
-                  <span className="text-xs text-zinc-500">Your balance</span>
+                  <span className="text-xs text-zinc-400">Your balance</span>
                   <span
                     className={`text-xs font-semibold ${
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"

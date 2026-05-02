@@ -14,17 +14,17 @@ export default function TalkingAvatarLoading() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-28" />
             <Skeleton className="h-48 w-full rounded-xl" />
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-20" />
             <Skeleton className="h-24 w-full rounded-lg" />
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-5 space-y-3">
+        <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-5 space-y-3">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-10 w-full rounded-lg" />
           <Skeleton className="h-10 w-full rounded-lg" />

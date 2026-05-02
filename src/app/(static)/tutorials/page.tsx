@@ -24,7 +24,7 @@ export default function TutorialsPage() {
             { title: "Using the API", desc: "Generate videos programmatically with the Genesis Studio REST API.", link: "/docs" },
           ].map((tut) => (
             <Link key={tut.title} href={tut.link}
-              className="block p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.10] transition-all">
+              className="block p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10] hover:bg-white/[0.05] hover:border-white/[0.10] transition-all">
               <h3 className="text-lg font-semibold text-white mb-1">{tut.title}</h3>
               <p className="text-sm text-zinc-400">{tut.desc}</p>
             </Link>

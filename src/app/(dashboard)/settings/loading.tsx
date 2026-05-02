@@ -13,7 +13,7 @@ export default function SettingsLoading() {
       </div>
 
       {/* Profile section */}
-      <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+      <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
         <Skeleton className="h-5 w-20" />
         <div className="flex items-center gap-4">
           <Skeleton className="w-16 h-16 rounded-full" />
@@ -25,14 +25,14 @@ export default function SettingsLoading() {
       </div>
 
       {/* Plan section */}
-      <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+      <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
         <Skeleton className="h-5 w-28" />
         <Skeleton className="h-10 w-full rounded-lg" />
         <Skeleton className="h-4 w-48" />
       </div>
 
       {/* Credit history */}
-      <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+      <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
         <Skeleton className="h-5 w-32" />
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex justify-between py-2">

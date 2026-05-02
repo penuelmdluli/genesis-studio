@@ -101,17 +101,17 @@ export function CommandPalette() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
-          <Search className="w-4 h-4 text-zinc-500 shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.10]">
+          <Search className="w-4 h-4 text-zinc-400 shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search commands..."
-            className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 outline-none"
+            className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-400 outline-none"
           />
-          <kbd className="px-1.5 py-0.5 rounded text-[10px] text-zinc-500 border border-white/[0.06] bg-white/[0.03] font-mono">
+          <kbd className="px-1.5 py-0.5 rounded text-[10px] text-zinc-400 border border-white/[0.10] bg-white/[0.05] font-mono">
             ESC
           </kbd>
         </div>
@@ -119,7 +119,7 @@ export function CommandPalette() {
         {/* Results */}
         <div className="max-h-72 overflow-y-auto p-2">
           {filtered.length === 0 ? (
-            <div className="text-center py-8 text-sm text-zinc-500">
+            <div className="text-center py-8 text-sm text-zinc-400">
               No commands found
             </div>
           ) : (
@@ -129,7 +129,7 @@ export function CommandPalette() {
                 if (groupItems.length === 0) return null;
                 return (
                   <div key={group}>
-                    <div className="px-2 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                    <div className="px-2 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                       {group}
                     </div>
                     {groupItems.map((cmd) => {
@@ -148,11 +148,11 @@ export function CommandPalette() {
                           <cmd.icon className="w-4 h-4 shrink-0" />
                           <span className="flex-1 text-left">{cmd.label}</span>
                           {cmd.shortcut && (
-                            <kbd className="px-1.5 py-0.5 rounded text-[10px] text-zinc-500 border border-white/[0.06] bg-white/[0.03] font-mono">
+                            <kbd className="px-1.5 py-0.5 rounded text-[10px] text-zinc-400 border border-white/[0.10] bg-white/[0.05] font-mono">
                               {cmd.shortcut}
                             </kbd>
                           )}
-                          <ArrowRight className="w-3 h-3 text-zinc-600" />
+                          <ArrowRight className="w-3 h-3 text-zinc-400" />
                         </button>
                       );
                     })}
@@ -164,17 +164,17 @@ export function CommandPalette() {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center gap-4 text-[10px] text-zinc-500">
+        <div className="px-4 py-2.5 border-t border-white/[0.10] flex items-center gap-4 text-[10px] text-zinc-400">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 rounded border border-white/[0.06] bg-white/[0.03] font-mono">↑↓</kbd>
+            <kbd className="px-1 py-0.5 rounded border border-white/[0.10] bg-white/[0.05] font-mono">↑↓</kbd>
             Navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 rounded border border-white/[0.06] bg-white/[0.03] font-mono">↵</kbd>
+            <kbd className="px-1 py-0.5 rounded border border-white/[0.10] bg-white/[0.05] font-mono">↵</kbd>
             Open
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 rounded border border-white/[0.06] bg-white/[0.03] font-mono">⌘K</kbd>
+            <kbd className="px-1 py-0.5 rounded border border-white/[0.10] bg-white/[0.05] font-mono">⌘K</kbd>
             Toggle
           </span>
         </div>

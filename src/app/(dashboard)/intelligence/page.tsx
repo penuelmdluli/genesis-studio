@@ -205,7 +205,7 @@ export default function IntelligencePage() {
               </Badge>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Content Intelligence</h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <p className="text-sm text-zinc-400 mt-1">
               Every video teaches the system what Africa wants to watch.
             </p>
           </div>
@@ -229,7 +229,7 @@ export default function IntelligencePage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-5 space-y-3">
+              <div key={i} className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-5 space-y-3">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-8 w-16" />
                 <Skeleton className="h-3 w-32" />
@@ -244,23 +244,23 @@ export default function IntelligencePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-zinc-500">Posts Analyzed</p>
+                      <p className="text-xs text-zinc-400">Posts Analyzed</p>
                       <p className="text-2xl font-bold text-zinc-100">{summary.totalPosts}</p>
-                      <p className="text-xs text-zinc-600">{summary.lockedPosts} with stable metrics</p>
+                      <p className="text-xs text-zinc-400">{summary.lockedPosts} with stable metrics</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-zinc-500">Avg Performance</p>
+                      <p className="text-xs text-zinc-400">Avg Performance</p>
                       <p className="text-2xl font-bold text-zinc-100">{summary.avgPerformanceScore}</p>
-                      <p className="text-xs text-zinc-600">out of 100</p>
+                      <p className="text-xs text-zinc-400">out of 100</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-zinc-500">AI Decisions</p>
+                      <p className="text-xs text-zinc-400">AI Decisions</p>
                       <p className="text-2xl font-bold text-zinc-100">{summary.totalDecisions}</p>
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-xs text-zinc-400">
                         {summary.totalDecisions > 0
                           ? `${Math.round((summary.correctDecisions / summary.totalDecisions) * 100)}% correct`
                           : "No decisions yet"}
@@ -269,9 +269,9 @@ export default function IntelligencePage() {
                   </Card>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-zinc-500">Active Insights</p>
+                      <p className="text-xs text-zinc-400">Active Insights</p>
                       <p className="text-2xl font-bold text-zinc-100">{summary.insightCount}</p>
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-xs text-zinc-400">
                         Confidence: {confidenceLabel(summary.insightCount > 5 ? 0.7 : summary.insightCount > 2 ? 0.4 : 0.2)}
                       </p>
                     </CardContent>
@@ -298,11 +298,11 @@ export default function IntelligencePage() {
                               <Icon className="w-4 h-4 text-emerald-400" />
                             </div>
                             <div>
-                              <p className="text-xs text-zinc-500">{insight.insight_type.replace(/_/g, " ").replace("best ", "")}</p>
+                              <p className="text-xs text-zinc-400">{insight.insight_type.replace(/_/g, " ").replace("best ", "")}</p>
                               <p className="text-sm font-semibold text-zinc-100 capitalize">{insight.insight_key}</p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <div className="flex items-center justify-between text-xs text-zinc-400">
                             <span>{formatNumber(insight.avg_views)} avg views</span>
                             <span>{insight.sample_size} posts</span>
                           </div>
@@ -337,7 +337,7 @@ export default function IntelligencePage() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-zinc-100 capitalize">{insight.insight_key}</p>
-                            <p className="text-xs text-zinc-500">
+                            <p className="text-xs text-zinc-400">
                               Score: {Math.round(insight.avg_performance_score)} &middot; {insight.sample_size} posts
                             </p>
                           </div>
@@ -370,7 +370,7 @@ export default function IntelligencePage() {
                           )}
                           <div>
                             <p className="text-sm font-semibold text-zinc-100 capitalize">{insight.insight_key}</p>
-                            <p className="text-xs text-zinc-500">
+                            <p className="text-xs text-zinc-400">
                               {isUp ? "+" : ""}{String(val.delta)} pts vs last week
                             </p>
                           </div>
@@ -397,24 +397,24 @@ export default function IntelligencePage() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-zinc-500 text-xs">Category</p>
+                        <p className="text-zinc-400 text-xs">Category</p>
                         <p className="text-zinc-200 capitalize">{formula.topic_category || "mixed"}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">Best Time</p>
+                        <p className="text-zinc-400 text-xs">Best Time</p>
                         <p className="text-zinc-200">{formula.optimal_hour != null ? `${formula.optimal_hour}:00` : "any"}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">Duration</p>
+                        <p className="text-zinc-400 text-xs">Duration</p>
                         <p className="text-zinc-200">{formula.optimal_duration || "?"}s</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">Avg Views</p>
+                        <p className="text-zinc-400 text-xs">Avg Views</p>
                         <p className="text-zinc-200">{formatNumber(formula.avg_views)}</p>
                       </div>
                     </div>
                     {formula.hook_pattern && (
-                      <p className="mt-3 text-xs text-zinc-500">
+                      <p className="mt-3 text-xs text-zinc-400">
                         Hook pattern: <span className="text-zinc-400 capitalize">{formula.hook_pattern}</span>
                         {formula.music_style && <> &middot; Music: <span className="text-zinc-400">{formula.music_style}</span></>}
                       </p>
@@ -431,15 +431,15 @@ export default function IntelligencePage() {
                   <Brain className="w-5 h-5 text-violet-400" />
                   AI Decision Log
                 </h2>
-                <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 overflow-hidden">
+                <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-white/[0.06]">
-                          <th className="text-left p-3 text-xs text-zinc-500 font-medium">Decision</th>
-                          <th className="text-left p-3 text-xs text-zinc-500 font-medium">Change</th>
-                          <th className="text-left p-3 text-xs text-zinc-500 font-medium hidden sm:table-cell">Reason</th>
-                          <th className="text-center p-3 text-xs text-zinc-500 font-medium">Outcome</th>
+                        <tr className="border-b border-white/[0.10]">
+                          <th className="text-left p-3 text-xs text-zinc-400 font-medium">Decision</th>
+                          <th className="text-left p-3 text-xs text-zinc-400 font-medium">Change</th>
+                          <th className="text-left p-3 text-xs text-zinc-400 font-medium hidden sm:table-cell">Reason</th>
+                          <th className="text-center p-3 text-xs text-zinc-400 font-medium">Outcome</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -449,11 +449,11 @@ export default function IntelligencePage() {
                               {d.decision_type.replace(/_/g, " ")}
                             </td>
                             <td className="p-3">
-                              <span className="text-zinc-500">{d.before_value}</span>
-                              <span className="text-zinc-600 mx-1">&rarr;</span>
+                              <span className="text-zinc-400">{d.before_value}</span>
+                              <span className="text-zinc-400 mx-1">&rarr;</span>
                               <span className="text-zinc-200">{d.after_value}</span>
                             </td>
-                            <td className="p-3 text-xs text-zinc-500 max-w-[200px] truncate hidden sm:table-cell">
+                            <td className="p-3 text-xs text-zinc-400 max-w-[200px] truncate hidden sm:table-cell">
                               {d.reason}
                             </td>
                             <td className="p-3 text-center">
@@ -464,7 +464,7 @@ export default function IntelligencePage() {
                                 <XCircle className="w-4 h-4 text-red-400 mx-auto" />
                               )}
                               {d.was_correct === null && (
-                                <Timer className="w-4 h-4 text-zinc-600 mx-auto" />
+                                <Timer className="w-4 h-4 text-zinc-400 mx-auto" />
                               )}
                             </td>
                           </tr>
@@ -491,14 +491,14 @@ export default function IntelligencePage() {
                           <Badge className={TIER_COLORS[post.performance_tier] || ""}>
                             {post.performance_tier}
                           </Badge>
-                          <span className="text-xs text-zinc-600">
+                          <span className="text-xs text-zinc-400">
                             {new Date(post.posted_at).toLocaleDateString()}
                           </span>
                         </div>
                         <p className="text-sm text-zinc-200 line-clamp-2 mb-2">
                           {post.headline || post.topic || "Untitled"}
                         </p>
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <div className="flex items-center justify-between text-xs text-zinc-400">
                           <span>{formatNumber(post.views)} views</span>
                           <span>{Math.round(post.engagement_rate * 10000) / 100}% eng</span>
                           <span>Score: {Math.round(post.performance_score)}</span>
@@ -521,26 +521,26 @@ export default function IntelligencePage() {
                   <CardContent className="p-5">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-zinc-500 text-xs">Total Posts Analyzed</p>
+                        <p className="text-zinc-400 text-xs">Total Posts Analyzed</p>
                         <p className="text-xl font-bold text-zinc-100">{summary.totalPosts}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">AI Decisions Made</p>
+                        <p className="text-zinc-400 text-xs">AI Decisions Made</p>
                         <p className="text-xl font-bold text-zinc-100">{summary.totalDecisions}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">Correct Decisions</p>
+                        <p className="text-zinc-400 text-xs">Correct Decisions</p>
                         <p className="text-xl font-bold text-zinc-100">
                           {summary.correctDecisions}
                           {summary.totalDecisions > 0 && (
-                            <span className="text-sm text-zinc-500 ml-1">
+                            <span className="text-sm text-zinc-400 ml-1">
                               ({Math.round((summary.correctDecisions / summary.totalDecisions) * 100)}%)
                             </span>
                           )}
                         </p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">Last Analysis</p>
+                        <p className="text-zinc-400 text-xs">Last Analysis</p>
                         <p className="text-sm text-zinc-300">
                           {summary.lastAnalysis
                             ? new Date(summary.lastAnalysis).toLocaleString()
@@ -562,9 +562,9 @@ export default function IntelligencePage() {
             {/* Empty State */}
             {!summary?.totalPosts && !loading && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Brain className="w-16 h-16 text-zinc-700 mb-4" />
+                <Brain className="w-16 h-16 text-zinc-400 mb-4" />
                 <h3 className="text-lg font-semibold text-zinc-300 mb-2">No Intelligence Data Yet</h3>
-                <p className="text-sm text-zinc-500 max-w-md">
+                <p className="text-sm text-zinc-400 max-w-md">
                   The intelligence system learns from every video posted. As more content is published
                   and metrics are collected, the AI will start generating insights and making decisions
                   to improve performance.

@@ -166,7 +166,7 @@ export default function FirstVideoPage() {
               Skip for now
             </Button>
           </div>
-          <p className="text-xs text-zinc-500">You have {user?.creditBalance ?? 50} credits to start</p>
+          <p className="text-xs text-zinc-400">You have {user?.creditBalance ?? 50} credits to start</p>
         </MotionSection>
       )}
 
@@ -190,7 +190,7 @@ export default function FirstVideoPage() {
                     <span className="text-2xl">{p.thumbnailHint}</span>
                     <div className="min-w-0">
                       <h3 className="text-sm font-semibold text-zinc-200 truncate">{p.title}</h3>
-                      <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{p.prompt}</p>
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{p.prompt}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -215,10 +215,10 @@ export default function FirstVideoPage() {
           <div>
             <h2 className="text-xl font-bold text-zinc-100 mb-2">{progressMsg}</h2>
             {selectedPrompt && (
-              <p className="text-sm text-zinc-500 max-w-md mx-auto">&quot;{selectedPrompt.title}&quot;</p>
+              <p className="text-sm text-zinc-400 max-w-md mx-auto">&quot;{selectedPrompt.title}&quot;</p>
             )}
           </div>
-          <p className="text-xs text-zinc-500">This usually takes 60-120 seconds</p>
+          <p className="text-xs text-zinc-400">This usually takes 60-120 seconds</p>
         </MotionSection>
       )}
 
@@ -247,7 +247,7 @@ export default function FirstVideoPage() {
               <Brain className="w-5 h-5" /> Try Brain Studio
             </Button>
           </div>
-          <p className="text-center text-xs text-zinc-500">Your video is saved in your Gallery</p>
+          <p className="text-center text-xs text-zinc-400">Your video is saved in your Gallery</p>
         </MotionSection>
       )}
 

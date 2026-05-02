@@ -94,7 +94,7 @@ export default function CollectionsPage() {
             <FolderOpen className="w-5 sm:w-6 h-5 sm:h-6 text-violet-400" />
             Collections
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             Organize your videos into folders and collections.
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function CollectionsPage() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-zinc-300">Create Collection</label>
               <button onClick={() => setShowCreate(false)} className="p-1 hover:bg-white/[0.06] rounded-lg">
-                <X className="w-4 h-4 text-zinc-500" />
+                <X className="w-4 h-4 text-zinc-400" />
               </button>
             </div>
             <Input
@@ -132,15 +132,15 @@ export default function CollectionsPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 rounded-2xl bg-white/[0.02] border border-white/[0.06] animate-pulse" />
+            <div key={i} className="h-32 rounded-2xl bg-white/[0.04] border border-white/[0.10] animate-pulse" />
           ))}
         </div>
       ) : collections.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <FolderOpen className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+            <FolderOpen className="w-12 h-12 text-zinc-400 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-zinc-300 mb-1">No collections yet</h3>
-            <p className="text-sm text-zinc-500 mb-4">
+            <p className="text-sm text-zinc-400 mb-4">
               Create your first collection to organize your generated videos.
             </p>
             <Button onClick={() => setShowCreate(true)}>
@@ -162,16 +162,16 @@ export default function CollectionsPage() {
                   </div>
                   <button
                     onClick={() => handleDelete(collection.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-zinc-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <h3 className="text-sm font-semibold text-zinc-200 mb-1">{collection.name}</h3>
                 {collection.description && (
-                  <p className="text-xs text-zinc-500 mb-2 line-clamp-2">{collection.description}</p>
+                  <p className="text-xs text-zinc-400 mb-2 line-clamp-2">{collection.description}</p>
                 )}
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                   <Film className="w-3 h-3" />
                   {collection.videoCount} video{collection.videoCount !== 1 ? "s" : ""}
                 </div>

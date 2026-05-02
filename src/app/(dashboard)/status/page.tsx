@@ -65,7 +65,7 @@ export default function StatusPage() {
             ))}
           </div>
 
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-zinc-400">
             Version: {health.version} | Last checked: {new Date(health.timestamp).toLocaleTimeString()}
           </p>
         </div>

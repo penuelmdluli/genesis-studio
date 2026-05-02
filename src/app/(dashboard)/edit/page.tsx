@@ -97,7 +97,7 @@ export default function EditPage() {
           <Film className="w-6 h-6 text-violet-400" />
           Video Editor
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Trim, merge, crop, add music, and text overlays to your videos.
         </p>
       </div>
@@ -114,16 +114,16 @@ export default function EditPage() {
                 className={`w-full p-3 rounded-xl border text-left transition-all ${
                   isActive
                     ? "border-violet-500/40 bg-violet-500/10"
-                    : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
+                    : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1]"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <m.icon className={`w-4 h-4 ${isActive ? "text-violet-400" : "text-zinc-500"}`} />
+                  <m.icon className={`w-4 h-4 ${isActive ? "text-violet-400" : "text-zinc-400"}`} />
                   <span className={`text-sm font-medium ${isActive ? "text-violet-300" : "text-zinc-300"}`}>
                     {m.label}
                   </span>
                 </div>
-                <div className="text-xs text-zinc-500 mt-0.5 ml-6">{m.desc}</div>
+                <div className="text-xs text-zinc-400 mt-0.5 ml-6">{m.desc}</div>
               </button>
             );
           })}
@@ -143,13 +143,13 @@ export default function EditPage() {
                     className="w-full rounded-xl bg-black"
                   />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">{selectedVideo.title}</span>
-                    <span className="text-xs text-zinc-500">{selectedVideo.duration}s · {selectedVideo.resolution}</span>
+                    <span className="text-xs text-zinc-400">{selectedVideo.title}</span>
+                    <span className="text-xs text-zinc-400">{selectedVideo.duration}s · {selectedVideo.resolution}</span>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Upload className="w-10 h-10 text-zinc-600 mb-3" />
+                  <Upload className="w-10 h-10 text-zinc-400 mb-3" />
                   <p className="text-sm text-zinc-400">Select a video from your gallery to start editing</p>
                 </div>
               )}
@@ -185,7 +185,7 @@ export default function EditPage() {
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-400">
                     Output duration: {Math.max(0, trimEnd - trimStart).toFixed(1)}s
                   </p>
                 </div>
@@ -198,7 +198,7 @@ export default function EditPage() {
                     {CROP_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
-                        className="p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/30 text-sm text-zinc-300 transition-all text-left"
+                        className="p-2.5 rounded-xl border border-white/[0.10] bg-white/[0.04] hover:border-violet-500/30 text-sm text-zinc-300 transition-all text-left"
                       >
                         {preset.label}
                       </button>
@@ -227,7 +227,7 @@ export default function EditPage() {
                           className={`px-3 py-1.5 rounded-lg text-xs capitalize transition-all ${
                             textPosition === pos
                               ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                              : "bg-white/[0.03] text-zinc-500 border border-white/[0.06]"
+                              : "bg-white/[0.05] text-zinc-400 border border-white/[0.10]"
                           }`}
                         >
                           {pos}
@@ -266,7 +266,7 @@ export default function EditPage() {
           <h3 className="text-sm font-medium text-zinc-300 px-1">Your Videos</h3>
           <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
             {videos.length === 0 ? (
-              <p className="text-xs text-zinc-500 p-3">No videos yet. Generate some first!</p>
+              <p className="text-xs text-zinc-400 p-3">No videos yet. Generate some first!</p>
             ) : (
               videos.slice(0, 20).map((video) => {
                 const isSelected = selectedVideoId === video.id;
@@ -277,7 +277,7 @@ export default function EditPage() {
                     className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
                       isSelected
                         ? "border-violet-500/40 bg-violet-500/10"
-                        : "border-white/[0.04] bg-white/[0.01] hover:border-white/[0.08]"
+                        : "border-white/[0.04] bg-white/[0.01] hover:border-white/[0.12]"
                     }`}
                   >
                     <div className="w-16 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0">
@@ -287,7 +287,7 @@ export default function EditPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-xs text-zinc-300 truncate">{video.title}</div>
-                      <div className="text-[10px] text-zinc-500">{video.duration}s · {video.resolution}</div>
+                      <div className="text-[10px] text-zinc-400">{video.duration}s · {video.resolution}</div>
                     </div>
                   </button>
                 );

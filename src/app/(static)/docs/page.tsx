@@ -18,7 +18,7 @@ export default function DocsPage() {
             Available on Pro and Studio plans.
           </p>
 
-          <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
             <h2 className="text-xl font-semibold text-white mb-4">Quick Start</h2>
             <div className="bg-black/50 rounded-xl p-4 font-mono text-sm text-green-400 overflow-x-auto">
               <pre>{`curl -X POST https://genesisstudio.app/api/v1/generate \\
@@ -33,7 +33,7 @@ export default function DocsPage() {
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
             <h2 className="text-xl font-semibold text-white mb-4">Authentication</h2>
             <p className="text-sm text-zinc-400">
               Generate an API key from your{" "}
@@ -43,24 +43,24 @@ export default function DocsPage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
             <h2 className="text-xl font-semibold text-white mb-4">Endpoints</h2>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
                 <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-xs font-mono">POST</span>
                 <code className="text-zinc-300">/api/v1/generate</code>
-                <span className="text-zinc-500">— Generate a video</span>
+                <span className="text-zinc-400">— Generate a video</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-xs font-mono">GET</span>
                 <code className="text-zinc-300">/api/v1/status/:jobId</code>
-                <span className="text-zinc-500">— Check generation status</span>
+                <span className="text-zinc-400">— Check generation status</span>
               </div>
             </div>
           </div>
 
           <div className="mt-8 pt-8 border-t border-white/10">
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-zinc-400">
               Need help? Contact us at{" "}
               <a href="mailto:hello@genesis-studio.app" className="text-violet-400">hello@genesis-studio.app</a>
             </p>

@@ -220,7 +220,7 @@ export default function AdminPage() {
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
           <Shield className="w-16 h-16 text-red-500/50" />
           <h1 className="text-2xl font-bold text-zinc-200">Access Denied</h1>
-          <p className="text-zinc-500">This page is restricted to platform administrators.</p>
+          <p className="text-zinc-400">This page is restricted to platform administrators.</p>
         </div>
       </PageTransition>
     );
@@ -272,10 +272,10 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Badge variant="red">ADMIN</Badge>
-              <span className="text-xs text-zinc-500">Owner Dashboard</span>
+              <span className="text-xs text-zinc-400">Owner Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Command Center</h1>
-            <p className="text-zinc-500 mt-1 text-sm">Everything happening on your platform</p>
+            <p className="text-zinc-400 mt-1 text-sm">Everything happening on your platform</p>
           </div>
           <Button onClick={fetchStats} variant="outline" size="sm" disabled={loading} className="shrink-0">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
@@ -284,7 +284,7 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-x-auto">
+        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10] overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -292,7 +292,7 @@ export default function AdminPage() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
                   ? "bg-violet-500/15 text-violet-300"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]"
+                  : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04]"
               }`}
             >
               <tab.icon className="w-3.5 h-3.5" />
@@ -323,7 +323,7 @@ export default function AdminPage() {
                         <card.icon className={`w-4 h-4 ${card.color}`} />
                       </div>
                       <div className="text-lg sm:text-xl font-bold text-zinc-100">{card.value}</div>
-                      <div className="text-[10px] sm:text-xs text-zinc-500">{card.label}</div>
+                      <div className="text-[10px] sm:text-xs text-zinc-400">{card.label}</div>
                     </CardContent>
                   </Card>
                 </StaggerItem>
@@ -347,7 +347,7 @@ export default function AdminPage() {
                         <div key={plan}>
                           <div className="flex justify-between items-center mb-1">
                             <span className={`text-sm font-medium capitalize ${planColors[plan] || "text-zinc-400"}`}>{plan}</span>
-                            <span className="text-xs text-zinc-500">{count} ({pct}%)</span>
+                            <span className="text-xs text-zinc-400">{count} ({pct}%)</span>
                           </div>
                           <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                             <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -379,9 +379,9 @@ export default function AdminPage() {
                         </div>
                       );
                     })}
-                    <div className="pt-2 border-t border-white/[0.06]">
+                    <div className="pt-2 border-t border-white/[0.10]">
                       <div className="flex justify-between text-xs">
-                        <span className="text-zinc-500">Failure Rate</span>
+                        <span className="text-zinc-400">Failure Rate</span>
                         <span className={parseFloat(failRate) > 10 ? "text-red-400" : "text-emerald-400"}>{failRate}%</span>
                       </div>
                     </div>
@@ -405,7 +405,7 @@ export default function AdminPage() {
                           <div key={model}>
                             <div className="flex justify-between mb-1">
                               <span className="text-xs text-zinc-400">{model}</span>
-                              <span className="text-xs text-zinc-500">{count}</span>
+                              <span className="text-xs text-zinc-400">{count}</span>
                             </div>
                             <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                               <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full" style={{ width: `${(count / maxCount) * 100}%` }} />
@@ -414,7 +414,7 @@ export default function AdminPage() {
                         );
                       })}
                     {Object.keys(stats.modelUsage).length === 0 && (
-                      <p className="text-xs text-zinc-600">No jobs this week</p>
+                      <p className="text-xs text-zinc-400">No jobs this week</p>
                     )}
                   </div>
                 </CardContent>
@@ -437,11 +437,11 @@ export default function AdminPage() {
                     const heightPct = Math.max(8, (dayData.jobs / maxJobs) * 100);
                     return (
                       <div key={key} className="flex flex-col items-center gap-1">
-                        <div className="w-full h-24 bg-white/[0.02] rounded-lg flex items-end p-1">
+                        <div className="w-full h-24 bg-white/[0.04] rounded-lg flex items-end p-1">
                           <div className="w-full bg-gradient-to-t from-violet-600 to-cyan-500 rounded transition-all" style={{ height: `${heightPct}%` }} />
                         </div>
-                        <span className="text-[10px] text-zinc-600">{date.toLocaleDateString("en", { weekday: "short" })}</span>
-                        <span className="text-[10px] text-zinc-500 font-medium">{dayData.jobs}</span>
+                        <span className="text-[10px] text-zinc-400">{date.toLocaleDateString("en", { weekday: "short" })}</span>
+                        <span className="text-[10px] text-zinc-400 font-medium">{dayData.jobs}</span>
                       </div>
                     );
                   })}
@@ -468,7 +468,7 @@ export default function AdminPage() {
                       <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
                     </div>
                     <div className="text-xl font-bold text-zinc-100">{kpi.value}</div>
-                    <div className="text-xs text-zinc-500">{kpi.label}</div>
+                    <div className="text-xs text-zinc-400">{kpi.label}</div>
                   </CardContent>
                 </Card>
               ))}
@@ -486,14 +486,14 @@ export default function AdminPage() {
                     )}
                   </h3>
                   {stats.lowBalanceUsers.length === 0 ? (
-                    <p className="text-xs text-zinc-600">All paid users have sufficient credits</p>
+                    <p className="text-xs text-zinc-400">All paid users have sufficient credits</p>
                   ) : (
                     <div className="space-y-2.5 max-h-[300px] overflow-y-auto">
                       {stats.lowBalanceUsers.map((u) => (
-                        <div key={u.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                        <div key={u.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
                           <div className="min-w-0">
                             <div className="text-sm text-zinc-200 truncate">{u.name || u.email}</div>
-                            <div className="text-[10px] text-zinc-500">
+                            <div className="text-[10px] text-zinc-400">
                               <span className={planColors[u.plan]}>{u.plan}</span> · {u.monthly_credits_used}/{u.monthly_credits_limit} used
                             </div>
                           </div>
@@ -501,7 +501,7 @@ export default function AdminPage() {
                             <div className={`text-sm font-bold ${u.credit_balance <= 5 ? "text-red-400" : "text-amber-400"}`}>
                               {u.credit_balance}
                             </div>
-                            <div className="text-[10px] text-zinc-600">credits left</div>
+                            <div className="text-[10px] text-zinc-400">credits left</div>
                           </div>
                         </div>
                       ))}
@@ -518,7 +518,7 @@ export default function AdminPage() {
                     Top Spenders (30d)
                   </h3>
                   {stats.topSpenders.length === 0 ? (
-                    <p className="text-xs text-zinc-600">No credit usage in the last 30 days</p>
+                    <p className="text-xs text-zinc-400">No credit usage in the last 30 days</p>
                   ) : (
                     <div className="space-y-2">
                       {stats.topSpenders.map((s, i) => {
@@ -527,7 +527,7 @@ export default function AdminPage() {
                           <div key={s.userId}>
                             <div className="flex justify-between mb-1">
                               <span className="text-xs text-zinc-400 truncate max-w-[60%]">
-                                <span className="text-zinc-600 mr-1">#{i + 1}</span>
+                                <span className="text-zinc-400 mr-1">#{i + 1}</span>
                                 {s.userId.slice(0, 8)}...
                               </span>
                               <span className="text-xs font-medium text-zinc-300">{s.totalSpent.toLocaleString()} credits</span>
@@ -554,28 +554,28 @@ export default function AdminPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-white/[0.06]">
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Type</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Amount</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Balance</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Description</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">When</th>
+                      <tr className="border-b border-white/[0.10]">
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Type</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Amount</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Balance</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Description</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">When</th>
                       </tr>
                     </thead>
                     <tbody>
                       {stats.recentTransactions.map((txn) => {
                         const typeInfo = txnTypeLabels[txn.type] || { label: txn.type, color: "text-zinc-400" };
                         return (
-                          <tr key={txn.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                          <tr key={txn.id} className="border-b border-white/[0.03] hover:bg-white/[0.04]">
                             <td className="py-2 px-3">
                               <span className={`text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</span>
                             </td>
                             <td className={`py-2 px-3 text-sm font-medium ${txn.amount > 0 ? "text-emerald-400" : "text-red-400"}`}>
                               {txn.amount > 0 ? "+" : ""}{txn.amount}
                             </td>
-                            <td className="py-2 px-3 text-xs text-zinc-500">{txn.balance}</td>
-                            <td className="py-2 px-3 text-xs text-zinc-500 max-w-[200px] truncate">{txn.description}</td>
-                            <td className="py-2 px-3 text-xs text-zinc-600">{formatRelativeTime(txn.created_at)}</td>
+                            <td className="py-2 px-3 text-xs text-zinc-400">{txn.balance}</td>
+                            <td className="py-2 px-3 text-xs text-zinc-400 max-w-[200px] truncate">{txn.description}</td>
+                            <td className="py-2 px-3 text-xs text-zinc-400">{formatRelativeTime(txn.created_at)}</td>
                           </tr>
                         );
                       })}
@@ -600,7 +600,7 @@ export default function AdminPage() {
                         <div className="text-xs text-zinc-400 truncate max-w-[60%]">{r.description}</div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="text-sm font-medium text-amber-400">+{Math.abs(r.amount)}</span>
-                          <span className="text-[10px] text-zinc-600">{formatRelativeTime(r.created_at)}</span>
+                          <span className="text-[10px] text-zinc-400">{formatRelativeTime(r.created_at)}</span>
                         </div>
                       </div>
                     ))}
@@ -622,7 +622,7 @@ export default function AdminPage() {
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="text-2xl font-bold text-zinc-100">${stats.overview.monthlyRecurring}</div>
-                  <div className="text-xs text-zinc-500">Monthly Recurring</div>
+                  <div className="text-xs text-zinc-400">Monthly Recurring</div>
                 </CardContent>
               </Card>
               <Card className="glass-strong">
@@ -631,7 +631,7 @@ export default function AdminPage() {
                     <Crown className="w-4 h-4 text-violet-400" />
                   </div>
                   <div className="text-2xl font-bold text-zinc-100">{stats.overview.paidSubscribers}</div>
-                  <div className="text-xs text-zinc-500">Paid Subscribers</div>
+                  <div className="text-xs text-zinc-400">Paid Subscribers</div>
                 </CardContent>
               </Card>
               <Card className="glass-strong">
@@ -644,7 +644,7 @@ export default function AdminPage() {
                       ? ((stats.overview.paidSubscribers / stats.overview.totalUsers) * 100).toFixed(1)
                       : "0"}%
                   </div>
-                  <div className="text-xs text-zinc-500">Conversion Rate</div>
+                  <div className="text-xs text-zinc-400">Conversion Rate</div>
                 </CardContent>
               </Card>
               <Card className="glass-strong">
@@ -653,7 +653,7 @@ export default function AdminPage() {
                     <Zap className="w-4 h-4 text-amber-400" />
                   </div>
                   <div className="text-2xl font-bold text-zinc-100">{stats.packPurchases.length}</div>
-                  <div className="text-xs text-zinc-500">Pack Purchases (30d)</div>
+                  <div className="text-xs text-zinc-400">Pack Purchases (30d)</div>
                 </CardContent>
               </Card>
             </div>
@@ -665,13 +665,13 @@ export default function AdminPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-white/[0.06]">
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Name</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Email</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Plan</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Credits</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Usage</th>
-                        <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Joined</th>
+                      <tr className="border-b border-white/[0.10]">
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Name</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Email</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Plan</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Credits</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Usage</th>
+                        <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Joined</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -679,7 +679,7 @@ export default function AdminPage() {
                         const usagePct = u.monthly_credits_limit > 0
                           ? Math.round((u.monthly_credits_used / u.monthly_credits_limit) * 100) : 0;
                         return (
-                          <tr key={u.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                          <tr key={u.id} className="border-b border-white/[0.03] hover:bg-white/[0.04]">
                             <td className="py-2.5 px-3 text-zinc-200 font-medium">{u.name}</td>
                             <td className="py-2.5 px-3 text-zinc-400 text-xs">{u.email}</td>
                             <td className="py-2.5 px-3">
@@ -698,17 +698,17 @@ export default function AdminPage() {
                                     style={{ width: `${Math.min(100, usagePct)}%` }}
                                   />
                                 </div>
-                                <span className="text-xs text-zinc-500">{usagePct}%</span>
+                                <span className="text-xs text-zinc-400">{usagePct}%</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-3 text-zinc-600 text-xs">{formatRelativeTime(u.created_at)}</td>
+                            <td className="py-2.5 px-3 text-zinc-400 text-xs">{formatRelativeTime(u.created_at)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                   {stats.subscribers.length === 0 && (
-                    <p className="text-xs text-zinc-600 text-center py-8">No paid subscribers yet</p>
+                    <p className="text-xs text-zinc-400 text-center py-8">No paid subscribers yet</p>
                   )}
                 </div>
               </CardContent>
@@ -724,11 +724,11 @@ export default function AdminPage() {
                   </h3>
                   <div className="space-y-2">
                     {stats.packPurchases.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.04] border border-white/[0.04]">
                         <div className="text-xs text-zinc-400 truncate max-w-[60%]">{p.description}</div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="text-sm font-medium text-cyan-400">+{Math.abs(p.amount)}</span>
-                          <span className="text-[10px] text-zinc-600">{formatRelativeTime(p.created_at)}</span>
+                          <span className="text-[10px] text-zinc-400">{formatRelativeTime(p.created_at)}</span>
                         </div>
                       </div>
                     ))}
@@ -747,22 +747,22 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-white/[0.06]">
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Status</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Model</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Res</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Dur</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Credits</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">GPU</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">When</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Error</th>
+                    <tr className="border-b border-white/[0.10]">
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Status</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Model</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Res</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Dur</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Credits</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">GPU</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">When</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Error</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentJobs.map((job) => {
                       const Icon = statusIcons[job.status] || Activity;
                       return (
-                        <tr key={job.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                        <tr key={job.id} className="border-b border-white/[0.03] hover:bg-white/[0.04]">
                           <td className="py-2.5 px-3">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md ${statusColors[job.status] || ""}`}>
                               <Icon className="w-3 h-3" />
@@ -770,11 +770,11 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-zinc-400 font-mono text-xs">{job.model_id}</td>
-                          <td className="py-2.5 px-3 text-zinc-500">{job.resolution}</td>
-                          <td className="py-2.5 px-3 text-zinc-500">{job.duration}s</td>
+                          <td className="py-2.5 px-3 text-zinc-400">{job.resolution}</td>
+                          <td className="py-2.5 px-3 text-zinc-400">{job.duration}s</td>
                           <td className="py-2.5 px-3 text-zinc-400">{job.credits_cost}</td>
-                          <td className="py-2.5 px-3 text-zinc-500">{job.gpu_time ? `${Math.round(job.gpu_time)}s` : "—"}</td>
-                          <td className="py-2.5 px-3 text-zinc-600 text-xs">{formatRelativeTime(job.created_at)}</td>
+                          <td className="py-2.5 px-3 text-zinc-400">{job.gpu_time ? `${Math.round(job.gpu_time)}s` : "—"}</td>
+                          <td className="py-2.5 px-3 text-zinc-400 text-xs">{formatRelativeTime(job.created_at)}</td>
                           <td className="py-2.5 px-3 text-red-400/70 text-xs max-w-[200px] truncate">{job.error_message || "—"}</td>
                         </tr>
                       );
@@ -794,24 +794,24 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-white/[0.06]">
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Name</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Email</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Plan</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Credits</th>
-                      <th className="text-left text-xs text-zinc-500 font-medium py-2 px-3">Joined</th>
+                    <tr className="border-b border-white/[0.10]">
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Name</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Email</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Plan</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Credits</th>
+                      <th className="text-left text-xs text-zinc-400 font-medium py-2 px-3">Joined</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentUsers.map((u) => (
-                      <tr key={u.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                      <tr key={u.id} className="border-b border-white/[0.03] hover:bg-white/[0.04]">
                         <td className="py-2.5 px-3 text-zinc-200 font-medium">{u.name}</td>
                         <td className="py-2.5 px-3 text-zinc-400 text-xs">{u.email}</td>
                         <td className="py-2.5 px-3">
                           <span className={`text-sm font-medium capitalize ${planColors[u.plan] || "text-zinc-400"}`}>{u.plan}</span>
                         </td>
                         <td className="py-2.5 px-3 text-zinc-400">{u.credit_balance}</td>
-                        <td className="py-2.5 px-3 text-zinc-600 text-xs">{formatRelativeTime(u.created_at)}</td>
+                        <td className="py-2.5 px-3 text-zinc-400 text-xs">{formatRelativeTime(u.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -851,7 +851,7 @@ export default function AdminPage() {
                       </div>
                       <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-zinc-500">Fail Count</span>
+                          <span className="text-zinc-400">Fail Count</span>
                           <span className={p.failCount > 0 ? "text-amber-400" : "text-zinc-400"}>{p.failCount}</span>
                         </div>
                         {p.lastError && (
@@ -860,7 +860,7 @@ export default function AdminPage() {
                           </div>
                         )}
                         {p.lastChecked && (
-                          <div className="text-zinc-600">
+                          <div className="text-zinc-400">
                             Last check: {formatRelativeTime(p.lastChecked)}
                           </div>
                         )}
@@ -888,7 +888,7 @@ export default function AdminPage() {
                         className={`p-4 rounded-xl border ${
                           isDanger ? "border-red-500/20 bg-red-500/5" :
                           isWarning ? "border-amber-500/20 bg-amber-500/5" :
-                          "border-white/[0.06] bg-white/[0.02]"
+                          "border-white/[0.10] bg-white/[0.04]"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -905,7 +905,7 @@ export default function AdminPage() {
                             style={{ width: `${Math.min(100, budget.percentUsed)}%` }}
                           />
                         </div>
-                        <div className="flex justify-between text-[10px] text-zinc-500">
+                        <div className="flex justify-between text-[10px] text-zinc-400">
                           <span>${(budget.spentCents / 100).toFixed(2)} / ${(budget.budgetCents / 100).toFixed(2)}</span>
                           <span>{budget.requests} reqs</span>
                         </div>
@@ -937,10 +937,10 @@ export default function AdminPage() {
                       <div key={job.id} className="p-3 rounded-lg bg-red-500/5 border border-red-500/10">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-mono text-zinc-400">{job.model_id}</span>
-                          <span className="text-[10px] text-zinc-600">{formatRelativeTime(job.created_at)}</span>
+                          <span className="text-[10px] text-zinc-400">{formatRelativeTime(job.created_at)}</span>
                         </div>
                         <p className="text-xs text-red-400/80 line-clamp-2">{job.error_message || "Unknown error"}</p>
-                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-zinc-600">
+                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-zinc-400">
                           <span>{job.credits_cost} credits</span>
                           <span>·</span>
                           <span className="font-mono">{job.id.slice(0, 8)}</span>

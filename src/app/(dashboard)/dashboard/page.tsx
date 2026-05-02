@@ -204,7 +204,7 @@ export default function DashboardPage() {
                   <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full ${c.bg} opacity-50 group-hover:opacity-100 transition-opacity duration-500`} />
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-zinc-500 font-medium">{stat.label}</p>
+                      <p className="text-xs text-zinc-400 font-medium">{stat.label}</p>
                       <div className={`w-8 h-8 rounded-lg ${c.bg} flex items-center justify-center`}>
                         <stat.icon className={`w-4 h-4 ${c.text}`} />
                       </div>
@@ -284,7 +284,7 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-3">
                 {pendingJobs.map((job) => (
-                  <div key={job.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <div key={job.id} className="p-3 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0 relative">
                         <div className="absolute inset-0 rounded-xl bg-violet-500/10 animate-ping" />
@@ -292,7 +292,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-zinc-200 truncate font-medium">&ldquo;{job.prompt}&rdquo;</p>
-                        <span className="text-[11px] text-zinc-500">{job.duration || 5}s</span>
+                        <span className="text-[11px] text-zinc-400">{job.duration || 5}s</span>
                       </div>
                       <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                         {job.status === "processing" ? "Generating..." : "In Queue"}
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                       <item.icon className={`w-5 h-5 ${c.text}`} />
                     </div>
                     <p className="text-sm font-semibold text-zinc-200 mb-1">{item.title}</p>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed line-clamp-2">{item.desc}</p>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed line-clamp-2">{item.desc}</p>
                   </motion.div>
                 </Link>
               </StaggerItem>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
 
       {/* ====== CREDIT USAGE ====== */}
       <MotionSection delay={0.25}>
-        <div className="rounded-xl border border-white/[0.06] bg-[#111118]/60 p-5">
+        <div className="rounded-xl border border-white/[0.10] bg-[#111118]/60 p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
@@ -364,7 +364,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-end gap-2 mb-3">
             <span className="text-3xl font-bold text-white">{user?.monthlyCreditsUsed ?? 0}</span>
-            <span className="text-sm text-zinc-500 mb-1">/ {user?.monthlyCreditsLimit ?? 50} credits</span>
+            <span className="text-sm text-zinc-400 mb-1">/ {user?.monthlyCreditsLimit ?? 50} credits</span>
           </div>
           <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden mb-2">
             <motion.div
@@ -378,7 +378,7 @@ export default function DashboardPage() {
               transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
             />
           </div>
-          <p className="text-[11px] text-zinc-500">
+          <p className="text-[11px] text-zinc-400">
             Credits reset monthly. Purchased credit packs never expire.
           </p>
         </div>
@@ -406,16 +406,16 @@ export default function DashboardPage() {
             {[1, 2, 3, 4].map((i) => <SkeletonVideoCard key={i} />)}
           </div>
         ) : (videos || []).length === 0 ? (
-          <div className="text-center py-16 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01]">
+          <div className="text-center py-16 rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.01]">
             <motion.div
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-white/[0.06] flex items-center justify-center mx-auto mb-4"
+              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-white/[0.10] flex items-center justify-center mx-auto mb-4"
             >
-              <Film className="w-7 h-7 text-zinc-500" />
+              <Film className="w-7 h-7 text-zinc-400" />
             </motion.div>
             <h3 className="text-base font-semibold text-zinc-300 mb-1">No videos yet</h3>
-            <p className="text-sm text-zinc-500 mb-5 max-w-xs mx-auto">
+            <p className="text-sm text-zinc-400 mb-5 max-w-xs mx-auto">
               Create your first AI video and watch the magic happen
             </p>
             <Link href="/generate">
@@ -512,7 +512,7 @@ function DashboardVideoCard({ video }: {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/10">
-            <Film className="w-6 h-6 text-zinc-700" />
+            <Film className="w-6 h-6 text-zinc-400" />
           </div>
         )}
 
@@ -553,7 +553,7 @@ function DashboardVideoCard({ video }: {
 
         {/* Hover border */}
         <div className={`absolute inset-0 rounded-xl border-2 transition-all duration-300 pointer-events-none ${
-          isHovered ? "border-violet-500/40" : "border-white/[0.06]"
+          isHovered ? "border-violet-500/40" : "border-white/[0.10]"
         }`} />
       </motion.div>
     </Link>

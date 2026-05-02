@@ -110,11 +110,11 @@ export function Modal({ open, onClose, children, className, title, description, 
           <div className="flex items-start justify-between p-5 md:p-6 pb-0">
             <div>
               {title && <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>}
-              {description && <p className="text-sm text-zinc-500 mt-1">{description}</p>}
+              {description && <p className="text-sm text-zinc-400 mt-1">{description}</p>}
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
@@ -126,7 +126,7 @@ export function Modal({ open, onClose, children, className, title, description, 
         {!title && !description && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors md:top-4 md:right-4"
+            className="absolute top-4 right-4 z-10 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors md:top-4 md:right-4"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

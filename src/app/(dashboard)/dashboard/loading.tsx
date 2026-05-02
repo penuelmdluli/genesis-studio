@@ -32,7 +32,7 @@ export default function DashboardLoading() {
       </div>
 
       {/* Videos */}
-      <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+      <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
         <Skeleton className="h-5 w-32" />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (

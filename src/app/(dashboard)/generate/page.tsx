@@ -384,7 +384,7 @@ export default function GeneratePage() {
         <h1 className="text-2xl font-bold text-zinc-100">
           Generate {isReel ? "Reel" : "Video"}
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Create AI-generated {isReel ? "reels" : "videos"} from text, images, or other videos{isReel ? " — optimized for social media" : ""}.
         </p>
       </div>
@@ -405,14 +405,14 @@ export default function GeneratePage() {
                       className={`p-3 rounded-xl border text-left transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
-                      <opt.icon className={`w-5 h-5 mb-2 ${isActive ? "text-violet-400" : "text-zinc-500"}`} />
+                      <opt.icon className={`w-5 h-5 mb-2 ${isActive ? "text-violet-400" : "text-zinc-400"}`} />
                       <div className={`text-sm font-medium ${isActive ? "text-violet-300" : "text-zinc-300"}`}>
                         {opt.label}
                       </div>
-                      <div className="text-xs text-zinc-500">{opt.desc}</div>
+                      <div className="text-xs text-zinc-400">{opt.desc}</div>
                     </button>
                   );
                 })}
@@ -445,16 +445,16 @@ export default function GeneratePage() {
                       className={`p-3 rounded-xl border text-left transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1]"
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <fmt.icon className={`w-4 h-4 ${isActive ? "text-violet-400" : "text-zinc-500"}`} />
+                        <fmt.icon className={`w-4 h-4 ${isActive ? "text-violet-400" : "text-zinc-400"}`} />
                         <span className={`text-sm font-medium ${isActive ? "text-violet-300" : "text-zinc-300"}`}>
                           {fmt.label}
                         </span>
                       </div>
-                      <div className="text-xs text-zinc-500">{fmt.desc}</div>
+                      <div className="text-xs text-zinc-400">{fmt.desc}</div>
                     </button>
                   );
                 })}
@@ -487,7 +487,7 @@ export default function GeneratePage() {
                         className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
                           presetPlatform === p
                             ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                            : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+                            : "bg-white/[0.05] text-zinc-400 border border-white/[0.10] hover:text-zinc-300"
                         }`}
                       >
                         {p}
@@ -499,13 +499,13 @@ export default function GeneratePage() {
                       <button
                         key={preset.id}
                         onClick={() => handleApplyPreset(preset)}
-                        className="p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
+                        className="p-2.5 rounded-xl border border-white/[0.10] bg-white/[0.04] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
                       >
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="text-sm">{preset.icon}</span>
                           <span className="text-xs font-medium text-zinc-300">{preset.name}</span>
                         </div>
-                        <p className="text-[10px] text-zinc-500 line-clamp-2">{preset.description}</p>
+                        <p className="text-[10px] text-zinc-400 line-clamp-2">{preset.description}</p>
                       </button>
                     ))}
                   </div>
@@ -537,7 +537,7 @@ export default function GeneratePage() {
               {/* Sample prompt chips — shown for new users */}
               {showSampleChips && !form.prompt.trim() && (
                 <div className="space-y-2">
-                  <span className="text-xs text-zinc-500">Try a sample prompt:</span>
+                  <span className="text-xs text-zinc-400">Try a sample prompt:</span>
                   <div className="flex flex-wrap gap-1.5">
                     {sampleChips.map((p) => (
                       <button
@@ -555,13 +555,13 @@ export default function GeneratePage() {
               {/* Prompt Suggestions — shown when prompt is empty */}
               {!form.prompt.trim() && (
                 <div className="space-y-2">
-                  <span className="text-xs text-zinc-500">Try a suggestion:</span>
+                  <span className="text-xs text-zinc-400">Try a suggestion:</span>
                   <div className="flex flex-wrap gap-1.5">
                     {PROMPT_SUGGESTIONS.slice(0, 6).map((s, i) => (
                       <button
                         key={i}
                         onClick={() => setFormField("prompt", s)}
-                        className="px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all line-clamp-1 max-w-[250px] text-left"
+                        className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.10] text-xs text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all line-clamp-1 max-w-[250px] text-left"
                       >
                         {s.length > 60 ? s.slice(0, 60) + "..." : s}
                       </button>
@@ -579,7 +579,7 @@ export default function GeneratePage() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-zinc-500">{form.prompt.length} characters</span>
+                <span className="text-xs text-zinc-400">{form.prompt.length} characters</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
@@ -613,7 +613,7 @@ export default function GeneratePage() {
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-zinc-300">Prompt Templates</label>
                   <button onClick={() => setShowTemplates(false)} className="p-1 hover:bg-white/[0.06] rounded-lg">
-                    <X className="w-4 h-4 text-zinc-500" />
+                    <X className="w-4 h-4 text-zinc-400" />
                   </button>
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
@@ -624,7 +624,7 @@ export default function GeneratePage() {
                       className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
                         templateCategory === cat
                           ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                          : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+                          : "bg-white/[0.05] text-zinc-400 border border-white/[0.10] hover:text-zinc-300"
                       }`}
                     >
                       {cat}
@@ -636,13 +636,13 @@ export default function GeneratePage() {
                     <button
                       key={t.id}
                       onClick={() => handleApplyTemplate(t)}
-                      className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
+                      className="p-3 rounded-xl border border-white/[0.10] bg-white/[0.04] hover:border-violet-500/30 hover:bg-violet-500/5 text-left transition-all"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-base">{t.icon}</span>
                         <span className="text-sm font-medium text-zinc-300">{t.name}</span>
                       </div>
-                      <p className="text-xs text-zinc-500 line-clamp-2">{t.template}</p>
+                      <p className="text-xs text-zinc-400 line-clamp-2">{t.template}</p>
                     </button>
                   ))}
                 </div>
@@ -658,7 +658,7 @@ export default function GeneratePage() {
                   Input Image
                 </label>
                 {inputImagePreview ? (
-                  <div className="relative rounded-xl overflow-hidden border border-white/[0.06]">
+                  <div className="relative rounded-xl overflow-hidden border border-white/[0.10]">
                     <img
                       src={inputImagePreview}
                       alt="Input"
@@ -675,10 +675,10 @@ export default function GeneratePage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
-                    <Upload className="w-8 h-8 text-zinc-500 mb-3" />
+                  <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.12] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
+                    <Upload className="w-8 h-8 text-zinc-400 mb-3" />
                     <span className="text-sm text-zinc-400">Click or drag to upload an image</span>
-                    <span className="text-xs text-zinc-500 mt-1">PNG, JPG up to 10MB</span>
+                    <span className="text-xs text-zinc-400 mt-1">PNG, JPG up to 10MB</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -724,7 +724,7 @@ export default function GeneratePage() {
                           ? model.tier === "hollywood"
                             ? "border-yellow-500/40 bg-yellow-500/10 shadow-lg shadow-yellow-500/10"
                             : "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1]"
                       }`}
                     >
                       <div className="flex items-center gap-1.5 mb-1">
@@ -738,7 +738,7 @@ export default function GeneratePage() {
                         )}
                       </div>
                       <div className="text-sm font-medium text-zinc-200 truncate">{model.name}</div>
-                      <div className="text-xs text-zinc-500 mt-0.5">~{model.avgGenerationTime}s</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">~{model.avgGenerationTime}s</div>
                     </button>
                   );
                 })}
@@ -789,7 +789,7 @@ export default function GeneratePage() {
               {/* Advanced Settings */}
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
               >
                 <Settings2 className="w-3.5 h-3.5" />
                 Advanced Settings
@@ -797,7 +797,7 @@ export default function GeneratePage() {
               </button>
 
               {showAdvanced && (
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/[0.06]">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/[0.10]">
                   <div>
                     <label className="text-xs text-zinc-400 mb-1.5 font-medium flex items-center gap-1">Seed <HelpTip text="Same seed + prompt = same result. Leave empty for random." side="top" /></label>
                     <Input
@@ -842,7 +842,7 @@ export default function GeneratePage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${form.enableLiveSound ? "bg-yellow-500/20" : "bg-white/[0.04]"}`}>
-                      <Volume2 className={`w-5 h-5 ${form.enableLiveSound ? "text-yellow-400" : "text-zinc-500"}`} />
+                      <Volume2 className={`w-5 h-5 ${form.enableLiveSound ? "text-yellow-400" : "text-zinc-400"}`} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -853,7 +853,7 @@ export default function GeneratePage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="text-xs text-zinc-400 mt-0.5">
                         Sound effects, dialogue, and ambient audio
                       </p>
                     </div>
@@ -874,12 +874,12 @@ export default function GeneratePage() {
                 <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <Music className="w-4 h-4 text-violet-400" />
                   Background Audio
-                  <span className="text-zinc-500 text-xs">(optional)</span>
+                  <span className="text-zinc-400 text-xs">(optional)</span>
                 </label>
                 {form.audioTrackId && (
                   <button
                     onClick={() => setFormField("audioTrackId", undefined as unknown as string)}
-                    className="text-xs text-zinc-500 hover:text-red-400 flex items-center gap-1 transition-colors"
+                    className="text-xs text-zinc-400 hover:text-red-400 flex items-center gap-1 transition-colors"
                   >
                     <X className="w-3 h-3" /> Remove
                   </button>
@@ -895,7 +895,7 @@ export default function GeneratePage() {
                     className={`px-2.5 py-1 rounded-full text-xs transition-all duration-200 ${
                       audioGenreFilter === genre
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                        : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:border-white/[0.1]"
+                        : "bg-white/[0.05] text-zinc-400 border border-white/[0.10] hover:border-white/[0.1]"
                     }`}
                   >
                     {genre}
@@ -916,7 +916,7 @@ export default function GeneratePage() {
                       className={`w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all duration-200 ${
                         isSelected
                           ? "border-violet-500/40 bg-violet-500/10"
-                          : "border-white/[0.04] bg-white/[0.01] hover:border-white/[0.08]"
+                          : "border-white/[0.04] bg-white/[0.01] hover:border-white/[0.12]"
                       }`}
                     >
                       <div
@@ -933,14 +933,14 @@ export default function GeneratePage() {
                         {playingTrackId === track.id ? (
                           <Square className={`w-3 h-3 text-white`} />
                         ) : (
-                          <Play className={`w-4 h-4 ml-0.5 ${isSelected ? "text-violet-400" : "text-zinc-500"}`} />
+                          <Play className={`w-4 h-4 ml-0.5 ${isSelected ? "text-violet-400" : "text-zinc-400"}`} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-300"}`}>
                           {track.name}
                         </div>
-                        <div className="text-xs text-zinc-500">
+                        <div className="text-xs text-zinc-400">
                           {track.genre} · {track.duration}s · {track.bpm} BPM
                         </div>
                       </div>
@@ -969,7 +969,7 @@ export default function GeneratePage() {
           <Card>
             <CardContent className="p-4 space-y-2">
               <label className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
-                Negative Prompt <span className="text-zinc-500 text-xs">(optional)</span>
+                Negative Prompt <span className="text-zinc-400 text-xs">(optional)</span>
                 <HelpTip text="Describe what you DON'T want. Helps avoid common artifacts like blur, distortion, or watermarks." side="top" />
               </label>
               <Textarea
@@ -999,7 +999,7 @@ export default function GeneratePage() {
                   { label: "Mode", badge: true, badgeVariant: form.isDraft ? "amber" as const : "violet" as const, value: form.isDraft ? "Draft" : "Full Quality" },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
-                    <span className="text-zinc-500">{row.label}</span>
+                    <span className="text-zinc-400">{row.label}</span>
                     {row.badge ? (
                       <Badge variant={row.badgeVariant}>{row.value}</Badge>
                     ) : (
@@ -1010,7 +1010,7 @@ export default function GeneratePage() {
 
                 {selectedAudioTrack && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">Audio</span>
+                    <span className="text-zinc-400">Audio</span>
                     <span className="text-zinc-200 flex items-center gap-1">
                       <Music className="w-3 h-3 text-violet-400" />
                       {selectedAudioTrack.name}
@@ -1020,7 +1020,7 @@ export default function GeneratePage() {
 
                 {effectiveAudio && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">Live Sound</span>
+                    <span className="text-zinc-400">Live Sound</span>
                     <span className="text-yellow-400 flex items-center gap-1 text-xs font-semibold">
                       <Volume2 className="w-3 h-3" />
                       Enabled (+30%)
@@ -1029,7 +1029,7 @@ export default function GeneratePage() {
                 )}
 
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Est. Time</span>
+                  <span className="text-zinc-400">Est. Time</span>
                   <span className="text-zinc-200">
                     ~{Math.round((currentModel?.avgGenerationTime || 60) * (form.isDraft ? 0.3 : 1))}s
                   </span>
@@ -1039,17 +1039,17 @@ export default function GeneratePage() {
               {/* Cost section — only shown when ready to generate */}
               {isReadyToGenerate ? (
                 <>
-                  <div className="border-t border-white/[0.06] pt-4">
+                  <div className="border-t border-white/[0.10] pt-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-zinc-300">Cost</span>
                       <div className="flex items-center gap-1.5">
                         <Zap className="w-4 h-4 text-violet-400" />
                         <span className="text-xl font-bold text-violet-300">{creditCost}</span>
-                        <span className="text-xs text-zinc-500">credits</span>
+                        <span className="text-xs text-zinc-400">credits</span>
                       </div>
                     </div>
                     <div className="flex justify-between mt-1.5">
-                      <span className="text-xs text-zinc-500">Your balance</span>
+                      <span className="text-xs text-zinc-400">Your balance</span>
                       <span className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
                         {`${user?.creditBalance?.toLocaleString() ?? 50} credits`}
                       </span>
@@ -1090,8 +1090,8 @@ export default function GeneratePage() {
                   )}
                 </>
               ) : (
-                <div className="border-t border-white/[0.06] pt-4 text-center">
-                  <p className="text-xs text-zinc-500">
+                <div className="border-t border-white/[0.10] pt-4 text-center">
+                  <p className="text-xs text-zinc-400">
                     {form.type === "i2v" && !form.inputImage
                       ? "Add a prompt and upload an image to see the cost"
                       : "Add a prompt to see the cost"}
@@ -1116,7 +1116,7 @@ export default function GeneratePage() {
               <div className="flex items-center gap-1.5 min-w-0">
                 <Zap className="w-4 h-4 text-violet-400 shrink-0" />
                 <span className="text-sm font-bold text-violet-300">{creditCost}</span>
-                <span className="text-xs text-zinc-500">credits</span>
+                <span className="text-xs text-zinc-400">credits</span>
                 {effectiveAudio && (
                   <Volume2 className="w-3 h-3 text-yellow-400 shrink-0" />
                 )}
@@ -1145,7 +1145,7 @@ export default function GeneratePage() {
             )}
           </>
         ) : (
-          <p className="text-xs text-center text-zinc-500 py-2">
+          <p className="text-xs text-center text-zinc-400 py-2">
             Fill in your prompt to generate
           </p>
         )}

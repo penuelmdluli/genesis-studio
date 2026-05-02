@@ -175,7 +175,7 @@ export default function StudioSetupPage() {
                       ? "bg-emerald-500 text-white"
                       : step === currentStep
                         ? "bg-violet-600 text-white"
-                        : "bg-zinc-800 text-zinc-500 border border-zinc-700"
+                        : "bg-zinc-800 text-zinc-400 border border-zinc-700"
                   }`}
                 >
                   {step < currentStep ? (
@@ -194,7 +194,7 @@ export default function StudioSetupPage() {
               </div>
             ))}
           </div>
-          <div className="flex justify-between text-xs text-zinc-500 mt-2 px-2">
+          <div className="flex justify-between text-xs text-zinc-400 mt-2 px-2">
             <span>Connect</span>
             <span>Assign Niches</span>
             <span>Ready</span>
@@ -261,7 +261,7 @@ export default function StudioSetupPage() {
             </CardHeader>
             <CardContent>
               {!isConnected ? (
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-zinc-400">
                   Connect your Facebook account first to see your pages.
                 </p>
               ) : (
@@ -282,7 +282,7 @@ export default function StudioSetupPage() {
                           <p className="text-sm font-medium text-white truncate">
                             {page.page_name}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-zinc-400">
                             {page.follower_count.toLocaleString()} followers
                           </p>
                         </div>
@@ -364,7 +364,7 @@ export default function StudioSetupPage() {
                   </Link>
                 </div>
               ) : (
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-zinc-400">
                   Complete the steps above to activate the Content Engine.
                 </p>
               )}

@@ -78,11 +78,11 @@ export function OnboardingTour() {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={dismiss} />
 
       {/* Card */}
-      <div className="relative bg-[#111118] border border-white/[0.08] rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
+      <div className="relative bg-[#111118] border border-white/[0.12] rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
         {/* Close */}
         <button
           onClick={dismiss}
-          className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-300 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -110,7 +110,7 @@ export function OnboardingTour() {
 
         {/* Actions */}
         <div className="flex items-center justify-between">
-          <button onClick={dismiss} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+          <button onClick={dismiss} className="text-xs text-zinc-400 hover:text-zinc-400 transition-colors">
             Skip tour
           </button>
           <Button size="sm" onClick={next}>

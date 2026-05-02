@@ -11,7 +11,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        "rounded-xl border border-white/[0.06] bg-[#111118]/80 backdrop-blur-sm",
+        "rounded-xl border border-white/[0.10] bg-[#111118]/80 backdrop-blur-sm",
         glow && "card-glow",
         hover && "card-hover",
         className

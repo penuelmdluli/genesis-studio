@@ -209,7 +209,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-500">
+            <p className="text-xs sm:text-sm text-zinc-400">
               No credit card required &bull; First video in 60 seconds
             </p>
           </MotionSection>
@@ -221,12 +221,12 @@ export default function LandingPage() {
                 <AnimatedCounter value={12000} suffix="+" className="font-semibold text-white" />
                 <span>videos created</span>
               </span>
-              <span className="hidden sm:inline text-zinc-600">|</span>
+              <span className="hidden sm:inline text-zinc-400">|</span>
               <span className="flex items-center gap-2">
                 <AnimatedCounter value={2000} suffix="+" className="font-semibold text-white" />
                 <span>creators</span>
               </span>
-              <span className="hidden sm:inline text-zinc-600">|</span>
+              <span className="hidden sm:inline text-zinc-400">|</span>
               <span className="hidden sm:block text-zinc-400">
                 Powered by 10+ AI models
               </span>
@@ -236,7 +236,7 @@ export default function LandingPage() {
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-          <ChevronDown className="w-6 h-6 text-zinc-500" />
+          <ChevronDown className="w-6 h-6 text-zinc-400" />
         </div>
       </section>
 
@@ -282,7 +282,7 @@ export default function LandingPage() {
             </div>
           ) : feedVideos.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-zinc-500 text-lg mb-4">Community feed is being built — check back soon!</p>
+              <p className="text-zinc-400 text-lg mb-4">Community feed is being built — check back soon!</p>
               <Link href="/generate">
                 <Button variant="outline">
                   <Sparkles className="w-4 h-4" />
@@ -323,7 +323,7 @@ export default function LandingPage() {
       {/* ========================================
           SECTION 3: HOW IT WORKS
       ======================================== */}
-      <section className="py-24 px-4 border-t border-white/[0.06]">
+      <section className="py-24 px-4 border-t border-white/[0.10]">
         <div className="max-w-5xl mx-auto">
           <MotionSection className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold">
@@ -355,7 +355,7 @@ export default function LandingPage() {
       {/* ========================================
           SECTION 4: CAPABILITIES
       ======================================== */}
-      <section className="py-24 px-4 border-t border-white/[0.06]">
+      <section className="py-24 px-4 border-t border-white/[0.10]">
         <div className="max-w-6xl mx-auto">
           <MotionSection className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-4">
@@ -370,7 +370,7 @@ export default function LandingPage() {
           <StaggerGroup className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {capabilities.map((cap) => (
               <StaggerItem key={cap.title}>
-                <GlowCard className="rounded-2xl border border-white/[0.06] bg-[#111118]/80 p-8 h-full">
+                <GlowCard className="rounded-2xl border border-white/[0.10] bg-[#111118]/80 p-8 h-full">
                   <div className="flex items-center gap-3 mb-5">
                     <div className="w-12 h-12 rounded-xl bg-violet-600/15 flex items-center justify-center">
                       <cap.icon className="w-6 h-6 text-violet-400" />
@@ -395,7 +395,7 @@ export default function LandingPage() {
       {/* ========================================
           SECTION 5: PRICING
       ======================================== */}
-      <section className="py-24 px-4 border-t border-white/[0.06]">
+      <section className="py-24 px-4 border-t border-white/[0.10]">
         <div className="max-w-6xl mx-auto">
           <MotionSection className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-4">
@@ -416,7 +416,7 @@ export default function LandingPage() {
                     className={`relative rounded-2xl border p-8 h-full flex flex-col ${
                       isPopular
                         ? "border-violet-500/40 bg-violet-500/[0.06] shadow-[0_0_40px_-10px_rgba(124,58,237,0.3)]"
-                        : "border-white/[0.06] bg-[#111118]/80"
+                        : "border-white/[0.10] bg-[#111118]/80"
                     }`}
                   >
                     {isPopular && (
@@ -433,7 +433,7 @@ export default function LandingPage() {
                         {plan.price === 0 ? "Free" : `$${plan.price}`}
                       </span>
                       {plan.price > 0 && (
-                        <span className="text-zinc-500 text-sm">/mo</span>
+                        <span className="text-zinc-400 text-sm">/mo</span>
                       )}
                     </div>
 
@@ -463,12 +463,12 @@ export default function LandingPage() {
 
           {/* Studio plan — full-width */}
           <MotionSection className="mb-8">
-            <div className="rounded-2xl border border-white/[0.06] bg-[#111118]/80 p-8 flex flex-col md:flex-row md:items-center gap-6">
+            <div className="rounded-2xl border border-white/[0.10] bg-[#111118]/80 p-8 flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-1">{studioPlan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-3">
                   <span className="text-3xl font-bold">${studioPlan.price}</span>
-                  <span className="text-zinc-500 text-sm">/mo</span>
+                  <span className="text-zinc-400 text-sm">/mo</span>
                 </div>
                 <div className="flex flex-wrap gap-x-6 gap-y-1.5">
                   {studioPlan.features.slice(0, 5).map((f) => (
@@ -490,13 +490,13 @@ export default function LandingPage() {
 
           {/* Credit packs */}
           <MotionSection>
-            <p className="text-center text-zinc-500 text-sm mb-4">
+            <p className="text-center text-zinc-400 text-sm mb-4">
               Need more credits? Buy packs anytime.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               {CREDIT_PACKS.map((pack) => (
                 <Link key={pack.id} href="/pricing">
-                  <div className="px-6 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all text-center cursor-pointer">
+                  <div className="px-6 py-3 rounded-xl border border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all text-center cursor-pointer">
                     <span className="block text-lg font-bold text-white">
                       {pack.credits.toLocaleString()}
                     </span>
@@ -544,7 +544,7 @@ export default function LandingPage() {
       {/* ========================================
           SECTION 7: FOOTER
       ======================================== */}
-      <footer className="border-t border-white/[0.06] py-16 px-4">
+      <footer className="border-t border-white/[0.10] py-16 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             {/* Brand */}
@@ -557,7 +557,7 @@ export default function LandingPage() {
                   Genesis Studio
                 </span>
               </Link>
-              <p className="text-sm text-zinc-500 leading-relaxed">
+              <p className="text-sm text-zinc-400 leading-relaxed">
                 AI video creation platform built in South Africa. 10+ models, Hollywood quality.
               </p>
             </div>
@@ -576,7 +576,7 @@ export default function LandingPage() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -598,7 +598,7 @@ export default function LandingPage() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -620,7 +620,7 @@ export default function LandingPage() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -642,7 +642,7 @@ export default function LandingPage() {
                       href={link.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
                     >
                       {link.label}
                     </a>
@@ -653,8 +653,8 @@ export default function LandingPage() {
           </div>
 
           {/* Copyright */}
-          <div className="pt-8 border-t border-white/[0.06] text-center">
-            <p className="text-sm text-zinc-600">
+          <div className="pt-8 border-t border-white/[0.10] text-center">
+            <p className="text-sm text-zinc-400">
               &copy; 2026 Genesis Studio. All rights reserved.
             </p>
           </div>

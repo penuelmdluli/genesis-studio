@@ -200,10 +200,10 @@ export default function VoiceoverPage() {
                   if (e.target.value.length <= MAX_CHARS) setText(e.target.value);
                 }}
                 rows={6}
-                className="min-h-[150px] resize-y border-zinc-700 bg-zinc-800/60 text-zinc-100 placeholder:text-zinc-500 focus:border-violet-500 focus:ring-violet-500/20"
+                className="min-h-[150px] resize-y border-zinc-700 bg-zinc-800/60 text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:ring-violet-500/20"
               />
               <div className="flex items-center justify-between text-sm">
-                <span className="text-zinc-500">
+                <span className="text-zinc-400">
                   {charCount > 0 && (
                     <>
                       Est. duration:{" "}
@@ -218,7 +218,7 @@ export default function VoiceoverPage() {
                   className={
                     charCount > MAX_CHARS * 0.9
                       ? "text-amber-400"
-                      : "text-zinc-500"
+                      : "text-zinc-400"
                   }
                 >
                   {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()}
@@ -265,7 +265,7 @@ export default function VoiceoverPage() {
                           >
                             {voice.gender === "female" ? "F" : "M"}
                           </span>
-                          <span className="text-xs text-zinc-500">
+                          <span className="text-xs text-zinc-400">
                             {voice.language.toUpperCase()}
                           </span>
                         </div>

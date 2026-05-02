@@ -268,7 +268,7 @@ export default function MotionControlPage() {
                 AI Powered
               </Badge>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
               Apply motion effects or transfer reference motion onto any character
             </p>
           </div>
@@ -285,7 +285,7 @@ export default function MotionControlPage() {
               <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium transition-all ${
                 step.done
                   ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                  : "bg-white/[0.03] text-zinc-600 border border-white/[0.06]"
+                  : "bg-white/[0.05] text-zinc-400 border border-white/[0.10]"
               }`}>
                 {step.done ? (
                   <svg className="w-3 h-3 text-violet-400" viewBox="0 0 12 12" fill="none">
@@ -315,7 +315,7 @@ export default function MotionControlPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Tabs: Fun Effects / Upload / History */}
-              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
                   { key: "effects" as const, label: "Effects", icon: Sparkles },
                   { key: "upload" as const, label: "Upload", icon: Upload },
@@ -327,7 +327,7 @@ export default function MotionControlPage() {
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
                       motionTab === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                        : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
                     <tab.icon className="w-3.5 h-3.5 shrink-0" />
@@ -348,7 +348,7 @@ export default function MotionControlPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           effectCategoryFilter === cat
                             ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                            : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                            : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                         }`}
                       >
                         {cat}
@@ -367,19 +367,19 @@ export default function MotionControlPage() {
                           className={`relative rounded-xl border p-3 text-center transition-all duration-200 group ${
                             isSelected
                               ? "border-violet-500/50 ring-2 ring-violet-500/30 bg-violet-500/10"
-                              : "border-white/[0.06] hover:border-violet-500/30 bg-white/[0.02] hover:bg-white/[0.04]"
+                              : "border-white/[0.10] hover:border-violet-500/30 bg-white/[0.04] hover:bg-white/[0.04]"
                           }`}
                         >
                           {/* Effect icon placeholder */}
                           <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${
                             isSelected ? "bg-violet-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
                           }`}>
-                            <Sparkles className={`w-5 h-5 ${isSelected ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-400"}`} />
+                            <Sparkles className={`w-5 h-5 ${isSelected ? "text-violet-400" : "text-zinc-400 group-hover:text-zinc-400"}`} />
                           </div>
                           <div className={`text-[11px] font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-400"}`}>
                             {effect.name}
                           </div>
-                          <div className="text-[9px] text-zinc-600 mt-0.5 capitalize">
+                          <div className="text-[9px] text-zinc-400 mt-0.5 capitalize">
                             {effect.category}
                           </div>
                           {/* Selected indicator */}
@@ -405,7 +405,7 @@ export default function MotionControlPage() {
                       </span>
                       <button
                         onClick={() => setSelectedEffect(null)}
-                        className="ml-auto text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="ml-auto text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
                       >
                         Clear
                       </button>
@@ -418,7 +418,7 @@ export default function MotionControlPage() {
               {motionTab === "upload" && (
                 <div>
                   {motionVideoPreview && motionVideo ? (
-                    <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                    <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                       <video
                         src={motionVideoPreview}
                         className="w-full h-56 object-contain"
@@ -439,7 +439,7 @@ export default function MotionControlPage() {
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
+                    <label className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
                       <input
                         ref={motionVideoRef}
                         type="file"
@@ -453,7 +453,7 @@ export default function MotionControlPage() {
                       <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
                         Upload a reference video for motion transfer
                       </span>
-                      <span className="text-xs text-zinc-600 mt-1">
+                      <span className="text-xs text-zinc-400 mt-1">
                         MP4, WebM or MOV — up to 30 seconds, max 50MB
                       </span>
                     </label>
@@ -464,9 +464,9 @@ export default function MotionControlPage() {
               {/* History Tab */}
               {motionTab === "history" && (
                 <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <Clock className="w-8 h-8 text-zinc-700 mb-2" />
-                  <p className="text-sm text-zinc-500">No motion history yet</p>
-                  <p className="text-xs text-zinc-600 mt-1">
+                  <Clock className="w-8 h-8 text-zinc-400 mb-2" />
+                  <p className="text-sm text-zinc-400">No motion history yet</p>
+                  <p className="text-xs text-zinc-400 mt-1">
                     Your previous motion generations will appear here
                   </p>
                 </div>
@@ -484,7 +484,7 @@ export default function MotionControlPage() {
             </CardHeader>
             <CardContent>
               {characterImagePreview ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                   <img
                     src={characterImagePreview}
                     alt="Character"
@@ -498,7 +498,7 @@ export default function MotionControlPage() {
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.02] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
+                <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.04] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
                   <input
                     ref={characterImageRef}
                     type="file"
@@ -512,7 +512,7 @@ export default function MotionControlPage() {
                   <span className="text-sm font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">
                     Add character image
                   </span>
-                  <span className="text-xs text-zinc-600 mt-1">
+                  <span className="text-xs text-zinc-400 mt-1">
                     PNG, JPG or WebP up to 10MB
                   </span>
                 </label>
@@ -526,7 +526,7 @@ export default function MotionControlPage() {
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Wand2 className="w-4 h-4 text-violet-400" />
                 Description
-                <span className="text-[10px] font-normal text-zinc-600 bg-white/[0.04] px-1.5 py-0.5 rounded">Optional</span>
+                <span className="text-[10px] font-normal text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded">Optional</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -534,9 +534,9 @@ export default function MotionControlPage() {
                 placeholder="Optionally describe the scene... e.g., 'Cinematic lighting, flowing dress, sunlit garden'"
                 value={prompt}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
-                className="min-h-[80px] bg-white/[0.03] border-white/[0.08] focus:border-violet-500/50 resize-none"
+                className="min-h-[80px] bg-white/[0.05] border-white/[0.12] focus:border-violet-500/50 resize-none"
               />
-              <div className="flex justify-between items-center text-xs text-zinc-600">
+              <div className="flex justify-between items-center text-xs text-zinc-400">
                 <span>{prompt.length} characters</span>
                 <span>Adds detail to the generated output</span>
               </div>
@@ -553,7 +553,7 @@ export default function MotionControlPage() {
                 </div>
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
                 >
                   Advanced
                   {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -563,7 +563,7 @@ export default function MotionControlPage() {
             <CardContent className="space-y-4">
               {/* Quality */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Quality</label>
+                <label className="block text-xs text-zinc-400 mb-1.5">Quality</label>
                 <div className="grid grid-cols-2 gap-2">
                   {([
                     { value: "standard" as const, label: "Standard", desc: "Fast & balanced" },
@@ -575,13 +575,13 @@ export default function MotionControlPage() {
                       className={`p-3 rounded-xl border text-left transition-all ${
                         quality === opt.value
                           ? "border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.12]"
                       }`}
                     >
                       <div className={`text-sm font-medium ${quality === opt.value ? "text-violet-300" : "text-zinc-300"}`}>
                         {opt.label}
                       </div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{opt.desc}</div>
+                      <div className="text-[10px] text-zinc-400 mt-0.5">{opt.desc}</div>
                     </button>
                   ))}
                 </div>
@@ -590,11 +590,11 @@ export default function MotionControlPage() {
               {/* Duration */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Duration</label>
+                  <label className="block text-xs text-zinc-400 mb-1.5">Duration</label>
                   <select
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
                     {MOTION_DURATIONS.map((d) => (
                       <option key={d} value={d}>{d}s</option>
@@ -602,11 +602,11 @@ export default function MotionControlPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Orientation</label>
+                  <label className="block text-xs text-zinc-400 mb-1.5">Orientation</label>
                   <select
                     value={orientation}
                     onChange={(e) => setOrientation(e.target.value as "video" | "image")}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
                     <option value="video">Match Video</option>
                     <option value="image">Match Image</option>
@@ -615,12 +615,12 @@ export default function MotionControlPage() {
               </div>
 
               {/* Audio Toggle */}
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.10]">
                 <div className="flex items-center gap-2 mb-1">
                   {enableAudio ? (
                     <Volume2 className="w-4 h-4 text-violet-400" />
                   ) : (
-                    <VolumeX className="w-4 h-4 text-zinc-500" />
+                    <VolumeX className="w-4 h-4 text-zinc-400" />
                   )}
                 </div>
                 <Switch
@@ -634,24 +634,24 @@ export default function MotionControlPage() {
 
               {/* Advanced Settings */}
               {showAdvanced && (
-                <div className="space-y-3 pt-3 border-t border-white/[0.06]">
+                <div className="space-y-3 pt-3 border-t border-white/[0.10]">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-zinc-500 mb-1.5">Seed</label>
+                      <label className="block text-xs text-zinc-400 mb-1.5">Seed</label>
                       <input
                         type="number"
                         value={seed ?? ""}
                         onChange={(e) => setSeed(e.target.value ? Number(e.target.value) : undefined)}
                         placeholder="Random"
-                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-violet-500/50 focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-zinc-500 mb-1.5">Keep Original Sound</label>
+                      <label className="block text-xs text-zinc-400 mb-1.5">Keep Original Sound</label>
                       <select
                         value={keepOriginalSound ? "yes" : "no"}
                         onChange={(e) => setKeepOriginalSound(e.target.value === "yes")}
-                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                       >
                         <option value="no">No</option>
                         <option value="yes">Yes</option>
@@ -689,8 +689,8 @@ export default function MotionControlPage() {
                       </div>
                     ) : (
                       <div className="text-center p-2">
-                        <Video className="w-6 h-6 text-zinc-700 mx-auto mb-1" />
-                        <p className="text-[10px] text-zinc-600">Motion</p>
+                        <Video className="w-6 h-6 text-zinc-400 mx-auto mb-1" />
+                        <p className="text-[10px] text-zinc-400">Motion</p>
                       </div>
                     )}
                     <div className="absolute bottom-1 left-1">
@@ -709,8 +709,8 @@ export default function MotionControlPage() {
                       />
                     ) : (
                       <div className="text-center p-2">
-                        <User className="w-6 h-6 text-zinc-700 mx-auto mb-1" />
-                        <p className="text-[10px] text-zinc-600">Character</p>
+                        <User className="w-6 h-6 text-zinc-400 mx-auto mb-1" />
+                        <p className="text-[10px] text-zinc-400">Character</p>
                       </div>
                     )}
                     <div className="absolute bottom-1 left-1">
@@ -743,17 +743,17 @@ export default function MotionControlPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Type</span>
+                    <span className="text-zinc-400">Type</span>
                     <span className="text-zinc-300">Motion Control</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Quality</span>
+                    <span className="text-zinc-400">Quality</span>
                     <span className="text-zinc-300">
                       {quality === "pro" ? "Pro" : "Standard"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Motion</span>
+                    <span className="text-zinc-400">Motion</span>
                     <span className="text-zinc-300 truncate max-w-[140px]">
                       {selectedEffect
                         ? selectedEffectObj?.name
@@ -763,38 +763,38 @@ export default function MotionControlPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Character</span>
+                    <span className="text-zinc-400">Character</span>
                     <span className="text-zinc-300">
                       {characterImage ? "Uploaded" : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Duration</span>
+                    <span className="text-zinc-400">Duration</span>
                     <span className="text-zinc-300">{duration}s</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Audio</span>
-                    <span className={enableAudio ? "text-violet-300" : "text-zinc-500"}>
+                    <span className="text-zinc-400">Audio</span>
+                    <span className={enableAudio ? "text-violet-300" : "text-zinc-400"}>
                       {enableAudio ? "Enabled" : "Off"}
                     </span>
                   </div>
                 </div>
 
-                <div className="border-t border-white/[0.06] pt-3">
+                <div className="border-t border-white/[0.10] pt-3">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-zinc-500">Estimated Cost</span>
+                    <span className="text-xs text-zinc-400">Estimated Cost</span>
                     <span className="text-sm font-bold text-violet-300">
                       {creditCost} credits
                     </span>
                   </div>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-zinc-500">Est. Time</span>
+                    <span className="text-xs text-zinc-400">Est. Time</span>
                     <span className="text-xs text-zinc-400">
                       ~{Math.ceil(duration * 12 / 60)} min
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-zinc-500">Balance</span>
+                    <span className="text-xs text-zinc-400">Balance</span>
                     <span className={`text-sm font-medium ${
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"
                     }`}>
@@ -819,7 +819,7 @@ export default function MotionControlPage() {
                 </Button>
 
                 {!hasEnoughCredits && !user?.isOwner && (
-                  <p className="text-[11px] text-center text-zinc-600">
+                  <p className="text-[11px] text-center text-zinc-400">
                     Need more credits?{" "}
                     <a href="/pricing" className="text-violet-400 hover:underline">
                       Upgrade your plan
@@ -838,7 +838,7 @@ export default function MotionControlPage() {
           <div className="flex items-center gap-1.5 min-w-0">
             <Zap className="w-4 h-4 text-violet-400 shrink-0" />
             <span className="text-sm font-bold text-violet-300">{creditCost}</span>
-            <span className="text-xs text-zinc-500">credits</span>
+            <span className="text-xs text-zinc-400">credits</span>
           </div>
           <Button
             onClick={handleGenerate}

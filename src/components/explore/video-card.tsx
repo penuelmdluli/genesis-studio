@@ -153,7 +153,7 @@ export function ExploreVideoCard({
       {/* Video card */}
       <div
         className={cn(
-          "relative rounded-xl border border-white/[0.06] bg-[#111118]/80 overflow-hidden cursor-pointer",
+          "relative rounded-xl border border-white/[0.10] bg-[#111118]/80 overflow-hidden cursor-pointer",
           "transition-all duration-300 ease-out",
           isHovered && "scale-[1.03] shadow-[0_0_30px_-5px_rgba(124,58,237,0.3)]"
         )}

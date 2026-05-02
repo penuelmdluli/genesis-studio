@@ -75,14 +75,14 @@ export function ChatBot() {
       {/* Chat window */}
       {isOpen && (
         <div className={cn(
-          "fixed z-50 rounded-2xl bg-[#0f0f17] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-fade-in-scale",
+          "fixed z-50 rounded-2xl bg-[#0f0f17] border border-white/[0.12] shadow-2xl flex flex-col overflow-hidden animate-fade-in-scale",
           // Mobile: fullscreen
           "inset-0 rounded-none md:inset-auto md:rounded-2xl",
           // Desktop: floating panel
           "md:bottom-24 md:right-6 md:w-[360px] md:h-[480px] md:top-auto md:left-auto"
         )}>
           {/* Header */}
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 shrink-0 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
+          <div className="px-4 py-3 border-b border-white/[0.10] flex items-center gap-3 shrink-0 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
               <span className="text-sm text-white font-bold">G</span>
             </div>
@@ -147,7 +147,7 @@ export function ChatBot() {
           </div>
 
           {/* Input */}
-          <div className="px-3 py-3 border-t border-white/[0.06] shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+          <div className="px-3 py-3 border-t border-white/[0.10] shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
             <div className="flex gap-2">
               <input
                 ref={inputRef}
@@ -155,7 +155,7 @@ export function ChatBot() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Ask anything..."
-                className="flex-1 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white text-sm placeholder-white/30 focus:outline-none focus:border-violet-500/50"
+                className="flex-1 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/[0.12] text-white text-sm placeholder-white/30 focus:outline-none focus:border-violet-500/50"
                 disabled={isLoading}
               />
               <button

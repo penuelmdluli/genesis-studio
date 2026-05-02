@@ -38,14 +38,14 @@ export default function BlogPage() {
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}
-              className="block p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-violet-500/20 hover:bg-violet-500/[0.02] transition-all group"
+              className="block p-6 rounded-2xl border border-white/[0.10] bg-white/[0.04] hover:border-violet-500/20 hover:bg-violet-500/[0.02] transition-all group"
             >
               <div className="flex items-center gap-3 mb-3">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[post.category] || "bg-zinc-500/15 text-zinc-300"}`}>
                   {post.category}
                 </span>
-                <span className="text-xs text-zinc-600">{post.publishedAt}</span>
-                <span className="text-xs text-zinc-600">{post.readTime}</span>
+                <span className="text-xs text-zinc-400">{post.publishedAt}</span>
+                <span className="text-xs text-zinc-400">{post.readTime}</span>
               </div>
               <h2 className="text-xl font-semibold text-zinc-100 group-hover:text-violet-300 transition-colors mb-2">
                 {post.title}
@@ -55,7 +55,7 @@ export default function BlogPage() {
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {post.tags.slice(0, 4).map((tag) => (
-                  <span key={tag} className="px-2 py-0.5 rounded-full bg-white/[0.04] text-[10px] text-zinc-500">
+                  <span key={tag} className="px-2 py-0.5 rounded-full bg-white/[0.04] text-[10px] text-zinc-400">
                     {tag}
                   </span>
                 ))}

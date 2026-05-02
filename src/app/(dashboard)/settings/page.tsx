@@ -117,7 +117,7 @@ export default function SettingsPage() {
     <PageTransition className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Manage your account and preferences.
         </p>
       </div>
@@ -136,14 +136,14 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Name</label>
-              <Input value={user?.name || ""} readOnly className="bg-white/[0.02] cursor-default" />
+              <Input value={user?.name || ""} readOnly className="bg-white/[0.04] cursor-default" />
             </div>
             <div>
               <label className="text-xs text-zinc-400 block mb-1.5 font-medium">Email</label>
-              <Input value={user?.email || ""} readOnly className="bg-white/[0.02] cursor-default truncate" />
+              <Input value={user?.email || ""} readOnly className="bg-white/[0.04] cursor-default truncate" />
             </div>
           </div>
-          <p className="text-xs text-zinc-500 flex items-center gap-1">
+          <p className="text-xs text-zinc-400 flex items-center gap-1">
             Profile is managed through Clerk. Click your avatar to update.
             <ExternalLink className="w-3 h-3" />
           </p>
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-white/[0.04] border border-white/[0.10]">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-200">
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                   {user?.plan || "free"}
                 </Badge>
               </div>
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="text-xs text-zinc-400 mt-1">
                 {user?.monthlyCreditsLimit?.toLocaleString() || 50} credits/month
               </p>
             </div>
@@ -205,14 +205,14 @@ export default function SettingsPage() {
               {creditHistoryLoading ? "Loading..." : "View Credit History"}
             </Button>
           ) : creditHistory.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">No credit transactions yet.</p>
+            <p className="text-sm text-zinc-400 text-center py-4">No credit transactions yet.</p>
           ) : (
             <div className="space-y-1 max-h-80 overflow-y-auto">
               {creditHistory.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-white/[0.02] transition-colors">
+                <div key={tx.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-white/[0.04] transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-zinc-300 truncate">{tx.description || tx.type}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-400">
                       {new Date(tx.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs text-zinc-500">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
                   <span>
                     {isUnlimited
                       ? "Unlimited storage on Studio plan"
@@ -329,7 +329,7 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm text-zinc-200">Export Your Data</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 Download all your data as a JSON file (POPIA/GDPR).
               </p>
             </div>
@@ -355,7 +355,7 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm text-zinc-200">Delete Account</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 Permanently delete your account and all data. This cannot be undone.
               </p>
             </div>

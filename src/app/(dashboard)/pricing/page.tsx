@@ -54,7 +54,7 @@ const FEATURE_ROWS: { label: string; free: string; creator: string; pro: string;
 
 function FeatureCell({ value }: { value: string }) {
   if (value === "check") return <Check className="w-4 h-4 text-violet-400 mx-auto" />;
-  if (value === "x") return <X className="w-4 h-4 text-zinc-700 mx-auto" />;
+  if (value === "x") return <X className="w-4 h-4 text-zinc-400 mx-auto" />;
   return <span className="text-sm text-zinc-300 font-medium">{value}</span>;
 }
 
@@ -133,7 +133,7 @@ export default function PricingPage() {
   };
 
   const planStyles: Record<string, { border: string; gradient: string }> = {
-    free: { border: "border-white/[0.06]", gradient: "from-white/[0.02] to-transparent" },
+    free: { border: "border-white/[0.10]", gradient: "from-white/[0.02] to-transparent" },
     creator: { border: "border-emerald-500/20", gradient: "from-emerald-500/[0.04] to-transparent" },
     pro: { border: "border-violet-500/30 ring-1 ring-violet-500/20", gradient: "from-violet-500/[0.06] to-transparent" },
     studio: { border: "border-amber-500/20", gradient: "from-amber-500/[0.04] to-transparent" },
@@ -165,7 +165,7 @@ export default function PricingPage() {
 
         {/* Currency + Billing Toggles */}
         <div className="flex flex-col items-center gap-3 mt-6">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.10]">
             <button
               onClick={() => setCurrency("ZAR")}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${currency === "ZAR" ? "bg-violet-600 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
@@ -181,14 +181,14 @@ export default function PricingPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-500"}`}>Monthly</span>
+            <span className={`text-sm ${billingCycle === "monthly" ? "text-zinc-200" : "text-zinc-400"}`}>Monthly</span>
             <button
               onClick={() => setBillingCycle((prev) => prev === "monthly" ? "annual" : "monthly")}
               className={`relative w-12 h-6 rounded-full transition-colors ${billingCycle === "annual" ? "bg-violet-600" : "bg-white/10"}`}
             >
               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${billingCycle === "annual" ? "translate-x-7" : "translate-x-1"}`} />
             </button>
-            <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-500"}`}>Annual</span>
+            <span className={`text-sm ${billingCycle === "annual" ? "text-zinc-200" : "text-zinc-400"}`}>Annual</span>
             {billingCycle === "annual" && <Badge variant="emerald" className="text-[10px]">Save 20%</Badge>}
           </div>
         </div>
@@ -217,7 +217,7 @@ export default function PricingPage() {
               <CardContent className="p-5 space-y-4 pt-6">
                 <div>
                   <h3 className="text-base font-bold text-zinc-100">{copy.headline}</h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">{copy.subheading}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">{copy.subheading}</p>
                   <div className="mt-3">
                     {isAnnual ? (
                       <>
@@ -226,7 +226,7 @@ export default function PricingPage() {
                             ? Math.round((plan.priceZAR * 12 * 0.8) / 12)
                             : Math.round(ANNUAL_PLANS[plan.id].annualPrice / 12)}
                         </span>
-                        <span className="text-sm text-zinc-500">/mo</span>
+                        <span className="text-sm text-zinc-400">/mo</span>
                         <div className="text-xs text-emerald-400 mt-1">
                           Billed {currencySymbol}{currency === "ZAR" && plan.priceZAR
                             ? Math.round(plan.priceZAR * 12 * 0.8).toLocaleString()
@@ -238,14 +238,14 @@ export default function PricingPage() {
                         <span className="text-3xl sm:text-4xl font-extrabold text-zinc-100">
                           {formatPrice(plan.price, plan.priceZAR)}
                         </span>
-                        {plan.price > 0 && <span className="text-sm text-zinc-500">/mo</span>}
+                        {plan.price > 0 && <span className="text-sm text-zinc-400">/mo</span>}
                       </>
                     )}
                   </div>
                 </div>
 
                 <p className="text-sm text-zinc-300 leading-relaxed min-h-[3rem]">{copy.outcome}</p>
-                <p className="text-xs text-zinc-500 italic">{copy.bestFor}</p>
+                <p className="text-xs text-zinc-400 italic">{copy.bestFor}</p>
 
                 <Button
                   variant={plan.popular ? "primary" : plan.id === "free" ? "ghost" : "secondary"}
@@ -257,7 +257,7 @@ export default function PricingPage() {
                   {isCurrentPlan ? "Current Plan" : plan.id === "free" ? "Free Forever" : `Get ${plan.name}`}
                 </Button>
 
-                <p className="text-[10px] text-zinc-500 text-center">
+                <p className="text-[10px] text-zinc-400 text-center">
                   {plan.credits.toLocaleString()} credits/mo
                 </p>
               </CardContent>
@@ -272,7 +272,7 @@ export default function PricingPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-white/[0.10]">
                 <th className="text-left py-3 px-4 text-zinc-400 font-medium">Feature</th>
                 <th className="text-center py-3 px-2 text-zinc-400 font-medium w-20">Free</th>
                 <th className="text-center py-3 px-2 text-zinc-400 font-medium w-20">Creator</th>
@@ -282,7 +282,7 @@ export default function PricingPage() {
             </thead>
             <tbody>
               {FEATURE_ROWS.map((row) => (
-                <tr key={row.label} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                <tr key={row.label} className="border-b border-white/[0.03] hover:bg-white/[0.04]">
                   <td className="py-2.5 px-4 text-zinc-300">{row.label}</td>
                   <td className="py-2.5 px-2 text-center"><FeatureCell value={row.free} /></td>
                   <td className="py-2.5 px-2 text-center"><FeatureCell value={row.creator} /></td>
@@ -296,14 +296,14 @@ export default function PricingPage() {
       </div>
 
       {/* Competitor Comparison */}
-      <Card className="border-white/[0.06]">
+      <Card className="border-white/[0.10]">
         <CardContent className="p-6 sm:p-8">
           <h3 className="text-lg font-bold text-zinc-100 mb-2">How we compare</h3>
-          <p className="text-sm text-zinc-500 mb-6">Genesis Studio is the only platform with full multi-scene production from a single prompt.</p>
+          <p className="text-sm text-zinc-400 mb-6">Genesis Studio is the only platform with full multi-scene production from a single prompt.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/[0.06]">
+                <tr className="border-b border-white/[0.10]">
                   <th className="text-left py-2 px-3 text-zinc-400 font-medium">Tool</th>
                   <th className="text-left py-2 px-3 text-zinc-400 font-medium">Cheapest plan</th>
                   <th className="text-left py-2 px-3 text-zinc-400 font-medium">Approx. $/video</th>
@@ -334,7 +334,7 @@ export default function PricingPage() {
       <div>
         <div className="text-center mb-6">
           <h2 className="text-xl font-bold text-zinc-100 mb-2">Need more credits?</h2>
-          <p className="text-sm text-zinc-500">One-time purchase. Never expire. Stack with your subscription.</p>
+          <p className="text-sm text-zinc-400">One-time purchase. Never expire. Stack with your subscription.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           {CREDIT_PACKS.map((pack) => (
@@ -345,11 +345,11 @@ export default function PricingPage() {
                 </div>
                 <div>
                   <div className="text-2xl sm:text-3xl font-bold text-zinc-100">{pack.credits.toLocaleString()}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">credits</div>
+                  <div className="text-xs text-zinc-400 mt-0.5">credits</div>
                 </div>
                 <div>
                   <div className="text-xl font-bold text-emerald-400">{formatPrice(pack.price, pack.priceZAR)}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
+                  <div className="text-xs text-zinc-400 mt-0.5">
                     {currency === "ZAR" && pack.priceZAR
                       ? `${(pack.priceZAR / pack.credits).toFixed(1)}c per credit`
                       : `${(pack.price / pack.credits * 100).toFixed(1)}\u00A2 per credit`}
@@ -373,7 +373,7 @@ export default function PricingPage() {
                 <Gift className="w-5 h-5 text-violet-400" />
                 <h3 className="text-lg font-bold text-zinc-100">Referral Program</h3>
               </div>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-zinc-400">
                 Earn {REFERRAL_REWARDS.referrerCredits} credits for every friend who joins. They get {REFERRAL_REWARDS.refereeCredits} bonus credits too.
               </p>
             </div>
@@ -385,19 +385,19 @@ export default function PricingPage() {
           </div>
           {referralData && (
             <div className="grid sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                <label className="text-xs text-zinc-500 font-medium mb-2 block">Your Referral Link</label>
+              <div className="sm:col-span-2 p-4 rounded-xl bg-white/[0.05] border border-white/[0.10]">
+                <label className="text-xs text-zinc-400 font-medium mb-2 block">Your Referral Link</label>
                 <div className="flex gap-2">
-                  <input type="text" readOnly value={referralData.shareUrl} className="flex-1 bg-white/[0.03] rounded-lg px-3 py-2 text-sm text-zinc-300 border border-white/[0.06] truncate" />
+                  <input type="text" readOnly value={referralData.shareUrl} className="flex-1 bg-white/[0.05] rounded-lg px-3 py-2 text-sm text-zinc-300 border border-white/[0.10] truncate" />
                   <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(referralData.shareUrl); toast("Link copied!", "success"); }}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2">Code: {referralData.code}</p>
+                <p className="text-xs text-zinc-400 mt-2">Code: {referralData.code}</p>
               </div>
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
-                <div><div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div><div className="text-xs text-zinc-500">Referrals</div></div>
-                <div><div className="text-2xl font-bold text-emerald-300">{referralData.creditsEarned}</div><div className="text-xs text-zinc-500">Credits Earned</div></div>
+              <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.10] space-y-3">
+                <div><div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div><div className="text-xs text-zinc-400">Referrals</div></div>
+                <div><div className="text-2xl font-bold text-emerald-300">{referralData.creditsEarned}</div><div className="text-xs text-zinc-400">Credits Earned</div></div>
               </div>
             </div>
           )}
@@ -416,10 +416,10 @@ export default function PricingPage() {
                   className="w-full flex items-center justify-between py-4 text-left text-sm font-semibold text-zinc-200 hover:text-zinc-100 transition-colors"
                 >
                   {faq.q}
-                  <span className={`text-zinc-500 transition-transform ${expandedFaq === i ? "rotate-45" : ""}`}>+</span>
+                  <span className={`text-zinc-400 transition-transform ${expandedFaq === i ? "rotate-45" : ""}`}>+</span>
                 </button>
                 {expandedFaq === i && (
-                  <p className="text-sm text-zinc-500 leading-relaxed pb-4 -mt-1">{faq.a}</p>
+                  <p className="text-sm text-zinc-400 leading-relaxed pb-4 -mt-1">{faq.a}</p>
                 )}
               </div>
             ))}

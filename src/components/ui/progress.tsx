@@ -28,7 +28,7 @@ export function Progress({
       </div>
       {showLabel && (
         <div className="flex justify-between mt-1">
-          <span className="text-xs text-zinc-500">{Math.round(clamped)}%</span>
+          <span className="text-xs text-zinc-400">{Math.round(clamped)}%</span>
         </div>
       )}
     </div>

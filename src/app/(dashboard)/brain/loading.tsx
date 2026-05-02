@@ -16,7 +16,7 @@ export default function BrainLoading() {
       {/* Input form skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-32 w-full rounded-lg" />
             <div className="flex gap-3">
@@ -36,7 +36,7 @@ export default function BrainLoading() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-5 space-y-3">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-5 space-y-3">
             <Skeleton className="h-5 w-20" />
             <Skeleton className="h-10 w-full rounded-lg" />
             <Skeleton className="h-10 w-full rounded-lg" />

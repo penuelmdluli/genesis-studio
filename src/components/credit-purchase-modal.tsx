@@ -52,9 +52,9 @@ export function CreditPurchaseModal() {
           <Zap className="w-7 h-7 text-white" />
         </div>
         <h2 className="text-xl font-bold text-white">Add Credits</h2>
-        <p className="text-sm text-zinc-500 mt-1">Credits never expire. Use them anytime.</p>
+        <p className="text-sm text-zinc-400 mt-1">Credits never expire. Use them anytime.</p>
         {user && (
-          <p className="text-xs text-zinc-600 mt-2">
+          <p className="text-xs text-zinc-400 mt-2">
             Current balance: <span className="text-violet-400 font-semibold">{user.creditBalance.toLocaleString()}</span> credits
           </p>
         )}
@@ -70,7 +70,7 @@ export function CreditPurchaseModal() {
             className={`relative w-full flex items-center justify-between p-4 rounded-xl border transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 ${
               pack.popular
                 ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/20 shadow-lg shadow-violet-500/5"
-                : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] hover:bg-white/[0.05]"
+                : "border-white/[0.12] bg-white/[0.05] hover:border-white/[0.15] hover:bg-white/[0.05]"
             }`}
           >
             <div className="flex items-center gap-3">
@@ -83,7 +83,7 @@ export function CreditPurchaseModal() {
                 <p className="text-white font-semibold text-sm">
                   {pack.credits.toLocaleString()} credits
                 </p>
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-[11px] text-zinc-400">
                   {pack.perCredit}¢ per credit
                 </p>
               </div>
@@ -100,7 +100,7 @@ export function CreditPurchaseModal() {
               {loading === pack.id ? (
                 <GenesisButtonLoader />
               ) : (
-                <ArrowRight className="w-4 h-4 text-zinc-600" />
+                <ArrowRight className="w-4 h-4 text-zinc-400" />
               )}
             </div>
             {pack.popular && (
@@ -121,7 +121,7 @@ export function CreditPurchaseModal() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white">Want more credits monthly?</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-400 mt-0.5">
                 Upgrade your plan for monthly credits + premium models.
               </p>
               <button
@@ -139,8 +139,8 @@ export function CreditPurchaseModal() {
       )}
 
       {/* What you get */}
-      <div className="mt-5 pt-4 border-t border-white/[0.06]">
-        <p className="text-[11px] text-zinc-600 uppercase tracking-wider font-medium mb-2">What credits cover</p>
+      <div className="mt-5 pt-4 border-t border-white/[0.10]">
+        <p className="text-[11px] text-zinc-400 uppercase tracking-wider font-medium mb-2">What credits cover</p>
         <div className="grid grid-cols-2 gap-1.5">
           {[
             "Video generation",

@@ -60,8 +60,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-500/15 text-violet-300">
               {post.category}
             </span>
-            <span className="text-xs text-zinc-500">{post.publishedAt}</span>
-            <span className="text-xs text-zinc-500">{post.readTime}</span>
+            <span className="text-xs text-zinc-400">{post.publishedAt}</span>
+            <span className="text-xs text-zinc-400">{post.readTime}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-zinc-100 leading-tight mb-4">
             {post.title}
@@ -87,7 +87,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         </article>
 
         {/* Tags */}
-        <div className="flex flex-wrap gap-2 mt-12 pt-8 border-t border-white/[0.06]">
+        <div className="flex flex-wrap gap-2 mt-12 pt-8 border-t border-white/[0.10]">
           {post.tags.map((tag) => (
             <span key={tag} className="px-3 py-1 rounded-full bg-white/[0.04] text-xs text-zinc-400">
               #{tag}

@@ -68,6 +68,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Genesis Studio",
   },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -92,7 +99,7 @@ export default function RootLayout({
       >
         <head>
           <meta name="theme-color" content="#7c3aed" />
-          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+          <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         </head>
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>

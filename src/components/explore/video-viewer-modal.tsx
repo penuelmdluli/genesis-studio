@@ -154,7 +154,7 @@ export function VideoViewerModal({
 
       {/* Modal content */}
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111118]/95 border border-white/[0.06] shadow-2xl animate-fade-in-scale scrollbar-hide"
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111118]/95 border border-white/[0.10] shadow-2xl animate-fade-in-scale scrollbar-hide"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
@@ -192,7 +192,7 @@ export function VideoViewerModal({
         {/* Details section */}
         <div className="p-4 sm:p-6 space-y-4">
           {/* Full prompt */}
-          <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.10]">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
                 Prompt used
@@ -213,7 +213,7 @@ export function VideoViewerModal({
           {/* Info badges */}
           <div className="flex flex-wrap gap-2">
             {video.duration && video.duration > 0 && (
-              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.06]">
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.10]">
                 <Clock className="w-3 h-3" />
                 {video.duration}s
               </span>
@@ -224,11 +224,11 @@ export function VideoViewerModal({
                 With Audio
               </span>
             )}
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.06]">
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.10]">
               <Eye className="w-3 h-3" />
               {formatCount(video.views)} views
             </span>
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.06]">
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] text-xs text-white/60 border border-white/[0.10]">
               <Heart className="w-3 h-3" />
               {formatCount(likeCount)} likes
             </span>
@@ -252,7 +252,7 @@ export function VideoViewerModal({
               onClick={() => handleRecreate("edit")}
               className={cn(
                 "py-3 rounded-xl text-white font-medium text-sm",
-                "bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08]",
+                "bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.12]",
                 "transition-all duration-200 flex items-center justify-center gap-2"
               )}
             >
@@ -265,14 +265,14 @@ export function VideoViewerModal({
           <div className="grid grid-cols-4 gap-2">
             <button
               onClick={() => handleRecreate("image")}
-              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
+              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.10] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
             >
               <ImagePlus className="w-4 h-4" />
               Use My Image
             </button>
             <button
               onClick={() => handleRecreate("motion")}
-              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
+              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.10] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
             >
               <Move3d className="w-4 h-4" />
               Motion Ref
@@ -283,7 +283,7 @@ export function VideoViewerModal({
                 "py-2.5 rounded-xl border text-xs transition-all text-center flex flex-col items-center gap-1",
                 isLiked
                   ? "bg-red-500/10 border-red-500/20 text-red-400"
-                  : "bg-white/[0.04] border-white/[0.06] text-white/60 hover:bg-white/[0.08] hover:text-white/90"
+                  : "bg-white/[0.04] border-white/[0.10] text-white/60 hover:bg-white/[0.08] hover:text-white/90"
               )}
             >
               <Heart className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} />
@@ -291,7 +291,7 @@ export function VideoViewerModal({
             </button>
             <button
               onClick={() => onShare?.(video)}
-              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
+              className="py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.10] text-white/60 hover:text-white/90 text-xs transition-all text-center flex flex-col items-center gap-1"
             >
               <Share2 className="w-4 h-4" />
               Share

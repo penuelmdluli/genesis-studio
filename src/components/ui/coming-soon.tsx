@@ -46,7 +46,7 @@ export function ComingSoonGate({ featureId, featureName, children }: ComingSoonG
       <h1 className="text-2xl font-bold text-zinc-100 mb-2">
         {featureName} — Coming Soon
       </h1>
-      <p className="text-sm text-zinc-500 max-w-md mb-8">
+      <p className="text-sm text-zinc-400 max-w-md mb-8">
         We&apos;re putting the finishing touches on {featureName}.
         This feature will be available shortly. Stay tuned!
       </p>

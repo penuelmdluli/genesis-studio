@@ -32,13 +32,13 @@ export default function Error({
           </button>
           <a
             href="/dashboard"
-            className="px-6 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-zinc-300 font-semibold text-sm hover:bg-white/[0.08] transition-all"
+            className="px-6 py-3 rounded-xl bg-white/[0.06] border border-white/[0.12] text-zinc-300 font-semibold text-sm hover:bg-white/[0.08] transition-all"
           >
             Go to Dashboard
           </a>
         </div>
         {error.digest && (
-          <p className="mt-6 text-xs text-zinc-600">Error ID: {error.digest}</p>
+          <p className="mt-6 text-xs text-zinc-400">Error ID: {error.digest}</p>
         )}
       </div>
     </div>

@@ -43,7 +43,7 @@ function NotificationItem({
       className={cn(
         "flex items-start gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer",
         notification.read
-          ? "opacity-60 hover:bg-white/[0.03]"
+          ? "opacity-60 hover:bg-white/[0.05]"
           : "bg-white/[0.04] hover:bg-white/[0.06]"
       )}
       onClick={() => onRead(notification.id)}
@@ -60,8 +60,8 @@ function NotificationItem({
             <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
           )}
         </div>
-        <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{notification.message}</p>
-        <p className="text-[10px] text-zinc-600 mt-1">{timeAgo(notification.createdAt)}</p>
+        <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{notification.message}</p>
+        <p className="text-[10px] text-zinc-400 mt-1">{timeAgo(notification.createdAt)}</p>
       </div>
     </div>
   );
@@ -114,7 +114,7 @@ export function NotificationCenter() {
           "relative p-2 rounded-lg transition-colors",
           isOpen
             ? "bg-white/[0.08] text-white"
-            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06]"
+            : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.06]"
         )}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
       >
@@ -130,11 +130,11 @@ export function NotificationCenter() {
         <div className={cn(
           "absolute right-0 top-full mt-2 z-50",
           "w-[340px] sm:w-[380px] max-h-[480px]",
-          "rounded-xl border border-white/[0.08] bg-[#0f0f17] shadow-2xl shadow-black/40",
+          "rounded-xl border border-white/[0.12] bg-[#0f0f17] shadow-2xl shadow-black/40",
           "flex flex-col overflow-hidden animate-fade-in-scale"
         )}>
           {/* Header */}
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 shrink-0">
+          <div className="px-4 py-3 border-b border-white/[0.10] flex items-center gap-3 shrink-0">
             <p className="text-sm font-semibold text-white flex-1">Notifications</p>
             {unreadCount > 0 && (
               <button
@@ -147,7 +147,7 @@ export function NotificationCenter() {
             {notifications.length > 0 && (
               <button
                 onClick={clearNotifications}
-                className="text-zinc-600 hover:text-zinc-400 transition-colors p-1"
+                className="text-zinc-400 hover:text-zinc-400 transition-colors p-1"
                 title="Clear all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -159,9 +159,9 @@ export function NotificationCenter() {
           <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
-                <Bell className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-                <p className="text-sm text-zinc-500">No notifications yet</p>
-                <p className="text-xs text-zinc-600 mt-1">
+                <Bell className="w-8 h-8 text-zinc-400 mx-auto mb-3" />
+                <p className="text-sm text-zinc-400">No notifications yet</p>
+                <p className="text-xs text-zinc-400 mt-1">
                   We&apos;ll notify you when your creations are ready
                 </p>
               </div>

@@ -178,7 +178,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
               rows={4}
               className={cn(
                 "w-full px-4 py-3 rounded-xl text-sm text-zinc-100 placeholder-zinc-600",
-                "bg-white/[0.04] border border-white/[0.08]",
+                "bg-white/[0.04] border border-white/[0.12]",
                 "focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/40",
                 "resize-none transition-all"
               )}
@@ -212,7 +212,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
             <div
               className={cn(
                 "flex items-center gap-4 p-4 rounded-xl",
-                "bg-white/[0.03] border border-white/[0.06]",
+                "bg-white/[0.05] border border-white/[0.10]",
                 "hover:bg-white/[0.06] hover:border-white/[0.10]",
                 "transition-all duration-200 cursor-pointer group/option"
               )}
@@ -222,9 +222,9 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium text-zinc-100">{option.title}</h4>
-                <p className="text-xs text-zinc-500 mt-0.5">{option.description}</p>
+                <p className="text-xs text-zinc-400 mt-0.5">{option.description}</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-zinc-600 group-hover/option:text-zinc-300 transition-colors shrink-0" />
+              <ArrowRight className="w-4 h-4 text-zinc-400 group-hover/option:text-zinc-300 transition-colors shrink-0" />
             </div>
           );
 
@@ -257,7 +257,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
         <h3 className="text-base font-semibold text-zinc-100">
           Create your free account to recreate this video
         </h3>
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-zinc-400">
           Get 50 free credits — start creating in 60 seconds
         </p>
       </div>
@@ -282,7 +282,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
           onClick={() => handleSignUpIntent("email")}
           className={cn(
             "flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl",
-            "bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] hover:border-white/[0.12]",
+            "bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.12] hover:border-white/[0.12]",
             "text-zinc-100 font-medium text-sm",
             "transition-all duration-200 press-effect"
           )}
@@ -293,7 +293,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
       </div>
 
       {/* Video preview */}
-      <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.10]">
         {video.thumbnailUrl ? (
           <img
             src={video.thumbnailUrl}
@@ -325,7 +325,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
       <div
         className={cn(
           "relative w-full max-w-md rounded-2xl backdrop-blur-xl bg-[#111118]/95 shadow-2xl animate-fade-in-scale",
-          "border border-white/[0.06]"
+          "border border-white/[0.10]"
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -336,7 +336,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

@@ -107,7 +107,7 @@ export function Sidebar() {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setMobileMenuOpen(true)}
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#0A0A0F]/90 border border-white/[0.06] backdrop-blur-xl text-zinc-400 hover:text-white transition-colors md:hidden"
+        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#0A0A0F]/90 border border-white/[0.10] backdrop-blur-xl text-zinc-400 hover:text-white transition-colors md:hidden"
         aria-label="Open menu"
       >
         <Menu className="w-5 h-5" />
@@ -125,7 +125,7 @@ export function Sidebar() {
       <aside
         className={cn(
           // Base: hidden on mobile, visible on md+
-          "fixed left-0 top-0 bottom-0 z-50 flex flex-col border-r border-white/[0.06] bg-[#0A0A0F]/95 backdrop-blur-xl transition-all duration-300",
+          "fixed left-0 top-0 bottom-0 z-50 flex flex-col border-r border-white/[0.10] bg-[#111118]/95 backdrop-blur-xl transition-all duration-300",
           // Desktop: show based on sidebarOpen state
           "hidden md:flex",
           sidebarOpen ? "md:w-64" : "md:w-16",
@@ -134,7 +134,7 @@ export function Sidebar() {
         )}
       >
         {/* Logo + Mobile close */}
-        <div className="flex items-center gap-2.5 p-4 h-16 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2.5 p-4 h-16 border-b border-white/[0.10]">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-lg shadow-violet-600/20">
             G
           </div>
@@ -147,7 +147,7 @@ export function Sidebar() {
           {mobileMenuOpen && (
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors md:hidden"
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-300 transition-colors md:hidden"
               aria-label="Close menu"
             >
               <X className="w-4 h-4" />
@@ -163,7 +163,7 @@ export function Sidebar() {
           if (!isInitialized) {
             return (
               <div className={cn(
-                "mx-3 mt-3 rounded-xl border bg-white/[0.03] border-white/[0.06] animate-pulse",
+                "mx-3 mt-3 rounded-xl border bg-white/[0.05] border-white/[0.10] animate-pulse",
                 expanded ? "p-3" : "p-2"
               )}>
                 <div className="flex items-center gap-2">
@@ -216,7 +216,7 @@ export function Sidebar() {
                 {expanded && (
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Credits</span>
+                      <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium">Credits</span>
                     </div>
                     <span className={cn(
                       "text-sm font-bold tabular-nums",
@@ -304,15 +304,15 @@ export function Sidebar() {
                 )}
                 {item.comingSoon ? (
                   <div
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-500 cursor-default group relative"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 cursor-default group relative"
                     title={`${item.label} — Coming Soon`}
                   >
-                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-500" />
+                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-400" />
                     {(sidebarOpen || mobileMenuOpen) && (
                       <span className="truncate flex-1">{item.label}</span>
                     )}
                     {(sidebarOpen || mobileMenuOpen) && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none bg-zinc-800 text-zinc-500">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none bg-zinc-800 text-zinc-400">
                         <Lock className="w-2.5 h-2.5" /> Soon
                       </span>
                     )}
@@ -357,14 +357,14 @@ export function Sidebar() {
         </nav>
 
         {/* User + Collapse */}
-        <div className="border-t border-white/[0.06] p-3">
+        <div className="border-t border-white/[0.10] p-3">
           <div className="flex items-center gap-3">
             <UserButton
               appearance={{
                 elements: {
                   avatarBox: "w-8 h-8 rounded-lg",
                   userButtonPopoverCard:
-                    "bg-[#111118]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40",
+                    "bg-[#111118]/95 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40",
                   userButtonPopoverMain: "bg-transparent",
                   userButtonPopoverActions: "bg-transparent",
                   userButtonPopoverActionButton:
@@ -372,7 +372,7 @@ export function Sidebar() {
                   userButtonPopoverActionButtonText: "text-zinc-200",
                   userButtonPopoverActionButtonIcon: "text-zinc-400",
                   userButtonPopoverFooter:
-                    "bg-transparent border-t border-white/[0.06]",
+                    "bg-transparent border-t border-white/[0.10]",
                   userPreview: "bg-transparent",
                   userPreviewMainIdentifier: "text-zinc-100 font-medium",
                   userPreviewSecondaryIdentifier: "text-zinc-400",
@@ -392,7 +392,7 @@ export function Sidebar() {
             {/* Desktop-only collapse toggle */}
             <button
               onClick={toggleSidebar}
-              className="hidden md:block p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="hidden md:block p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-300 transition-colors"
               aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               {sidebarOpen ? (

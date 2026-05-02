@@ -54,13 +54,13 @@ function ImageCard({ url, index, onDownload }: { url: string; index: number; onD
   const imgSrc = retryCount > 0 ? `${url}${url.includes("?") ? "&" : "?"}retry=${retryCount}` : url;
 
   return (
-    <div className="relative group rounded-xl overflow-hidden border border-white/[0.06] bg-zinc-900/50">
+    <div className="relative group rounded-xl overflow-hidden border border-white/[0.10] bg-zinc-900/50">
       {/* Loading skeleton */}
       {!loaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10">
           <div className="flex flex-col items-center gap-2">
             <GenesisLoader size="md" />
-            <span className="text-xs text-zinc-500">Loading image...</span>
+            <span className="text-xs text-zinc-400">Loading image...</span>
           </div>
         </div>
       )}
@@ -211,7 +211,7 @@ export default function ImagesPage() {
           <ImageIcon className="w-6 h-6 text-violet-400" />
           AI Image Generation
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Generate stunning images with FLUX Pro — 4 images per generation, 10 credits.
         </p>
       </div>
@@ -232,13 +232,13 @@ export default function ImagesPage() {
 
               {!prompt.trim() && (
                 <div className="space-y-2">
-                  <span className="text-xs text-zinc-500">Try a suggestion:</span>
+                  <span className="text-xs text-zinc-400">Try a suggestion:</span>
                   <div className="flex flex-wrap gap-1.5">
                     {IMAGE_SUGGESTIONS.map((s, i) => (
                       <button
                         key={i}
                         onClick={() => setPrompt(s)}
-                        className="px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 transition-all line-clamp-1 max-w-[280px] text-left"
+                        className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.10] text-xs text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 transition-all line-clamp-1 max-w-[280px] text-left"
                       >
                         {s.length > 60 ? s.slice(0, 60) + "..." : s}
                       </button>
@@ -248,7 +248,7 @@ export default function ImagesPage() {
               )}
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">{prompt.length} characters</span>
+                <span className="text-xs text-zinc-400">{prompt.length} characters</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -277,10 +277,10 @@ export default function ImagesPage() {
                       className={`p-3 rounded-xl border text-center transition-all ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1]"
                       }`}
                     >
-                      <opt.icon className={`w-5 h-5 mx-auto mb-1 ${isActive ? "text-violet-400" : "text-zinc-500"}`} />
+                      <opt.icon className={`w-5 h-5 mx-auto mb-1 ${isActive ? "text-violet-400" : "text-zinc-400"}`} />
                       <div className={`text-sm ${isActive ? "text-violet-300" : "text-zinc-400"}`}>{opt.label}</div>
                     </button>
                   );
@@ -336,7 +336,7 @@ export default function ImagesPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-medium text-zinc-300">Generated Images</label>
-                  <span className="text-xs text-zinc-500">{images.length} images — hover to download</span>
+                  <span className="text-xs text-zinc-400">{images.length} images — hover to download</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {images.map((url, i) => (
@@ -354,23 +354,23 @@ export default function ImagesPage() {
             <CardContent className="p-4 space-y-4">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Model</span>
+                  <span className="text-zinc-400">Model</span>
                   <span className="text-zinc-200">FLUX Pro v1.1</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Output</span>
+                  <span className="text-zinc-400">Output</span>
                   <span className="text-zinc-200">4 images</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Aspect Ratio</span>
+                  <span className="text-zinc-400">Aspect Ratio</span>
                   <span className="text-zinc-200 capitalize">{aspectRatio}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Cost</span>
+                  <span className="text-zinc-400">Cost</span>
                   <span className="text-violet-300 font-bold">{creditCost} credits</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Your balance</span>
+                  <span className="text-zinc-400">Your balance</span>
                   <span className={hasEnoughCredits ? "text-emerald-400" : "text-red-400"}>
                     {user?.creditBalance?.toLocaleString() ?? 0} credits
                   </span>
@@ -403,7 +403,7 @@ export default function ImagesPage() {
           <div className="flex items-center gap-1.5 min-w-0">
             <Zap className="w-4 h-4 text-violet-400 shrink-0" />
             <span className="text-sm font-bold text-violet-300">{creditCost}</span>
-            <span className="text-xs text-zinc-500">credits</span>
+            <span className="text-xs text-zinc-400">credits</span>
           </div>
           <Button
             className="flex-1 max-w-[200px] shadow-lg shadow-violet-600/20"

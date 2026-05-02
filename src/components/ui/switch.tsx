@@ -36,7 +36,7 @@ export function Switch({
       {(label || description) && (
         <div className="flex-1 min-w-0">
           {label && <span className="text-sm font-medium text-zinc-200 block">{label}</span>}
-          {description && <span className="text-xs text-zinc-500 block mt-0.5">{description}</span>}
+          {description && <span className="text-xs text-zinc-400 block mt-0.5">{description}</span>}
         </div>
       )}
       <button

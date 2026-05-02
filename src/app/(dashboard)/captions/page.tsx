@@ -411,7 +411,7 @@ export default function CaptionsPage() {
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Auto Captions</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Generate accurate captions and subtitles for your videos using AI speech recognition.
         </p>
       </div>
@@ -442,12 +442,12 @@ export default function CaptionsPage() {
                       className={`p-3 rounded-xl border text-center transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <mode.icon
                         className={`w-5 h-5 mx-auto mb-1.5 ${
-                          isActive ? "text-violet-400" : "text-zinc-500"
+                          isActive ? "text-violet-400" : "text-zinc-400"
                         }`}
                       />
                       <div
@@ -470,9 +470,9 @@ export default function CaptionsPage() {
                     placeholder="Paste your video URL here"
                     value={videoUrl}
                     onChange={(e) => handleUrlChange(e.target.value)}
-                    className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200"
+                    className="w-full rounded-lg border border-white/[0.12] bg-white/[0.05] px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200"
                   />
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-400">
                     Direct link to an MP4, MOV, or WEBM file
                   </p>
                 </div>
@@ -482,14 +482,14 @@ export default function CaptionsPage() {
               {inputMode === "upload" && (
                 <div>
                   {videoFile ? (
-                    <div className="flex items-center justify-between p-3 rounded-xl border border-white/[0.08] bg-white/[0.03]">
+                    <div className="flex items-center justify-between p-3 rounded-xl border border-white/[0.12] bg-white/[0.05]">
                       <div className="flex items-center gap-3">
                         <Film className="w-5 h-5 text-violet-400" />
                         <div>
                           <p className="text-sm text-zinc-200 truncate max-w-[300px]">
                             {videoFile.name}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-zinc-400">
                             {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
                             {videoDuration ? ` / ${videoDuration}s` : ""}
                           </p>
@@ -500,18 +500,18 @@ export default function CaptionsPage() {
                           setVideoFile(null);
                           setVideoDuration(null);
                         }}
-                        className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+                        className="text-xs text-zinc-400 hover:text-red-400 transition-colors"
                       >
                         Remove
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
-                      <Upload className="w-8 h-8 text-zinc-500 mb-3" />
+                    <label className="flex flex-col items-center justify-center p-10 rounded-xl border-2 border-dashed border-white/[0.12] hover:border-violet-500/30 cursor-pointer transition-colors bg-white/[0.01]">
+                      <Upload className="w-8 h-8 text-zinc-400 mb-3" />
                       <span className="text-sm text-zinc-400">
                         Click or drag to upload a video
                       </span>
-                      <span className="text-xs text-zinc-500 mt-1">
+                      <span className="text-xs text-zinc-400 mt-1">
                         MP4, MOV, WEBM up to 500MB
                       </span>
                       <input
@@ -539,10 +539,10 @@ export default function CaptionsPage() {
                       placeholder="Select a video from your gallery"
                     />
                   ) : (
-                    <div className="p-6 rounded-xl border border-white/[0.06] bg-white/[0.02] text-center">
-                      <Film className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
+                    <div className="p-6 rounded-xl border border-white/[0.10] bg-white/[0.04] text-center">
+                      <Film className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
                       <p className="text-sm text-zinc-400">No videos in your gallery yet</p>
-                      <p className="text-xs text-zinc-500 mt-1">
+                      <p className="text-xs text-zinc-400 mt-1">
                         Generate a video first or paste a URL above
                       </p>
                     </div>
@@ -564,7 +564,7 @@ export default function CaptionsPage() {
                 onChange={(v) => setLanguage(v)}
                 options={LANGUAGES}
               />
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 Select the primary spoken language in your video
               </p>
             </CardContent>
@@ -587,12 +587,12 @@ export default function CaptionsPage() {
                       className={`p-3 rounded-xl border text-left transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <style.icon
                         className={`w-5 h-5 mb-1.5 ${
-                          isActive ? "text-violet-400" : "text-zinc-500"
+                          isActive ? "text-violet-400" : "text-zinc-400"
                         }`}
                       />
                       <div
@@ -602,7 +602,7 @@ export default function CaptionsPage() {
                       >
                         {style.label}
                       </div>
-                      <div className="text-xs text-zinc-500">{style.desc}</div>
+                      <div className="text-xs text-zinc-400">{style.desc}</div>
                     </button>
                   );
                 })}
@@ -651,7 +651,7 @@ export default function CaptionsPage() {
                       <span className="text-sm text-zinc-300">Burning captions into video...</span>
                     </div>
                     <Progress value={burnProgress} />
-                    <p className="text-xs text-zinc-500 text-center">{burnProgress}% — 5 credits</p>
+                    <p className="text-xs text-zinc-400 text-center">{burnProgress}% — 5 credits</p>
                   </div>
                 )}
               </CardContent>
@@ -671,7 +671,7 @@ export default function CaptionsPage() {
                 <video
                   src={burnedVideoUrl}
                   controls
-                  className="w-full rounded-lg border border-white/[0.08]"
+                  className="w-full rounded-lg border border-white/[0.12]"
                 />
                 <Button
                   className="w-full"
@@ -699,24 +699,24 @@ export default function CaptionsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Source</span>
+                  <span className="text-zinc-400">Source</span>
                   <span className="text-zinc-200 capitalize">{inputMode}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Language</span>
+                  <span className="text-zinc-400">Language</span>
                   <span className="text-zinc-200">
                     {LANGUAGES.find((l) => l.value === language)?.label}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Style</span>
+                  <span className="text-zinc-400">Style</span>
                   <span className="text-zinc-200">
                     {CAPTION_STYLES.find((s) => s.value === captionStyle)?.label}
                   </span>
                 </div>
                 {videoDuration && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">Duration</span>
+                    <span className="text-zinc-400">Duration</span>
                     <span className="text-zinc-200 flex items-center gap-1">
                       <Clock className="w-3 h-3 text-zinc-400" />
                       {Math.floor(videoDuration / 60)}m {videoDuration % 60}s
@@ -724,12 +724,12 @@ export default function CaptionsPage() {
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Est. Time</span>
+                  <span className="text-zinc-400">Est. Time</span>
                   <span className="text-zinc-200">~30s</span>
                 </div>
               </div>
 
-              <div className="border-t border-white/[0.06] pt-4">
+              <div className="border-t border-white/[0.10] pt-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-zinc-300">Cost</span>
                   <div className="flex items-center gap-1.5">
@@ -737,14 +737,14 @@ export default function CaptionsPage() {
                     <span className="text-xl font-bold text-violet-300">
                       {creditCost || "~2"}
                     </span>
-                    <span className="text-xs text-zinc-500">credits</span>
+                    <span className="text-xs text-zinc-400">credits</span>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-zinc-400 mt-1">
                   {CREDITS_PER_MINUTE} credits per minute of video
                 </p>
                 <div className="flex justify-between mt-1.5">
-                  <span className="text-xs text-zinc-500">Your balance</span>
+                  <span className="text-xs text-zinc-400">Your balance</span>
                   <span
                     className={`text-xs font-semibold ${
                       hasEnoughCredits ? "text-emerald-400" : "text-red-400"
@@ -763,7 +763,7 @@ export default function CaptionsPage() {
                     <span className="text-sm text-zinc-300">Processing captions...</span>
                   </div>
                   <Progress value={progress} />
-                  <p className="text-xs text-zinc-500 text-center">{progress}%</p>
+                  <p className="text-xs text-zinc-400 text-center">{progress}%</p>
                 </div>
               )}
 

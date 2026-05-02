@@ -331,12 +331,12 @@ export default function TalkingAvatarPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-zinc-100">Talking Avatar</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">
+            <p className="text-sm text-zinc-400 mt-0.5">
               Upload a face photo and give it a voice with AI lip sync
             </p>
           </div>
         </div>
-        <p className="text-[11px] text-zinc-600 ml-[52px]">
+        <p className="text-[11px] text-zinc-400 ml-[52px]">
           HeyGen alternative — 90% less
         </p>
       </div>
@@ -349,7 +349,7 @@ export default function TalkingAvatarPage() {
               <Lock className="w-5 h-5 text-amber-400 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-amber-300">Pro plan required</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
+                <p className="text-xs text-zinc-400 mt-0.5">
                   Talking Avatar is available on Pro and Studio plans. Upgrade to unlock this feature.
                 </p>
               </div>
@@ -367,12 +367,12 @@ export default function TalkingAvatarPage() {
               <CardTitle className="flex items-center gap-2 text-sm">
                 <ImageIcon className="w-4 h-4 text-violet-400" />
                 Face Photo
-                <span className="text-[10px] text-zinc-600 font-normal ml-1">Step 1</span>
+                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 1</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {faceImagePreview ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                   <img
                     src={faceImagePreview}
                     alt="Face preview"
@@ -387,7 +387,7 @@ export default function TalkingAvatarPage() {
                 </div>
               ) : (
                 <label
-                  className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
+                  className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                 >
@@ -404,7 +404,7 @@ export default function TalkingAvatarPage() {
                   <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
                     Drop a face photo or click to upload
                   </span>
-                  <span className="text-xs text-zinc-600 mt-1">
+                  <span className="text-xs text-zinc-400 mt-1">
                     PNG, JPEG or WebP — max 10MB — clear front-facing face works best
                   </span>
                 </label>
@@ -418,12 +418,12 @@ export default function TalkingAvatarPage() {
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Mic className="w-4 h-4 text-violet-400" />
                 Voice Input
-                <span className="text-[10px] text-zinc-600 font-normal ml-1">Step 2</span>
+                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 2</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Tabs */}
-              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
                   { key: "script" as const, label: "Type Script", icon: MessageCircle },
                   { key: "audio" as const, label: "Upload Audio", icon: Upload },
@@ -434,7 +434,7 @@ export default function TalkingAvatarPage() {
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                       inputMode === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                        : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
                     <tab.icon className="w-3.5 h-3.5" />
@@ -450,7 +450,7 @@ export default function TalkingAvatarPage() {
                     value={scriptText}
                     onChange={(e) => setScriptText(e.target.value)}
                     placeholder="Type what the avatar should say..."
-                    className="min-h-[120px] bg-white/[0.03] border-white/[0.08] text-zinc-200 placeholder:text-zinc-600 resize-none"
+                    className="min-h-[120px] bg-white/[0.05] border-white/[0.12] text-zinc-200 placeholder:text-zinc-400 resize-none"
                   />
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5">Voice</label>
@@ -462,12 +462,12 @@ export default function TalkingAvatarPage() {
                           className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                             voiceId === voice.id
                               ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                              : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                              : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                           }`}
                         >
                           <span>
                             <span>{voice.name}</span>
-                            <span className="ml-1 text-[10px] text-zinc-600">
+                            <span className="ml-1 text-[10px] text-zinc-400">
                               {voice.gender === "female" ? "F" : "M"} / {voice.language}
                             </span>
                           </span>
@@ -499,23 +499,23 @@ export default function TalkingAvatarPage() {
               {inputMode === "audio" && (
                 <div>
                   {audioFileName ? (
-                    <div className="flex items-center gap-3 p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-white/[0.12] bg-white/[0.04]">
                       <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
                         <Mic className="w-5 h-5 text-violet-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-zinc-300 truncate">{audioFileName}</p>
-                        <p className="text-[10px] text-zinc-600">Ready to use</p>
+                        <p className="text-[10px] text-zinc-400">Ready to use</p>
                       </div>
                       <button
                         onClick={clearAudio}
-                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
+                    <label className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
                       <input
                         ref={audioInputRef}
                         type="file"
@@ -527,7 +527,7 @@ export default function TalkingAvatarPage() {
                       <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
                         Upload audio file
                       </span>
-                      <span className="text-xs text-zinc-600 mt-1">MP3 or WAV — max 25MB</span>
+                      <span className="text-xs text-zinc-400 mt-1">MP3 or WAV — max 25MB</span>
                     </label>
                   )}
                 </div>
@@ -555,7 +555,7 @@ export default function TalkingAvatarPage() {
                     className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                       duration === d
                         ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                        : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                        : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                     }`}
                   >
                     {d}s
@@ -582,7 +582,7 @@ export default function TalkingAvatarPage() {
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       language === lang.code
                         ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                        : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                        : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                     }`}
                   >
                     {lang.label}
@@ -602,11 +602,11 @@ export default function TalkingAvatarPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Duration</span>
+                <span className="text-xs text-zinc-400">Duration</span>
                 <span className="text-xs text-zinc-300">{duration}s</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Rate</span>
+                <span className="text-xs text-zinc-400">Rate</span>
                 <span className="text-xs text-zinc-300">15 credits / 10s</span>
               </div>
               <div className="h-px bg-white/[0.06]" />
@@ -663,7 +663,7 @@ export default function TalkingAvatarPage() {
           <CardContent className="space-y-3">
             {resultVideoUrl ? (
               <>
-                <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                <div className="rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                   <video
                     src={resultVideoUrl}
                     className="w-full max-h-[480px] object-contain"
@@ -682,10 +682,10 @@ export default function TalkingAvatarPage() {
                 </a>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex flex-col items-center justify-center h-48 rounded-xl bg-white/[0.04] border border-white/[0.10]">
                 <GenesisLoader size="md" />
                 <p className="text-sm text-zinc-300 font-medium">Generating your talking avatar...</p>
-                <p className="text-[11px] text-zinc-600 mt-1.5">
+                <p className="text-[11px] text-zinc-400 mt-1.5">
                   This may take 1-3 minutes — you can leave this page
                 </p>
               </div>

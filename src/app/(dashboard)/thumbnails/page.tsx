@@ -167,7 +167,7 @@ export default function ThumbnailsPage() {
     <PageTransition className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">AI Thumbnails</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Generate eye-catching thumbnails for YouTube, Instagram, and TikTok
           with AI.
         </p>
@@ -191,7 +191,7 @@ export default function ThumbnailsPage() {
                 className="text-base"
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-400">
                   {prompt.length} / 1000 characters
                 </span>
               </div>
@@ -214,7 +214,7 @@ export default function ThumbnailsPage() {
                       className={`p-3 rounded-xl border text-left transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <div
@@ -222,7 +222,7 @@ export default function ThumbnailsPage() {
                       >
                         {s.label}
                       </div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-zinc-400">
                         {s.dimensions}
                       </div>
                     </button>
@@ -246,7 +246,7 @@ export default function ThumbnailsPage() {
                       className={`px-3 py-2 rounded-xl border text-sm transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
-                          : "border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] text-zinc-400 hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       {s}
@@ -275,7 +275,7 @@ export default function ThumbnailsPage() {
                       className={`p-3 rounded-xl border text-center transition-all duration-200 press-effect ${
                         isActive
                           ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.04]"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
                       }`}
                     >
                       <div
@@ -283,7 +283,7 @@ export default function ThumbnailsPage() {
                       >
                         {v}
                       </div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-zinc-400">
                         {v === 1 ? "image" : "images"} &middot; {cost}{" "}
                         {cost === 1 ? "credit" : "credits"}
                       </div>
@@ -325,13 +325,13 @@ export default function ThumbnailsPage() {
                     key={row.label}
                     className="flex justify-between items-center"
                   >
-                    <span className="text-zinc-500">{row.label}</span>
+                    <span className="text-zinc-400">{row.label}</span>
                     <span className="text-zinc-200">{row.value}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-white/[0.06] pt-4">
+              <div className="border-t border-white/[0.10] pt-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-zinc-300">
                     Cost
@@ -341,11 +341,11 @@ export default function ThumbnailsPage() {
                     <span className="text-xl font-bold text-violet-300">
                       {creditCost}
                     </span>
-                    <span className="text-xs text-zinc-500">credits</span>
+                    <span className="text-xs text-zinc-400">credits</span>
                   </div>
                 </div>
                 <div className="flex justify-between mt-1.5">
-                  <span className="text-xs text-zinc-500">Your balance</span>
+                  <span className="text-xs text-zinc-400">Your balance</span>
                   <span
                     className={`text-xs font-semibold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}
                   >
@@ -417,7 +417,7 @@ export default function ThumbnailsPage() {
             {generatedImages.map((image, index) => (
               <Card key={image.id}>
                 <CardContent className="p-3 space-y-3">
-                  <div className="relative rounded-lg overflow-hidden border border-white/[0.06] bg-[#0D0D14]">
+                  <div className="relative rounded-lg overflow-hidden border border-white/[0.10] bg-[#0D0D14]">
                     <img
                       src={image.url}
                       alt={`Generated thumbnail ${index + 1}`}
@@ -472,7 +472,7 @@ export default function ThumbnailsPage() {
               <p className="text-sm font-medium text-zinc-200">
                 Generating your thumbnails...
               </p>
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="text-xs text-zinc-400 mt-1">
                 This usually takes 10-30 seconds
               </p>
             </div>

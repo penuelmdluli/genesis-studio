@@ -46,7 +46,7 @@ export function DataSaverToggle() {
         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
           enabled
             ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20"
-            : "bg-white/[0.03] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+            : "bg-white/[0.05] text-zinc-400 border border-white/[0.10] hover:text-zinc-300"
         }`}
         title={enabled ? "Data Saver: ON — lower quality previews, no autoplay" : "Data Saver: OFF"}
         aria-label={enabled ? "Data Saver is on, click to turn off" : "Data Saver is off, click to turn on"}

@@ -53,7 +53,7 @@ function CharacterCard({ char, onToggle, onDelete }: {
     <div className={`group relative rounded-2xl border overflow-hidden transition-all duration-300 ${
       char.active
         ? "border-violet-500/30 bg-gradient-to-b from-violet-500/5 to-transparent hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/10"
-        : "border-white/[0.06] bg-white/[0.01] opacity-40 hover:opacity-60"
+        : "border-white/[0.10] bg-white/[0.01] opacity-40 hover:opacity-60"
     }`}>
       {/* Image */}
       <div className="relative aspect-[3/4] bg-[#0D0D14] overflow-hidden">
@@ -81,7 +81,7 @@ function CharacterCard({ char, onToggle, onDelete }: {
             <div className="w-12 h-12 rounded-xl bg-violet-500/15 flex items-center justify-center mb-2">
               <Users className="w-6 h-6 text-violet-400/50" />
             </div>
-            <span className="text-[10px] text-zinc-600">No image</span>
+            <span className="text-[10px] text-zinc-400">No image</span>
           </div>
         )}
 
@@ -120,7 +120,7 @@ function CharacterCard({ char, onToggle, onDelete }: {
       {/* Info */}
       <div className="p-3">
         <p className="text-sm font-semibold text-zinc-100">{char.name}</p>
-        <p className="text-[11px] text-zinc-500 line-clamp-2 mt-0.5 leading-relaxed">{char.description}</p>
+        <p className="text-[11px] text-zinc-400 line-clamp-2 mt-0.5 leading-relaxed">{char.description}</p>
       </div>
     </div>
   );
@@ -178,8 +178,8 @@ export default function MBSConfigPage() {
   if (!user?.isOwner) {
     return (
       <PageTransition className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Shield className="w-12 h-12 text-zinc-700" />
-        <p className="text-zinc-500 text-lg">Owner access required</p>
+        <Shield className="w-12 h-12 text-zinc-400" />
+        <p className="text-zinc-400 text-lg">Owner access required</p>
       </PageTransition>
     );
   }
@@ -282,7 +282,7 @@ export default function MBSConfigPage() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-zinc-100">MBS Configuration</h1>
-              <p className="text-xs sm:text-sm text-zinc-500">Manage characters, creators, and the content pipeline</p>
+              <p className="text-xs sm:text-sm text-zinc-400">Manage characters, creators, and the content pipeline</p>
             </div>
           </div>
         </div>
@@ -299,11 +299,11 @@ export default function MBSConfigPage() {
           { label: "Active Creators", value: creators.filter(c => c.active).length, color: "cyan" },
           { label: "Total Creators", value: creators.length, color: "zinc" },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+          <div key={stat.label} className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-4 text-center">
             <div className={`text-2xl font-bold ${stat.color === "violet" ? "text-violet-400" : stat.color === "cyan" ? "text-cyan-400" : "text-zinc-400"}`}>
               {stat.value}
             </div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">{stat.label}</div>
+            <div className="text-[11px] text-zinc-400 mt-0.5">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -345,7 +345,7 @@ export default function MBSConfigPage() {
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="animate-pulse rounded-2xl border border-white/[0.06] overflow-hidden">
+                <div key={i} className="animate-pulse rounded-2xl border border-white/[0.10] overflow-hidden">
                   <div className="aspect-[3/4] bg-white/[0.04]" />
                   <div className="p-3 space-y-2">
                     <div className="h-4 w-20 bg-white/[0.06] rounded" />
@@ -403,7 +403,7 @@ export default function MBSConfigPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <Input placeholder="Handle (e.g. squidboycally)" value={newCreatorHandle} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCreatorHandle(e.target.value)} className="text-sm" />
                 <select value={newCreatorPlatform} onChange={(e) => setNewCreatorPlatform(e.target.value)}
-                  className="rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-300 px-3 py-2 focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40 outline-none">
+                  className="rounded-xl bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-300 px-3 py-2 focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40 outline-none">
                   <option value="tiktok">TikTok</option>
                   <option value="facebook">Facebook</option>
                   <option value="instagram">Instagram</option>
@@ -423,16 +423,16 @@ export default function MBSConfigPage() {
           {/* Creator List */}
           {creators.length === 0 && !loading ? (
             <div className="text-center py-8">
-              <Music className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">No creators yet</p>
-              <p className="text-xs text-zinc-600">Add TikTok, Facebook, or Instagram creators to source dance content</p>
+              <Music className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
+              <p className="text-sm text-zinc-400">No creators yet</p>
+              <p className="text-xs text-zinc-400">Add TikTok, Facebook, or Instagram creators to source dance content</p>
             </div>
           ) : (
             <div className="space-y-2">
               {creators.map((creator) => (
                 <div key={creator.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                   creator.active
-                    ? "border-white/[0.08] bg-white/[0.02] hover:border-cyan-500/20 hover:bg-cyan-500/[0.02]"
+                    ? "border-white/[0.12] bg-white/[0.04] hover:border-cyan-500/20 hover:bg-cyan-500/[0.02]"
                     : "border-white/[0.04] bg-white/[0.01] opacity-40"
                 }`}>
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-violet-500/10 flex items-center justify-center shrink-0">
@@ -447,7 +447,7 @@ export default function MBSConfigPage() {
                       {creator.verified && <Badge variant="emerald" className="text-[9px]">Verified</Badge>}
                     </div>
                     <a href={creator.profile_url} target="_blank" rel="noopener noreferrer"
-                      className="text-[11px] text-zinc-500 hover:text-cyan-400 truncate flex items-center gap-1 transition-colors">
+                      className="text-[11px] text-zinc-400 hover:text-cyan-400 truncate flex items-center gap-1 transition-colors">
                       {creator.profile_url.replace(/https?:\/\/(www\.)?/, "").slice(0, 40)}
                       <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                     </a>

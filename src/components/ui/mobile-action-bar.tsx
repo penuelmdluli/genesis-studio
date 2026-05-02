@@ -21,7 +21,7 @@ export function MobileActionBar({ children, className, show = true }: MobileActi
     <div
       className={cn(
         "fixed bottom-0 left-0 right-0 z-40 md:hidden",
-        "bg-[#0A0A0F]/95 backdrop-blur-xl border-t border-white/[0.06]",
+        "bg-[#0A0A0F]/95 backdrop-blur-xl border-t border-white/[0.10]",
         "px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
         className
       )}

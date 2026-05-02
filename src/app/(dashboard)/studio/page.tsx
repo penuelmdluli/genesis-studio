@@ -408,7 +408,7 @@ export default function StudioDashboardPage() {
                   <CardContent className="space-y-3">
                     {/* Trend headline */}
                     <div>
-                      <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                      <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">
                         Trend
                       </p>
                       <p className="text-sm text-zinc-300 line-clamp-2">
@@ -435,7 +435,7 @@ export default function StudioDashboardPage() {
 
                     {/* Stats */}
                     {breakdown && breakdown.videoCount > 0 && (
-                      <div className="flex items-center gap-3 text-xs text-zinc-500">
+                      <div className="flex items-center gap-3 text-xs text-zinc-400">
                         <span>{breakdown.videoCount} videos</span>
                         <span>{breakdown.totalViews} views</span>
                       </div>
@@ -522,28 +522,28 @@ export default function StudioDashboardPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-zinc-800">
-                        <th className="text-left text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-left text-xs text-zinc-400 font-medium p-4 pb-3">
                           Video
                         </th>
-                        <th className="text-left text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-left text-xs text-zinc-400 font-medium p-4 pb-3">
                           Page
                         </th>
-                        <th className="text-left text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-left text-xs text-zinc-400 font-medium p-4 pb-3">
                           Posted
                         </th>
-                        <th className="text-center text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-center text-xs text-zinc-400 font-medium p-4 pb-3">
                           <Eye className="w-3.5 h-3.5 inline" />
                         </th>
-                        <th className="text-center text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-center text-xs text-zinc-400 font-medium p-4 pb-3">
                           <ThumbsUp className="w-3.5 h-3.5 inline" />
                         </th>
-                        <th className="text-center text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-center text-xs text-zinc-400 font-medium p-4 pb-3">
                           <Share2 className="w-3.5 h-3.5 inline" />
                         </th>
-                        <th className="text-center text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-center text-xs text-zinc-400 font-medium p-4 pb-3">
                           <MessageCircle className="w-3.5 h-3.5 inline" />
                         </th>
-                        <th className="text-center text-xs text-zinc-500 font-medium p-4 pb-3">
+                        <th className="text-center text-xs text-zinc-400 font-medium p-4 pb-3">
                           Score
                         </th>
                       </tr>
@@ -573,7 +573,7 @@ export default function StudioDashboardPage() {
                           <td className="p-4 text-sm text-zinc-400">
                             {post.page_name}
                           </td>
-                          <td className="p-4 text-sm text-zinc-500">
+                          <td className="p-4 text-sm text-zinc-400">
                             {formatTimeAgo(post.posted_at)}
                           </td>
                           <td className="p-4 text-center text-sm text-zinc-300">
@@ -601,10 +601,10 @@ export default function StudioDashboardPage() {
                   </table>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-                  <BarChart3 className="w-10 h-10 mb-3 text-zinc-600" />
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                  <BarChart3 className="w-10 h-10 mb-3 text-zinc-400" />
                   <p className="text-sm">No posts yet this week</p>
-                  <p className="text-xs text-zinc-600 mt-1">
+                  <p className="text-xs text-zinc-400 mt-1">
                     Posts will appear here after publishing
                   </p>
                 </div>

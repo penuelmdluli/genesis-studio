@@ -15,7 +15,7 @@ export default function PricingLoading() {
       {/* Plan cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div key={i} className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-20" />
             <Skeleton className="h-10 w-28" />
             <Skeleton className="h-4 w-full" />

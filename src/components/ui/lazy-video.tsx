@@ -235,7 +235,7 @@ export function VideoGridSkeleton({
   return (
     <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4", className)}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-white/[0.06] bg-[#111118]/80 overflow-hidden">
+        <div key={i} className="rounded-xl border border-white/[0.10] bg-[#111118]/80 overflow-hidden">
           <div className="relative aspect-video">
             <div className="absolute inset-0 bg-[#0D0D14]">
               <div className="absolute inset-0 bg-gradient-to-br from-violet-900/10 via-transparent to-fuchsia-900/10" />
@@ -245,7 +245,7 @@ export function VideoGridSkeleton({
               />
             </div>
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.10] flex items-center justify-center">
                 <div className="w-0 h-0 border-l-[8px] border-l-white/[0.12] border-y-[6px] border-y-transparent ml-0.5" />
               </div>
             </div>
@@ -329,7 +329,7 @@ export function GenerationOrb({
       {/* Text */}
       <div className="text-center">
         <p className="text-sm text-zinc-300 font-medium">{text}</p>
-        {eta && <p className="text-xs text-zinc-500 mt-1">ETA: {eta}</p>}
+        {eta && <p className="text-xs text-zinc-400 mt-1">ETA: {eta}</p>}
       </div>
     </div>
   );

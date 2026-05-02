@@ -305,7 +305,7 @@ export function ShareModal({ isOpen, onClose, video }: ShareModalProps) {
           <h2 className="text-lg font-semibold text-zinc-100">Share this video</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -313,7 +313,7 @@ export function ShareModal({ isOpen, onClose, video }: ShareModalProps) {
         </div>
 
         {/* Video preview */}
-        <div className="mx-5 mb-4 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+        <div className="mx-5 mb-4 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.10]">
           {video.thumbnailUrl ? (
             <img
               src={video.thumbnailUrl}
@@ -330,8 +330,8 @@ export function ShareModal({ isOpen, onClose, video }: ShareModalProps) {
 
         {/* Share URL display */}
         <div className="mx-5 mb-4">
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-            <Link2 className="w-4 h-4 text-zinc-500 shrink-0" />
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.10]">
+            <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
             <span className="text-xs text-zinc-400 truncate flex-1 font-mono">{shareUrl}</span>
             <button
               onClick={handleCopyLink}

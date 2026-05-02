@@ -381,7 +381,7 @@ export default function BrainStudioPage() {
               <Badge variant="default">NEW</Badge>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Brain Studio</h1>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1">
               Type one concept. Get a finished multi-scene video.
             </p>
           </div>
@@ -418,7 +418,7 @@ export default function BrainStudioPage() {
             <CardContent className="p-8 text-center">
               <Brain className="w-16 h-16 text-violet-400/50 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-zinc-200 mb-2">Unlock the AI Director</h2>
-              <p className="text-zinc-500 mb-6 max-w-md mx-auto">
+              <p className="text-zinc-400 mb-6 max-w-md mx-auto">
                 Brain Studio creates multi-scene, directed videos with transitions, music, voiceover, and captions — all from one sentence.
               </p>
               <a href="/pricing">
@@ -448,14 +448,14 @@ export default function BrainStudioPage() {
                     maxLength={5000}
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-zinc-500">{concept.length}/5000</span>
+                    <span className="text-xs text-zinc-400">{concept.length}/5000</span>
                   </div>
                   <div className="flex gap-1.5 flex-wrap mt-2">
                     {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (
                       <button
                         key={i}
                         onClick={() => setConcept(ex)}
-                        className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[200px]"
+                        className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:border-violet-500/30 transition-colors truncate max-w-[200px]"
                       >
                         {ex.slice(0, 40)}...
                       </button>
@@ -467,7 +467,7 @@ export default function BrainStudioPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Style */}
                   <div>
-                    <label className="text-xs text-zinc-500 font-medium mb-2 block">Style</label>
+                    <label className="text-xs text-zinc-400 font-medium mb-2 block">Style</label>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
                       {STYLES.slice(0, 5).map((s) => (
                         <button
@@ -476,7 +476,7 @@ export default function BrainStudioPage() {
                           className={`p-2 rounded-lg text-center text-[10px] sm:text-xs transition-all overflow-hidden ${
                             style === s.value
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
-                              : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                              : "bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300"
                           }`}
                         >
                           <div className="text-base sm:text-lg mb-0.5">{s.emoji}</div>
@@ -492,7 +492,7 @@ export default function BrainStudioPage() {
                           className={`p-2 rounded-lg text-center text-[10px] sm:text-xs transition-all overflow-hidden ${
                             style === s.value
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
-                              : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                              : "bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300"
                           }`}
                         >
                           <div className="text-base sm:text-lg mb-0.5">{s.emoji}</div>
@@ -504,7 +504,7 @@ export default function BrainStudioPage() {
 
                   {/* Duration */}
                   <div>
-                    <label className="text-xs text-zinc-500 font-medium mb-2 block">Duration</label>
+                    <label className="text-xs text-zinc-400 font-medium mb-2 block">Duration</label>
                     <div className="grid grid-cols-3 gap-1.5">
                       {DURATIONS.map((d) => (
                         <button
@@ -513,7 +513,7 @@ export default function BrainStudioPage() {
                           className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                             targetDuration === d
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
-                              : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                              : "bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300"
                           }`}
                         >
                           {d}s
@@ -524,7 +524,7 @@ export default function BrainStudioPage() {
 
                   {/* Aspect Ratio */}
                   <div>
-                    <label className="text-xs text-zinc-500 font-medium mb-2 block">Aspect Ratio</label>
+                    <label className="text-xs text-zinc-400 font-medium mb-2 block">Aspect Ratio</label>
                     <div className="grid grid-cols-3 gap-1.5">
                       {[
                         { value: "landscape" as const, icon: Monitor, label: "16:9" },
@@ -537,7 +537,7 @@ export default function BrainStudioPage() {
                           className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-all ${
                             aspectRatio === ar.value
                               ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
-                              : "bg-white/[0.03] border border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                              : "bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300"
                           }`}
                         >
                           <ar.icon className="w-5 h-5" />
@@ -562,14 +562,14 @@ export default function BrainStudioPage() {
                       className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                         toggle.state
                           ? "bg-violet-500/15 border border-violet-500/30 text-violet-300"
-                          : "bg-white/[0.03] border border-white/[0.06] text-zinc-500"
+                          : "bg-white/[0.05] border border-white/[0.10] text-zinc-400"
                       }`}
                     >
                       <toggle.icon className="w-4 h-4 shrink-0" />
                       <span className="sm:hidden">{toggle.label}</span>
                       <span className="hidden sm:inline">{toggle.fullLabel}</span>
                       {toggle.state && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                      <span className="text-[10px] text-zinc-500 hidden sm:inline">+{toggle.credits}cr</span>
+                      <span className="text-[10px] text-zinc-400 hidden sm:inline">+{toggle.credits}cr</span>
                     </button>
                   ))}
                 </div>
@@ -577,7 +577,7 @@ export default function BrainStudioPage() {
                 {/* Language (if voiceover on) */}
                 {voiceover && (
                   <div className="max-w-xs">
-                    <label className="text-xs text-zinc-500 font-medium mb-1.5 block">Voiceover Language</label>
+                    <label className="text-xs text-zinc-400 font-medium mb-1.5 block">Voiceover Language</label>
                     <Select
                       value={voiceoverLanguage}
                       onChange={(v) => setVoiceoverLanguage(v)}
@@ -605,10 +605,10 @@ export default function BrainStudioPage() {
                       <Zap className="w-4 h-4 text-violet-400" />
                       <span className="text-xs sm:text-sm text-zinc-400">Est:</span>
                       <span className="text-base sm:text-lg font-bold text-violet-300">~{estimatedCredits}</span>
-                      <span className="text-xs text-zinc-500">credits</span>
+                      <span className="text-xs text-zinc-400">credits</span>
                     </div>
-                    <span className="text-xs text-zinc-500">|</span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-zinc-400">|</span>
+                    <span className="text-xs text-zinc-400">
                       ~{Math.ceil(targetDuration / 5)} scenes
                     </span>
                   </div>
@@ -641,7 +641,7 @@ export default function BrainStudioPage() {
                 <Brain className="w-16 h-16 text-violet-400" />
               </motion.div>
               <h2 className="text-xl font-bold text-zinc-200 mb-2">Genesis Brain is directing...</h2>
-              <p className="text-zinc-500 mb-4">
+              <p className="text-zinc-400 mb-4">
                 Writing your script, designing shots, selecting models, planning transitions
               </p>
               <div className="flex justify-center gap-1">
@@ -666,7 +666,7 @@ export default function BrainStudioPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <CardTitle className="text-sm sm:text-base truncate">{plan.title}</CardTitle>
-                    <p className="text-[11px] sm:text-xs text-zinc-500 mt-1">
+                    <p className="text-[11px] sm:text-xs text-zinc-400 mt-1">
                       {plan.scenes.length} scenes | {plan.totalDuration}s | {plan.overallStyle}
                     </p>
                   </div>
@@ -729,14 +729,14 @@ export default function BrainStudioPage() {
                         <div className="flex flex-col gap-1 shrink-0">
                           <button
                             onClick={() => handleAddScene(i)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                             title="Add scene after"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleRemoveScene(i)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             title="Remove scene"
                             disabled={plan.scenes.length <= 1}
                           >
@@ -764,7 +764,7 @@ export default function BrainStudioPage() {
                     onChange={(e) => setPlan({ ...plan, voiceoverScript: e.target.value })}
                     className="min-h-[80px]"
                   />
-                  <p className="text-xs text-zinc-500 mt-1 truncate">
+                  <p className="text-xs text-zinc-400 mt-1 truncate">
                     {plan.voiceoverScript.split(/\s+/).length} words &middot; ~{Math.ceil(plan.voiceoverScript.split(/\s+/).length / 150 * 60)}s speaking time
                   </p>
                 </CardContent>
@@ -779,9 +779,9 @@ export default function BrainStudioPage() {
                     <div className="flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-violet-400" />
                       <span className="text-base sm:text-lg font-bold text-violet-300">{totalCredits}</span>
-                      <span className="text-xs text-zinc-500">credits</span>
+                      <span className="text-xs text-zinc-400">credits</span>
                     </div>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-zinc-400">
                       {plan.scenes.length} scenes | {plan.totalDuration}s
                     </span>
                   </div>
@@ -826,7 +826,7 @@ export default function BrainStudioPage() {
                       <h2 className="text-lg font-bold text-zinc-100">
                         {isAssembling ? "Assembling Final Video" : `Creating Scene ${completedCount + 1} of ${totalCount}`}
                       </h2>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="text-xs text-zinc-400 mt-0.5">
                         {isAssembling
                           ? progress >= 96
                             ? "Burning captions into video..."
@@ -855,7 +855,7 @@ export default function BrainStudioPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400 font-mono">{progress}%</span>
-                  {!isAssembling && <span className="text-zinc-500">~{estMinutes} min remaining</span>}
+                  {!isAssembling && <span className="text-zinc-400">~{estMinutes} min remaining</span>}
                 </div>
               </CardContent>
             </Card>
@@ -877,7 +877,7 @@ export default function BrainStudioPage() {
                       isProcessing ? "border-violet-500/30 shadow-lg shadow-violet-500/5" :
                       isCompleted ? "border-emerald-500/20" :
                       isFailed ? "border-red-500/20" :
-                      "border-white/[0.06] opacity-75"
+                      "border-white/[0.10] opacity-75"
                     }`}
                   >
                     {/* Active scene glow */}
@@ -913,7 +913,7 @@ export default function BrainStudioPage() {
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900/40 via-[#0D0D14] to-zinc-800/20">
                               <div className="relative flex items-center justify-center">
                                 <div className="w-8 h-8 rounded-full border-2 border-zinc-700/50 border-t-violet-500/60 animate-spin" />
-                                <Clock className="absolute w-3.5 h-3.5 text-zinc-500" />
+                                <Clock className="absolute w-3.5 h-3.5 text-zinc-400" />
                               </div>
                             </div>
                           )}
@@ -952,14 +952,14 @@ export default function BrainStudioPage() {
                                 {isCompleted ? "Ready" : isProcessing ? "Generating" : isFailed ? "Failed" : "In Queue"}
                               </Badge>
                             </div>
-                            <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                            <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
                               {scenePlan?.prompt?.slice(0, 120) || "..."}
                               {(scenePlan?.prompt?.length || 0) > 120 ? "..." : ""}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {scenePlan?.cameraMovement && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500 hidden sm:inline">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-400 hidden sm:inline">
                                 {scenePlan.cameraMovement}
                               </span>
                             )}
@@ -1010,10 +1010,10 @@ export default function BrainStudioPage() {
                           ) : progress >= (75 + i * 5) ? (
                             <GenesisButtonLoader />
                           ) : (
-                            <Clock className="w-3 h-3 text-zinc-500" />
+                            <Clock className="w-3 h-3 text-zinc-400" />
                           )}
                         </div>
-                        <span className={`text-sm ${step.done ? "text-zinc-300" : progress >= (75 + i * 5) ? "text-zinc-400" : "text-zinc-500"}`}>
+                        <span className={`text-sm ${step.done ? "text-zinc-300" : progress >= (75 + i * 5) ? "text-zinc-400" : "text-zinc-400"}`}>
                           {step.label}
                         </span>
                       </div>
@@ -1039,7 +1039,7 @@ export default function BrainStudioPage() {
                 <Clapperboard className="w-5 h-5 text-violet-400" />
                 <h2 className="text-lg font-bold text-zinc-100">That&apos;s a Wrap!</h2>
               </div>
-              <p className="text-xs text-zinc-500">{plan?.title || concept.slice(0, 60)}</p>
+              <p className="text-xs text-zinc-400">{plan?.title || concept.slice(0, 60)}</p>
             </motion.div>
 
             {/* Main video with glow ring */}
@@ -1064,7 +1064,7 @@ export default function BrainStudioPage() {
                         />
                       ) : (
                         <div className="aspect-video bg-black flex items-center justify-center">
-                          <p className="text-zinc-500">Video processing...</p>
+                          <p className="text-zinc-400">Video processing...</p>
                         </div>
                       )}
                     </div>
@@ -1137,7 +1137,7 @@ export default function BrainStudioPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
               >
-                <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Individual Scenes</h3>
+                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Individual Scenes</h3>
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
                   {sceneStatuses.filter(s => s.outputVideoUrl).map((scene) => {
                     const scenePlan = plan?.scenes?.find((s: SceneDefinition) => s.sceneNumber === scene.sceneNumber);
@@ -1169,7 +1169,7 @@ export default function BrainStudioPage() {
                             </span>
                           </div>
                         </div>
-                        <p className="text-[10px] text-zinc-500 mt-1.5 truncate px-0.5">
+                        <p className="text-[10px] text-zinc-400 mt-1.5 truncate px-0.5">
                           {scenePlan?.description || `Scene ${scene.sceneNumber}`}
                         </p>
                       </div>
@@ -1187,7 +1187,7 @@ export default function BrainStudioPage() {
             <CardContent className="p-8 text-center">
               <AlertTriangle className="w-12 h-12 text-red-400/60 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-zinc-200 mb-2">Production Failed</h2>
-              <p className="text-sm text-zinc-500 mb-2">{error || "Something went wrong."}</p>
+              <p className="text-sm text-zinc-400 mb-2">{error || "Something went wrong."}</p>
               <p className="text-xs text-emerald-400 mb-6">Credits have been automatically refunded.</p>
               <div className="flex gap-2 justify-center">
                 <Button onClick={() => setBrainState("review")}>

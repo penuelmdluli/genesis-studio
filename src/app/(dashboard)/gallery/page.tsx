@@ -151,7 +151,7 @@ export default function GalleryPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-100">Gallery</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             {(videos || []).length} video{(videos || []).length !== 1 ? "s" : ""}
             {totalDuration > 0 && <> &middot; {totalDuration}s total footage</>}
           </p>
@@ -159,7 +159,7 @@ export default function GalleryPage() {
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <Input
               placeholder="Search videos..."
               value={search}
@@ -170,7 +170,7 @@ export default function GalleryPage() {
 
           <div className="flex items-center gap-2">
             {/* Filters — scrollable on mobile */}
-            <div className="flex items-center gap-1 rounded-lg border border-white/[0.06] p-0.5 bg-white/[0.02] overflow-x-auto flex-1 sm:flex-none">
+            <div className="flex items-center gap-1 rounded-lg border border-white/[0.10] p-0.5 bg-white/[0.04] overflow-x-auto flex-1 sm:flex-none">
               {(
                 [
                   { key: "all", label: "All" },
@@ -185,7 +185,7 @@ export default function GalleryPage() {
                   className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 whitespace-nowrap ${
                     filterFormat === f.key
                       ? "bg-violet-500/15 text-violet-300 shadow-sm"
-                      : "text-zinc-500 hover:text-zinc-300"
+                      : "text-zinc-400 hover:text-zinc-300"
                   }`}
                 >
                   {f.label}
@@ -199,23 +199,23 @@ export default function GalleryPage() {
                 const order: SortKey[] = ["newest", "oldest", "name"];
                 setSortBy(order[(order.indexOf(sortBy) + 1) % order.length]);
               }}
-              className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
+              className="p-2 rounded-lg border border-white/[0.10] bg-white/[0.04] text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
               title={`Sort: ${sortBy}`}
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
 
             {/* View mode — hidden on small mobile */}
-            <div className="hidden sm:flex rounded-lg border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+            <div className="hidden sm:flex rounded-lg border border-white/[0.10] overflow-hidden bg-white/[0.04]">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-2 transition-colors ${viewMode === "grid" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
+                className={`p-2 transition-colors ${viewMode === "grid" ? "bg-violet-500/15 text-violet-300" : "text-zinc-400 hover:text-zinc-300"}`}
               >
                 <Grid3x3 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 transition-colors ${viewMode === "list" ? "bg-violet-500/15 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
+                className={`p-2 transition-colors ${viewMode === "list" ? "bg-violet-500/15 text-violet-300" : "text-zinc-400 hover:text-zinc-300"}`}
               >
                 <List className="w-4 h-4" />
               </button>
@@ -243,7 +243,7 @@ export default function GalleryPage() {
               {pendingJobs.map((job) => (
                 <div
                   key={job.id}
-                  className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm"
+                  className="p-3 rounded-xl bg-white/[0.05] border border-white/[0.10] backdrop-blur-sm"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
@@ -257,7 +257,7 @@ export default function GalleryPage() {
                         <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                           {job.status === "processing" ? "Generating..." : "In Queue"}
                         </Badge>
-                        <span className="text-[11px] text-zinc-500">
+                        <span className="text-[11px] text-zinc-400">
                           AI Video &middot; {job.duration || 5}s
                         </span>
                       </div>
@@ -287,7 +287,7 @@ export default function GalleryPage() {
           <GenesisLoader size="sm" text="Loading gallery..." />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full mt-6">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <div key={i} className="aspect-video rounded-xl bg-white/[0.03] border border-white/[0.06] animate-pulse" />
+              <div key={i} className="aspect-video rounded-xl bg-white/[0.05] border border-white/[0.10] animate-pulse" />
             ))}
           </div>
         </div>
@@ -295,13 +295,13 @@ export default function GalleryPage() {
         <div className="text-center py-24 relative">
           <div className="absolute inset-0 bg-glow-center opacity-20" />
           <div className="relative z-10">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
-              <Film className="w-9 h-9 text-zinc-500" />
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-white/[0.10] flex items-center justify-center mx-auto mb-5">
+              <Film className="w-9 h-9 text-zinc-400" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-300 mb-2">
               {search || filterFormat !== "all" ? "No videos match your filters" : "Your gallery is empty"}
             </h3>
-            <p className="text-sm text-zinc-500 mb-6 max-w-sm mx-auto">
+            <p className="text-sm text-zinc-400 mb-6 max-w-sm mx-auto">
               {search || filterFormat !== "all"
                 ? "Try adjusting your search or filters."
                 : "Create your first AI video and it will appear here."}
@@ -341,7 +341,7 @@ export default function GalleryPage() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.03, duration: 0.3 }}
-              className="flex items-center gap-4 p-3 rounded-xl border border-white/[0.06] bg-[#111118]/40 hover:bg-[#111118]/80 hover:border-white/[0.1] transition-all duration-200 cursor-pointer group"
+              className="flex items-center gap-4 p-3 rounded-xl border border-white/[0.10] bg-[#111118]/40 hover:bg-[#111118]/80 hover:border-white/[0.1] transition-all duration-200 cursor-pointer group"
               onClick={() => setSelectedVideo(video.id)}
             >
               <div className="w-28 h-16 rounded-lg bg-[#0D0D14] overflow-hidden shrink-0 relative">
@@ -357,7 +357,7 @@ export default function GalleryPage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/20 to-fuchsia-900/10">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.06]">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.10]">
                       <span className="text-[10px] font-bold text-white/40">G</span>
                     </div>
                   </div>
@@ -373,15 +373,15 @@ export default function GalleryPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-200 truncate">{video.title}</p>
-                <p className="text-xs text-zinc-500 truncate mt-0.5">{video.prompt}</p>
+                <p className="text-xs text-zinc-400 truncate mt-0.5">{video.prompt}</p>
               </div>
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <span className="hidden sm:inline-flex">{video.aspectRatio === "portrait" && <Badge variant="cyan" className="text-[10px]">Reel</Badge>}</span>
                 <span className="hidden sm:inline-flex">{video.audioUrl && <Badge variant="violet" className="text-[10px]"><Volume2 className="w-2.5 h-2.5 mr-1" />Audio</Badge>}</span>
                 <Badge className="text-[10px]">{video.resolution}</Badge>
-                <span className="text-xs text-zinc-500 hidden sm:inline">{formatRelativeTime(video.createdAt)}</span>
+                <span className="text-xs text-zinc-400 hidden sm:inline">{formatRelativeTime(video.createdAt)}</span>
                 <button
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
                   onClick={(e) => handleDownload(e, video.url, video.title)}
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -659,7 +659,7 @@ function VideoCard({
           <div className="absolute inset-0 z-[5]">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-900/30 via-[#0D0D14] to-fuchsia-900/20" />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/40 to-cyan-500/30 flex items-center justify-center mb-2 border border-white/[0.08]">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/40 to-cyan-500/30 flex items-center justify-center mb-2 border border-white/[0.12]">
                 <span className="text-sm font-bold text-white/60">G</span>
               </div>
               <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">Genesis Studio</span>
@@ -693,7 +693,7 @@ function VideoCard({
           />
         ) : !isVisible && !video.thumbnailUrl ? (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-900/20 via-[#0D0D14] to-fuchsia-900/10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.06]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/30 to-cyan-500/20 flex items-center justify-center border border-white/[0.10]">
               <span className="text-sm font-bold text-white/40">G</span>
             </div>
           </div>
@@ -780,16 +780,16 @@ function VideoCard({
       <div className="p-3 bg-[#111118]/80 border-t border-white/[0.04]">
         <p className="text-sm font-medium text-zinc-200 truncate">{video.title}</p>
         <div className="flex items-center justify-between mt-1">
-          <span className="text-[11px] text-zinc-500">
+          <span className="text-[11px] text-zinc-400">
             {formatRelativeTime(video.createdAt)}
           </span>
-          <span className="text-[11px] text-zinc-500">{video.resolution}</span>
+          <span className="text-[11px] text-zinc-400">{video.resolution}</span>
         </div>
       </div>
 
       {/* Hover ring effect */}
       <div className={`absolute inset-0 rounded-xl border-2 transition-all duration-300 pointer-events-none ${
-        isHovered ? "border-violet-500/40 shadow-lg shadow-violet-500/10" : "border-white/[0.06]"
+        isHovered ? "border-violet-500/40 shadow-lg shadow-violet-500/10" : "border-white/[0.10]"
       }`} />
     </motion.div>
   );

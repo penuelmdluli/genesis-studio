@@ -418,7 +418,7 @@ export default async function DevDashboardPage() {
           <h1 className="mb-2 text-xl font-bold text-zinc-200">
             Dev Dashboard
           </h1>
-          <p className="text-zinc-500">Not available in production</p>
+          <p className="text-zinc-400">Not available in production</p>
         </div>
       </div>
     );
@@ -458,7 +458,7 @@ export default async function DevDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-100">Dev Dashboard</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-400">
             Content pipeline status — {new Date().toLocaleDateString("en-ZA")}
           </p>
         </div>
@@ -518,7 +518,7 @@ export default async function DevDashboardPage() {
               key={status}
               className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
             >
-              <p className="text-sm capitalize text-zinc-500">{status}</p>
+              <p className="text-sm capitalize text-zinc-400">{status}</p>
               <p className="text-2xl font-bold text-zinc-100">{count}</p>
               <span
                 className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColor(status)}`}
@@ -545,11 +545,11 @@ export default async function DevDashboardPage() {
               key={label}
               className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
             >
-              <p className="text-sm text-zinc-500">{label}</p>
+              <p className="text-sm text-zinc-400">{label}</p>
               <p className="text-xl font-bold text-zinc-100">
                 {formatCost(data.estimated)}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 Actual: {formatCost(data.actual)}
               </p>
             </div>
@@ -564,7 +564,7 @@ export default async function DevDashboardPage() {
         </h2>
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
           {totalEngineUsage === 0 ? (
-            <p className="text-sm text-zinc-500">No generations yet</p>
+            <p className="text-sm text-zinc-400">No generations yet</p>
           ) : (
             <div className="space-y-2">
               {Object.entries(engineUsage)
@@ -602,13 +602,13 @@ export default async function DevDashboardPage() {
       <section>
         <h2 className="mb-3 text-lg font-semibold text-zinc-200">
           Engagement Insights{" "}
-          <span className="ml-2 text-xs font-normal text-zinc-500">
+          <span className="ml-2 text-xs font-normal text-zinc-400">
             last 30 days · learn-and-adapt
           </span>
         </h2>
         {engagement.posts.length === 0 ? (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-zinc-400">
               No metrics yet — posted content will appear here once{" "}
               <code className="rounded bg-zinc-800 px-1 py-0.5">
                 ?action=pull_metrics
@@ -672,7 +672,7 @@ export default async function DevDashboardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800 text-zinc-500">
+                    <tr className="border-b border-zinc-800 text-zinc-400">
                       <th className="px-2 py-2 font-medium">Title</th>
                       <th className="px-2 py-2 font-medium">Page</th>
                       <th className="px-2 py-2 font-medium">Tier</th>
@@ -722,7 +722,7 @@ export default async function DevDashboardPage() {
                         <td className="px-2 py-2 text-right font-mono text-zinc-300">
                           {(post.engagement_rate * 100).toFixed(2)}%
                         </td>
-                        <td className="px-2 py-2 text-xs text-zinc-500">
+                        <td className="px-2 py-2 text-xs text-zinc-400">
                           {formatDate(post.posted_at)}
                         </td>
                       </tr>
@@ -742,14 +742,14 @@ export default async function DevDashboardPage() {
         </h2>
         <div className="rounded-lg border border-zinc-800 bg-zinc-900">
           {trendingTopics.length === 0 ? (
-            <p className="p-4 text-sm text-zinc-500">
+            <p className="p-4 text-sm text-zinc-400">
               No trending topics in the last 24 hours
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500">
+                  <tr className="border-b border-zinc-800 text-zinc-400">
                     <th className="px-4 py-3 font-medium">Title</th>
                     <th className="px-4 py-3 font-medium">Category</th>
                     <th className="px-4 py-3 font-medium">Source</th>
@@ -804,12 +804,12 @@ export default async function DevDashboardPage() {
         </h2>
         <div className="rounded-lg border border-zinc-800 bg-zinc-900">
           {pageStatuses.length === 0 ? (
-            <p className="p-4 text-sm text-zinc-500">No pages tracked yet</p>
+            <p className="p-4 text-sm text-zinc-400">No pages tracked yet</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500">
+                  <tr className="border-b border-zinc-800 text-zinc-400">
                     <th className="px-4 py-3 font-medium">Page ID</th>
                     <th className="px-4 py-3 font-medium">Total</th>
                     <th className="px-4 py-3 font-medium">Posted</th>
@@ -867,12 +867,12 @@ export default async function DevDashboardPage() {
         </h2>
         <div className="rounded-lg border border-zinc-800 bg-zinc-900">
           {recentGenerations.length === 0 ? (
-            <p className="p-4 text-sm text-zinc-500">No generations yet</p>
+            <p className="p-4 text-sm text-zinc-400">No generations yet</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500">
+                  <tr className="border-b border-zinc-800 text-zinc-400">
                     <th className="px-4 py-3 font-medium">Page</th>
                     <th className="px-4 py-3 font-medium">Pillar</th>
                     <th className="px-4 py-3 font-medium">Engine</th>
@@ -911,7 +911,7 @@ export default async function DevDashboardPage() {
                             ? formatCost(Number(gen.cost_usd))
                             : "—"}
                         </td>
-                        <td className="px-4 py-3 text-zinc-500">
+                        <td className="px-4 py-3 text-zinc-400">
                           {formatDate(gen.created_at as string)}
                         </td>
                       </tr>
@@ -931,7 +931,7 @@ export default async function DevDashboardPage() {
         </h2>
         <div className="rounded-lg border border-zinc-800 bg-zinc-900">
           {recentErrors.length === 0 ? (
-            <p className="p-4 text-sm text-zinc-500">No recent errors</p>
+            <p className="p-4 text-sm text-zinc-400">No recent errors</p>
           ) : (
             <div className="space-y-2 p-4">
               {recentErrors.map((err: Record<string, unknown>) => (
@@ -943,7 +943,7 @@ export default async function DevDashboardPage() {
                     <span className="text-sm font-medium text-red-400">
                       {err.page_id as string} / {err.pillar as string}
                     </span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-zinc-400">
                       {formatDate(err.created_at as string)}
                     </span>
                   </div>

@@ -32,7 +32,7 @@ export default function SignInPage() {
           </p>
 
           {/* Social proof */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 mb-8">
+          <div className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-5 mb-8">
             <div className="flex items-center gap-3 mb-3">
               <div className="flex -space-x-2">
                 {["violet", "cyan", "fuchsia", "emerald"].map((color) => (
@@ -43,9 +43,9 @@ export default function SignInPage() {
                   </div>
                 ))}
               </div>
-              <span className="text-xs text-zinc-500">2,000+ creators active this week</span>
+              <span className="text-xs text-zinc-400">2,000+ creators active this week</span>
             </div>
-            <p className="text-xs text-zinc-500 italic leading-relaxed">
+            <p className="text-xs text-zinc-400 italic leading-relaxed">
               &ldquo;I made a full product video in 3 minutes. This tool is insane.&rdquo;
             </p>
           </div>
@@ -79,34 +79,42 @@ export default function SignInPage() {
               </div>
               <span className="text-xl font-bold gradient-text">Genesis Studio</span>
             </Link>
-            <p className="text-sm text-zinc-500">Sign in to continue creating</p>
+            <p className="text-sm text-zinc-400">Sign in to continue creating</p>
           </div>
 
           <SignIn
             appearance={{
               elements: {
                 rootBox: "mx-auto w-full",
-                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40 rounded-2xl",
+                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40 rounded-2xl",
                 headerTitle: "text-white text-lg",
                 headerSubtitle: "text-zinc-400",
+                // Google OAuth hidden until Clerk + Google Cloud config is verified
+                // See docs/runbooks/google-oauth-fix.md for re-enabling
                 socialButtonsBlockButton:
-                  "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold",
+                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
+                    ? "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold"
+                    : "hidden",
                 socialButtonsBlockButtonText: "font-semibold text-zinc-900",
                 socialButtonsProviderIcon: "w-5 h-5",
+                dividerRow:
+                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
+                    ? undefined
+                    : "hidden",
+                dividerLine: "bg-white/[0.08]",
+                dividerText: "text-zinc-400 text-xs",
                 formFieldInput:
                   "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
                 formButtonPrimary:
                   "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 shadow-lg shadow-violet-600/25 rounded-xl h-11 text-sm font-semibold",
                 footerActionLink: "text-violet-400 hover:text-violet-300 font-medium",
                 formFieldLabel: "text-zinc-400 text-sm",
-                dividerLine: "bg-white/[0.08]",
-                dividerText: "text-zinc-500 text-xs",
                 identityPreviewEditButton: "text-violet-400",
               },
             }}
           />
 
-          <p className="text-center text-xs text-zinc-600 mt-6">
+          <p className="text-center text-xs text-zinc-400 mt-6">
             Don&apos;t have an account?{" "}
             <Link href="/sign-up" className="text-violet-400 hover:text-violet-300 font-medium">
               Sign up free

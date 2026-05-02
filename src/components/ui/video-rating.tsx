@@ -53,7 +53,7 @@ export function VideoRating({ videoId, initialRating = null, size = "sm" }: Vide
             className={`${btnSize} rounded-lg border transition-all ${
               isActive
                 ? `${btn.bg} ${btn.color}`
-                : "border-transparent text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.04]"
+                : "border-transparent text-zinc-400 hover:text-zinc-400 hover:bg-white/[0.04]"
             }`}
             title={btn.label}
             aria-label={`Rate video: ${btn.label}`}

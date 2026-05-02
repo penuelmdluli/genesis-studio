@@ -61,7 +61,7 @@ const PAGE_SIZE = 20;
 function SkeletonCard() {
   return (
     <div className="flex flex-col gap-2 animate-pulse">
-      <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-hidden">
+      <div className="rounded-xl bg-white/[0.04] border border-white/[0.10] overflow-hidden">
         <div className="aspect-video bg-white/[0.06]" />
       </div>
       <div className="h-10 rounded-lg bg-white/[0.04]" />
@@ -280,7 +280,7 @@ export default function ExplorePage() {
       </section>
 
       {/* ========== Filter Tabs ========== */}
-      <div className="sticky top-16 z-30 bg-[#0A0A0F]/90 backdrop-blur-lg border-b border-white/[0.06]">
+      <div className="sticky top-16 z-30 bg-[#0A0A0F]/90 backdrop-blur-lg border-b border-white/[0.10]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
             {TABS.map((tab) => {
@@ -294,7 +294,7 @@ export default function ExplorePage() {
                     "border transition-all duration-200 shrink-0",
                     isActive
                       ? "border-violet-500 bg-violet-500/10 text-violet-300"
-                      : "border-white/[0.06] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-300"
+                      : "border-white/[0.10] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-300"
                   )}
                 >
                   {tab.icon}
@@ -320,13 +320,13 @@ export default function ExplorePage() {
         {/* Empty state */}
         {!isLoading && videos.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-5">
-              <VideoOff className="w-7 h-7 text-zinc-600" />
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.10] flex items-center justify-center mb-5">
+              <VideoOff className="w-7 h-7 text-zinc-400" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-300">
               No videos yet
             </h3>
-            <p className="text-sm text-zinc-500 mt-1 max-w-sm">
+            <p className="text-sm text-zinc-400 mt-1 max-w-sm">
               Be the first to create! Generate a video and share it with the
               community.
             </p>
@@ -374,7 +374,7 @@ export default function ExplorePage() {
 
         {/* End of feed */}
         {!hasMore && videos.length > 0 && !isLoading && (
-          <p className="text-center text-sm text-zinc-600 py-10">
+          <p className="text-center text-sm text-zinc-400 py-10">
             You&apos;ve reached the end. Time to create your own!
           </p>
         )}

@@ -38,10 +38,10 @@ export default function SignUpPage() {
               { value: "10+", label: "AI models", sub: "included" },
               { value: "60s", label: "First video", sub: "that fast" },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+              <div key={stat.label} className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-4 text-center">
                 <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}</div>
                 <div className="text-[11px] text-zinc-400 font-medium">{stat.label}</div>
-                <div className="text-[10px] text-zinc-600">{stat.sub}</div>
+                <div className="text-[10px] text-zinc-400">{stat.sub}</div>
               </div>
             ))}
           </div>
@@ -58,7 +58,7 @@ export default function SignUpPage() {
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
                   item.highlight ? "bg-violet-500/20" : "bg-white/[0.06]"
                 }`}>
-                  <svg className={`w-3 h-3 ${item.highlight ? "text-violet-400" : "text-zinc-500"}`} viewBox="0 0 12 12" fill="none">
+                  <svg className={`w-3 h-3 ${item.highlight ? "text-violet-400" : "text-zinc-400"}`} viewBox="0 0 12 12" fill="none">
                     <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
@@ -68,11 +68,11 @@ export default function SignUpPage() {
           </div>
 
           {/* Trust badges */}
-          <div className="flex items-center gap-4 mt-10 pt-8 border-t border-white/[0.06]">
-            <span className="text-[11px] text-zinc-600 uppercase tracking-wider font-medium">Trusted by creators in</span>
+          <div className="flex items-center gap-4 mt-10 pt-8 border-t border-white/[0.10]">
+            <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-medium">Trusted by creators in</span>
             <div className="flex gap-3">
               {["SA", "NG", "KE", "US", "UK"].map((country) => (
-                <span key={country} className="text-xs font-medium text-zinc-500 bg-white/[0.04] px-2 py-1 rounded-md">
+                <span key={country} className="text-xs font-medium text-zinc-400 bg-white/[0.04] px-2 py-1 rounded-md">
                   {country}
                 </span>
               ))}
@@ -99,13 +99,19 @@ export default function SignUpPage() {
             appearance={{
               elements: {
                 rootBox: "mx-auto w-full",
-                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40 rounded-2xl",
+                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40 rounded-2xl",
                 headerTitle: "text-white text-lg",
                 headerSubtitle: "text-zinc-400",
                 socialButtonsBlockButton:
-                  "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold",
+                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
+                    ? "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold"
+                    : "hidden",
                 socialButtonsBlockButtonText: "font-semibold text-zinc-900",
                 socialButtonsProviderIcon: "w-5 h-5",
+                dividerRow:
+                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
+                    ? undefined
+                    : "hidden",
                 formFieldInput:
                   "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
                 formButtonPrimary:
@@ -113,12 +119,12 @@ export default function SignUpPage() {
                 footerActionLink: "text-violet-400 hover:text-violet-300 font-medium",
                 formFieldLabel: "text-zinc-400 text-sm",
                 dividerLine: "bg-white/[0.08]",
-                dividerText: "text-zinc-500 text-xs",
+                dividerText: "text-zinc-400 text-xs",
               },
             }}
           />
 
-          <p className="text-center text-xs text-zinc-600 mt-6">
+          <p className="text-center text-xs text-zinc-400 mt-6">
             Already have an account?{" "}
             <Link href="/sign-in" className="text-violet-400 hover:text-violet-300 font-medium">
               Sign in

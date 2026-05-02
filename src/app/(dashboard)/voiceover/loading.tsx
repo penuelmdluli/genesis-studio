@@ -15,12 +15,12 @@ export default function VoiceoverLoading() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {/* Script input */}
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-20" />
             <Skeleton className="h-32 w-full rounded-lg" />
           </div>
           {/* Voice selection */}
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-28" />
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -31,7 +31,7 @@ export default function VoiceoverLoading() {
         </div>
 
         {/* Sidebar */}
-        <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-5 space-y-3">
+        <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-5 space-y-3">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-10 w-full rounded-lg" />
           <Skeleton className="h-10 w-full rounded-lg" />

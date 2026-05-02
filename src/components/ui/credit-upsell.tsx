@@ -82,7 +82,7 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
                   ? "You're out of credits!"
                   : `Only ${balance} credits remaining`}
               </p>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-400 mt-0.5">
                 {isEmpty
                   ? "Buy a credit pack to keep generating"
                   : "Top up now to avoid interruptions"}
@@ -99,7 +99,7 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
               {loading === "pack-500" ? "..." : "Buy 500 Credits — $12"}
             </Button>
             {onDismiss && (
-              <button onClick={onDismiss} className="p-1 text-zinc-600 hover:text-zinc-400">
+              <button onClick={onDismiss} className="p-1 text-zinc-400 hover:text-zinc-400">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -126,7 +126,7 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
 
           {context === "upgrade" ? (
             <div className="space-y-3">
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {`You've used ${Math.round((user.monthlyCreditsUsed / Math.max(1, user.monthlyCreditsLimit)) * 100)}% of your monthly credits. Upgrade for more.`}
               </p>
               <Button
@@ -146,16 +146,16 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
                   key={pack.id}
                   onClick={() => handleBuyPack(pack.id)}
                   disabled={!!loading}
-                  className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-violet-500/30 hover:bg-violet-500/[0.04] transition-all text-center group"
+                  className="p-3 rounded-xl bg-white/[0.05] border border-white/[0.10] hover:border-violet-500/30 hover:bg-violet-500/[0.04] transition-all text-center group"
                 >
                   <div className="text-lg font-bold text-zinc-200 group-hover:text-violet-300 transition-colors">
                     {pack.credits.toLocaleString()}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">credits</div>
+                  <div className="text-xs text-zinc-400 mt-0.5">credits</div>
                   <div className="text-sm font-semibold text-violet-400 mt-2">
                     ${pack.price}
                   </div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">
+                  <div className="text-[10px] text-zinc-400 mt-0.5">
                     ${(pack.price / pack.credits * 100).toFixed(1)}c each
                   </div>
                 </button>

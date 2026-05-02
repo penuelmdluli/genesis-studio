@@ -15,7 +15,7 @@ export default function MotionControlLoading() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Upload area */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-48 w-full rounded-xl" />
             <div className="grid grid-cols-2 gap-3">
@@ -24,7 +24,7 @@ export default function MotionControlLoading() {
             </div>
           </div>
           {/* Effects grid */}
-          <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-6 space-y-4">
+          <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-6 space-y-4">
             <Skeleton className="h-5 w-24" />
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -35,7 +35,7 @@ export default function MotionControlLoading() {
         </div>
 
         {/* Settings sidebar */}
-        <div className="rounded-xl border border-white/[0.06] bg-[#111118]/80 p-5 space-y-3">
+        <div className="rounded-xl border border-white/[0.10] bg-[#111118]/80 p-5 space-y-3">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-10 w-full rounded-lg" />
           <Skeleton className="h-10 w-full rounded-lg" />

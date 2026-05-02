@@ -31,7 +31,7 @@ export function Tooltip({ content, children, side = "top", className }: TooltipP
       {visible && (
         <div
           className={cn(
-            "absolute z-50 px-2.5 py-1.5 text-xs text-zinc-200 bg-zinc-900 border border-white/[0.08] rounded-lg shadow-xl whitespace-nowrap animate-fade-in-scale",
+            "absolute z-50 px-2.5 py-1.5 text-xs text-zinc-200 bg-zinc-900 border border-white/[0.12] rounded-lg shadow-xl whitespace-nowrap animate-fade-in-scale",
             positions[side],
             className
           )}
@@ -59,7 +59,7 @@ export function HelpTip({
 }) {
   return (
     <Tooltip content={text} side={side} className={cn("max-w-[200px] whitespace-normal", className)}>
-      <Info className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 transition-colors cursor-help shrink-0" />
+      <Info className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-300 transition-colors cursor-help shrink-0" />
     </Tooltip>
   );
 }

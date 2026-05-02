@@ -414,7 +414,7 @@ export default function MimicStudioPage() {
                 AI Powered
               </Badge>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
               Transform any character into a performer. Upload your character image, provide a reference video, and watch them perform.
             </p>
           </div>
@@ -431,7 +431,7 @@ export default function MimicStudioPage() {
               <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium transition-all ${
                 step.done
                   ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                  : "bg-white/[0.03] text-zinc-500 border border-white/[0.06]"
+                  : "bg-white/[0.05] text-zinc-400 border border-white/[0.10]"
               }`}>
                 {step.done ? (
                   <Check className="w-3 h-3 text-violet-400" />
@@ -459,7 +459,7 @@ export default function MimicStudioPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Tabs — Upload vs Library */}
-              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "library" as const, label: "Studio Library", icon: User },
@@ -470,7 +470,7 @@ export default function MimicStudioPage() {
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                       characterTab === tab.key
                         ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                        : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
                     <tab.icon className="w-3.5 h-3.5 shrink-0" />
@@ -481,7 +481,7 @@ export default function MimicStudioPage() {
 
               {/* Selected character preview (works for both upload + library) */}
               {(characterImagePreview || libraryCharacter) ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                   <img
                     src={libraryCharacter?.portrait_url || characterImagePreview || ""}
                     alt={libraryCharacter?.name || "Character"}
@@ -500,7 +500,7 @@ export default function MimicStudioPage() {
                   </button>
                 </div>
               ) : characterTab === "upload" ? (
-                <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
+                <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
                   <input
                     ref={characterImageRef}
                     type="file"
@@ -514,19 +514,19 @@ export default function MimicStudioPage() {
                   <span className="text-sm font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">
                     Upload your character image
                   </span>
-                  <span className="text-xs text-zinc-500 mt-1">
+                  <span className="text-xs text-zinc-400 mt-1">
                     PNG, JPG, or WEBP — max 10MB. Full body works best.
                   </span>
                 </label>
               ) : (
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <div className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-3">
                   {libraryLoading ? (
-                    <div className="flex items-center justify-center h-44 text-zinc-500 text-sm gap-2">
+                    <div className="flex items-center justify-center h-44 text-zinc-400 text-sm gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Loading characters…
                     </div>
                   ) : libraryCharacters.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-44 text-zinc-500 text-sm">
+                    <div className="flex flex-col items-center justify-center h-44 text-zinc-400 text-sm">
                       No characters available yet.
                     </div>
                   ) : (
@@ -535,7 +535,7 @@ export default function MimicStudioPage() {
                         <button
                           key={char.id}
                           onClick={() => handleLibrarySelect(char)}
-                          className="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/[0.06] hover:border-cyan-500/40 transition-all duration-200"
+                          className="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/[0.10] hover:border-cyan-500/40 transition-all duration-200"
                         >
                           <img
                             src={char.portrait_url}
@@ -567,7 +567,7 @@ export default function MimicStudioPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Tabs */}
-              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                   { key: "upload" as const, label: "Upload Video", icon: Upload },
@@ -578,7 +578,7 @@ export default function MimicStudioPage() {
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                       referenceTab === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                        : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
                     <tab.icon className="w-3.5 h-3.5 shrink-0" />
@@ -594,9 +594,9 @@ export default function MimicStudioPage() {
                     placeholder="Paste TikTok, Instagram, Facebook, or YouTube URL"
                     value={referenceUrl}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setReferenceUrl(e.target.value); setError(null); }}
-                    className="bg-white/[0.03] border-white/[0.08] text-sm"
+                    className="bg-white/[0.05] border-white/[0.12] text-sm"
                   />
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-zinc-400">
                     We&apos;ll download the video for you. Max 30 seconds.
                   </p>
                 </div>
@@ -606,7 +606,7 @@ export default function MimicStudioPage() {
               {referenceTab === "upload" && (
                 <div>
                   {referenceVideoPreview && referenceVideo ? (
-                    <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                    <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                       <video
                         src={referenceVideoPreview}
                         className="w-full h-56 object-contain"
@@ -627,7 +627,7 @@ export default function MimicStudioPage() {
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.02] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
+                    <label className="flex flex-col items-center justify-center h-56 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group">
                       <input
                         ref={referenceVideoRef}
                         type="file"
@@ -641,7 +641,7 @@ export default function MimicStudioPage() {
                       <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
                         Upload a reference video
                       </span>
-                      <span className="text-xs text-zinc-500 mt-1">
+                      <span className="text-xs text-zinc-400 mt-1">
                         MP4, WebM, or MOV — max 30 seconds, 100MB
                       </span>
                     </label>
@@ -671,7 +671,7 @@ export default function MimicStudioPage() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         duration === d
                           ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                          : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                          : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                       }`}
                     >
                       {d}s
@@ -691,7 +691,7 @@ export default function MimicStudioPage() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         aspectRatio === ar.value
                           ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                          : "bg-white/[0.03] text-zinc-500 hover:text-zinc-300 border border-white/[0.06]"
+                          : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
                       }`}
                     >
                       {ar.label}
@@ -706,7 +706,7 @@ export default function MimicStudioPage() {
                   {keepAudio ? (
                     <Volume2 className="w-4 h-4 text-violet-400" />
                   ) : (
-                    <VolumeX className="w-4 h-4 text-zinc-500" />
+                    <VolumeX className="w-4 h-4 text-zinc-400" />
                   )}
                   <span className="text-xs font-medium text-zinc-300">Keep original audio</span>
                 </div>
@@ -731,7 +731,7 @@ export default function MimicStudioPage() {
                   placeholder="e.g. Dancing in a neon-lit studio, cyberpunk atmosphere..."
                   value={prompt}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
-                  className="h-20 text-sm bg-white/[0.03] border-white/[0.08]"
+                  className="h-20 text-sm bg-white/[0.05] border-white/[0.12]"
                 />
               </div>
             </CardContent>
@@ -761,7 +761,7 @@ export default function MimicStudioPage() {
                       <Check className="w-5 h-5" />
                       <span className="text-sm font-bold">Your Mimic video is ready!</span>
                     </div>
-                    <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-black/30">
+                    <div className="rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                       <video
                         src={outputVideoUrl}
                         className="w-full max-h-[500px] object-contain"
@@ -809,7 +809,7 @@ export default function MimicStudioPage() {
                       <X className="w-5 h-5" />
                       <span className="text-sm font-medium">{error || "Generation failed"}</span>
                     </div>
-                    <p className="text-xs text-zinc-500">Credits have been automatically refunded.</p>
+                    <p className="text-xs text-zinc-400">Credits have been automatically refunded.</p>
                     <button
                       onClick={resetGeneration}
                       className="px-4 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 text-xs font-medium transition-colors"
@@ -833,27 +833,27 @@ export default function MimicStudioPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Character</span>
-                    <span className={characterImage ? "text-violet-300" : "text-zinc-500"}>
+                    <span className="text-zinc-400">Character</span>
+                    <span className={characterImage ? "text-violet-300" : "text-zinc-400"}>
                       {characterImage ? characterImage.name.slice(0, 20) : "Not uploaded"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Reference</span>
-                    <span className={hasReference ? "text-violet-300" : "text-zinc-500"}>
+                    <span className="text-zinc-400">Reference</span>
+                    <span className={hasReference ? "text-violet-300" : "text-zinc-400"}>
                       {referenceTab === "url" && referenceUrl ? "URL provided" : referenceVideo ? referenceVideo.name.slice(0, 20) : "Not provided"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Duration</span>
+                    <span className="text-zinc-400">Duration</span>
                     <span className="text-zinc-300">{duration}s</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Aspect Ratio</span>
+                    <span className="text-zinc-400">Aspect Ratio</span>
                     <span className="text-zinc-300">{aspectRatio}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Audio</span>
+                    <span className="text-zinc-400">Audio</span>
                     <span className="text-zinc-300">{keepAudio ? "Keep original" : "Muted"}</span>
                   </div>
                 </div>
@@ -861,11 +861,11 @@ export default function MimicStudioPage() {
                 <div className="h-px bg-white/[0.06]" />
 
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-zinc-500">Cost</span>
+                  <span className="text-xs text-zinc-400">Cost</span>
                   <span className="text-sm font-bold text-violet-300">{CREDIT_COST.toLocaleString()} credits</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-zinc-500">Your balance</span>
+                  <span className="text-xs text-zinc-400">Your balance</span>
                   <span className={`text-sm font-bold ${hasEnoughCredits ? "text-emerald-400" : "text-red-400"}`}>
                     {credits.toLocaleString()} credits
                   </span>
@@ -910,9 +910,9 @@ export default function MimicStudioPage() {
       <MobileActionBar>
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="text-xs">
-            <span className="text-zinc-500">Cost: </span>
+            <span className="text-zinc-400">Cost: </span>
             <span className="font-bold text-violet-300">{CREDIT_COST.toLocaleString()}</span>
-            <span className="text-zinc-500 ml-1.5">Balance: {credits.toLocaleString()}</span>
+            <span className="text-zinc-400 ml-1.5">Balance: {credits.toLocaleString()}</span>
           </div>
           <Button
             variant="primary"

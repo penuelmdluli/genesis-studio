@@ -24,7 +24,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ref={ref}
       value={value}
       className={cn(
-        "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200 hover:border-white/[0.12] appearance-none cursor-pointer",
+        "w-full rounded-lg border border-white/[0.12] bg-white/[0.05] px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all duration-200 hover:border-white/[0.12] appearance-none cursor-pointer",
         className
       )}
       onChange={(e) => onChange?.(e.target.value)}

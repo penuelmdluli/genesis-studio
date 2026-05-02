@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 // ============================================================
 // CRON: Run Intelligence Analysis — runs every 12 hours
 // Analyzes all post performance data and extracts insights
@@ -19,6 +20,7 @@ const PAGE_IDS = [
 ];
 
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

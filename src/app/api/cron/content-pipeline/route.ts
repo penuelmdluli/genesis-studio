@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 /**
  * Content Pipeline Cron — Twice Daily
  *
@@ -19,6 +20,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 300;
 
 export async function GET(req: Request) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 

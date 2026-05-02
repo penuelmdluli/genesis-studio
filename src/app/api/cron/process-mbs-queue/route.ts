@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
@@ -21,6 +22,7 @@ export const maxDuration = 60;
  * 3. Post completed jobs to Facebook
  */
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
   if (secret !== envString("CRON_SECRET")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

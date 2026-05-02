@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 // ============================================================
 // CRON: Outcome Tracker — runs every 24 hours
 // Measures whether AI decisions improved performance
@@ -10,6 +11,7 @@ import { logFeedbackEvent } from "@/lib/intelligence";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

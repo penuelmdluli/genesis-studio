@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { downloadAndPersist, fetchVideoMetadata } from "@/lib/mbs/scraper";
@@ -15,6 +16,7 @@ export const maxDuration = 120;
  * GET /api/cron/vet-candidates
  */
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
   if (secret !== envString("CRON_SECRET")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

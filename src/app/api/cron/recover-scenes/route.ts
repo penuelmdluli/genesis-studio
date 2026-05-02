@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 /**
  * RECOVER-SCENES CRON — Polling-based RunPod status recovery
  *
@@ -99,6 +100,7 @@ async function uploadVideoFromBase64(
 }
 
 export async function GET(req: Request) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {

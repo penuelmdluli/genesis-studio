@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { sendCreditsExpiryEmail, sendWinBackEmail, sendWeeklyDigestEmail } from "@/lib/email-retention";
@@ -11,6 +12,7 @@ import { sendCreditsExpiryEmail, sendWinBackEmail, sendWeeklyDigestEmail } from 
  * GET /api/cron/retention?secret=xxx
  */
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   const secret = req.nextUrl.searchParams.get("secret");
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

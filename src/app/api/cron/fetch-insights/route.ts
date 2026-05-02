@@ -1,3 +1,4 @@
+import { isAutomationPaused } from "@/lib/automation-killswitch";
 // ============================================================
 // CRON: Fetch Facebook Insights — runs every 6 hours
 // Fetches real performance metrics for all posted videos
@@ -19,6 +20,7 @@ const PAGE_IDS = [
 ];
 
 export async function GET(req: NextRequest) {
+  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
   // Verify cron secret
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getUserByClerkId } from "@/lib/db";
 import { isOwnerClerkId, deductCredits, getCreditBalance } from "@/lib/credits";
-import { planProduction, calculateBrainCredits, estimateBrainCredits } from "@/lib/genesis-brain/planner";
+import { planProduction, calculateBrainCredits, estimateBrainCredits, appendOwnerBranding } from "@/lib/genesis-brain/planner";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
 import { createProduction, updateProduction } from "@/lib/genesis-brain/orchestrator";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
@@ -81,6 +81,11 @@ export async function POST(req: NextRequest) {
 
     // Apply consistency engine
     plan = consistencyEngine.applyAll(plan, body.brandKit);
+
+    // Owner branding: append Genesis Studio marketing outro to voiceover
+    if (isOwnerClerkId(clerkId)) {
+      appendOwnerBranding(plan);
+    }
 
     // Store voice settings in the plan so produce route can access them
     if (body.voiceoverVoice) {

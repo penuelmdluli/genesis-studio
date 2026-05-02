@@ -379,6 +379,32 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   return plan;
 }
 
+/**
+ * Append Genesis Studio marketing outro to the final scene voiceover.
+ * Called by the orchestrator for owner accounts only.
+ */
+export function appendOwnerBranding(plan: ScenePlan): void {
+  if (!plan.scenes || plan.scenes.length === 0) return;
+  const lastScene = plan.scenes[plan.scenes.length - 1];
+
+  const outro = "Created with Genesis Studio. AI video generation for creators. Try it free at genesis studio dot app.";
+
+  if (lastScene.voiceoverLine) {
+    const sep = /[.!?]$/.test(lastScene.voiceoverLine.trim()) ? " " : ". ";
+    lastScene.voiceoverLine = `${lastScene.voiceoverLine.trim()}${sep}${outro}`;
+  } else {
+    lastScene.voiceoverLine = outro;
+  }
+
+  // Keep voiceoverScript in sync
+  if (plan.voiceoverScript) {
+    const sep = /[.!?]$/.test(plan.voiceoverScript.trim()) ? " " : ". ";
+    plan.voiceoverScript = `${plan.voiceoverScript.trim()}${sep}${outro}`;
+  }
+
+  console.log(`[BRAIN PLANNER] Appended Genesis Studio branding to final voiceover`);
+}
+
 // ────────────────────────────────────────────────────────────
 // PREMIUM ENGAGEMENT CTA
 // Dedicated Claude call that studies the final scene and picks from

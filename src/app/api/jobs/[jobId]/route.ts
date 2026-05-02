@@ -180,6 +180,11 @@ export async function GET(
               );
             }
 
+            // Owner auto-post: single videos → Tech Pulse Africa (fire and forget)
+            import("@/lib/owner-autopost").then(({ autoPostSingleVideo }) =>
+              autoPostSingleVideo(clerkId, videoStorageKey(job.user_id, job.id), job.prompt)
+            ).catch(() => {});
+
             // Auto-publish to Explore feed (fire and forget)
             autoPublishToExplore({
               jobId: job.id,

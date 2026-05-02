@@ -145,6 +145,13 @@ export async function GET(
 
       recordSpend("fal-kling-i2v-mimic", result.costUsd).catch(() => {});
 
+      // Owner auto-post: Mimic videos → Mzansi Baby Stars page
+      if (r2PersistOk) {
+        import("@/lib/owner-autopost").then(({ autoPostMimicToMBS }) =>
+          autoPostMimicToMBS(clerkId, r2Key, job.prompt || "Mimic Studio dance video")
+        ).catch((e) => console.error("[Mimic] Auto-post failed:", e));
+      }
+
       return NextResponse.json({
         status: "completed",
         outputVideoUrl: outputUrl,

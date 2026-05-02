@@ -32,7 +32,7 @@ import {
 } from "./audio";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { createVideo } from "@/lib/db";
-import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
+import { uploadVideo, videoStorageKey, verifyR2Upload, r2PublicUrl } from "@/lib/storage";
 import { refundCredits } from "@/lib/credits";
 import { extractThumbnailFromUrl, extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { AI_MODELS } from "@/lib/constants";
@@ -1896,6 +1896,19 @@ async function finalizeAssembly(
   });
 
   console.log(`[ASSEMBLY] 🎬 Production ${productionId} COMPLETE — Gallery: ${galleryVideoId}, Thumbnail: ${finalThumbnail ? "yes" : "no"}`);
+
+  // Owner auto-post: Brain Studio → Tech Pulse Africa + Africa 2050
+  try {
+    const { autoPostBrainToPages } = await import("@/lib/owner-autopost");
+    const finalVideoUrl = r2PublicUrl(vKey);
+    autoPostBrainToPages(
+      production.userId,
+      finalVideoUrl,
+      production.concept || "AI-generated production"
+    ).catch((e) => console.error("[ASSEMBLY] Auto-post to pages failed:", e));
+  } catch {
+    // owner-autopost module not critical
+  }
 }
 
 /**

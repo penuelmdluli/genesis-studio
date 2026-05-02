@@ -581,40 +581,26 @@ export const MOTION_PRESETS: MotionPreset[] = [
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {
-  free: ["wan-2.2", "seedance-1.5", "mimic-motion"],
+  // RunPod models removed — endpoint unreliable (cold starts, timeouts).
+  // All generation routes through FAL.AI (always warm, managed infrastructure).
+  // RunPod models kept in AI_MODELS registry for historical job lookups but
+  // not offered to users for new generations.
+  free: ["seedance-1.5"],
   creator: [
-    "wan-2.2",
     "seedance-1.5",
     "kling-2.6",
-    "mimic-motion",
-    "ltx-video",
-    "hunyuan-video",
-    "wan-2.1-turbo",
-    "mochi-1",
   ],
   pro: [
-    "wan-2.2",
     "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
-    "mimic-motion",
-    "ltx-video",
-    "hunyuan-video",
-    "wan-2.1-turbo",
-    "mochi-1",
   ],
   studio: [
-    "wan-2.2",
     "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
-    "mimic-motion",
-    "ltx-video",
-    "hunyuan-video",
-    "wan-2.1-turbo",
-    "mochi-1",
   ],
 };
 

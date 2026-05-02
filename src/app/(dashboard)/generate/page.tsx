@@ -314,6 +314,7 @@ export default function GeneratePage() {
       let inputImageUrl: string | undefined;
       if (form.inputImage && (form.type === "i2v" || form.type === "v2v")) {
         try {
+          toast("Uploading image...", "info");
           inputImageUrl = await uploadFile(form.inputImage, "image");
         } catch {
           console.error("Image upload failed, continuing without image");

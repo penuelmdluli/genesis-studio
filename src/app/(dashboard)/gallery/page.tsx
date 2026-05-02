@@ -72,6 +72,7 @@ export default function GalleryPage() {
 
   const handleDownload = async (e: React.MouseEvent, url: string, title: string) => {
     e.stopPropagation();
+    toast("Preparing download...", "info");
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Download failed: ${res.status}`);

@@ -168,16 +168,23 @@ export default function CaptionsPage() {
     setError(null);
     setSrtContent(null);
     setBurnedVideoUrl(null);
+    setIsProcessing(true);
+    setProgress(5);
 
     let targetUrl = resolvedVideoUrl;
 
     // For file upload, use signed URL upload (bypasses Vercel 4.5MB limit)
     if (inputMode === "upload" && videoFile) {
       try {
+        toast("Uploading video...", "info");
+        setProgress(10);
         const { uploadFile } = await import("@/lib/upload-client");
         targetUrl = await uploadFile(videoFile, "video");
+        setProgress(25);
       } catch {
         setError("Failed to upload video. Please try again.");
+        toast("Upload failed. Please try again.", "error");
+        setIsProcessing(false);
         generateLockRef.current = false;
         return;
       }
@@ -188,12 +195,12 @@ export default function CaptionsPage() {
 
     if (!targetUrl) {
       setError("Please provide a video URL or upload a video.");
+      setIsProcessing(false);
       generateLockRef.current = false;
       return;
     }
 
-    setIsProcessing(true);
-    setProgress(10);
+    setProgress(30);
 
     try {
       const res = await fetch("/api/captions", {

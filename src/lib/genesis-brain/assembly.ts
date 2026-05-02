@@ -1827,7 +1827,7 @@ async function finalizeAssembly(
 
   // Determine best model ID from scenes
   const sceneModels = completedScenes.map(s => s.modelId).filter(Boolean);
-  const primaryModel = (sceneModels[0] || "wan-2.2") as ModelId;
+  const primaryModel = (sceneModels[0] || "seedance-1.5") as ModelId;
 
   let galleryVideoId = videoId;
   let retries = 0;

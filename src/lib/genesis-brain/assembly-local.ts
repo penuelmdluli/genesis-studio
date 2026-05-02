@@ -422,7 +422,7 @@ export async function localAssembly(productionId: string): Promise<{
         userId: production.userId,
         title: production.concept.slice(0, 100),
         prompt: production.concept,
-        modelId: "wan-2.2" as ModelId,
+        modelId: "seedance-1.5" as ModelId,
         url: videoApiUrl,
         thumbnailUrl: "",
         duration: Math.round(totalDuration),

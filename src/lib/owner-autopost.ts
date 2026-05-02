@@ -159,8 +159,21 @@ async function postToPage(
     }
 
     const data = (await res.json()) as { id: string; post_id?: string };
-    console.log(`[OWNER-AUTOPOST] ✅ Posted to ${page.name}: ${data.post_id || data.id}`);
-    return { success: true, postId: data.post_id || data.id };
+    const postId = data.post_id || data.id;
+    console.log(`[OWNER-AUTOPOST] ✅ Posted to ${page.name}: ${postId}`);
+
+    // Auto-comment with marketing CTA + engagement prompt
+    try {
+      const { postMarketingComments } = await import("@/lib/social/facebook-comments");
+      // Fire and forget — don't block on comments
+      postMarketingComments(postId, token).catch((e) =>
+        console.error(`[OWNER-AUTOPOST] Comments failed on ${page.name}:`, e)
+      );
+    } catch {
+      // Comments are non-critical
+    }
+
+    return { success: true, postId };
   } catch (err) {
     console.error(`[OWNER-AUTOPOST] ${page.name} error:`, err);
     return { success: false, error: String(err) };

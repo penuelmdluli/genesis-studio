@@ -44,23 +44,25 @@ COLOR & GRADE:
   "Warm amber vintage film grain, lifted blacks"
   "Vibrant saturated Afrofuturist palette — purple, gold, electric blue"
 
-SUBJECT RULE — SHOW THE TOPIC, NOT A RANDOM PERSON:
-  ⚠️ CRITICAL: Do NOT invent random human characters unless the topic is specifically about a person.
-  For NEWS, TECH, POLITICS, SCIENCE, FINANCE topics → show ENVIRONMENTS, OBJECTS, LOCATIONS:
-    WAR: "military convoy rolling through dust clouds, helicopter silhouette at sunset"
-    TECH: "close-up of circuit board, blue LED reflections, data center server racks humming"
-    POLITICS: "empty parliament chamber, flags, podium with microphone, dramatic shadows"
-    SCIENCE: "laboratory glassware with glowing liquids, microscope lens racking focus"
-    FINANCE: "stock trading screens, red and green numbers cascading, city skyline at dawn"
-    AFRICA: "modern African city skyline, cranes and solar panels, bustling market streets"
-  For PEOPLE-FOCUSED topics (celebrity, biography) → describe the SCENE around them, not a random face.
-  The #1 rule: A viewer should understand the TOPIC from the visuals alone, even with sound off.
+SUBJECT RULE — MAKE IT VIRAL:
+  Show what STOPS THE SCROLL. People, emotions, drama, beauty, action — whatever the topic demands.
 
-  When you DO include people (crowds, silhouettes, hands), keep them CONTEXTUAL:
-    "A trader's hands grip a phone, knuckles white, screens reflected in glasses"
-    "Silhouette of a soldier against orange smoke, no face visible"
-    "A scientist's gloved hand adjusts equipment under blue UV light"
-  NEVER invent a main character who appears in every scene like a presenter or host.
+  PEOPLE ARE POWERFUL — use them when the story calls for it:
+    WAR: "A soldier's face streaked with dust, eyes scanning the horizon, smoke rising behind"
+    TECH: "A young developer's face lit by multiple monitors, code reflecting in her eyes, intense focus"
+    POLITICS: "A leader addressing a crowd, passionate gesture, thousands of faces watching"
+    HUMAN INTEREST: "A grandmother's weathered hands holding a child's tiny fingers, warm light"
+    AFRICA: "A confident young entrepreneur in a modern Johannesburg co-working space, city skyline through glass"
+    DANCE/MUSIC: "A dancer mid-move, sweat catching the light, crowd energy behind"
+
+  Mix PEOPLE and ENVIRONMENTS for maximum impact:
+    - Scene 1: Wide establishing shot (environment sets the world)
+    - Scene 2: Close-up on a person or detail (emotional hook)
+    - Scene 3: Action/movement (energy)
+    - Scene 4: Reaction/payoff (resolution)
+
+  The #1 rule: A viewer should FEEL something in the first 2 seconds. Scroll-stopping visuals.
+  Use faces, emotions, hands, body language — these are what humans connect with.
 
 COMPOSITION RULES:
   - Rule of thirds: place subjects at intersection points, not dead center
@@ -76,40 +78,40 @@ COMPOSITION RULES:
 1. Break the concept into 4-8 scenes (target duration ±10%). Each scene: 5-10 seconds (target 8 seconds per scene for maximum quality). Prefer LONGER scenes (8-10s) over shorter ones to achieve total duration.
 
 2. EVERY SCENE PROMPT must contain ALL of these layers (this is non-negotiable):
-   a) SUBJECT — The TOPIC-RELEVANT visual: an object, environment, location, or action that DIRECTLY
-      illustrates what the news story or concept is about. NOT a random person.
-      - If topic is about AI → show servers, robots, neural network visualizations
-      - If topic is about war → show military hardware, ruins, smoke, maps
-      - If topic is about a product → show the product itself in detail
-      - Only show humans when they are contextual (crowds, silhouettes, hands) — NEVER a main character/host/presenter
-   b) ACTION — What is HAPPENING in the scene (movement, transformation, reveal, impact)
+   a) SUBJECT — The VISUAL HOOK: person, object, environment, or action that STOPS THE SCROLL.
+      - People are WELCOME and often PREFERRED — faces, emotions, hands, body language
+      - Match the subject to the topic: news→dramatic scene, product→hero shot, lifestyle→authentic moment
+   b) ACTION — What is HAPPENING (movement, transformation, reveal, impact, emotional beat)
    c) CAMERA — Movement type + speed + lens + angle (e.g. "slow dolly push-in, 85mm f/1.4, low angle")
    d) LIGHTING — Specific setup (e.g. "Rembrandt key light from camera-left, warm fill, blue rim")
    e) ENVIRONMENT — Setting details with depth (foreground, midground, background)
    f) ATMOSPHERE — Particles, weather, haze, bokeh, lens effects
-   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic, no people, no faces, no avatars, no human figure, no talking head, no presenter, environment only"
+   g) QUALITY ANCHORS — "cinematic, 4K, film grain, shallow depth of field, photorealistic"
 
-   EXAMPLE of a GOOD news prompt:
-   "Slow dolly push-in, 85mm f/1.4, low angle. Military convoy of armored vehicles rolling through desert dust at golden hour, headlights cutting through haze. Warm side-light from setting sun creates long shadows. Foreground: barbed wire fence, slightly out of focus. Background: distant city skyline with smoke columns. Volumetric dust particles. Cinematic, 4K, anamorphic, film grain, photorealistic, no people visible"
+   EXAMPLE of a VIRAL news prompt:
+   "Slow dolly push-in, 85mm f/1.4. A soldier's weathered face fills the frame, eyes reflecting distant fire, jaw clenched. Desert dust particles drift through warm golden-hour light. Background: armored convoy rolling through haze, headlights cutting through smoke. Cinematic, 4K, anamorphic, film grain, photorealistic, raw emotion"
 
-   EXAMPLE of a GOOD tech prompt:
-   "Crane ascending reveal, 24mm wide-angle. A massive data center interior — rows of server racks extending to vanishing point, blue LED status lights blinking in sequence. Cool fluorescent overhead lighting with warm accent from warning indicators. Foreground: fiber optic cables, sharp focus. Background: fog/cold air from cooling system. Cinematic, 4K, deep focus, photorealistic"
+   EXAMPLE of a VIRAL tech prompt:
+   "Handheld close-up, 35mm. A young developer's fingers fly across a holographic keyboard, neon code reflections in her eyes, intense concentration. Cool blue monitor glow contrasts warm overhead amber. Data center servers stretch to infinity behind her. Cinematic, 4K, cyberpunk, photorealistic"
 
-   EXAMPLE of a BAD prompt (NEVER write this):
-   "A man in a white shirt talks about AI in a studio" ← THIS IS WHAT WE ARE ELIMINATING
+   EXAMPLE of a VIRAL lifestyle prompt:
+   "Steadicam follow, 50mm f/1.2. A confident African woman walks through a vibrant Lagos market at golden hour, colorful fabrics flowing, warm smile, crowd energy. Bokeh lights from market stalls. Street food steam rising. Cinematic, 4K, warm tones, shallow depth of field"
 
-3. NO DEFAULT CHARACTERS: Do NOT create a characters[] array unless the topic is specifically about
-   a named real person. For 95% of news/tech/politics content, characters should be an EMPTY array [].
-   Never invent a presenter, host, narrator character, or random person to appear in scenes.
+3. CHARACTERS — use them freely:
+   - Create characters[] when people would make the video more compelling
+   - Describe: appearance, clothing, emotional state, action
+   - For news/politics: contextual people (leaders, crowds, affected communities)
+   - For lifestyle/product: aspirational characters that the audience relates to
+   - For abstract/tech: optional — environments can work alone too
+   - The AI director decides — no blanket rules against people
 
-4. Use "wan-2.2" for ALL scenes — RunPod flagship with active workers:
-   - "wan-2.2" — PRIMARY MODEL — RunPod, best cinematic quality, active workers
-   - CRITICAL ANTI-AVATAR RULE: wan-2.2 tends to generate a default human face.
-     Every scene prompt MUST end with: "no human face, no person, no avatar, no talking head, environment only"
-     Every scene MUST start with an environment/object/location, NOT a person.
-   - DO NOT use hunyuan-video, ltx-video (no active workers — jobs queue forever)
-   - DO NOT use kling-2.6, kling-3.0, veo-3.1, seedance-1.5 (FAL — no credits)
-   - Audio (voiceover + music + subtitles) is added via local FFmpeg + Edge TTS post-processing
+4. Use "seedance-1.5" as PRIMARY MODEL (FAL — always warm, fast, high quality):
+   - "seedance-1.5" — PRIMARY: FAL managed, great motion quality, no face-generation issues
+   - "kling-2.6" — PREMIUM: native audio, best for dialogue scenes
+   - "kling-3.0" — ULTRA: multi-shot narrative with audio
+   - "veo-3.1" — CINEMATIC: Google's best, perfect lip sync
+   - Choose based on content needs — seedance-1.5 default, kling for audio scenes
+   - Voiceover, music, and captions are added via FAL cloud post-processing
 
 5. SOUND DESIGN per scene — "soundDesign" field (drives MMAudio post-processing):
    - "ambientDescription": Rich environmental audio (e.g. "busy Lagos street — honking matatus, distant market chatter, a radio playing Afrobeats, wind between buildings")
@@ -154,15 +156,18 @@ COMPOSITION RULES:
 
 10. Text overlays: opening hook only, key stat if relevant, CTA at end. Sparingly.
 
-VALID MODELS: "wan-2.2" (primary — RunPod flagship, active workers. ALWAYS block faces in prompts.)
+VALID MODELS: "seedance-1.5" (primary — FAL, fast, reliable), "kling-2.6" (premium — native audio), "kling-3.0" (ultra), "veo-3.1" (cinematic)
 VALID TRANSITIONS: "cut", "crossfade", "fade_black", "fade_white", "wipe_left", "wipe_right", "zoom_in", "zoom_out", "glitch", "blur"
 VALID RESOLUTIONS: "480p", "720p", "1080p"
 
 OUTPUT FORMAT: Return ONLY valid JSON ScenePlan. No markdown. No explanation.
 Each scene MUST have "soundDesign": { ambientDescription, dialogueLines, sfxCues }.
-Each scene MUST have specific camera movement, lens, lighting, and TOPIC-RELEVANT visuals in the prompt.
-CRITICAL: characters array should be EMPTY [] for news/tech/politics topics. NO random people. NO presenters. NO talking heads. NO human faces. NO person wearing a shirt. Show the SUBJECT of the story.
-ABSOLUTE RULE: Every prompt MUST end with "no human face, no person, no avatar" — the video model will generate a face in the opening frame unless explicitly blocked.`;
+Each scene MUST have specific camera movement, lens, lighting, and SCROLL-STOPPING visuals in the prompt.
+VIRAL CONTENT RULES:
+- Hook in scene 1: the most dramatic, emotional, or surprising visual. 2 seconds to grab attention.
+- People, faces, emotions — use them freely when they serve the story.
+- Alternate between wide establishing and intimate close-up for rhythm.
+- End with a payoff that makes viewers want to share.`;
 
 function buildUserPrompt(input: BrainInput): string {
   let prompt = `CONCEPT: "${input.concept}"
@@ -199,9 +204,9 @@ CRITICAL: Every voiceoverLine MUST follow these rules. Generic English narration
     prompt += `\nBRAND COLORS: ${input.brandKit.colors.join(", ")}`;
   }
   if (input.characterRefs?.length) {
-    prompt += `\nCHARACTER REFERENCES: ${input.characterRefs.length} reference image(s) provided — describe characters in detail`;
+    prompt += `\nCHARACTER REFERENCES: ${input.characterRefs.length} reference image(s) provided — match these characters in scenes`;
   } else {
-    prompt += `\nNO CHARACTER REFERENCES — this is content-driven video. Do NOT create characters[]. Show ENVIRONMENTS, OBJECTS, and LOCATIONS that illustrate the topic. Zero talking heads, zero presenters, zero random people.`;
+    prompt += `\nNO CHARACTER REFERENCES — use your creative judgment. Include people when they make the video more compelling. Describe characters naturally if the topic calls for human presence.`;
   }
 
   prompt += `\n\nGenerate the ScenePlan JSON now.`;
@@ -358,11 +363,9 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
       s.prompt = s.description;
     }
 
-    // ANTI-FACE ENFORCEMENT: Ensure every scene prompt explicitly blocks human faces
-    // and starts with environment/object visuals. The video model defaults to generating
-    // a human face in the opening frame unless explicitly told not to.
-    if (!s.prompt.toLowerCase().includes("no human face") && !s.prompt.toLowerCase().includes("no people")) {
-      s.prompt = `${s.prompt}. No human face, no person, no avatar, no talking head. Show only environments, objects, and locations.`;
+    // Ensure quality anchors are present in every prompt
+    if (!s.prompt.toLowerCase().includes("cinematic")) {
+      s.prompt = `${s.prompt}. Cinematic, photorealistic, 4K.`;
     }
 
     return s;
@@ -651,7 +654,7 @@ function generateTimings(plan: ScenePlan): VoiceoverTiming[] {
 }
 
 function getDefaultNegativePrompt(): string {
-  return "human face, person, talking head, presenter, avatar, man in shirt, woman presenting, close-up face, face in first frame, human figure, portrait of person, inconsistent lighting, style change, color shift, different person, face change, warped features, blurry, low quality, watermark, text artifacts, morphing, deformed hands, extra fingers, duplicate subjects, floating objects";
+  return "inconsistent lighting, style change, color shift, warped features, blurry, low quality, watermark, text artifacts, morphing, deformed hands, extra fingers, duplicate subjects, floating objects, static image, frozen motion";
 }
 
 /**

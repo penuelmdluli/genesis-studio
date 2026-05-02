@@ -126,18 +126,9 @@ export class ConsistencyEngine {
    */
   getUniversalNegatives(): string {
     return [
-      "talking head",
-      "presenter",
-      "host",
-      "avatar",
-      "random person facing camera",
-      "man in white shirt",
-      "news anchor",
       "inconsistent lighting",
       "style change",
       "color shift",
-      "different person",
-      "face change",
       "warped features",
       "blurry",
       "low quality",
@@ -150,6 +141,8 @@ export class ConsistencyEngine {
       "extra fingers",
       "duplicate subjects",
       "floating objects",
+      "static image",
+      "frozen motion",
     ].join(", ");
   }
 

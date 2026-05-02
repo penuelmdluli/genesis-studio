@@ -833,27 +833,27 @@ export default function MimicStudioPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Character</span>
+                    <span className="text-zinc-200">Character</span>
                     <span className={characterImage ? "text-violet-300" : "text-zinc-400"}>
                       {characterImage ? characterImage.name.slice(0, 20) : "Not uploaded"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Reference</span>
+                    <span className="text-zinc-200">Reference</span>
                     <span className={hasReference ? "text-violet-300" : "text-zinc-400"}>
                       {referenceTab === "url" && referenceUrl ? "URL provided" : referenceVideo ? referenceVideo.name.slice(0, 20) : "Not provided"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Duration</span>
+                    <span className="text-zinc-200">Duration</span>
                     <span className="text-zinc-300">{duration}s</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Aspect Ratio</span>
+                    <span className="text-zinc-200">Aspect Ratio</span>
                     <span className="text-zinc-300">{aspectRatio}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Audio</span>
+                    <span className="text-zinc-200">Audio</span>
                     <span className="text-zinc-300">{keepAudio ? "Keep original" : "Muted"}</span>
                   </div>
                 </div>
@@ -910,7 +910,7 @@ export default function MimicStudioPage() {
       <MobileActionBar>
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="text-xs">
-            <span className="text-zinc-400">Cost: </span>
+            <span className="text-zinc-200">Cost: </span>
             <span className="font-bold text-violet-300">{CREDIT_COST.toLocaleString()}</span>
             <span className="text-zinc-400 ml-1.5">Balance: {credits.toLocaleString()}</span>
           </div>

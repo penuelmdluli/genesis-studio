@@ -325,7 +325,7 @@ export default function ThumbnailsPage() {
                     key={row.label}
                     className="flex justify-between items-center"
                   >
-                    <span className="text-zinc-400">{row.label}</span>
+                    <span className="text-zinc-200">{row.label}</span>
                     <span className="text-zinc-200">{row.value}</span>
                   </div>
                 ))}

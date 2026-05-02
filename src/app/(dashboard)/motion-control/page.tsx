@@ -743,17 +743,17 @@ export default function MotionControlPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Type</span>
+                    <span className="text-zinc-200">Type</span>
                     <span className="text-zinc-300">Motion Control</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Quality</span>
+                    <span className="text-zinc-200">Quality</span>
                     <span className="text-zinc-300">
                       {quality === "pro" ? "Pro" : "Standard"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Motion</span>
+                    <span className="text-zinc-200">Motion</span>
                     <span className="text-zinc-300 truncate max-w-[140px]">
                       {selectedEffect
                         ? selectedEffectObj?.name
@@ -763,17 +763,17 @@ export default function MotionControlPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Character</span>
+                    <span className="text-zinc-200">Character</span>
                     <span className="text-zinc-300">
                       {characterImage ? "Uploaded" : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Duration</span>
+                    <span className="text-zinc-200">Duration</span>
                     <span className="text-zinc-300">{duration}s</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Audio</span>
+                    <span className="text-zinc-200">Audio</span>
                     <span className={enableAudio ? "text-violet-300" : "text-zinc-400"}>
                       {enableAudio ? "Enabled" : "Off"}
                     </span>

@@ -699,33 +699,33 @@ export default function CaptionsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Source</span>
-                  <span className="text-zinc-200 capitalize">{inputMode}</span>
+                  <span className="text-zinc-200">Source</span>
+                  <span className="text-white font-medium capitalize">{inputMode}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Language</span>
-                  <span className="text-zinc-200">
+                  <span className="text-zinc-200">Language</span>
+                  <span className="text-white font-medium">
                     {LANGUAGES.find((l) => l.value === language)?.label}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Style</span>
-                  <span className="text-zinc-200">
+                  <span className="text-zinc-200">Style</span>
+                  <span className="text-white font-medium">
                     {CAPTION_STYLES.find((s) => s.value === captionStyle)?.label}
                   </span>
                 </div>
                 {videoDuration && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Duration</span>
-                    <span className="text-zinc-200 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-zinc-400" />
+                    <span className="text-zinc-200">Duration</span>
+                    <span className="text-white font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-zinc-300" />
                       {Math.floor(videoDuration / 60)}m {videoDuration % 60}s
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Est. Time</span>
-                  <span className="text-zinc-200">~30s</span>
+                  <span className="text-zinc-200">Est. Time</span>
+                  <span className="text-white font-medium">~30s</span>
                 </div>
               </div>
 

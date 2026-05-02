@@ -999,7 +999,7 @@ export default function GeneratePage() {
                   { label: "Mode", badge: true, badgeVariant: form.isDraft ? "amber" as const : "violet" as const, value: form.isDraft ? "Draft" : "Full Quality" },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
-                    <span className="text-zinc-400">{row.label}</span>
+                    <span className="text-zinc-200">{row.label}</span>
                     {row.badge ? (
                       <Badge variant={row.badgeVariant}>{row.value}</Badge>
                     ) : (
@@ -1010,7 +1010,7 @@ export default function GeneratePage() {
 
                 {selectedAudioTrack && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Audio</span>
+                    <span className="text-zinc-200">Audio</span>
                     <span className="text-zinc-200 flex items-center gap-1">
                       <Music className="w-3 h-3 text-violet-400" />
                       {selectedAudioTrack.name}
@@ -1020,7 +1020,7 @@ export default function GeneratePage() {
 
                 {effectiveAudio && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Live Sound</span>
+                    <span className="text-zinc-200">Live Sound</span>
                     <span className="text-yellow-400 flex items-center gap-1 text-xs font-semibold">
                       <Volume2 className="w-3 h-3" />
                       Enabled (+30%)
@@ -1029,7 +1029,7 @@ export default function GeneratePage() {
                 )}
 
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Est. Time</span>
+                  <span className="text-zinc-200">Est. Time</span>
                   <span className="text-zinc-200">
                     ~{Math.round((currentModel?.avgGenerationTime || 60) * (form.isDraft ? 0.3 : 1))}s
                   </span>

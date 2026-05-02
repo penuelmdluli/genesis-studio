@@ -164,6 +164,15 @@ export default function AdminPage() {
                 <a href="https://dashboard.fal.ai" target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.06] text-sm text-zinc-300 transition-colors">
                   <Activity className="w-4 h-4 text-emerald-400" /> FAL Dashboard ↗
                 </a>
+                <a href="/api/admin/fb-health" target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.06] text-sm text-zinc-300 transition-colors">
+                  <CheckCircle className="w-4 h-4 text-blue-400" /> Check FB Token Health ↗
+                </a>
+                <a href="https://sentry.io" target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.06] text-sm text-zinc-300 transition-colors">
+                  <XCircle className="w-4 h-4 text-red-400" /> Sentry Errors ↗
+                </a>
+                <a href="https://plausible.io" target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.06] text-sm text-zinc-300 transition-colors">
+                  <TrendingUp className="w-4 h-4 text-indigo-400" /> Plausible Analytics ↗
+                </a>
               </div>
             </CardContent>
           </Card>

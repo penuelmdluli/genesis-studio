@@ -113,10 +113,19 @@ export async function GET() {
     ? { status: "ok", detail: "Page tokens set" }
     : { status: "error", detail: "No FB tokens" };
 
+  // Clerk webhook
+  health.clerk_webhook = { status: "ok", detail: "Route: /api/webhooks/clerk" };
+
   // Automation
   health.automation = process.env.AUTOMATION_PAUSED === "true"
-    ? { status: "warn", detail: "PAUSED (AUTOMATION_PAUSED=true)" }
+    ? { status: "warn", detail: "PAUSED" }
     : { status: "ok", detail: "Running" };
+
+  // Webhook processing
+  const { count: webhookCount } = await sb.from("webhook_events").select("id", { count: "exact", head: true });
+  health.webhooks = (webhookCount || 0) > 0
+    ? { status: "ok", detail: `${webhookCount} processed` }
+    : { status: "warn", detail: "0 events — no payments yet" };
 
   return NextResponse.json({
     health,

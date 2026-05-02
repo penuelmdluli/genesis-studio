@@ -105,19 +105,27 @@ COMPOSITION RULES:
    - For abstract/tech: optional — environments can work alone too
    - The AI director decides — no blanket rules against people
 
-4. Use "seedance-1.5" as PRIMARY MODEL (FAL — always warm, fast, high quality):
-   - "seedance-1.5" — PRIMARY: FAL managed, great motion quality, no face-generation issues
-   - "kling-2.6" — PREMIUM: native audio, best for dialogue scenes
-   - "kling-3.0" — ULTRA: multi-shot narrative with audio
-   - "veo-3.1" — CINEMATIC: Google's best, perfect lip sync
-   - Choose based on content needs — seedance-1.5 default, kling for audio scenes
-   - Voiceover, music, and captions are added via FAL cloud post-processing
+4. SMART MODEL SELECTION — choose the right model for each scene:
+   - "seedance-1.5" — DEFAULT: best for cinematic B-roll, environments, action shots (no dialogue)
+   - "kling-2.6" — USE FOR DIALOGUE: native audio + lip sync. When a character SPEAKS, use this model.
+     Set modelId="kling-2.6" for any scene with dialogueLines or where a character says something.
+   - "kling-3.0" — PREMIUM DIALOGUE: multi-shot narrative with audio, best character consistency
+   - "veo-3.1" — HOLLYWOOD: Google's best, perfect lip sync, cinematic quality
 
-5. SOUND DESIGN per scene — "soundDesign" field (drives MMAudio post-processing):
-   - "ambientDescription": Rich environmental audio (e.g. "busy Lagos street — honking matatus, distant market chatter, a radio playing Afrobeats, wind between buildings")
-   - "dialogueLines": Array of { speaker, line } for any spoken words
-   - "sfxCues": Timed sound effects (e.g. "metallic door clang at 1s", "thunder crack at 3s", "footsteps on gravel throughout")
-   Make sound design CINEMATIC: layer ambient + foley + spot SFX. Think Dolby Atmos, not silence.
+   RULE: If a scene has characters TALKING (dialogueLines not empty), use "kling-2.6" or higher.
+   If a scene is visual-only (no speech), use "seedance-1.5" (cheaper, faster).
+   Mix models in the same production — dialogue scenes get kling, visual scenes get seedance.
+
+5. SOUND DESIGN per scene — "soundDesign" field:
+   - "ambientDescription": Rich environmental audio (e.g. "busy Lagos street — honking matatus, distant market chatter")
+   - "dialogueLines": Array of { speaker, line } — CHARACTERS SPEAKING with lip sync.
+     When you write dialogueLines, the video model generates the character ACTUALLY SPEAKING these words
+     with synchronized lip movement. This is the Hollywood feature.
+     Example: [{ "speaker": "CEO", "line": "The future of Africa is being built right here, right now." }]
+   - "sfxCues": Timed sound effects (e.g. "metallic door clang at 1s", "thunder crack at 3s")
+
+   DIALOGUE IS POWERFUL — use it. Characters speaking directly to camera creates emotional connection.
+   Mix dialogue scenes with cinematic B-roll for professional storytelling rhythm.
 
 6. TRANSITIONS — vary for rhythm:
    - "cut" — energy, impact, fast pace
@@ -325,11 +333,21 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
   // RunPod endpoints (wan-2.2) are unreliable with cold starts/timeouts.
   const DEFAULT_MODEL: ModelId = "seedance-1.5" as ModelId;
 
-  // Validate each scene — use FAL models only for reliable generation
+  // Validate each scene — use FAL models, auto-upgrade dialogue scenes to lip-sync models
   plan.scenes = plan.scenes.map((scene, i) => {
-    // Allow explicitly selected FAL models (kling, veo, seedance); swap RunPod models to default
     const model = AI_MODELS[scene.modelId as ModelId];
-    const selectedModel: ModelId = (model?.provider === "fal") ? scene.modelId as ModelId : DEFAULT_MODEL;
+    let selectedModel: ModelId = (model?.provider === "fal") ? scene.modelId as ModelId : DEFAULT_MODEL;
+
+    // Smart model upgrade: scenes with dialogue get lip-sync capable models
+    const hasDialogue = (scene.soundDesign?.dialogueLines?.length ?? 0) > 0;
+    const hasCharacterSpeaking = scene.prompt?.toLowerCase().includes("says:") ||
+      scene.prompt?.toLowerCase().includes("speaks") ||
+      scene.prompt?.toLowerCase().includes("talking");
+
+    if ((hasDialogue || hasCharacterSpeaking) && !AI_MODELS[selectedModel]?.hasAudio) {
+      selectedModel = "kling-2.6" as ModelId; // Native audio + lip sync
+      console.log(`[BRAIN PLANNER] Scene ${i + 1}: dialogue detected → upgrading to kling-2.6 (lip sync)`);
+    }
     if (scene.modelId !== selectedModel) {
       console.log(`[BRAIN PLANNER] Swapping ${scene.modelId} → ${selectedModel} (FAL only for reliability)`);
     }

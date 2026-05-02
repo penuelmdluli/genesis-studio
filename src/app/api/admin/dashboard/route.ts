@@ -70,7 +70,56 @@ export async function GET() {
     else debited += Math.abs(t.amount);
   }
 
+  // System health checks
+  const health: Record<string, { status: string; detail?: string }> = {};
+
+  // Sentry
+  health.sentry = process.env.NEXT_PUBLIC_SENTRY_DSN
+    ? { status: "ok", detail: "DSN configured" }
+    : { status: "error", detail: "NEXT_PUBLIC_SENTRY_DSN not set" };
+
+  // Plausible
+  health.plausible = { status: "ok", detail: "Script in layout.tsx" };
+
+  // Email (Resend)
+  health.email = process.env.RESEND_API_KEY
+    ? { status: "ok", detail: "Resend API key set" }
+    : { status: "error", detail: "RESEND_API_KEY not set" };
+
+  // R2 Storage
+  health.r2 = process.env.R2_PUBLIC_URL
+    ? { status: "ok", detail: process.env.R2_PUBLIC_URL.slice(0, 40) }
+    : { status: "error", detail: "R2_PUBLIC_URL not set" };
+
+  // FAL AI
+  health.fal = process.env.FAL_KEY
+    ? { status: "ok", detail: "FAL_KEY configured" }
+    : { status: "error", detail: "FAL_KEY not set" };
+
+  // Yoco Payments
+  health.yoco = process.env.YOCO_SECRET_KEY?.startsWith("sk_live_")
+    ? { status: "ok", detail: "Live keys" }
+    : process.env.YOCO_SECRET_KEY
+      ? { status: "warn", detail: "Test keys" }
+      : { status: "error", detail: "Not configured" };
+
+  // Claude AI (chat)
+  health.claude = (process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY)
+    ? { status: "ok", detail: "API key set" }
+    : { status: "error", detail: "No Claude key" };
+
+  // Facebook
+  health.facebook = process.env.FB_MBS_PAGE_ACCESS_TOKEN
+    ? { status: "ok", detail: "Page tokens set" }
+    : { status: "error", detail: "No FB tokens" };
+
+  // Automation
+  health.automation = process.env.AUTOMATION_PAUSED === "true"
+    ? { status: "warn", detail: "PAUSED (AUTOMATION_PAUSED=true)" }
+    : { status: "ok", detail: "Running" };
+
   return NextResponse.json({
+    health,
     users: {
       total: usersR.count || 0,
       newThisWeek: newUsersWeek,

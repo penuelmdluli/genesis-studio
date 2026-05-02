@@ -7,7 +7,10 @@ import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { Users, Zap, Film, TrendingUp, Activity, CheckCircle, XCircle, Clock, MessageCircle } from "lucide-react";
 import Link from "next/link";
 
+interface HealthCheck { status: string; detail?: string }
+
 interface DashboardData {
+  health: Record<string, HealthCheck>;
   users: { total: number; newThisWeek: number; byPlan: Record<string, number>; totalCreditsOutstanding: number };
   generation: {
     totalAllTime: number;
@@ -64,6 +67,26 @@ export default function AdminPage() {
           </Card>
         ))}
       </div>
+
+      {/* System Health */}
+      <MotionSection delay={0.05} className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-3 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" /> System Health
+            </h2>
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+              {Object.entries(data.health).map(([name, h]) => (
+                <div key={name} className="text-center">
+                  <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${h.status === "ok" ? "bg-emerald-500" : h.status === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
+                  <p className="text-[10px] font-medium text-zinc-300 capitalize">{name}</p>
+                  <p className="text-[9px] text-zinc-400 truncate" title={h.detail}>{h.detail}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </MotionSection>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Model Success Rates */}

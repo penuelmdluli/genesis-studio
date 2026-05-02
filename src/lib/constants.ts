@@ -585,22 +585,25 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
   // All generation routes through FAL.AI (always warm, managed infrastructure).
   // RunPod models kept in AI_MODELS registry for historical job lookups but
   // not offered to users for new generations.
-  free: ["seedance-1.5"],
+  free: ["seedance-1.5", "mimic-motion"],
   creator: [
     "seedance-1.5",
     "kling-2.6",
+    "mimic-motion",
   ],
   pro: [
     "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    "mimic-motion",
   ],
   studio: [
     "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    "mimic-motion",
   ],
 };
 

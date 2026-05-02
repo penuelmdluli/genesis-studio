@@ -120,6 +120,26 @@ export default function GalleryPage() {
     }
   };
 
+  const handlePostToPages = async (e: React.MouseEvent, videoId: string) => {
+    e.stopPropagation();
+    toast("Posting to Facebook pages...", "info");
+    try {
+      const res = await fetch(`/api/videos/${videoId}/post-to-pages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPages: "all" }),
+      });
+      if (res.status === 403) {
+        toast("Owner access required to post to pages", "error");
+        return;
+      }
+      if (!res.ok) throw new Error("Post failed");
+      toast("Posted to Facebook pages!", "success");
+    } catch {
+      toast("Failed to post to pages", "error");
+    }
+  };
+
   const handleDeleteClick = (e: React.MouseEvent, videoId: string) => {
     e.stopPropagation();
     setConfirmDeleteId(videoId);
@@ -472,6 +492,13 @@ export default function GalleryPage() {
                 >
                   <Share2 className="w-4 h-4" />
                   Share
+                </button>
+                <button
+                  onClick={(e) => handlePostToPages(e, currentVideo.id)}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 shadow-lg shadow-blue-600/20"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Post to Pages
                 </button>
                 <a
                   href="/generate"

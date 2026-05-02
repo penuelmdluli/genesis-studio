@@ -28,13 +28,13 @@ const PAGES: Record<string, FacebookPage> = {
   },
   tech_pulse: {
     name: "Tech Pulse Africa",
-    pageId: process.env.FB_TECH_PULSE_PAGE_ID || "",
+    pageId: process.env.FB_TECH_PULSE_PAGE_ID || "100919755007786",
     tokenEnvKey: "FB_PAGE_TOKEN_tech_news",
   },
   africa_2050: {
     name: "Africa 2050",
-    pageId: process.env.FB_AFRICA_2050_PAGE_ID || "",
-    tokenEnvKey: "FB_PAGE_TOKEN_ai_money",
+    pageId: process.env.FB_AFRICA_2050_PAGE_ID || "104120995511039",
+    tokenEnvKey: "FB_PAGE_TOKEN_limitless_you",
   },
 };
 

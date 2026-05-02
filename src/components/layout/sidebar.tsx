@@ -298,16 +298,16 @@ export function Sidebar() {
             return (
               <div key={item.href}>
                 {showSection && (
-                  <div className="px-3 pt-4 pb-1.5 text-[10px] uppercase tracking-wider text-zinc-600 font-semibold">
+                  <div className="px-3 pt-4 pb-1.5 text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
                     {item.section}
                   </div>
                 )}
                 {item.comingSoon ? (
                   <div
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 cursor-default group relative"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-500 cursor-default group relative"
                     title={`${item.label} — Coming Soon`}
                   >
-                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-700" />
+                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-500" />
                     {(sidebarOpen || mobileMenuOpen) && (
                       <span className="truncate flex-1">{item.label}</span>
                     )}
@@ -325,13 +325,13 @@ export function Sidebar() {
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative focus-visible:ring-2 focus-visible:ring-violet-500/50 focus-visible:outline-none",
                     isActive
                       ? "bg-violet-500/15 text-violet-300"
-                      : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
                   )}
                 >
                   {isActive && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-violet-500" />
                   )}
-                  <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-300")} />
+                  <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors", isActive ? "text-violet-400" : "text-zinc-400 group-hover:text-zinc-300")} />
                   {(sidebarOpen || mobileMenuOpen) && (
                     <span className="truncate flex-1">{item.label}</span>
                   )}
@@ -384,7 +384,7 @@ export function Sidebar() {
                 <div className="text-sm font-medium text-zinc-200 truncate">
                   {user?.name || "User"}
                 </div>
-                <div className="text-xs text-zinc-500 truncate capitalize">
+                <div className="text-xs text-zinc-400 truncate capitalize">
                   {user?.plan || "free"} plan
                 </div>
               </div>

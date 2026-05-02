@@ -448,7 +448,7 @@ export default function BrainStudioPage() {
                     maxLength={5000}
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-zinc-600">{concept.length}/5000</span>
+                    <span className="text-xs text-zinc-500">{concept.length}/5000</span>
                   </div>
                   <div className="flex gap-1.5 flex-wrap mt-2">
                     {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (
@@ -569,7 +569,7 @@ export default function BrainStudioPage() {
                       <span className="sm:hidden">{toggle.label}</span>
                       <span className="hidden sm:inline">{toggle.fullLabel}</span>
                       {toggle.state && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                      <span className="text-[10px] text-zinc-600 hidden sm:inline">+{toggle.credits}cr</span>
+                      <span className="text-[10px] text-zinc-500 hidden sm:inline">+{toggle.credits}cr</span>
                     </button>
                   ))}
                 </div>
@@ -607,7 +607,7 @@ export default function BrainStudioPage() {
                       <span className="text-base sm:text-lg font-bold text-violet-300">~{estimatedCredits}</span>
                       <span className="text-xs text-zinc-500">credits</span>
                     </div>
-                    <span className="text-xs text-zinc-600">|</span>
+                    <span className="text-xs text-zinc-500">|</span>
                     <span className="text-xs text-zinc-500">
                       ~{Math.ceil(targetDuration / 5)} scenes
                     </span>
@@ -729,14 +729,14 @@ export default function BrainStudioPage() {
                         <div className="flex flex-col gap-1 shrink-0">
                           <button
                             onClick={() => handleAddScene(i)}
-                            className="p-1.5 rounded-lg text-zinc-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                             title="Add scene after"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleRemoveScene(i)}
-                            className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             title="Remove scene"
                             disabled={plan.scenes.length <= 1}
                           >
@@ -764,7 +764,7 @@ export default function BrainStudioPage() {
                     onChange={(e) => setPlan({ ...plan, voiceoverScript: e.target.value })}
                     className="min-h-[80px]"
                   />
-                  <p className="text-xs text-zinc-600 mt-1 truncate">
+                  <p className="text-xs text-zinc-500 mt-1 truncate">
                     {plan.voiceoverScript.split(/\s+/).length} words &middot; ~{Math.ceil(plan.voiceoverScript.split(/\s+/).length / 150 * 60)}s speaking time
                   </p>
                 </CardContent>
@@ -855,7 +855,7 @@ export default function BrainStudioPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400 font-mono">{progress}%</span>
-                  {!isAssembling && <span className="text-zinc-600">~{estMinutes} min remaining</span>}
+                  {!isAssembling && <span className="text-zinc-500">~{estMinutes} min remaining</span>}
                 </div>
               </CardContent>
             </Card>
@@ -1010,10 +1010,10 @@ export default function BrainStudioPage() {
                           ) : progress >= (75 + i * 5) ? (
                             <GenesisButtonLoader />
                           ) : (
-                            <Clock className="w-3 h-3 text-zinc-600" />
+                            <Clock className="w-3 h-3 text-zinc-500" />
                           )}
                         </div>
-                        <span className={`text-sm ${step.done ? "text-zinc-300" : progress >= (75 + i * 5) ? "text-zinc-400" : "text-zinc-600"}`}>
+                        <span className={`text-sm ${step.done ? "text-zinc-300" : progress >= (75 + i * 5) ? "text-zinc-400" : "text-zinc-500"}`}>
                           {step.label}
                         </span>
                       </div>

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonCard, SkeletonVideoCard } from "@/components/ui/skeleton";
 import { PageTransition, StaggerGroup, StaggerItem, AnimatedCounter, MotionSection, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
+import { useToast } from "@/components/ui/toast";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Sparkles,
@@ -31,7 +32,20 @@ import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { user, activeJobs, videos, isInitialized } = useStore();
+  const { toast } = useToast();
   const isLoading = !isInitialized;
+
+  // Handle payment success/pack_success redirects from Yoco
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      toast("Payment successful! Your plan has been upgraded.", "success");
+      window.history.replaceState({}, "", "/dashboard");
+    } else if (params.get("pack_success") === "true") {
+      toast("Credits added to your account!", "success");
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, [toast]);
 
   const pendingJobs = (activeJobs || []).filter(
     (j) => j.status === "processing" || j.status === "queued"
@@ -278,7 +292,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-zinc-200 truncate font-medium">&ldquo;{job.prompt}&rdquo;</p>
-                        <span className="text-[11px] text-zinc-600">{job.duration || 5}s</span>
+                        <span className="text-[11px] text-zinc-500">{job.duration || 5}s</span>
                       </div>
                       <Badge variant={job.status === "processing" ? "amber" : "default"} className="text-[10px]">
                         {job.status === "processing" ? "Generating..." : "In Queue"}
@@ -364,7 +378,7 @@ export default function DashboardPage() {
               transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
             />
           </div>
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-zinc-500">
             Credits reset monthly. Purchased credit packs never expire.
           </p>
         </div>
@@ -401,7 +415,7 @@ export default function DashboardPage() {
               <Film className="w-7 h-7 text-zinc-500" />
             </motion.div>
             <h3 className="text-base font-semibold text-zinc-300 mb-1">No videos yet</h3>
-            <p className="text-sm text-zinc-600 mb-5 max-w-xs mx-auto">
+            <p className="text-sm text-zinc-500 mb-5 max-w-xs mx-auto">
               Create your first AI video and watch the magic happen
             </p>
             <Link href="/generate">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,15 @@ export default function PricingPage() {
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [currency, setCurrency] = useState<"USD" | "ZAR">("ZAR");
+
+  // Handle payment redirect outcomes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("cancelled") === "true") {
+      toast("Payment was cancelled or declined. Please try again or use a different card.", "error");
+      window.history.replaceState({}, "", "/pricing");
+    }
+  }, [toast]);
   const [referralData, setReferralData] = useState<{ code: string; shareUrl: string; referralCount: number; creditsEarned: number } | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
@@ -236,7 +245,7 @@ export default function PricingPage() {
                 </div>
 
                 <p className="text-sm text-zinc-300 leading-relaxed min-h-[3rem]">{copy.outcome}</p>
-                <p className="text-xs text-zinc-600 italic">{copy.bestFor}</p>
+                <p className="text-xs text-zinc-500 italic">{copy.bestFor}</p>
 
                 <Button
                   variant={plan.popular ? "primary" : plan.id === "free" ? "ghost" : "secondary"}
@@ -248,7 +257,7 @@ export default function PricingPage() {
                   {isCurrentPlan ? "Current Plan" : plan.id === "free" ? "Free Forever" : `Get ${plan.name}`}
                 </Button>
 
-                <p className="text-[10px] text-zinc-600 text-center">
+                <p className="text-[10px] text-zinc-500 text-center">
                   {plan.credits.toLocaleString()} credits/mo
                 </p>
               </CardContent>
@@ -384,7 +393,7 @@ export default function PricingPage() {
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-zinc-600 mt-2">Code: {referralData.code}</p>
+                <p className="text-xs text-zinc-500 mt-2">Code: {referralData.code}</p>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
                 <div><div className="text-2xl font-bold text-violet-300">{referralData.referralCount}</div><div className="text-xs text-zinc-500">Referrals</div></div>

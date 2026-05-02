@@ -3,7 +3,7 @@
 | ID | Risk | Likelihood | Impact | Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|
 | R1 | FAL.AI rate limit during traffic surge | M | H | Per-user daily cap + global cap + queue | Auto | Mitigated |
-| R2 | Stripe webhook delay → stuck checkout | L | M | Polling fallback + clear UI state | Auto | Mitigated |
+| R2 | Yoco webhook delay → stuck checkout (3DS adds 30-60s) | L | M | Async webhook + idempotency + Slack alert on failure | Auto | Mitigated |
 | R3 | Facebook page token expires mid-cron | M | M | 60-day refresh cycle + Slack alert on failure | Operator | Accepted |
 | R4 | Single operator (bus factor = 1) | H | H | Runbooks + documented procedures + Penuel as backup | Operator | Accepted |
 | R5 | South African ZAR/USD FX swing | M | L | Quarterly price review | Operator | Accepted |
@@ -18,7 +18,7 @@
 | R14 | User uploads malicious content (CSAM, copyright) | L | H | Prompt moderation. Reference image moderation. Manual review queue | Partially auto | Partially mitigated |
 | R15 | Vercel serverless function cold starts degrade UX | M | L | Critical paths (generate, health) are frequently hit. Static pages pre-rendered | Auto | Accepted |
 | R16 | Email deliverability drops (spam classification) | M | M | DKIM/SPF/DMARC configured. monitor via mail-tester.com monthly | Operator | Partially mitigated |
-| R17 | Stripe test keys used in production | L | H | Verified sk_live_ prefix on production deploy | Auto | Mitigated |
+| R17 | Yoco keys misconfigured in production | L | H | Verified sk_live_ prefix on production. Stripe is placeholder (not used). | Auto | Mitigated |
 | R18 | Credit balance goes negative from race condition | M | M | Credit deduction checks balance. Need atomic RPC for full safety | Auto | Partially mitigated |
 | R19 | No automated backups verified | M | H | Supabase PITR enabled by default. Need manual verification | Operator | Action required |
 | R20 | Source maps leak code structure | L | L | Next.js 16 defaults to no public source maps. Verified | Auto | Mitigated |

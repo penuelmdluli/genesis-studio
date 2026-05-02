@@ -212,7 +212,7 @@ export default function SettingsPage() {
                 <div key={tx.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-white/[0.02] transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-zinc-300 truncate">{tx.description || tx.type}</p>
-                    <p className="text-xs text-zinc-600">
+                    <p className="text-xs text-zinc-500">
                       {new Date(tx.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>

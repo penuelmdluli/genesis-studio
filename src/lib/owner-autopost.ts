@@ -131,8 +131,9 @@ const VIDEO_TITLES = [
 async function postToPage(
   page: FacebookPage,
   videoUrl: string,
-  description: string
-): Promise<{ success: boolean; postId?: string; error?: string }> {
+  description: string,
+  videoId?: string
+): Promise<{ success: boolean; postId?: string; scheduled?: boolean; scheduledFor?: string; error?: string }> {
   const token = process.env[page.tokenEnvKey];
   if (!token || !page.pageId) {
     console.warn(`[OWNER-AUTOPOST] ${page.name}: missing pageId or token (${page.tokenEnvKey})`);
@@ -140,12 +141,25 @@ async function postToPage(
   }
 
   try {
+    // Smart scheduling — check if we should post now or queue for later
+    const { getPostingSlot, recordOwnerPost } = await import("@/lib/owner-scheduler");
+    const slot = await getPostingSlot(page.pageId, page.name);
+    console.log(`[OWNER-AUTOPOST] ${slot.reason}`);
+
     const params = new URLSearchParams({
       file_url: videoUrl,
       title: pickRandom(VIDEO_TITLES),
       description,
       access_token: token,
     });
+
+    // If scheduling for later, use Facebook's scheduled_publish_time
+    if (slot.action === "schedule" && slot.scheduledFor) {
+      const unixTimestamp = Math.floor(slot.scheduledFor.getTime() / 1000);
+      params.set("scheduled_publish_time", String(unixTimestamp));
+      params.set("published", "false");
+      console.log(`[OWNER-AUTOPOST] 📅 Scheduling ${page.name} post for ${slot.scheduledFor.toISOString()}`);
+    }
 
     const res = await fetch(
       `https://graph.facebook.com/v25.0/${page.pageId}/videos`,
@@ -160,20 +174,35 @@ async function postToPage(
 
     const data = (await res.json()) as { id: string; post_id?: string };
     const postId = data.post_id || data.id;
-    console.log(`[OWNER-AUTOPOST] ✅ Posted to ${page.name}: ${postId}`);
+    const isScheduled = slot.action === "schedule";
 
-    // Auto-comment with marketing CTA + engagement prompt
-    try {
-      const { postMarketingComments } = await import("@/lib/social/facebook-comments");
-      // Fire and forget — don't block on comments
-      postMarketingComments(postId, token).catch((e) =>
-        console.error(`[OWNER-AUTOPOST] Comments failed on ${page.name}:`, e)
-      );
-    } catch {
-      // Comments are non-critical
+    console.log(`[OWNER-AUTOPOST] ${isScheduled ? "📅 Scheduled" : "✅ Posted"} to ${page.name}: ${postId}`);
+
+    // Record the post for future scheduling decisions
+    recordOwnerPost(
+      page.pageId, page.name, postId, videoId || "",
+      isScheduled ? "scheduled" : "posted",
+      slot.scheduledFor
+    ).catch(() => {});
+
+    // Auto-comment (only on immediate posts — scheduled posts get commented when they go live)
+    if (!isScheduled) {
+      try {
+        const { postMarketingComments } = await import("@/lib/social/facebook-comments");
+        postMarketingComments(postId, token).catch((e) =>
+          console.error(`[OWNER-AUTOPOST] Comments failed on ${page.name}:`, e)
+        );
+      } catch {
+        // Comments are non-critical
+      }
     }
 
-    return { success: true, postId };
+    return {
+      success: true,
+      postId,
+      scheduled: isScheduled,
+      scheduledFor: slot.scheduledFor?.toISOString(),
+    };
   } catch (err) {
     console.error(`[OWNER-AUTOPOST] ${page.name} error:`, err);
     return { success: false, error: String(err) };

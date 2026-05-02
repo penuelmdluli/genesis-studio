@@ -94,18 +94,9 @@ export async function startAssembly(
       return;
     }
 
-    // Always use local assembly (FFmpeg + Edge TTS) — free, no FAL dependency.
-    // Produces complete video: all scenes concatenated + voiceover + music + subtitles.
-    const { simplifiedFinalize } = await import("./assembly-fallback");
-    console.log(`[ASSEMBLY] Using local assembly (FFmpeg + Edge TTS) — free, no FAL needed`);
-    await simplifiedFinalize(productionId);
-    return;
-
-    // eslint-disable-next-line no-constant-condition -- FAL assembly disabled while credits exhausted
-    if (false as boolean) {
-    // NOTE: FAL-based assembly below is disabled. When FAL credits are restored,
-    // remove the `if (false)` wrapper and the early return above.
-
+    // Use FAL cloud assembly (voiceover + captions + music + concatenation).
+    // Local FFmpeg assembly was disabled — Vercel's /tmp has size limits that
+    // cause failures when downloading multiple scene videos.
     const production = (await getProduction(productionId))!;
     if (!production) return;
     const plan = production.plan!;
@@ -286,7 +277,6 @@ export async function startAssembly(
     });
 
     console.log(`[ASSEMBLY] startAssembly complete for ${productionId} — phase: ${state.phase}`);
-    } // end if (false) — FAL assembly disabled
   } catch (err) {
     console.error(`[ASSEMBLY] startAssembly error for ${productionId}:`, err);
     await failAssembly(

@@ -100,7 +100,9 @@ async function uploadVideoFromBase64(
 }
 
 export async function GET(req: Request) {
-  if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
+  // NOTE: recover-scenes is CUSTOMER-FACING — must NOT be paused.
+  // It processes FAL/RunPod scene completions for Brain Studio productions.
+  // Without it, user scenes complete on the provider but never get assembled.
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {

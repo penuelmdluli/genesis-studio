@@ -343,6 +343,10 @@ export default function TalkingAvatarPage() {
   const [productAiLoading, setProductAiLoading] = useState(false);
   const productInputRef = useRef<HTMLInputElement>(null);
 
+  // AI Face Suggestion
+  const [suggestedFaces, setSuggestedFaces] = useState<string[]>([]);
+  const [faceGenLoading, setFaceGenLoading] = useState(false);
+
   // Enhancement state (post-processing after avatar generation)
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStage, setEnhanceStage] = useState<string | null>(null);
@@ -492,6 +496,78 @@ Rules:
     } finally {
       setProductAiLoading(false);
     }
+  };
+
+  // ─── AI Face Suggestion ────────────────────────────────────────────
+
+  const suggestFaces = async () => {
+    setFaceGenLoading(true);
+    setError(null);
+    setSuggestedFaces([]);
+    try {
+      // Step 1: Ask AI to describe the ideal spokesperson
+      const descPrompt = `You are a casting director for a product advertisement video. Based on this product, describe the IDEAL spokesperson's appearance for a front-facing headshot photo.
+
+Product: ${productName || "general product"}
+${productDescription ? `Description: ${productDescription}` : ""}
+Target audience: ${selectedTone === "professional" ? "business professionals" : selectedTone === "friendly" ? "everyday consumers" : selectedTone === "urgent" ? "impulse buyers" : "general audience"}
+
+Write a SINGLE detailed prompt for generating a photorealistic headshot of the perfect spokesperson. Include:
+- Age range, gender (pick one), ethnicity (be diverse and inclusive)
+- Expression (warm smile, confident look, etc.)
+- Attire (what they'd wear for this product type)
+- Lighting and background (studio headshot style)
+
+The photo must be: front-facing, clear face, shoulders visible, professional headshot quality, looking directly at camera.
+
+Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
+
+      const chatRes = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: descPrompt }),
+      });
+      const chatData = await chatRes.json();
+      const facePrompt = chatData.reply || "Professional headshot of a confident person smiling warmly at camera, studio lighting, clean background, shoulders visible";
+
+      // Step 2: Generate 4 face options via FLUX Pro
+      toast("Generating spokesperson options...", "info");
+      const imgRes = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `${facePrompt}. Photorealistic professional headshot, front-facing, looking directly at camera, sharp focus on face, studio portrait photography, 85mm lens, shallow depth of field`,
+          aspectRatio: "portrait",
+          numImages: 4,
+        }),
+      });
+
+      const imgData = await imgRes.json();
+      if (imgData.images && imgData.images.length > 0) {
+        setSuggestedFaces(imgData.images);
+        if (imgData.creditsCost) {
+          updateCreditBalance((user?.creditBalance ?? 0) - imgData.creditsCost);
+        }
+        toast(`${imgData.images.length} spokesperson options generated!`, "success");
+      } else {
+        setError(imgData.error || "Failed to generate faces. Try again.");
+      }
+    } catch {
+      setError("Face generation failed. Try again.");
+    } finally {
+      setFaceGenLoading(false);
+    }
+  };
+
+  const selectSuggestedFace = async (dataUrl: string) => {
+    // Convert data URL to File object for the existing upload pipeline
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], `ai-spokesperson-${Date.now()}.jpg`, { type: "image/jpeg" });
+    setFaceImage(file);
+    setFaceImagePreview(dataUrl);
+    setSuggestedFaces([]);
+    toast("Spokesperson selected!", "success");
   };
 
   // ─── AI Script Actions ────────────────────────────────────────────
@@ -1010,6 +1086,64 @@ Rules:
                   </span>
                   <span className="text-xs text-zinc-400 mt-1">PNG, JPEG or WebP — max 10MB — clear front-facing face works best</span>
                 </label>
+              )}
+
+              {/* AI Suggest Face — visible in Product Ad Mode or when no face selected */}
+              {isProductMode && !faceImage && (
+                <div className="mt-3">
+                  <button
+                    onClick={suggestFaces}
+                    disabled={faceGenLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 text-amber-300 hover:from-amber-600/30 hover:to-orange-600/30 transition-all text-sm font-medium disabled:opacity-50"
+                  >
+                    {faceGenLoading ? (
+                      <><GenesisButtonLoader /> Generating spokesperson options...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4" /> Suggest Spokesperson Face</>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-zinc-400 mt-1.5 text-center">
+                    AI picks the ideal face for your {productName || "product"} ad (10 credits for 4 options)
+                  </p>
+                </div>
+              )}
+
+              {/* Suggested Faces Grid */}
+              {suggestedFaces.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <label className="block text-xs font-medium text-zinc-400">Pick your spokesperson</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {suggestedFaces.map((face, i) => (
+                      <button
+                        key={i}
+                        onClick={() => selectSuggestedFace(face)}
+                        className="relative rounded-xl overflow-hidden border-2 border-white/[0.08] hover:border-violet-500/50 transition-all group aspect-[3/4]"
+                      >
+                        <img src={face} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium bg-violet-600 px-3 py-1.5 rounded-lg">
+                            Use This
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={suggestFaces}
+                      disabled={faceGenLoading}
+                      className="flex-1 text-[11px] px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
+                    >
+                      {faceGenLoading ? "Generating..." : "Regenerate Options"}
+                    </button>
+                    <button
+                      onClick={() => setSuggestedFaces([])}
+                      className="text-[11px] px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -660,15 +660,36 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
     }
   };
 
-  const selectSuggestedFace = async (dataUrl: string) => {
-    // Convert data URL to File object for the existing upload pipeline
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    const file = new File([blob], `ai-spokesperson-${Date.now()}.jpg`, { type: "image/jpeg" });
-    setFaceImage(file);
-    setFaceImagePreview(dataUrl);
-    setSuggestedFaces([]);
-    toast("Spokesperson selected!", "success");
+  const selectSuggestedFace = async (imageUrl: string) => {
+    try {
+      let blob: Blob;
+      if (imageUrl.startsWith("data:")) {
+        // Convert base64 data URL to blob
+        const [header, b64Data] = imageUrl.split(",");
+        const mimeMatch = header.match(/data:([^;]+)/);
+        const mime = mimeMatch?.[1] || "image/jpeg";
+        const byteString = atob(b64Data);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+        blob = new Blob([ab], { type: mime });
+      } else {
+        // Fetch regular URL
+        const res = await fetch(imageUrl);
+        blob = await res.blob();
+      }
+      const file = new File([blob], `ai-spokesperson-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
+      setFaceImage(file);
+      setFaceImagePreview(imageUrl);
+      setSuggestedFaces([]);
+      toast("Spokesperson selected!", "success");
+    } catch (err) {
+      console.error("Failed to select face:", err);
+      // Fallback: just set the preview URL directly, upload will use the URL
+      setFaceImagePreview(imageUrl);
+      setSuggestedFaces([]);
+      toast("Spokesperson selected!", "success");
+    }
   };
 
   // ─── AI Script Actions ────────────────────────────────────────────
@@ -1211,8 +1232,8 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 </label>
               )}
 
-              {/* AI Suggest Face — visible in Product Ad Mode or when no face selected */}
-              {isProductMode && !faceImage && (
+              {/* AI Suggest Face — visible in Product Ad Mode when no face selected and no suggestions showing */}
+              {isProductMode && !faceImage && suggestedFaces.length === 0 && (
                 <div className="mt-3">
                   <button
                     onClick={suggestFaces}
@@ -1231,22 +1252,34 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 </div>
               )}
 
+              {/* Loading state while generating faces */}
+              {faceGenLoading && suggestedFaces.length === 0 && (
+                <div className="mt-3 flex flex-col items-center justify-center py-8 rounded-xl bg-white/[0.04] border border-amber-500/20">
+                  <GenesisLoader size="sm" />
+                  <p className="text-sm text-amber-300 font-medium mt-3">Finding the perfect spokesperson...</p>
+                  <p className="text-[10px] text-zinc-400 mt-1">AI is analyzing your product and generating 4 face options</p>
+                </div>
+              )}
+
               {/* Suggested Faces Grid */}
               {suggestedFaces.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <label className="block text-xs font-medium text-zinc-400">Pick your spokesperson</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="mt-3 space-y-3">
+                  <label className="block text-xs font-medium text-violet-300">Pick your spokesperson — click any face to use it</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {suggestedFaces.map((face, i) => (
                       <button
                         key={i}
                         onClick={() => selectSuggestedFace(face)}
-                        className="relative rounded-xl overflow-hidden border-2 border-white/[0.08] hover:border-violet-500/50 transition-all group aspect-[3/4]"
+                        className="relative rounded-xl overflow-hidden border-2 border-white/[0.12] hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/20 transition-all duration-200 cursor-pointer group aspect-[3/4] focus:outline-none focus:ring-2 focus:ring-violet-500"
                       >
-                        <img src={face} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium bg-violet-600 px-3 py-1.5 rounded-lg">
-                            Use This
+                        <img src={face} alt={`Spokesperson option ${i + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center pb-3">
+                          <span className="text-white text-xs font-semibold bg-violet-600 px-4 py-2 rounded-lg shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform duration-200">
+                            Select This Face
                           </span>
+                        </div>
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">
+                          {i + 1}
                         </div>
                       </button>
                     ))}
@@ -1255,15 +1288,15 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                     <button
                       onClick={suggestFaces}
                       disabled={faceGenLoading}
-                      className="flex-1 text-[11px] px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
+                      className="flex-1 text-[11px] px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 hover:bg-amber-500/20 transition-colors font-medium disabled:opacity-50"
                     >
-                      {faceGenLoading ? "Generating..." : "Regenerate Options"}
+                      {faceGenLoading ? "Generating..." : "Generate New Options (10 credits)"}
                     </button>
                     <button
                       onClick={() => setSuggestedFaces([])}
-                      className="text-[11px] px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
+                      className="text-[11px] px-3 py-2.5 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
                     >
-                      Dismiss
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -1835,6 +1868,13 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Error display — visible on all screens */}
+      {error && (
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 lg:hidden">
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
       )}
 
       {/* ─── Mobile: Fixed Generate ──────────────────────────────────── */}

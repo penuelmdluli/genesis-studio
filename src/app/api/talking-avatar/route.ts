@@ -29,13 +29,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { imageUrl, text, audioUrl, voiceId, duration, language } = body as {
+    const { imageUrl, text, audioUrl, voiceId, duration, language, tone, aspectRatio, background } = body as {
       imageUrl: string;
       text?: string;
       audioUrl?: string;
       voiceId?: string;
       duration?: number;
       language?: string;
+      tone?: string;
+      aspectRatio?: string;
+      background?: string;
     };
 
     // Validate required fields
@@ -113,8 +116,16 @@ export async function POST(req: NextRequest) {
           const voiceMap: Record<string, string> = {
             "voice-aria": "en-US-AriaNeural",
             "voice-james": "en-US-GuyNeural",
+            "voice-luna": "en-US-JennyNeural",
+            "voice-alex": "en-US-DavisNeural",
+            "voice-sophia": "en-US-SaraNeural",
+            "voice-marcus": "en-US-TonyNeural",
             "voice-naledi": "en-ZA-LeahNeural",
             "voice-thabo": "en-ZA-LukeNeural",
+            "voice-sakura": "ja-JP-NanamiNeural",
+            "voice-carlos": "es-MX-JorgeNeural",
+            "voice-amelie": "fr-FR-DeniseNeural",
+            "voice-hans": "de-DE-ConradNeural",
           };
           const ttsVoice = voiceMap[voiceId || ""] || "en-US-AriaNeural";
           await tts.setMetadata(ttsVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
@@ -137,10 +148,33 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Step 2: Build prompt — if we have audio, tell Kling to lip-sync to it
+      // Step 2: Build prompt with tone, background, and delivery style
+      const toneDirections: Record<string, string> = {
+        professional: "Confident, authoritative delivery. Measured pace, composed facial expressions, direct eye contact.",
+        friendly: "Warm, approachable delivery. Natural smile, relaxed demeanor, conversational pace.",
+        urgent: "High-energy, compelling delivery. Leaning slightly forward, emphatic gestures, faster pace.",
+        inspirational: "Passionate, motivational delivery. Expressive eyes, deliberate pauses for impact, sweeping gestures.",
+        humorous: "Light-hearted, witty delivery. Playful expressions, comedic timing, animated facial reactions.",
+        calm: "Soothing, reassuring delivery. Gentle pace, soft expressions, steady eye contact.",
+      };
+      const toneDirection = toneDirections[tone || ""] || toneDirections.professional;
+
+      const bgScene = background
+        ? `Setting: ${background}.`
+        : "Professional studio setting with soft lighting.";
+
       const avatarPrompt = text
-        ? `A person speaking directly to camera: "${text.slice(0, 300)}". Natural head movement, perfect lip synchronization, expressive facial gestures, professional lighting, eye contact with viewer.`
-        : "A person speaking naturally to camera with expressive facial movement, gestures, and lip sync. Professional studio setting.";
+        ? `A person speaking directly to camera: "${text.slice(0, 300)}". ${toneDirection} ${bgScene} Perfect lip synchronization, natural head movement, eye contact with viewer.`
+        : `A person speaking naturally to camera. ${toneDirection} ${bgScene} Expressive facial movement, gestures, and lip sync.`;
+
+      // Map aspect ratio to FAL format and DB format
+      type DbAR = "landscape" | "portrait" | "square";
+      const arMap: Record<string, { fal: string; db: DbAR }> = {
+        "16:9": { fal: "16:9", db: "landscape" },
+        "9:16": { fal: "9:16", db: "portrait" },
+        "1:1": { fal: "1:1", db: "square" },
+      };
+      const ar = arMap[aspectRatio || ""] || arMap["16:9"];
 
       // Create a job record in the database for polling
       const job = await createJob({
@@ -155,7 +189,7 @@ export async function POST(req: NextRequest) {
         fps: 30,
         isDraft: false,
         creditsCost,
-        aspectRatio: "landscape",
+        aspectRatio: ar.db,
         audioUrl: finalAudioUrl,
       });
 
@@ -165,7 +199,7 @@ export async function POST(req: NextRequest) {
           prompt: avatarPrompt,
           image_url: imageUrl,
           duration: String(Math.min(effectiveDuration, 10)),
-          aspect_ratio: "16:9",
+          aspect_ratio: ar.fal,
           native_audio: true,
         },
       });

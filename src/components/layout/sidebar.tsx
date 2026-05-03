@@ -55,7 +55,7 @@ const baseNavItems: NavItem[] = [
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "HOT" },
   { href: "/brain/templates", label: "Templates", icon: Film, section: "Create" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
-  { href: "/talking-avatar", label: "Talking Avatar", icon: MessageCircle, section: "Create", badge: "HOT" },
+  { href: "/talking-avatar", label: "Avatar Ad Studio", icon: MessageCircle, section: "Create", badge: "HOT" },
   { href: "/mimic", label: "Mimic Studio", icon: Zap, section: "Create", badge: "NEW" },
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },

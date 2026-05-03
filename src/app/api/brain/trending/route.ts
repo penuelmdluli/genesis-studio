@@ -107,5 +107,11 @@ export async function GET() {
 
 function buildWarPrompt(title: string, description: string): string {
   const context = description ? `${title}. ${description}` : title;
-  return `BREAKING: ${context}. Show intense action — missiles launching, explosions, military hardware in motion, satellite imagery, dramatic drone footage, destruction and aftermath. Cinematic war documentary style with raw intensity. Every scene must have movement and impact. No static shots, no standing people, pure action and drama.`;
+  return `BREAKING: ${context}.
+
+Show intense action — missiles launching, explosions, military hardware in motion, satellite imagery, dramatic drone footage, destruction and aftermath. Cinematic war documentary style with raw intensity. Every scene must have movement and impact.
+
+IMPORTANT: The final scene must be a powerful closing shot with text overlay: "Stay informed. Follow for more." — this drives engagement and follows.
+
+Voiceover must end with a strong narrator line that makes viewers share the video.`;
 }

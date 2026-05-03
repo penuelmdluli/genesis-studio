@@ -421,7 +421,15 @@ export function appendOwnerBranding(plan: ScenePlan): void {
   if (!plan.scenes || plan.scenes.length === 0) return;
   const lastScene = plan.scenes[plan.scenes.length - 1];
 
-  const outro = "Created with Genesis Studio. AI video generation for creators. Try it free at genesis studio dot app.";
+  // Rotating outros — each video gets a different marketing close
+  const outros = [
+    "This was created entirely by AI using Genesis Studio. No cameras. No crew. Just one prompt. Try it free at genesis studio dot app.",
+    "Every frame of this video was AI-generated in under 2 minutes. The future of content is here. Genesis Studio dot app.",
+    "What you just watched was made by artificial intelligence. Want to create your own? Genesis Studio. 100 free credits. No card needed.",
+    "This is the power of AI video. One idea becomes a full production with voiceover, music, and captions. Genesis Studio dot app. Start free.",
+    "Made with Genesis Studio — where African creators build the future of content. Try it free at genesis studio dot app.",
+  ];
+  const outro = outros[Math.floor(Math.random() * outros.length)];
 
   if (lastScene.voiceoverLine) {
     const sep = /[.!?]$/.test(lastScene.voiceoverLine.trim()) ? " " : ". ";

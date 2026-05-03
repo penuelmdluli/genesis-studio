@@ -520,7 +520,7 @@ export default function LandingPage() {
                 Your first video is free.
               </h2>
               <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
-                50 credits. No credit card. Generate your first AI video in under 60 seconds.
+                100 credits. No credit card. Generate your first AI video in under 60 seconds.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href="/sign-up">

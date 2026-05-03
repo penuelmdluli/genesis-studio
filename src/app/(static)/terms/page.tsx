@@ -32,7 +32,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-white mb-3">4. Credits and Payments</h2>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li>Credits are used to generate videos and access AI features.</li>
-              <li>Free accounts receive 50 credits upon registration.</li>
+              <li>Free accounts receive 100 credits upon registration.</li>
               <li>Subscription plans renew automatically unless cancelled before the billing date.</li>
               <li>Credit packs are one-time purchases and do not expire.</li>
               <li>We reserve the right to modify credit costs and pricing with 30 days notice.</li>

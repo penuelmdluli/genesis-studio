@@ -31,7 +31,7 @@ export default function SignUpPage() {
             <span className="gradient-text">that stop the scroll.</span>
           </h1>
           <p className="text-zinc-400 leading-relaxed mb-10 text-[15px]">
-            50 free credits. No credit card. Your first video renders in under 60 seconds.
+            100 free credits. No credit card. Your first video renders in under 60 seconds.
           </p>
 
           {/* Stats row */}
@@ -107,7 +107,7 @@ export default function SignUpPage() {
     </div>
               <span className="text-xl font-bold gradient-text">Genesis Studio</span>
             </Link>
-            <p className="text-sm text-zinc-400 font-medium">50 free credits. No card needed.</p>
+            <p className="text-sm text-zinc-400 font-medium">100 free credits. No card needed.</p>
               <Suspense><SaveReferral /></Suspense>
     </div>
 

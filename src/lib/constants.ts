@@ -175,7 +175,7 @@ export const PLANS: Plan[] = [
     credits: 100,
     maxResolution: "720p",
     features: [
-      "50 credits/month",
+      "100 credits/month",
       "720p max resolution",
       "Watermarked output",
       "Auto Captions (3/month)",

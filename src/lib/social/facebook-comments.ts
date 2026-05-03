@@ -35,9 +35,9 @@ export async function postPageComment(
 // ── Marketing Comments for Owner Auto-Posts ──
 
 const PINNED_COMMENTS = [
-  "🎬 This was 100% AI-generated using Genesis Studio. No camera. No crew. No editing. Just one prompt.\n\n👉 Try it FREE: https://genesisstudio.app\n🎁 50 free credits — create your first video in 60 seconds!",
+  "🎬 This was 100% AI-generated using Genesis Studio. No camera. No crew. No editing. Just one prompt.\n\n👉 Try it FREE: https://genesisstudio.app\n🎁 100 free credits — create your first video in 60 seconds!",
   "⚡ How was this made? One prompt + Genesis Studio = this video.\n\nAI does the script, voiceover, music, and captions.\n\n🚀 https://genesisstudio.app — try it free, no card needed!",
-  "🤖 Yes, this is AI. And yes, you can make your own.\n\nGenesis Studio — the #1 AI video tool for African creators.\n\n👇 https://genesisstudio.app\n✨ 50 free credits waiting for you!",
+  "🤖 Yes, this is AI. And yes, you can make your own.\n\nGenesis Studio — the #1 AI video tool for African creators.\n\n👇 https://genesisstudio.app\n✨ 100 free credits waiting for you!",
   "💡 Imagine creating content like this every day without a camera.\n\nThat's Genesis Studio. AI video generation. Built in South Africa.\n\n🔗 https://genesisstudio.app — start free today!",
   "🌍 Made in Africa. Powered by AI. Available worldwide.\n\nGenesis Studio turns your ideas into cinematic videos.\nVoiceover. Music. Captions. All automatic.\n\n🚀 https://genesisstudio.app",
 ];

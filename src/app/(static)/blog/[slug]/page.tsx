@@ -101,7 +101,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             Ready to create AI videos?
           </h3>
           <p className="text-sm text-zinc-400 mb-4">
-            Start generating stunning videos with 50 free credits. No credit card required.
+            Start generating stunning videos with 100 free credits. No credit card required.
           </p>
           <Link
             href="/sign-up"

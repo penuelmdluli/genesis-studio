@@ -85,11 +85,11 @@ function wrap(content: string): string {
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
   return sendEmail({
     to: email,
-    subject: "Welcome to Genesis Studio! Your 50 free credits are ready",
+    subject: "Welcome to Genesis Studio! Your 100 free credits are ready",
     html: wrap(`
       <h1 style="color: white; font-size: 28px; margin-bottom: 8px;">Welcome, ${name}!</h1>
       <p style="color: #a1a1aa; margin-bottom: 24px;">
-        You've got <strong style="color: #8b5cf6;">50 free credits</strong> to create stunning AI videos.
+        You've got <strong style="color: #8b5cf6;">100 free credits</strong> to create stunning AI videos.
       </p>
       <p style="color: #a1a1aa; margin-bottom: 8px;">Here's what you can make:</p>
       <ul style="color: #a1a1aa; padding-left: 20px; margin-bottom: 32px;">

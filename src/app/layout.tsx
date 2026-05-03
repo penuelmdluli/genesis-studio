@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: "%s | Genesis Studio",
   },
   description:
-    "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ AI models, 50 free credits. Made in South Africa.",
+    "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ AI models, 100 free credits. Made in South Africa.",
   keywords: [
     "AI video generator",
     "AI video maker",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Genesis Studio — AI Video Creation Platform",
     description:
-      "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ models. 50 free credits. Made in South Africa.",
+      "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ models. 100 free credits. Made in South Africa.",
     type: "website",
     siteName: "Genesis Studio",
     locale: "en_ZA",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Genesis Studio — Create AI Videos in Seconds",
     description:
-      "Text to video, dance transfer, short films with audio. 10+ AI models. 50 free credits.",
+      "Text to video, dance transfer, short films with audio. 10+ AI models. 100 free credits.",
   },
   robots: {
     index: true,

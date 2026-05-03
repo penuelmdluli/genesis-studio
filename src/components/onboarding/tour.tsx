@@ -11,7 +11,7 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Welcome to Genesis Studio!",
-    description: "You have 50 free credits to start creating AI videos. Let's make your first one in 90 seconds.",
+    description: "You have 100 free credits to start creating AI videos. Let's make your first one in 90 seconds.",
     action: "Let's Go!",
   },
   {

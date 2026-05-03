@@ -258,7 +258,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
           Create your free account to recreate this video
         </h3>
         <p className="text-sm text-zinc-400">
-          Get 50 free credits — start creating in 60 seconds
+          Get 100 free credits — start creating in 60 seconds
         </p>
       </div>
 

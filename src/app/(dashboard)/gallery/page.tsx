@@ -500,6 +500,17 @@ export default function GalleryPage() {
                   <Share2 className="w-4 h-4" />
                   Post to Pages
                 </button>
+                <button
+                  onClick={() => {
+                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with Genesis Studio 🎬\n\nhttps://genesisstudio.app/explore/${currentVideo.id}`);
+                    window.open(`https://wa.me/?text=${text}`, "_blank");
+                    toast("Opening WhatsApp...", "info");
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 shadow-lg shadow-green-600/20"
+                >
+                  <Share2 className="w-4 h-4" />
+                  WhatsApp
+                </button>
                 <a
                   href="/generate"
                   className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white/80 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"

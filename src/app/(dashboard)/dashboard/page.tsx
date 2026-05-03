@@ -384,6 +384,28 @@ export default function DashboardPage() {
         </div>
       </MotionSection>
 
+      {/* ====== CREATOR STATS ====== */}
+      <MotionSection delay={0.25}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.10] p-3 text-center">
+            <p className="text-2xl font-bold text-violet-300">{(videos || []).length}</p>
+            <p className="text-[10px] text-zinc-400">Videos Created</p>
+          </div>
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.10] p-3 text-center">
+            <p className="text-2xl font-bold text-cyan-300">{Math.round(totalDuration / 60)}m</p>
+            <p className="text-[10px] text-zinc-400">Total Duration</p>
+          </div>
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.10] p-3 text-center">
+            <p className="text-2xl font-bold text-emerald-300">{user?.creditBalance?.toLocaleString() || 0}</p>
+            <p className="text-[10px] text-zinc-400">Credits Left</p>
+          </div>
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.10] p-3 text-center">
+            <p className="text-2xl font-bold text-amber-300">{pendingJobs.length}</p>
+            <p className="text-[10px] text-zinc-400">In Progress</p>
+          </div>
+        </div>
+      </MotionSection>
+
       {/* ====== RECENT VIDEOS ====== */}
       <MotionSection delay={0.3}>
         <div className="flex items-center justify-between mb-4">

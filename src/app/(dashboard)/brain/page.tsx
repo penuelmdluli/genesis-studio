@@ -86,9 +86,13 @@ export default function BrainStudioPage() {
   const { toast } = useToast();
   const isLoading = !isInitialized;
 
-  // State
+  // State — pre-fill from URL params (templates, trending)
   const [brainState, setBrainState] = useState<BrainState>("input");
-  const [concept, setConcept] = useState("");
+  const [concept, setConcept] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const p = new URLSearchParams(window.location.search);
+    return p.get("concept") || "";
+  });
   const [style, setStyle] = useState<VideoStyle>("cinematic");
   const [targetDuration, setTargetDuration] = useState(30);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("landscape");
@@ -483,6 +487,20 @@ export default function BrainStudioPage() {
                   />
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-zinc-400">{concept.length}/5000</span>
+                    <button
+                      onClick={async () => {
+                        if (!concept.trim() || concept.length < 5) { toast("Type a short idea first — e.g. 'coffee brand ad'", "error"); return; }
+                        toast("Writing your script...", "info");
+                        try {
+                          const r = await fetch("/api/chat", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({message: `Write a detailed Brain Studio video concept for: "${concept}". Include 4-6 scene descriptions with camera angles, lighting, and action. Make it cinematic and viral. Return ONLY the concept text, no explanation.`}) });
+                          const d = await r.json();
+                          if (d.reply) { setConcept(d.reply); toast("Script written! Review and generate.", "success"); }
+                        } catch { toast("Failed to write script", "error"); }
+                      }}
+                      className="text-[10px] px-2.5 py-1 rounded-md bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors flex items-center gap-1"
+                    >
+                      ✨ AI Write Script
+                    </button>
                   </div>
                   <div className="flex gap-1.5 flex-wrap mt-2">
                     {EXAMPLE_CONCEPTS.slice(0, 3).map((ex, i) => (

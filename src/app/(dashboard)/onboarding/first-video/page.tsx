@@ -12,6 +12,7 @@ import { getRandomPrompts, type SamplePrompt } from "@/lib/sample-prompts";
 import { Sparkles, ArrowRight, Play, RefreshCw, Brain, Film } from "lucide-react";
 
 const ONBOARDING_SKIP_KEY = "onboarding_skipped";
+const REFERRAL_PROCESSED_KEY = "referral_processed";
 
 type Step = "welcome" | "pick" | "generating" | "reveal" | "error";
 
@@ -41,6 +42,30 @@ export default function FirstVideoPage() {
       router.replace("/dashboard");
     }
   }, [videos, router]);
+
+  // Process referral code from URL or cookie (runs once on first load)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(REFERRAL_PROCESSED_KEY)) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref") || document.cookie.split(";").find((c) => c.trim().startsWith("ref="))?.split("=")[1];
+    if (!ref) return;
+
+    localStorage.setItem(REFERRAL_PROCESSED_KEY, "true");
+    fetch("/api/referral", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: ref }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.creditsGranted) {
+          toast(`Welcome bonus! You got ${d.creditsGranted} extra credits from a friend's referral 🎉`, "success");
+        }
+      })
+      .catch(() => {});
+  }, [toast]);
 
   // Cycle progress messages during generation
   useEffect(() => {

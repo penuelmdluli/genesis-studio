@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SaveReferral } from "@/components/auth/save-referral";
 import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
 import { AuthBackgroundVideo } from "@/components/auth-background-video";
@@ -18,7 +20,8 @@ export default function SignUpPage() {
           <Link href="/" className="flex items-center gap-2.5 mb-12">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-violet-600/30">
               G
-            </div>
+                <Suspense><SaveReferral /></Suspense>
+    </div>
             <span className="text-2xl font-bold gradient-text">Genesis Studio</span>
           </Link>
 
@@ -39,12 +42,17 @@ export default function SignUpPage() {
               { value: "60s", label: "First video", sub: "that fast" },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-4 text-center">
-                <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}</div>
-                <div className="text-[11px] text-zinc-400 font-medium">{stat.label}</div>
-                <div className="text-[10px] text-zinc-400">{stat.sub}</div>
-              </div>
+                <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}    <Suspense><SaveReferral /></Suspense>
+    </div>
+                <div className="text-[11px] text-zinc-400 font-medium">{stat.label}    <Suspense><SaveReferral /></Suspense>
+    </div>
+                <div className="text-[10px] text-zinc-400">{stat.sub}    <Suspense><SaveReferral /></Suspense>
+    </div>
+                  <Suspense><SaveReferral /></Suspense>
+    </div>
             ))}
-          </div>
+              <Suspense><SaveReferral /></Suspense>
+    </div>
 
           {/* What you get */}
           <div className="space-y-3">
@@ -61,11 +69,14 @@ export default function SignUpPage() {
                   <svg className={`w-3 h-3 ${item.highlight ? "text-violet-400" : "text-zinc-400"}`} viewBox="0 0 12 12" fill="none">
                     <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                </div>
+                    <Suspense><SaveReferral /></Suspense>
+    </div>
                 <span className={item.highlight ? "text-zinc-300" : "text-zinc-400"}>{item.text}</span>
-              </div>
+                  <Suspense><SaveReferral /></Suspense>
+    </div>
             ))}
-          </div>
+              <Suspense><SaveReferral /></Suspense>
+    </div>
 
           {/* Trust badges */}
           <div className="flex items-center gap-4 mt-10 pt-8 border-t border-white/[0.10]">
@@ -76,10 +87,14 @@ export default function SignUpPage() {
                   {country}
                 </span>
               ))}
-            </div>
-          </div>
-        </div>
-      </div>
+                <Suspense><SaveReferral /></Suspense>
+    </div>
+              <Suspense><SaveReferral /></Suspense>
+    </div>
+            <Suspense><SaveReferral /></Suspense>
+    </div>
+          <Suspense><SaveReferral /></Suspense>
+    </div>
 
       {/* Right panel - auth */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 relative z-10">
@@ -88,11 +103,13 @@ export default function SignUpPage() {
             <Link href="/" className="inline-flex items-center gap-2 mb-3">
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white">
                 G
-              </div>
+                  <Suspense><SaveReferral /></Suspense>
+    </div>
               <span className="text-xl font-bold gradient-text">Genesis Studio</span>
             </Link>
             <p className="text-sm text-zinc-400 font-medium">50 free credits. No card needed.</p>
-          </div>
+              <Suspense><SaveReferral /></Suspense>
+    </div>
 
           <SignUp
             forceRedirectUrl="/onboarding/first-video"
@@ -130,8 +147,11 @@ export default function SignUpPage() {
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
+            <Suspense><SaveReferral /></Suspense>
+    </div>
+          <Suspense><SaveReferral /></Suspense>
+    </div>
+        <Suspense><SaveReferral /></Suspense>
     </div>
   );
 }

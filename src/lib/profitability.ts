@@ -211,7 +211,7 @@ export const PLAN_LIMITS = {
   free: {
     maxGenerationsPerDay: 5,
     maxConcurrentJobs: 1,
-    maxCreditsPerMonth: 50,
+    maxCreditsPerMonth: 100,
     maxCreditPerGeneration: 80,
   },
   creator: {

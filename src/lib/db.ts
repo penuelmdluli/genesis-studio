@@ -47,9 +47,9 @@ export async function createUser(params: {
       name: params.name,
       avatar_url: params.avatarUrl,
       plan: "free",
-      credit_balance: 50,
+      credit_balance: 100,
       monthly_credits_used: 0,
-      monthly_credits_limit: 50,
+      monthly_credits_limit: 100,
     })
     .select()
     .single();

@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
           email,
           name: fullName,
           avatar_url: avatarUrl,
-          credit_balance: 50,
+          credit_balance: 100,
           plan: "free",
         });
         console.log(`[CLERK WEBHOOK] Created new user: ${email}`);

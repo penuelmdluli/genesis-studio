@@ -492,7 +492,8 @@ export default function TalkingAvatarPage() {
   const userPlan = user?.plan || "free";
   const isPlanAllowed = userPlan === "creator" || userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
   const baseCreditCost = computeCreditCost(duration);
-  const productIntroCost = (isProductMode && productImage) ? 15 : 0;
+  // Product intro: 15 for video generation + 10 extra if no image uploaded (AI generates one)
+  const productIntroCost = isProductMode ? (productImage ? 15 : 25) : 0;
   const enhanceCost = productIntroCost + (musicMood !== "none" ? 3 : 0) + (subtitleStyle !== "none" ? 5 : 0);
   const creditCost = baseCreditCost + enhanceCost;
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
@@ -1822,10 +1823,10 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 <span className="text-xs text-zinc-400">Tone</span>
                 <span className="text-xs text-zinc-300 capitalize">{selectedTone}</span>
               </div>
-              {isProductMode && productImage && (
+              {isProductMode && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Product showcase intro</span>
-                  <span className="text-xs text-zinc-300">+15</span>
+                  <span className="text-xs text-zinc-400">Product showcase intro{!productImage ? " (AI image)" : ""}</span>
+                  <span className="text-xs text-zinc-300">+{productImage ? 15 : 25}</span>
                 </div>
               )}
               {musicMood !== "none" && (

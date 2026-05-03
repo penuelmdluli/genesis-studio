@@ -117,15 +117,18 @@ export async function POST(req: NextRequest) {
 
     const wantsMusic = !!(musicMood || customMusicUrl);
     const wantsSubtitles = !!subtitleStyle;
-    const wantsProductIntro = !!productImageUrl;
+    // Product intro: either user uploaded an image, or has a product name (we'll AI-generate the image)
+    const wantsProductIntro = !!(productImageUrl || productName);
 
     if (!wantsMusic && !wantsSubtitles && !wantsProductIntro) {
       return NextResponse.json({ error: "No enhancements requested" }, { status: 400 });
     }
 
-    // Credit cost: 15 for product intro (Kling I2V) + 3 for music + 5 for subtitles
+    // Credit cost: 15 for product intro (Kling I2V) + 10 for AI image if needed + 3 for music + 5 for subtitles
+    const needsAiImage = wantsProductIntro && !productImageUrl;
     const creditCost =
       (wantsProductIntro ? 15 : 0) +
+      (needsAiImage ? 10 : 0) +
       (wantsMusic ? 3 : 0) +
       (wantsSubtitles ? 5 : 0);
     const ownerAccount = isOwnerClerkId(clerkId);
@@ -150,60 +153,103 @@ export async function POST(req: NextRequest) {
       const targetDurationMs = durationMs || 10000;
 
       // ── Step 0: Generate product showcase intro ──
-      if (wantsProductIntro && productImageUrl) {
+      if (wantsProductIntro) {
         console.log(`[AVATAR ENHANCE] Generating product showcase intro for: ${productName || "product"}`);
 
-        const productPrompt = productName
-          ? `Cinematic product showcase of ${productName}. Slow elegant camera rotation around the product, dramatic studio lighting with soft reflections, premium feel, shallow depth of field, professional commercial quality. The product is the hero — center frame, beautifully lit.`
-          : `Cinematic product showcase. Slow elegant camera orbit, dramatic studio lighting, premium commercial feel, professional product photography in motion, shallow depth of field.`;
+        // If no product image uploaded, generate one with FLUX Pro
+        let finalProductImageUrl = productImageUrl;
+        if (!finalProductImageUrl && productName) {
+          console.log("[AVATAR ENHANCE] No product image — generating with FLUX Pro");
+          try {
+            const FAL_API_KEY = process.env.FAL_KEY || "";
+            const imgPrompt = `Professional product photography of ${productName}. Clean white/gradient studio background, dramatic lighting, hero shot, commercial quality, centered composition, high-end advertising photography, 8K detail, soft shadows`;
 
-        // Map aspect ratio
-        const arMap: Record<string, string> = { "16:9": "16:9", "9:16": "9:16", "1:1": "1:1" };
-        const ar = arMap[aspectRatio || ""] || "16:9";
+            const sizeMap: Record<string, { width: number; height: number }> = {
+              "16:9": { width: 1360, height: 768 },
+              "9:16": { width: 768, height: 1360 },
+              "1:1": { width: 1024, height: 1024 },
+            };
+            const imgSize = sizeMap[aspectRatio || ""] || sizeMap["16:9"];
 
-        try {
-          // Generate 5s product video using Kling 2.6 I2V
-          const productResult = await fal.subscribe("fal-ai/kling-video/v2.6/pro/image-to-video", {
-            input: {
-              prompt: productPrompt,
-              image_url: productImageUrl,
-              duration: "5",
-              aspect_ratio: ar,
-            },
-            logs: false,
-          });
+            const imgRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+              method: "POST",
+              headers: { Authorization: `Key ${FAL_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: imgPrompt,
+                image_size: imgSize,
+                num_images: 1,
+                output_format: "jpeg",
+                num_inference_steps: 28,
+                guidance_scale: 3.5,
+              }),
+            });
 
-          const productData = productResult.data as Record<string, unknown>;
-          const productVideoUrl =
-            (productData?.video_url as string) ||
-            (productData?.video as { url?: string })?.url ||
-            "";
+            if (imgRes.ok) {
+              const imgData = await imgRes.json();
+              finalProductImageUrl = imgData.images?.[0]?.url;
+              if (finalProductImageUrl) {
+                console.log(`[AVATAR ENHANCE] AI product image generated: ${finalProductImageUrl.slice(0, 60)}...`);
+              }
+            }
+          } catch (imgErr) {
+            console.warn("[AVATAR ENHANCE] FLUX Pro image generation failed:", imgErr);
+          }
+        }
 
-          if (productVideoUrl) {
-            console.log(`[AVATAR ENHANCE] Product intro generated: ${productVideoUrl.slice(0, 60)}...`);
+        if (!finalProductImageUrl) {
+          console.warn("[AVATAR ENHANCE] No product image available, skipping product intro");
+        } else {
+          const productPrompt = productName
+            ? `Cinematic product showcase of ${productName}. Slow elegant camera rotation around the product, dramatic studio lighting with soft reflections, premium feel, shallow depth of field, professional commercial quality. The product is the hero — center frame, beautifully lit.`
+            : `Cinematic product showcase. Slow elegant camera orbit, dramatic studio lighting, premium commercial feel, professional product photography in motion, shallow depth of field.`;
 
-            // Concatenate: product intro + avatar video
-            const concatResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-videos", {
+          // Map aspect ratio
+          const arMap: Record<string, string> = { "16:9": "16:9", "9:16": "9:16", "1:1": "1:1" };
+          const ar = arMap[aspectRatio || ""] || "16:9";
+
+          try {
+            // Generate 5s product video using Kling 2.6 I2V
+            const productResult = await fal.subscribe("fal-ai/kling-video/v2.6/pro/image-to-video", {
               input: {
-                video_urls: [productVideoUrl, currentVideoUrl],
+                prompt: productPrompt,
+                image_url: finalProductImageUrl,
+                duration: "5",
+                aspect_ratio: ar,
               },
               logs: false,
             });
 
-            const concatData = concatResult.data as Record<string, unknown>;
-            const concatUrl =
-              (concatData?.video_url as string) ||
-              (concatData?.video as { url?: string })?.url ||
+            const productData = productResult.data as Record<string, unknown>;
+            const productVideoUrl =
+              (productData?.video_url as string) ||
+              (productData?.video as { url?: string })?.url ||
               "";
 
-            if (concatUrl) {
-              currentVideoUrl = concatUrl;
-              console.log(`[AVATAR ENHANCE] Concatenated product intro + avatar: ${concatUrl.slice(0, 60)}...`);
+            if (productVideoUrl) {
+              console.log(`[AVATAR ENHANCE] Product intro generated: ${productVideoUrl.slice(0, 60)}...`);
+
+              // Concatenate: product intro + avatar video
+              const concatResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-videos", {
+                input: {
+                  video_urls: [productVideoUrl, currentVideoUrl],
+                },
+                logs: false,
+              });
+
+              const concatData = concatResult.data as Record<string, unknown>;
+              const concatUrl =
+                (concatData?.video_url as string) ||
+                (concatData?.video as { url?: string })?.url ||
+                "";
+
+              if (concatUrl) {
+                currentVideoUrl = concatUrl;
+                console.log(`[AVATAR ENHANCE] Concatenated product intro + avatar: ${concatUrl.slice(0, 60)}...`);
+              }
             }
+          } catch (productErr) {
+            console.warn("[AVATAR ENHANCE] Product intro generation failed, continuing without it:", productErr);
           }
-        } catch (productErr) {
-          console.warn("[AVATAR ENHANCE] Product intro generation failed, continuing without it:", productErr);
-          // Continue without product intro — still deliver the avatar video
         }
       }
 

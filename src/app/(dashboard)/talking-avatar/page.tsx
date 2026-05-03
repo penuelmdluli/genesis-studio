@@ -970,22 +970,48 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
 
   return (
     <PageTransition className="space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-600/20">
-            <MessageCircle className="w-5 h-5 text-white" />
+      {/* ─── Hero Section ────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-950/40 via-zinc-900/80 to-fuchsia-950/30 p-6 sm:p-8">
+        {/* Animated gradient orbs */}
+        <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-violet-600/10 blur-3xl animate-pulse" />
+        <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-fuchsia-600/10 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                  <Megaphone className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400">Marketing Studio</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
+                Turn Any Product Into a<br />
+                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-400 bg-clip-text text-transparent">
+                  High-Converting Video Ad
+                </span>
+              </h1>
+              <p className="text-sm text-zinc-400 mt-2 max-w-lg">
+                Upload your product, pick a face, and AI creates a professional spokesperson video with music and captions — ready to post on any platform.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-100">Avatar Ad Studio</h1>
-            <p className="text-sm text-zinc-400 mt-0.5">
-              Spokesperson videos, product ads, with music & captions — ready to post
-            </p>
+
+          {/* Stats row */}
+          <div className="flex gap-6 mt-5 flex-wrap">
+            {[
+              { value: "90%", label: "cheaper than HeyGen" },
+              { value: "19", label: "templates ready" },
+              { value: "12", label: "AI voices" },
+              { value: "6", label: "platforms" },
+            ].map((stat) => (
+              <div key={stat.label} className="flex items-baseline gap-1.5">
+                <span className="text-lg font-bold text-white">{stat.value}</span>
+                <span className="text-[10px] text-zinc-400">{stat.label}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <p className="text-[11px] text-zinc-400 ml-[52px]">
-          Like HeyGen &amp; Synthesia — 90% less cost, 10x more features
-        </p>
       </div>
 
       {/* Plan Gate */}
@@ -997,7 +1023,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
               <div>
                 <p className="text-sm font-medium text-amber-300">Creator plan required</p>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Talking Avatar is available on Creator, Pro and Studio plans.
+                  Upgrade to create professional video ads — starts at R220/month.
                 </p>
               </div>
             </div>
@@ -1006,39 +1032,70 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       )}
 
       {/* ─── Mode Toggle: Avatar Only vs Product Ad ─────────────────── */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
+      <div className="flex gap-1.5 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
         <button
           onClick={() => setIsProductMode(false)}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${
             !isProductMode
-              ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+              ? "bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 text-violet-300 border border-violet-500/30 shadow-lg shadow-violet-600/10"
               : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
           }`}
         >
           <MessageCircle className="w-4 h-4" />
-          Avatar Video
+          <div className="text-left">
+            <div>Spokesperson Video</div>
+            <div className="text-[10px] opacity-60 font-normal">Custom avatar with your script</div>
+          </div>
         </button>
         <button
           onClick={() => setIsProductMode(true)}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${
             isProductMode
-              ? "bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-300 border border-amber-500/30"
+              ? "bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-600/10"
               : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
           }`}
         >
           <Package className="w-4 h-4" />
-          Product Ad Studio
+          <div className="text-left">
+            <div>Product Ad Studio</div>
+            <div className="text-[10px] opacity-60 font-normal">AI builds your entire ad</div>
+          </div>
         </button>
       </div>
 
+      {/* What you get — only show when nothing is in progress */}
+      {!jobId && !resultVideoUrl && !isEnhancing && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/[0.12]">
+            <ImageIcon className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+            <span className="text-[11px] text-zinc-300">{isProductMode ? "Product showcase intro" : "AI lip-sync avatar"}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-fuchsia-500/[0.06] border border-fuchsia-500/[0.12]">
+            <Wand2 className="w-3.5 h-3.5 text-fuchsia-400 flex-shrink-0" />
+            <span className="text-[11px] text-zinc-300">AI-written script</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/[0.12]">
+            <Music className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span className="text-[11px] text-zinc-300">Background music</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/[0.12]">
+            <Captions className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <span className="text-[11px] text-zinc-300">Auto-captions burned in</span>
+          </div>
+        </div>
+      )}
+
       {/* ─── Product Ad Mode ─────────────────────────────────────────── */}
       {isProductMode && (
-        <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-orange-500/[0.03]">
+        <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-orange-500/[0.03] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl" />
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <Package className="w-4 h-4 text-amber-400" />
-              Your Product
-              <span className="text-[10px] text-amber-400/60 font-normal ml-1">AI creates the perfect ad</span>
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                <Package className="w-3 h-3 text-white" />
+              </div>
+              What Are You Selling?
+              <span className="text-[10px] text-amber-400/60 font-normal ml-auto">AI does the rest</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1213,9 +1270,9 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
-                <ImageIcon className="w-4 h-4 text-violet-400" />
-                Face Photo
-                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 1</span>
+                <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">1</div>
+                {isProductMode ? "Your Spokesperson" : "Face Photo"}
+                <span className="text-[10px] text-zinc-400 font-normal ml-auto">{faceImage ? "Ready" : "Required"}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1322,9 +1379,9 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
-                <Mic className="w-4 h-4 text-violet-400" />
-                Voice Input
-                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 2</span>
+                <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">2</div>
+                {isProductMode ? "Ad Script & Voice" : "Voice Input"}
+                <span className="text-[10px] text-zinc-400 font-normal ml-auto">{scriptText ? `${scriptText.split(/\s+/).filter(Boolean).length} words` : "Required"}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1491,9 +1548,9 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
-                <Smartphone className="w-4 h-4 text-violet-400" />
+                <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">3</div>
                 Platform & Style
-                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 3</span>
+                <span className="text-[10px] text-zinc-400 font-normal ml-auto">{PLATFORM_PRESETS.find(p => p.id === selectedPlatform)?.name || "Custom"}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1573,11 +1630,12 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
-                <Music className="w-4 h-4 text-violet-400" />
-                Music & Captions
-                <span className="text-[10px] text-zinc-400 font-normal ml-1">Step 4 — Optional</span>
-                {(musicMood !== "none" || subtitleStyle !== "none") && (
-                  <span className="text-[10px] text-amber-400 font-normal ml-auto">+{enhanceCost} credits</span>
+                <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">4</div>
+                Post-Production
+                {(musicMood !== "none" || subtitleStyle !== "none") ? (
+                  <span className="text-[10px] text-emerald-400 font-normal ml-auto">Enhanced</span>
+                ) : (
+                  <span className="text-[10px] text-zinc-400 font-normal ml-auto">Optional — makes it viral</span>
                 )}
               </CardTitle>
             </CardHeader>
@@ -1800,14 +1858,23 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
             onClick={handleGenerate}
             disabled={!canGenerate || isGenerating}
             loading={isGenerating}
-            className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:from-violet-500 hover:to-fuchsia-400 text-white font-medium rounded-xl shadow-lg shadow-violet-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full h-14 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-500 hover:from-violet-500 hover:via-fuchsia-400 hover:to-amber-400 text-white font-semibold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 text-base"
           >
             {!isPlanAllowed ? (
-              <span className="flex items-center gap-2"><Lock className="w-4 h-4" />Creator plan required</span>
+              <span className="flex items-center gap-2"><Lock className="w-4 h-4" />Upgrade to Create Ads</span>
+            ) : isProductMode ? (
+              <span className="flex items-center gap-2"><Megaphone className="w-5 h-5" />Create Product Ad</span>
             ) : (
-              <span className="flex items-center gap-2"><Play className="w-4 h-4" />Generate Avatar</span>
+              <span className="flex items-center gap-2"><Play className="w-5 h-5" />Generate Video</span>
             )}
           </Button>
+          {canGenerate && !isGenerating && (
+            <p className="text-[10px] text-zinc-400 text-center">
+              {isProductMode
+                ? "Product showcase + spokesperson + music + captions"
+                : "AI lip-sync video ready in 1-3 minutes"}
+            </p>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
@@ -1819,11 +1886,14 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
 
       {/* ─── Result ──────────────────────────────────────────────────── */}
       {(jobId || resultVideoUrl || isEnhancing) && (
-        <Card>
+        <Card className={resultVideoUrl ? "border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.02] to-violet-500/[0.02]" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <Play className="w-4 h-4 text-violet-400" />
-              Result
+              {resultVideoUrl ? (
+                <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Your Video Is Ready</>
+              ) : (
+                <><Play className="w-4 h-4 text-violet-400" /> Creating Your {isProductMode ? "Product Ad" : "Video"}...</>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1900,15 +1970,17 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       {/* ─── Mobile: Fixed Generate ──────────────────────────────────── */}
       <MobileActionBar>
         <Button
-          className="w-full shadow-lg shadow-violet-600/20"
+          className="w-full shadow-lg shadow-violet-600/20 h-12 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-500"
           disabled={!canGenerate || isGenerating}
           loading={isGenerating}
           onClick={handleGenerate}
         >
-          {isGenerating ? "Generating..." : !isPlanAllowed ? (
-            <><Lock className="w-4 h-4" /> Creator plan required</>
+          {isGenerating ? "Creating your ad..." : !isPlanAllowed ? (
+            <><Lock className="w-4 h-4" /> Upgrade to Create Ads</>
+          ) : isProductMode ? (
+            <><Megaphone className="w-4 h-4" /> Create Product Ad — {creditCost} cr</>
           ) : (
-            <><Play className="w-4 h-4" /> Generate — {creditCost} credits</>
+            <><Play className="w-4 h-4" /> Generate Video — {creditCost} cr</>
           )}
         </Button>
       </MobileActionBar>

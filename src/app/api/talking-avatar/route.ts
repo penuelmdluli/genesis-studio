@@ -103,10 +103,44 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // Build a talking-head prompt from the text/audio input
+      // Step 1: Generate TTS audio from text if no audio file provided
+      let finalAudioUrl = audioUrl;
+      if (text && !audioUrl) {
+        try {
+          // Use Edge TTS (free) to generate speech from the script
+          const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
+          const tts = new MsEdgeTTS();
+          const voiceMap: Record<string, string> = {
+            "voice-aria": "en-US-AriaNeural",
+            "voice-james": "en-US-GuyNeural",
+            "voice-naledi": "en-ZA-LeahNeural",
+            "voice-thabo": "en-ZA-LukeNeural",
+          };
+          const ttsVoice = voiceMap[voiceId || ""] || "en-US-AriaNeural";
+          await tts.setMetadata(ttsVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+          const { audioStream } = tts.toStream(text);
+          const chunks: Buffer[] = [];
+          for await (const chunk of audioStream) {
+            if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+          }
+          const audioBuffer = Buffer.concat(chunks);
+
+          // Upload TTS audio to R2
+          const { uploadAudio, audioStorageKey } = await import("@/lib/storage");
+          const audioKey = audioStorageKey(user.id, `avatar-${Date.now()}`);
+          await uploadAudio(audioKey, audioBuffer);
+          const { r2PublicUrl } = await import("@/lib/storage");
+          finalAudioUrl = r2PublicUrl(audioKey);
+          console.log(`[TALKING AVATAR] TTS audio generated: ${ttsVoice}, ${audioBuffer.length} bytes`);
+        } catch (ttsErr) {
+          console.warn("[TALKING AVATAR] TTS failed, falling back to prompt-only:", ttsErr);
+        }
+      }
+
+      // Step 2: Build prompt — if we have audio, tell Kling to lip-sync to it
       const avatarPrompt = text
-        ? `A person talking and expressing: "${text.slice(0, 200)}". Natural head movement, lip sync, expressive facial gestures.`
-        : "A person talking naturally with expressive facial movement and gestures, lip syncing to audio.";
+        ? `A person speaking directly to camera: "${text.slice(0, 300)}". Natural head movement, perfect lip synchronization, expressive facial gestures, professional lighting, eye contact with viewer.`
+        : "A person speaking naturally to camera with expressive facial movement, gestures, and lip sync. Professional studio setting.";
 
       // Create a job record in the database for polling
       const job = await createJob({
@@ -115,16 +149,17 @@ export async function POST(req: NextRequest) {
         modelId: "kling-2.6",
         prompt: avatarPrompt,
         inputImageUrl: imageUrl,
-        inputVideoUrl: audioUrl,
+        inputVideoUrl: finalAudioUrl,
         resolution: "720p",
         duration: effectiveDuration,
         fps: 30,
         isDraft: false,
         creditsCost,
         aspectRatio: "landscape",
+        audioUrl: finalAudioUrl,
       });
 
-      // Submit to FAL.AI Kling i2v with the face image
+      // Step 3: Submit to Kling with native audio for lip sync
       const result = await fal.queue.submit(FAL_AVATAR_MODEL, {
         input: {
           prompt: avatarPrompt,

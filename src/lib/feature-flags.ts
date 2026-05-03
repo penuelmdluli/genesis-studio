@@ -15,15 +15,16 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/pricing": true,
   "/settings": true,
   "/mimic": true,
-  // Hidden for launch — code remains, UI hidden
-  "/motion-control": false,
-  "/talking-avatar": false,
-  "/upscale": false,
-  "/thumbnails": false,
-  "/images": false,
+  "/motion-control": true,
+  "/talking-avatar": true,
+  "/upscale": true,
+  "/thumbnails": true,
+  "/images": true,
+  "/brain/templates": true,
+  "/collections": true,
+  "/api-keys": true,
+  // Hidden — not ready yet
   "/edit": false,
-  "/collections": false,
-  "/api-keys": false,
 };
 
 export function isRouteVisibleAtLaunch(href: string): boolean {

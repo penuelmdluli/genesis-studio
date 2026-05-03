@@ -433,6 +433,22 @@ export default function TalkingAvatarPage() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStage, setEnhanceStage] = useState<string | null>(null);
 
+  // Progress tracking for premium feel
+  const [progressSteps, setProgressSteps] = useState<Array<{ label: string; status: "pending" | "active" | "done" | "error" }>>([]);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Start/stop elapsed timer
+  const startTimer = useCallback(() => {
+    setElapsedTime(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => setElapsedTime(t => t + 1), 1000);
+  }, []);
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  }, []);
+
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -804,6 +820,20 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
     if (!hasEnoughCredits) { setError(`Need ${creditCost} credits, have ${user?.creditBalance ?? 0}.`); generateLockRef.current = false; return; }
 
     setIsGenerating(true);
+
+    // Build progress steps based on what's selected
+    const steps: Array<{ label: string; status: "pending" | "active" | "done" | "error" }> = [
+      { label: "Uploading files", status: "active" },
+      { label: "Generating avatar video", status: "pending" },
+    ];
+    if (isProductMode) steps.push({ label: "Creating product showcase", status: "pending" });
+    if (musicMood !== "none") steps.push({ label: "Mixing background music", status: "pending" });
+    if (subtitleStyle !== "none") steps.push({ label: "Burning captions", status: "pending" });
+    steps.push({ label: "Finalizing video", status: "pending" });
+    setProgressSteps(steps);
+    setProgressPercent(5);
+    startTimer();
+
     try {
       toast("Uploading files...", "info");
       const imageUrl = await uploadFileToStorage(faceImage, "image");
@@ -823,6 +853,9 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       const bgPreset = BACKGROUND_PRESETS.find(b => b.id === selectedBackground);
       const backgroundPrompt = selectedBackground === "custom" ? customBackground : bgPreset?.prompt || "";
 
+      // Update progress: upload done, generation starting
+      setProgressSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: "done" } : i === 1 ? { ...s, status: "active" } : s));
+      setProgressPercent(15);
       toast("Starting avatar generation...", "info");
       const res = await fetch("/api/talking-avatar", {
         method: "POST",
@@ -854,6 +887,8 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       console.error("Talking avatar generation failed:", err);
       setError("Network error. Please try again.");
       toast("Network error.", "error");
+      setProgressSteps([]);
+      stopTimer();
     } finally {
       setIsGenerating(false);
       generateLockRef.current = false;
@@ -867,11 +902,59 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
   // Enhancement pipeline — runs after avatar video completes
   const runEnhancement = useCallback(async (videoUrl: string) => {
     setIsEnhancing(true);
-    try {
-      if (uploadedProductUrl) setEnhanceStage("Creating product showcase intro...");
-      else if (musicMood !== "none") setEnhanceStage("Mixing background music...");
-      else if (subtitleStyle !== "none") setEnhanceStage("Burning captions...");
 
+    // Figure out which steps are enhancement steps and activate the first one
+    const hasProduct = !!(uploadedProductUrl || (isProductMode && productName));
+    const hasMusic = musicMood !== "none";
+    const hasCaptions = subtitleStyle !== "none";
+
+    // Activate the next pending step
+    setProgressSteps(prev => {
+      const next = prev.findIndex(s => s.status === "pending");
+      if (next >= 0) return prev.map((s, i) => i === next ? { ...s, status: "active" } : s);
+      return prev;
+    });
+
+    if (hasProduct) {
+      setEnhanceStage("Creating product showcase — AI is generating your intro scene...");
+      setProgressPercent(60);
+    } else if (hasMusic) {
+      setEnhanceStage("Generating background music...");
+      setProgressPercent(65);
+    } else if (hasCaptions) {
+      setEnhanceStage("Transcribing and burning captions...");
+      setProgressPercent(75);
+    }
+
+    // Simulate progress during the long enhance call
+    const enhanceTimer = setInterval(() => {
+      setProgressPercent(prev => Math.min(prev + 1, 92));
+
+      // Cycle through stage messages to show activity
+      setEnhanceStage(prev => {
+        if (!prev) return prev;
+        if (prev.includes("product showcase") && hasMusic) return "Mixing background music into your video...";
+        if (prev.includes("background music") && hasCaptions) return "Burning captions — almost done...";
+        if (prev.includes("Burning captions")) return "Finalizing and saving your video...";
+        return prev;
+      });
+
+      // Update step statuses based on progress
+      setProgressSteps(prev => {
+        const activeIdx = prev.findIndex(s => s.status === "active");
+        // Gradually mark steps done as time passes
+        if (activeIdx >= 0 && Math.random() < 0.15) {
+          const updated = [...prev];
+          updated[activeIdx] = { ...updated[activeIdx], status: "done" };
+          const nextPending = updated.findIndex(s => s.status === "pending");
+          if (nextPending >= 0) updated[nextPending] = { ...updated[nextPending], status: "active" };
+          return updated;
+        }
+        return prev;
+      });
+    }, 8000);
+
+    try {
       const res = await fetch("/api/talking-avatar/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -888,26 +971,40 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         }),
       });
 
+      clearInterval(enhanceTimer);
       const data = await res.json();
       if (res.ok && data.videoUrl) {
         setResultVideoUrl(data.videoUrl);
-        toast("Product ad ready!", "success");
+        setProgressSteps(prev => prev.map(s => ({ ...s, status: "done" })));
+        setProgressPercent(100);
+        stopTimer();
+        toast("Your video is ready!", "success");
       } else {
         setResultVideoUrl(videoUrl);
+        setProgressSteps(prev => prev.map(s => s.status === "active" ? { ...s, status: "error" } : s));
+        stopTimer();
         toast(data.error || "Enhancement failed, showing original video.", "error");
       }
     } catch {
+      clearInterval(enhanceTimer);
       setResultVideoUrl(videoUrl);
+      stopTimer();
       toast("Enhancement failed, showing original video.", "error");
     } finally {
       setIsEnhancing(false);
       setEnhanceStage(null);
     }
-  }, [musicMood, subtitleStyle, language, duration, jobId, toast, uploadedProductUrl, isProductMode, productName, aspectRatio]);
+  }, [musicMood, subtitleStyle, language, duration, jobId, toast, uploadedProductUrl, isProductMode, productName, aspectRatio, stopTimer]);
 
   useEffect(() => {
     if (!jobId || resultVideoUrl || isEnhancing) return;
+    // Slowly increment progress while waiting
+    let pollCount = 0;
     pollIntervalRef.current = setInterval(async () => {
+      pollCount++;
+      // Simulate progress: slowly climb from 15% to 50% during avatar gen
+      setProgressPercent(Math.min(15 + pollCount * 3, 50));
+
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
         if (!res.ok) return;
@@ -915,17 +1012,25 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         if (data.status === "completed" && data.outputVideoUrl) {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
 
-          // If enhancements selected, run post-processing pipeline
+          // Mark avatar step done
+          setProgressSteps(prev => prev.map((s, i) => i <= 1 ? { ...s, status: "done" } : s));
+          setProgressPercent(55);
+
           if (wantsEnhancement) {
-            toast("Avatar generated! Now enhancing...", "success");
+            toast("Avatar generated! Enhancing...", "success");
             runEnhancement(data.outputVideoUrl);
           } else {
             setResultVideoUrl(data.outputVideoUrl);
-            toast("Talking avatar is ready!", "success");
+            setProgressSteps(prev => prev.map(s => ({ ...s, status: "done" })));
+            setProgressPercent(100);
+            stopTimer();
+            toast("Your video is ready!", "success");
           }
         } else if (data.status === "failed") {
           setError(data.errorMessage || "Generation failed. Credits refunded.");
           setJobId(null);
+          setProgressSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: "error" } : s));
+          stopTimer();
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           toast("Generation failed. Credits refunded.", "error");
         }
@@ -1928,33 +2033,75 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 rounded-xl bg-white/[0.04] border border-white/[0.10]">
-                <GenesisLoader size="md" />
-                {isEnhancing ? (
-                  <>
-                    <p className="text-sm text-zinc-300 font-medium mt-3">Enhancing your video...</p>
-                    <p className="text-[11px] text-violet-400 mt-1.5">{enhanceStage || "Adding music & captions..."}</p>
-                    <div className="flex gap-3 mt-3">
-                      {musicMood !== "none" && (
-                        <span className="text-[10px] px-2 py-1 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-300">
-                          <Music className="w-3 h-3 inline mr-1" />{musicMood}
-                        </span>
-                      )}
-                      {subtitleStyle !== "none" && (
-                        <span className="text-[10px] px-2 py-1 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-300">
-                          <Captions className="w-3 h-3 inline mr-1" />{subtitleStyle}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-zinc-300 font-medium mt-3">Generating your talking avatar...</p>
-                    <p className="text-[11px] text-zinc-400 mt-1.5">
-                      This may take 1-3 minutes{wantsEnhancement ? " — music & captions will be added after" : " — you can leave this page"}
+              <div className="rounded-xl bg-white/[0.03] border border-white/[0.10] p-6">
+                {/* Progress bar */}
+                <div className="relative h-2 rounded-full bg-white/[0.08] mb-5 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-amber-500 transition-all duration-1000 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                  {progressPercent < 100 && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse" />
+                  )}
+                </div>
+
+                {/* Current stage message */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <GenesisLoader size="sm" />
+                    <p className="text-sm text-zinc-200 font-medium">
+                      {enhanceStage || (isEnhancing ? "Post-production in progress..." : "AI is creating your avatar...")}
                     </p>
-                  </>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                    <Clock className="w-3 h-3" />
+                    {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, "0")}
+                  </div>
+                </div>
+
+                {/* Step-by-step progress */}
+                {progressSteps.length > 0 && (
+                  <div className="space-y-2">
+                    {progressSteps.map((step, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                          step.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                          step.status === "active" ? "bg-violet-500/20 text-violet-400 animate-pulse" :
+                          step.status === "error" ? "bg-red-500/20 text-red-400" :
+                          "bg-white/[0.06] text-zinc-500"
+                        }`}>
+                          {step.status === "done" ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : step.status === "active" ? (
+                            <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                          ) : step.status === "error" ? (
+                            <X className="w-3 h-3" />
+                          ) : (
+                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                          )}
+                        </div>
+                        <span className={`text-xs transition-colors duration-300 ${
+                          step.status === "done" ? "text-emerald-400" :
+                          step.status === "active" ? "text-zinc-200 font-medium" :
+                          step.status === "error" ? "text-red-400" :
+                          "text-zinc-500"
+                        }`}>
+                          {step.label}
+                          {step.status === "done" && " ✓"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
+
+                {/* Reassurance message */}
+                <p className="text-[10px] text-zinc-400 mt-4 text-center">
+                  {progressPercent < 50
+                    ? "You can leave this page — we'll save your video to the gallery"
+                    : progressPercent < 90
+                    ? "Almost there — post-production is adding the finishing touches"
+                    : "Saving your final video..."}
+                </p>
               </div>
             )}
           </CardContent>

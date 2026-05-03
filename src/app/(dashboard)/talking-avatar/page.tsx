@@ -449,9 +449,29 @@ export default function TalkingAvatarPage() {
                   <Textarea
                     value={scriptText}
                     onChange={(e) => setScriptText(e.target.value)}
-                    placeholder="Type what the avatar should say..."
+                    placeholder="Type what the avatar should say... e.g. 'Hi! I'm Sarah, and today I'll show you how our product can save you 3 hours every week.'"
                     className="min-h-[120px] bg-white/[0.05] border-white/[0.12] text-zinc-200 placeholder:text-zinc-400 resize-none"
                   />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-400">{scriptText.length}/1000</span>
+                    <button
+                      onClick={async () => {
+                        if (!scriptText.trim() || scriptText.length < 5) {
+                          setError("Type a topic first — e.g. 'product demo for coffee brand'");
+                          return;
+                        }
+                        setError(null);
+                        try {
+                          const r = await fetch("/api/chat", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({message: `Write a short talking-head script (max 150 words) for someone speaking to camera about: "${scriptText}". Make it conversational, engaging, and natural. Include a hook in the first sentence. End with a call-to-action. Return ONLY the script text, no explanation or quotes.`}) });
+                          const d = await r.json();
+                          if (d.reply) { setScriptText(d.reply); }
+                        } catch { setError("Failed to write script"); }
+                      }}
+                      className="text-[10px] px-2.5 py-1 rounded-md bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors flex items-center gap-1"
+                    >
+                      ✨ AI Write Script
+                    </button>
+                  </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5">Voice</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">

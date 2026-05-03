@@ -272,6 +272,35 @@ export default function FirstVideoPage() {
               <Brain className="w-5 h-5" /> Try Brain Studio
             </Button>
           </div>
+
+          {/* Referral CTA — highest emotional moment */}
+          <div className="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/8 p-4 text-center">
+            <p className="text-sm font-medium text-zinc-200 mb-1">🎁 Love it? Share with a friend</p>
+            <p className="text-xs text-zinc-400 mb-3">You both get bonus credits when they sign up</p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const text = encodeURIComponent("I just made an AI video in 60 seconds — you need to try this! 🎬\n\nhttps://genesisstudio.app/sign-up");
+                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                }}
+              >
+                Share on WhatsApp
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText("https://genesisstudio.app/sign-up");
+                  toast("Link copied!", "success");
+                }}
+              >
+                Copy Link
+              </Button>
+            </div>
+          </div>
+
           <p className="text-center text-xs text-zinc-400">Your video is saved in your Gallery</p>
         </MotionSection>
       )}

@@ -86,13 +86,31 @@ export default function BrainStudioPage() {
   const { toast } = useToast();
   const isLoading = !isInitialized;
 
-  // State — pre-fill from URL params (templates, trending)
+  // State
   const [brainState, setBrainState] = useState<BrainState>("input");
-  const [concept, setConcept] = useState(() => {
-    if (typeof window === "undefined") return "";
+  const [concept, setConcept] = useState("");
+
+  // Pre-fill from URL params OR sessionStorage (templates, trending)
+  useEffect(() => {
+    // Check URL params first
     const p = new URLSearchParams(window.location.search);
-    return p.get("concept") || "";
-  });
+    let templateConcept = p.get("concept");
+    let templateDuration = p.get("duration");
+
+    // Fallback to sessionStorage (set by templates page)
+    if (!templateConcept) {
+      templateConcept = sessionStorage.getItem("brain_template_concept");
+      templateDuration = sessionStorage.getItem("brain_template_duration");
+      sessionStorage.removeItem("brain_template_concept");
+      sessionStorage.removeItem("brain_template_duration");
+    }
+
+    if (templateConcept) {
+      setConcept(templateConcept);
+      if (templateDuration) setTargetDuration(Number(templateDuration));
+      window.history.replaceState({}, "", "/brain");
+    }
+  }, []);
   const [style, setStyle] = useState<VideoStyle>("cinematic");
   const [targetDuration, setTargetDuration] = useState(30);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("landscape");

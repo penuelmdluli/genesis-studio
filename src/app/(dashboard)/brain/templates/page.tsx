@@ -85,11 +85,13 @@ export default function TemplatesPage() {
   const filtered = category === "All" ? TEMPLATES : TEMPLATES.filter((t) => t.category === category);
 
   const handleUseTemplate = (template: typeof TEMPLATES[0]) => {
-    // Navigate to Brain Studio with the template concept pre-filled
+    // Save to sessionStorage as backup (URL params can get lost on client nav)
+    sessionStorage.setItem("brain_template_concept", template.concept);
+    sessionStorage.setItem("brain_template_duration", String(template.duration));
+
     const params = new URLSearchParams({
       concept: template.concept,
       duration: String(template.duration),
-      template: template.id,
     });
     router.push(`/brain?${params.toString()}`);
     toast(`Template "${template.title}" loaded — customize and generate!`, "success");

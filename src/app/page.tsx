@@ -199,7 +199,7 @@ export default function LandingPage() {
               <Link href="/sign-up" className="w-full sm:w-auto">
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
-                  Start Free — 50 Credits
+                  Start Free — 100 Credits
                 </Button>
               </Link>
               <Link href="#community" className="w-full sm:w-auto">

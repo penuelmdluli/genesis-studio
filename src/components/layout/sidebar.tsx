@@ -193,7 +193,7 @@ export function Sidebar() {
           }
 
           const credits = user?.creditBalance ?? 0;
-          const limit = user?.monthlyCreditsLimit ?? 50;
+          const limit = user?.monthlyCreditsLimit ?? 100;
           const isLow = credits < 100 && credits > 0;
           const isEmpty = credits <= 0;
 

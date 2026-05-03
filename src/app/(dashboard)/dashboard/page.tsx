@@ -406,6 +406,28 @@ export default function DashboardPage() {
         </div>
       </MotionSection>
 
+      {/* ====== QUICK ACTIONS ====== */}
+      <MotionSection delay={0.27}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <Link href="/generate" className="flex items-center gap-2 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/15 transition-all group">
+            <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Generate Video</span>
+          </Link>
+          <Link href="/brain" className="flex items-center gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15 transition-all group">
+            <Brain className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Brain Studio</span>
+          </Link>
+          <Link href="/brain/templates" className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all group">
+            <Film className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Templates</span>
+          </Link>
+          <Link href="/explore" className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all group">
+            <ArrowUpRight className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Explore Feed</span>
+          </Link>
+        </div>
+      </MotionSection>
+
       {/* ====== REFERRAL BANNER ====== */}
       {(user?.creditBalance ?? 0) < 200 && (
         <MotionSection delay={0.28}>

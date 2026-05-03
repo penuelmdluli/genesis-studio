@@ -7,10 +7,10 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
+  { href: "/explore", label: "Explore" },
   { href: "#features", label: "Features" },
   { href: "#models", label: "Models" },
   { href: "/pricing", label: "Pricing" },
-  { href: "#api", label: "API" },
 ];
 
 export function Navbar() {

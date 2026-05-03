@@ -233,8 +233,9 @@ export async function POST(req: NextRequest) {
                   requestId,
                   logs: false,
                 });
-                console.log(`[AVATAR ENHANCE] Kling poll ${i + 1}/24: status=${status.status}`);
-                if (status.status === "COMPLETED") {
+                const statusStr = status.status as string;
+                console.log(`[AVATAR ENHANCE] Kling poll ${i + 1}/24: status=${statusStr}`);
+                if (statusStr === "COMPLETED") {
                   const result = await fal.queue.result("fal-ai/kling-video/v2.6/pro/image-to-video", { requestId });
                   const data = result.data as Record<string, unknown>;
                   productVideoUrl =
@@ -242,8 +243,8 @@ export async function POST(req: NextRequest) {
                     (data?.video as { url?: string })?.url ||
                     "";
                   break;
-                } else if (status.status === "FAILED") {
-                  console.error("[AVATAR ENHANCE] Kling job FAILED");
+                } else if (statusStr === "FAILED" || statusStr === "ERROR") {
+                  console.error(`[AVATAR ENHANCE] Kling job ${statusStr}`);
                   break;
                 }
               } catch (pollErr) {

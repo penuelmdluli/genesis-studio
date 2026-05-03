@@ -426,6 +426,9 @@ export default function TalkingAvatarPage() {
   const [suggestedFaces, setSuggestedFaces] = useState<string[]>([]);
   const [faceGenLoading, setFaceGenLoading] = useState(false);
 
+  // Product image URL (uploaded during generation, used by enhance)
+  const [uploadedProductUrl, setUploadedProductUrl] = useState<string | null>(null);
+
   // Enhancement state (post-processing after avatar generation)
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStage, setEnhanceStage] = useState<string | null>(null);
@@ -489,10 +492,11 @@ export default function TalkingAvatarPage() {
   const userPlan = user?.plan || "free";
   const isPlanAllowed = userPlan === "creator" || userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
   const baseCreditCost = computeCreditCost(duration);
-  const enhanceCost = (musicMood !== "none" ? 3 : 0) + (subtitleStyle !== "none" ? 5 : 0);
+  const productIntroCost = (isProductMode && productImage) ? 15 : 0;
+  const enhanceCost = productIntroCost + (musicMood !== "none" ? 3 : 0) + (subtitleStyle !== "none" ? 5 : 0);
   const creditCost = baseCreditCost + enhanceCost;
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
-  const wantsEnhancement = musicMood !== "none" || subtitleStyle !== "none";
+  const wantsEnhancement = musicMood !== "none" || subtitleStyle !== "none" || isProductMode;
 
   // ─── Use Case Selection ───────────────────────────────────────────
 
@@ -808,6 +812,12 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         audioUrl = await uploadFileToStorage(audioFile, "audio");
       }
 
+      // Upload product image if in product ad mode
+      let uploadedProductImageUrl: string | undefined;
+      if (isProductMode && productImage) {
+        uploadedProductImageUrl = await uploadFileToStorage(productImage, "image");
+      }
+
       // Resolve background prompt
       const bgPreset = BACKGROUND_PRESETS.find(b => b.id === selectedBackground);
       const backgroundPrompt = selectedBackground === "custom" ? customBackground : bgPreset?.prompt || "";
@@ -832,6 +842,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       const data = await res.json();
       if (res.ok) {
         setJobId(data.jobId);
+        if (uploadedProductImageUrl) setUploadedProductUrl(uploadedProductImageUrl);
         updateCreditBalance((user?.creditBalance ?? 0) - data.creditsCost);
         toast("Avatar generation started! This may take a few minutes.", "success");
       } else {
@@ -856,8 +867,9 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
   const runEnhancement = useCallback(async (videoUrl: string) => {
     setIsEnhancing(true);
     try {
-      if (musicMood !== "none") setEnhanceStage("Mixing background music...");
-      if (subtitleStyle !== "none" && musicMood === "none") setEnhanceStage("Burning captions...");
+      if (uploadedProductUrl) setEnhanceStage("Creating product showcase intro...");
+      else if (musicMood !== "none") setEnhanceStage("Mixing background music...");
+      else if (subtitleStyle !== "none") setEnhanceStage("Burning captions...");
 
       const res = await fetch("/api/talking-avatar/enhance", {
         method: "POST",
@@ -869,15 +881,17 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           subtitleStyle: subtitleStyle !== "none" ? subtitleStyle : undefined,
           language,
           durationMs: duration * 1000,
+          productImageUrl: uploadedProductUrl || undefined,
+          productName: isProductMode ? productName : undefined,
+          aspectRatio,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.videoUrl) {
         setResultVideoUrl(data.videoUrl);
-        toast("Avatar enhanced with music & captions!", "success");
+        toast("Product ad ready!", "success");
       } else {
-        // Enhancement failed — show the raw video instead
         setResultVideoUrl(videoUrl);
         toast(data.error || "Enhancement failed, showing original video.", "error");
       }
@@ -888,7 +902,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       setIsEnhancing(false);
       setEnhanceStage(null);
     }
-  }, [musicMood, subtitleStyle, language, duration, jobId, toast]);
+  }, [musicMood, subtitleStyle, language, duration, jobId, toast, uploadedProductUrl, isProductMode, productName, aspectRatio]);
 
   useEffect(() => {
     if (!jobId || resultVideoUrl || isEnhancing) return;
@@ -1750,6 +1764,12 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 <span className="text-xs text-zinc-400">Tone</span>
                 <span className="text-xs text-zinc-300 capitalize">{selectedTone}</span>
               </div>
+              {isProductMode && productImage && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-400">Product showcase intro</span>
+                  <span className="text-xs text-zinc-300">+15</span>
+                </div>
+              )}
               {musicMood !== "none" && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-400">Music ({musicMood})</span>

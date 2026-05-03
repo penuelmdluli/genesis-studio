@@ -10,13 +10,12 @@ fal.config({ credentials: process.env.FAL_KEY || "" });
  * POST /api/talking-avatar/enhance
  *
  * Post-processing pipeline for avatar videos:
- *  1. Mix background music (FAL compose) — lowers music to -28 LUFS under voice
- *  2. Burn subtitles (FAL auto-subtitle) — TikTok/YouTube/Cinematic style
- *
- * Accepts a completed avatar video URL and returns enhanced version.
+ *  1. Product showcase intro (Kling I2V on product image → 5s video)
+ *  2. Concatenate product intro + avatar video
+ *  3. Mix background music (FAL compose)
+ *  4. Burn subtitles (FAL auto-subtitle)
  */
 
-// Caption style presets (same as captions/burn)
 const CAPTION_STYLES: Record<string, Record<string, unknown>> = {
   tiktok: {
     font: "Montserrat/Montserrat-ExtraBold.ttf",
@@ -65,7 +64,6 @@ const CAPTION_STYLES: Record<string, Record<string, unknown>> = {
   },
 };
 
-// Music mood → FAL stable-audio prompt mapping
 const MUSIC_PROMPTS: Record<string, string> = {
   upbeat: "upbeat positive corporate background music, energetic, modern, inspirational, 120 bpm",
   corporate: "professional corporate background music, clean, modern, confident, 100 bpm",
@@ -97,6 +95,9 @@ export async function POST(req: NextRequest) {
       subtitleStyle,
       language,
       durationMs,
+      productImageUrl,
+      productName,
+      aspectRatio,
     } = body as {
       videoUrl: string;
       jobId?: string;
@@ -105,6 +106,9 @@ export async function POST(req: NextRequest) {
       subtitleStyle?: string;
       language?: string;
       durationMs?: number;
+      productImageUrl?: string;
+      productName?: string;
+      aspectRatio?: string;
     };
 
     if (!videoUrl) {
@@ -113,13 +117,17 @@ export async function POST(req: NextRequest) {
 
     const wantsMusic = !!(musicMood || customMusicUrl);
     const wantsSubtitles = !!subtitleStyle;
+    const wantsProductIntro = !!productImageUrl;
 
-    if (!wantsMusic && !wantsSubtitles) {
+    if (!wantsMusic && !wantsSubtitles && !wantsProductIntro) {
       return NextResponse.json({ error: "No enhancements requested" }, { status: 400 });
     }
 
-    // Credit cost: 3 for music mix + 5 for subtitle burn
-    const creditCost = (wantsMusic ? 3 : 0) + (wantsSubtitles ? 5 : 0);
+    // Credit cost: 15 for product intro (Kling I2V) + 3 for music + 5 for subtitles
+    const creditCost =
+      (wantsProductIntro ? 15 : 0) +
+      (wantsMusic ? 3 : 0) +
+      (wantsSubtitles ? 5 : 0);
     const ownerAccount = isOwnerClerkId(clerkId);
 
     if (!ownerAccount) {
@@ -127,7 +135,7 @@ export async function POST(req: NextRequest) {
         user.id,
         creditCost,
         "",
-        `Avatar enhance: ${[wantsMusic && "music", wantsSubtitles && "captions"].filter(Boolean).join("+")}`
+        `Avatar enhance: ${[wantsProductIntro && "product-intro", wantsMusic && "music", wantsSubtitles && "captions"].filter(Boolean).join("+")}`
       );
       if (!success) {
         return NextResponse.json(
@@ -141,11 +149,68 @@ export async function POST(req: NextRequest) {
       let currentVideoUrl = videoUrl;
       const targetDurationMs = durationMs || 10000;
 
+      // ── Step 0: Generate product showcase intro ──
+      if (wantsProductIntro && productImageUrl) {
+        console.log(`[AVATAR ENHANCE] Generating product showcase intro for: ${productName || "product"}`);
+
+        const productPrompt = productName
+          ? `Cinematic product showcase of ${productName}. Slow elegant camera rotation around the product, dramatic studio lighting with soft reflections, premium feel, shallow depth of field, professional commercial quality. The product is the hero — center frame, beautifully lit.`
+          : `Cinematic product showcase. Slow elegant camera orbit, dramatic studio lighting, premium commercial feel, professional product photography in motion, shallow depth of field.`;
+
+        // Map aspect ratio
+        const arMap: Record<string, string> = { "16:9": "16:9", "9:16": "9:16", "1:1": "1:1" };
+        const ar = arMap[aspectRatio || ""] || "16:9";
+
+        try {
+          // Generate 5s product video using Kling 2.6 I2V
+          const productResult = await fal.subscribe("fal-ai/kling-video/v2.6/pro/image-to-video", {
+            input: {
+              prompt: productPrompt,
+              image_url: productImageUrl,
+              duration: "5",
+              aspect_ratio: ar,
+            },
+            logs: false,
+          });
+
+          const productData = productResult.data as Record<string, unknown>;
+          const productVideoUrl =
+            (productData?.video_url as string) ||
+            (productData?.video as { url?: string })?.url ||
+            "";
+
+          if (productVideoUrl) {
+            console.log(`[AVATAR ENHANCE] Product intro generated: ${productVideoUrl.slice(0, 60)}...`);
+
+            // Concatenate: product intro + avatar video
+            const concatResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-videos", {
+              input: {
+                video_urls: [productVideoUrl, currentVideoUrl],
+              },
+              logs: false,
+            });
+
+            const concatData = concatResult.data as Record<string, unknown>;
+            const concatUrl =
+              (concatData?.video_url as string) ||
+              (concatData?.video as { url?: string })?.url ||
+              "";
+
+            if (concatUrl) {
+              currentVideoUrl = concatUrl;
+              console.log(`[AVATAR ENHANCE] Concatenated product intro + avatar: ${concatUrl.slice(0, 60)}...`);
+            }
+          }
+        } catch (productErr) {
+          console.warn("[AVATAR ENHANCE] Product intro generation failed, continuing without it:", productErr);
+          // Continue without product intro — still deliver the avatar video
+        }
+      }
+
       // ── Step 1: Mix background music ──
       if (wantsMusic) {
         let musicSource = customMusicUrl;
 
-        // Generate AI music if no custom URL
         if (!musicSource && musicMood) {
           const musicPrompt = MUSIC_PROMPTS[musicMood] || MUSIC_PROMPTS.corporate;
           console.log(`[AVATAR ENHANCE] Generating AI music: ${musicMood}`);
@@ -153,7 +218,7 @@ export async function POST(req: NextRequest) {
           const musicResult = await fal.subscribe("fal-ai/stable-audio", {
             input: {
               prompt: musicPrompt,
-              seconds_total: Math.min(Math.ceil(targetDurationMs / 1000), 47),
+              seconds_total: Math.min(Math.ceil(targetDurationMs / 1000) + 5, 47),
             },
             logs: false,
           });
@@ -170,7 +235,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (musicSource) {
-          // Loudnorm music to -28 LUFS (sits below voice)
+          // Loudnorm music to -28 LUFS
           let normalizedMusic = musicSource;
           try {
             const normResult = await fal.subscribe("fal-ai/ffmpeg-api/loudnorm", {
@@ -187,19 +252,24 @@ export async function POST(req: NextRequest) {
             console.warn("[AVATAR ENHANCE] Loudnorm failed, using raw music:", normErr);
           }
 
-          // Compose video + music together
+          // Get actual video duration for compose
+          let composeDurationMs = targetDurationMs;
+          if (wantsProductIntro) {
+            composeDurationMs += 5000; // product intro is 5s
+          }
+
           const composeResult = await fal.subscribe("fal-ai/ffmpeg-api/compose", {
             input: {
               tracks: [
                 {
                   id: "video-main",
                   type: "video",
-                  keyframes: [{ timestamp: 0, duration: targetDurationMs, url: currentVideoUrl }],
+                  keyframes: [{ timestamp: 0, duration: composeDurationMs, url: currentVideoUrl }],
                 },
                 {
                   id: "music-bg",
                   type: "audio",
-                  keyframes: [{ timestamp: 0, duration: targetDurationMs, url: normalizedMusic }],
+                  keyframes: [{ timestamp: 0, duration: composeDurationMs, url: normalizedMusic }],
                 },
               ],
             },
@@ -268,7 +338,6 @@ export async function POST(req: NextRequest) {
       const storageKey = videoStorageKey(user.id, `avatar-enhanced-${Date.now()}`);
       const persistedUrl = await persistExternalVideo(currentVideoUrl, storageKey);
 
-      // Update job if provided
       if (jobId) {
         const { r2PublicUrl } = await import("@/lib/storage");
         await updateJobStatus(jobId, {
@@ -283,6 +352,7 @@ export async function POST(req: NextRequest) {
         videoUrl: persistedUrl || r2PublicUrl(storageKey),
         creditsCost: creditCost,
         enhancements: {
+          productIntro: wantsProductIntro,
           music: wantsMusic,
           subtitles: wantsSubtitles,
         },

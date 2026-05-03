@@ -6,6 +6,9 @@ import { fal } from "@fal-ai/client";
 
 fal.config({ credentials: process.env.FAL_KEY || "" });
 
+// Vercel function timeout — Kling I2V + music + captions can take 3-4 minutes
+export const maxDuration = 300;
+
 /**
  * POST /api/talking-avatar/enhance
  *
@@ -248,7 +251,10 @@ export async function POST(req: NextRequest) {
               }
             }
           } catch (productErr) {
-            console.warn("[AVATAR ENHANCE] Product intro generation failed, continuing without it:", productErr);
+            const errMsg = productErr instanceof Error ? productErr.message : String(productErr);
+            console.error("[AVATAR ENHANCE] Product intro generation FAILED:", errMsg);
+            console.error("[AVATAR ENHANCE] Product image URL:", finalProductImageUrl?.slice(0, 100));
+            // Continue without product intro — still deliver the avatar video
           }
         }
       }

@@ -7,6 +7,9 @@ import { fal } from "@fal-ai/client";
 
 fal.config({ credentials: process.env.FAL_KEY || "" });
 
+// TTS generation + R2 upload can take 30-60s
+export const maxDuration = 120;
+
 const FAL_AVATAR_MODEL = "fal-ai/kling-video/v2.6/pro/image-to-video";
 
 export async function POST(req: NextRequest) {

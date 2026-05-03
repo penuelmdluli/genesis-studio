@@ -211,25 +211,48 @@ export async function POST(req: NextRequest) {
           const ar = arMap[aspectRatio || ""] || "16:9";
 
           try {
-            // Generate 5s product video using Kling 2.6 I2V
-            const productResult = await fal.subscribe("fal-ai/kling-video/v2.6/pro/image-to-video", {
+            // Generate 5s product video using Kling 2.6 I2V (async submit + poll)
+            console.log("[AVATAR ENHANCE] Submitting Kling I2V job for product intro...");
+            const submitResult = await fal.queue.submit("fal-ai/kling-video/v2.6/pro/image-to-video", {
               input: {
                 prompt: productPrompt,
                 image_url: finalProductImageUrl,
                 duration: "5",
                 aspect_ratio: ar,
               },
-              logs: false,
             });
+            const requestId = submitResult.request_id;
+            console.log(`[AVATAR ENHANCE] Kling job submitted: ${requestId}`);
 
-            const productData = productResult.data as Record<string, unknown>;
-            const productVideoUrl =
-              (productData?.video_url as string) ||
-              (productData?.video as { url?: string })?.url ||
-              "";
+            // Poll for completion (max 4 minutes, check every 10s)
+            let productVideoUrl = "";
+            for (let i = 0; i < 24; i++) {
+              await new Promise(r => setTimeout(r, 10000));
+              try {
+                const status = await fal.queue.status("fal-ai/kling-video/v2.6/pro/image-to-video", {
+                  requestId,
+                  logs: false,
+                });
+                console.log(`[AVATAR ENHANCE] Kling poll ${i + 1}/24: status=${status.status}`);
+                if (status.status === "COMPLETED") {
+                  const result = await fal.queue.result("fal-ai/kling-video/v2.6/pro/image-to-video", { requestId });
+                  const data = result.data as Record<string, unknown>;
+                  productVideoUrl =
+                    (data?.video_url as string) ||
+                    (data?.video as { url?: string })?.url ||
+                    "";
+                  break;
+                } else if (status.status === "FAILED") {
+                  console.error("[AVATAR ENHANCE] Kling job FAILED");
+                  break;
+                }
+              } catch (pollErr) {
+                console.warn(`[AVATAR ENHANCE] Poll error (attempt ${i + 1}):`, pollErr);
+              }
+            }
 
             if (productVideoUrl) {
-              console.log(`[AVATAR ENHANCE] Product intro generated: ${productVideoUrl.slice(0, 60)}...`);
+              console.log(`[AVATAR ENHANCE] Product intro generated: ${productVideoUrl.slice(0, 80)}...`);
 
               // Concatenate: product intro + avatar video
               const concatResult = await fal.subscribe("fal-ai/ffmpeg-api/merge-videos", {
@@ -247,14 +270,14 @@ export async function POST(req: NextRequest) {
 
               if (concatUrl) {
                 currentVideoUrl = concatUrl;
-                console.log(`[AVATAR ENHANCE] Concatenated product intro + avatar: ${concatUrl.slice(0, 60)}...`);
+                console.log(`[AVATAR ENHANCE] Concatenated product intro + avatar: ${concatUrl.slice(0, 80)}...`);
               }
+            } else {
+              console.warn("[AVATAR ENHANCE] Product intro video not ready after polling, continuing without it");
             }
           } catch (productErr) {
             const errMsg = productErr instanceof Error ? productErr.message : String(productErr);
-            console.error("[AVATAR ENHANCE] Product intro generation FAILED:", errMsg);
-            console.error("[AVATAR ENHANCE] Product image URL:", finalProductImageUrl?.slice(0, 100));
-            // Continue without product intro — still deliver the avatar video
+            console.error("[AVATAR ENHANCE] Product intro FAILED:", errMsg);
           }
         }
       }

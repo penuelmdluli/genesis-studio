@@ -71,24 +71,40 @@ export default function GeneratePage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
-  // Seed from explore video — pre-fill prompt when arriving via ?seed_from={videoId}
+  // Pre-fill from URL params (explore recreate, templates, etc.)
   const [seedLoaded, setSeedLoaded] = useState(false);
   useEffect(() => {
+    if (seedLoaded) return;
+
+    // Option 1: ?prompt=...&model=... (direct from recreate modal)
+    const directPrompt = searchParams.get("prompt");
+    if (directPrompt) {
+      setSeedLoaded(true);
+      setFormField("prompt", decodeURIComponent(directPrompt));
+      const model = searchParams.get("model");
+      if (model) setFormField("modelId", decodeURIComponent(model) as ModelId);
+      toast("Prompt loaded — customize and generate!", "info");
+      window.history.replaceState({}, "", "/generate");
+      return;
+    }
+
+    // Option 2: ?seed_from={videoId} (fetch from explore API)
     const seedFrom = searchParams.get("seed_from");
-    if (!seedFrom || seedLoaded) return;
-    setSeedLoaded(true);
-    fetch(`/api/explore/${seedFrom}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        const video = data?.video;
-        if (video?.prompt) {
-          setFormField("prompt", video.prompt);
-          if (video.modelId) setFormField("modelId", video.modelId);
-          if (video.duration) setFormField("duration", video.duration);
-          toast("Prompt loaded from Explore. Feel free to tweak it!", "info");
-        }
-      })
-      .catch(() => {});
+    if (seedFrom) {
+      setSeedLoaded(true);
+      fetch(`/api/explore/${seedFrom}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          const video = data?.video;
+          if (video?.prompt) {
+            setFormField("prompt", video.prompt);
+            if (video.modelId) setFormField("modelId", video.modelId);
+            if (video.duration) setFormField("duration", video.duration);
+            toast("Prompt loaded from Explore. Feel free to tweak it!", "info");
+          }
+        })
+        .catch(() => {});
+    }
   }, [searchParams, seedLoaded, setFormField, toast]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);

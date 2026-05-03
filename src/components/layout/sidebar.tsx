@@ -34,6 +34,7 @@ import {
   Image,
   Users,
   Radio,
+  Globe,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
@@ -48,6 +49,7 @@ interface NavItem {
 
 const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/explore", label: "Explore", icon: Globe, section: "Discover" },
   // --- CREATE ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "NEW" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "HOT" },

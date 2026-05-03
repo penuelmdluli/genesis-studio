@@ -166,9 +166,25 @@ export async function POST(req: NextRequest) {
         ? `Setting: ${background}.`
         : "Professional studio setting with soft lighting.";
 
-      const avatarPrompt = text
-        ? `A person speaking directly to camera: "${text.slice(0, 300)}". ${toneDirection} ${bgScene} Perfect lip synchronization, natural head movement, eye contact with viewer.`
-        : `A person speaking naturally to camera. ${toneDirection} ${bgScene} Expressive facial movement, gestures, and lip sync.`;
+      // Build avatar prompt — adapt based on context
+      const scriptSnippet = text ? text.slice(0, 200) : "";
+      const isProductAd = scriptSnippet.toLowerCase().includes("product") ||
+        scriptSnippet.toLowerCase().includes("try it") ||
+        scriptSnippet.toLowerCase().includes("sign up") ||
+        scriptSnippet.toLowerCase().includes("link") ||
+        scriptSnippet.toLowerCase().includes("buy") ||
+        scriptSnippet.toLowerCase().includes("free trial");
+
+      let avatarPrompt: string;
+      if (text && isProductAd) {
+        // Product ad mode: more dynamic, expressive, marketing energy
+        avatarPrompt = `A charismatic spokesperson presenting a product to camera. ${toneDirection} Dynamic hand gestures emphasizing key points, occasional product-holding motion, enthusiastic facial expressions, natural body movement. ${bgScene} Perfect lip synchronization, cinematic lighting, commercial quality. The person is passionately selling something they believe in.`;
+      } else if (text) {
+        // Regular talking head: natural, conversational
+        avatarPrompt = `A person speaking naturally and engagingly to camera. ${toneDirection} ${bgScene} Natural head movement, varied facial expressions, occasional hand gestures, perfect lip synchronization, eye contact with viewer. Not stiff — alive and expressive.`;
+      } else {
+        avatarPrompt = `A person speaking naturally to camera with varied expressions and gestures. ${toneDirection} ${bgScene} Expressive facial movement, natural body language, lip sync.`;
+      }
 
       // Map aspect ratio to FAL format and DB format
       type DbAR = "landscape" | "portrait" | "square";

@@ -955,20 +955,23 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
     }, 8000);
 
     try {
+      const enhancePayload = {
+        videoUrl,
+        jobId,
+        musicMood: musicMood !== "none" ? musicMood : undefined,
+        subtitleStyle: subtitleStyle !== "none" ? subtitleStyle : undefined,
+        language,
+        durationMs: duration * 1000,
+        productImageUrl: uploadedProductUrl || undefined,
+        productName: isProductMode ? productName : undefined,
+        aspectRatio,
+      };
+      console.log("[AVATAR UI] Enhance payload:", JSON.stringify(enhancePayload));
+
       const res = await fetch("/api/talking-avatar/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          videoUrl,
-          jobId,
-          musicMood: musicMood !== "none" ? musicMood : undefined,
-          subtitleStyle: subtitleStyle !== "none" ? subtitleStyle : undefined,
-          language,
-          durationMs: duration * 1000,
-          productImageUrl: uploadedProductUrl || undefined,
-          productName: isProductMode ? productName : undefined,
-          aspectRatio,
-        }),
+        body: JSON.stringify(enhancePayload),
       });
 
       clearInterval(enhanceTimer);
@@ -1017,6 +1020,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           setProgressPercent(55);
 
           if (wantsEnhancement) {
+            console.log("[AVATAR UI] Enhancement triggered. productUrl:", uploadedProductUrl, "musicMood:", musicMood, "subtitleStyle:", subtitleStyle, "isProductMode:", isProductMode);
             toast("Avatar generated! Enhancing...", "success");
             runEnhancement(data.outputVideoUrl);
           } else {

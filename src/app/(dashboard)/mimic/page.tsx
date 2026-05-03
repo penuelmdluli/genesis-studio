@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { PageTransition } from "@/components/ui/motion";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { uploadFile } from "@/lib/upload-client";
@@ -52,26 +52,21 @@ interface MbsCharacter {
 
 const STORAGE_KEY = "mimic_active_job";
 
-const STATUS_LABELS: Record<JobStatus, string> = {
-  idle: "",
-  uploading: "Uploading files...",
-  scraping: "Fetching video from URL...",
-  submitting: "Submitting to Kling...",
-  in_queue: "In queue — waiting for GPU...",
-  processing: "Generating your video...",
-  completed: "Done!",
-  failed: "Generation failed",
-};
+const PROGRESS_STEPS = [
+  "Uploading files",
+  "Submitting to GPU",
+  "Waiting in queue",
+  "Generating your video",
+  "Saving result",
+];
 
-const STATUS_PROGRESS: Record<JobStatus, number> = {
-  idle: 0,
-  uploading: 10,
-  scraping: 20,
-  submitting: 30,
-  in_queue: 40,
-  processing: 65,
-  completed: 100,
-  failed: 0,
+/** Maps each JobStatus to { stepIndex, percent } so we can drive the premium tracker. */
+const STATUS_PROGRESS_MAP: Partial<Record<JobStatus, { stepIndex: number; percent: number }>> = {
+  uploading:   { stepIndex: 0, percent: 10 },
+  scraping:    { stepIndex: 0, percent: 15 },
+  submitting:  { stepIndex: 1, percent: 30 },
+  in_queue:    { stepIndex: 2, percent: 45 },
+  processing:  { stepIndex: 3, percent: 65 },
 };
 
 export default function MimicStudioPage() {
@@ -108,6 +103,58 @@ export default function MimicStudioPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const generateLockRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Premium progress tracker
+  const progress = useGenerationProgress();
+  const prevJobStatusRef = useRef<JobStatus>("idle");
+
+  useEffect(() => {
+    const prev = prevJobStatusRef.current;
+    prevJobStatusRef.current = jobStatus;
+
+    if (jobStatus === "idle" || jobStatus === prev) return;
+
+    // Starting a new generation
+    if (jobStatus === "uploading" || jobStatus === "scraping") {
+      if (prev === "idle" || prev === "completed" || prev === "failed") {
+        progress.start(PROGRESS_STEPS);
+      }
+      const entry = STATUS_PROGRESS_MAP[jobStatus];
+      if (entry) progress.setProgress(entry.percent, jobStatus === "scraping" ? "Fetching video from URL..." : "Uploading files...");
+      return;
+    }
+
+    if (jobStatus === "completed") {
+      progress.complete("Your mimic video is ready!");
+      return;
+    }
+
+    if (jobStatus === "failed") {
+      progress.fail(error || "Generation failed");
+      return;
+    }
+
+    // For submitting / in_queue / processing — advance steps to the target index
+    const entry = STATUS_PROGRESS_MAP[jobStatus];
+    if (entry) {
+      // If coming from idle (e.g. restore from localStorage), initialize first
+      if (prev === "idle" || prev === "completed" || prev === "failed") {
+        progress.start(PROGRESS_STEPS);
+      }
+      // Advance from current active step to the target step
+      const currentActive = progress.steps.findIndex(s => s.status === "active");
+      const stepsToAdvance = currentActive >= 0 ? entry.stepIndex - currentActive : 0;
+      for (let i = 0; i < stepsToAdvance; i++) {
+        progress.advanceStep();
+      }
+      const messages: Record<string, string> = {
+        submitting: "Submitting to GPU...",
+        in_queue: "In queue — waiting for GPU...",
+        processing: "Generating your video...",
+      };
+      progress.setProgress(entry.percent, messages[jobStatus] || "Processing...");
+    }
+  }, [jobStatus, error]);
 
   const credits = user?.creditBalance ?? 0;
   const hasEnoughCredits = user?.isOwner || credits >= CREDIT_COST;
@@ -394,6 +441,7 @@ export default function MimicStudioPage() {
     setOutputVideoUrl(null);
     setError(null);
     setIsGenerating(false);
+    progress.reset();
     if (pollRef.current) clearInterval(pollRef.current);
     localStorage.removeItem(STORAGE_KEY);
   };
@@ -738,30 +786,24 @@ export default function MimicStudioPage() {
             </CardContent>
           </Card>
 
-          {/* Generation Status */}
+          {/* Generation Status — Premium Progress Tracker */}
           {jobStatus !== "idle" && (
             <Card glow={jobStatus === "completed"}>
               <CardContent className="py-6">
-                {/* Active generation */}
-                {isActive && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
-                      <span className="text-sm font-medium text-zinc-200">
-                        {STATUS_LABELS[jobStatus]}
-                      </span>
-                    </div>
-                    <Progress value={STATUS_PROGRESS[jobStatus]} className="h-1.5" />
-                  </div>
+                {/* Premium progress tracker (active + completed states) */}
+                {(isActive || jobStatus === "completed" || jobStatus === "failed") && (
+                  <GenerationProgress
+                    steps={progress.steps}
+                    percent={progress.percent}
+                    stageMessage={progress.stageMessage}
+                    showTimer
+                    timerActive={progress.isActive}
+                  />
                 )}
 
-                {/* Completed */}
+                {/* Completed — video + actions */}
                 {jobStatus === "completed" && outputVideoUrl && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-emerald-400">
-                      <Check className="w-5 h-5" />
-                      <span className="text-sm font-bold">Your Mimic video is ready!</span>
-                    </div>
+                  <div className="space-y-4 mt-5">
                     <div className="rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
                       <video
                         src={outputVideoUrl}
@@ -803,13 +845,9 @@ export default function MimicStudioPage() {
                   </div>
                 )}
 
-                {/* Failed */}
+                {/* Failed — error + retry */}
                 {jobStatus === "failed" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-red-400">
-                      <X className="w-5 h-5" />
-                      <span className="text-sm font-medium">{error || "Generation failed"}</span>
-                    </div>
+                  <div className="space-y-3 mt-4">
                     <p className="text-xs text-zinc-400">Credits have been automatically refunded.</p>
                     <button
                       onClick={resetGeneration}

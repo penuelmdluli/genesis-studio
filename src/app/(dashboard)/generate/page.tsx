@@ -59,6 +59,7 @@ import {
   Languages,
 } from "lucide-react";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
   { value: "t2v", label: "Text to Video", icon: Film, desc: "Generate from text prompt" },
@@ -121,6 +122,7 @@ export default function GeneratePage() {
   const [showPresets, setShowPresets] = useState(false);
   const [presetPlatform, setPresetPlatform] = useState<string>("All");
   const [isTranslating, setIsTranslating] = useState(false);
+  const progress = useGenerationProgress();
 
   // Sample prompt chips for new users (< 5 generations)
   const [sampleChips] = useState<SamplePrompt[]>(() => getOnePerCategory());
@@ -304,6 +306,7 @@ export default function GeneratePage() {
 
     setIsGenerating(true);
     setModerationWarning(null);
+    progress.start(["Uploading files", "Submitting to AI", "Generating video", "Saving to gallery"]);
 
     // Content moderation check
     try {
@@ -318,6 +321,7 @@ export default function GeneratePage() {
           setModerationWarning(modData.reason || "This prompt contains content that violates our guidelines.");
           setError("Prompt blocked by content moderation. Please modify your prompt.");
           setIsGenerating(false);
+          progress.fail("Prompt blocked by content moderation");
           generateLockRef.current = false;
           return;
         }
@@ -331,11 +335,14 @@ export default function GeneratePage() {
       if (form.inputImage && (form.type === "i2v" || form.type === "v2v")) {
         try {
           toast("Uploading image...", "info");
+          progress.setProgress(10, "Uploading your image...");
           inputImageUrl = await uploadFile(form.inputImage, "image");
         } catch {
           console.error("Image upload failed, continuing without image");
         }
       }
+      progress.advanceStep("Submitting to AI...");
+      progress.setProgress(30);
 
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -360,6 +367,8 @@ export default function GeneratePage() {
       });
 
       const data = await res.json();
+      progress.advanceStep("Generating video...");
+      progress.setProgress(60);
       if (res.ok) {
         addJob({
           id: data.jobId,
@@ -381,14 +390,19 @@ export default function GeneratePage() {
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
         toast("Generation started! Check your gallery for progress.", "success");
         setError(null);
+        progress.advanceStep("Saving to gallery...");
+        progress.setProgress(90);
+        progress.complete("Your video is ready!");
       } else {
         setError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");
+        progress.fail("Generation failed");
       }
     } catch (err) {
       console.error("Generation failed:", err);
       setError("Network error. Please check your connection and try again.");
       toast("Network error. Please try again.", "error");
+      progress.fail("Generation failed");
     } finally {
       setIsGenerating(false);
       generateLockRef.current = false;
@@ -1093,6 +1107,18 @@ export default function GeneratePage() {
                     )}
                   </Button>
 
+                  {(isGenerating || progress.percent > 0) && (
+                    <div className="mt-4">
+                      <GenerationProgress
+                        steps={progress.steps}
+                        percent={progress.percent}
+                        stageMessage={progress.stageMessage}
+                        timerActive={progress.isActive}
+                        compact
+                      />
+                    </div>
+                  )}
+
                   {error && (
                     <p className="text-xs text-center text-red-400 mt-2">
                       {error}
@@ -1157,6 +1183,17 @@ export default function GeneratePage() {
                 )}
               </Button>
             </div>
+            {(isGenerating || progress.percent > 0) && (
+              <div className="mt-2">
+                <GenerationProgress
+                  steps={progress.steps}
+                  percent={progress.percent}
+                  stageMessage={progress.stageMessage}
+                  timerActive={progress.isActive}
+                  compact
+                />
+              </div>
+            )}
             {error && (
               <p className="text-xs text-center text-red-400 mt-1.5">{error}</p>
             )}

@@ -35,6 +35,7 @@ import { uploadFile } from "@/lib/upload-client";
 import { Switch } from "@/components/ui/switch";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { HelpTip } from "@/components/ui/tooltip";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 
 type MotionTab = "upload" | "effects" | "history";
 type MotionQuality = "standard" | "pro";
@@ -73,6 +74,8 @@ export default function MotionControlPage() {
 
   const motionVideoRef = useRef<HTMLInputElement>(null);
   const characterImageRef = useRef<HTMLInputElement>(null);
+
+  const progress = useGenerationProgress();
 
   // isLoading already defined from isInitialized above
 
@@ -185,11 +188,15 @@ export default function MotionControlPage() {
     }
 
     setIsGenerating(true);
+    progress.start(["Uploading files", "Applying motion reference", "Generating video", "Saving to gallery"]);
     try {
-      toast("Uploading files...", "info");
+      progress.setProgress(10, "Uploading character image...");
 
       // Upload character image
       const characterImageUrl = await uploadFileToR2(characterImage, "image");
+
+      progress.setProgress(25, "Uploading motion reference...");
+      progress.advanceStep("Applying motion reference...");
 
       // Upload motion video if provided
       let referenceVideoUrl: string | undefined;
@@ -197,7 +204,8 @@ export default function MotionControlPage() {
         referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
       }
 
-      toast("Starting motion control...", "info");
+      progress.setProgress(45, "Starting motion generation...");
+      progress.advanceStep("Generating video...");
 
       const res = await fetch("/api/motion-control", {
         method: "POST",
@@ -219,6 +227,9 @@ export default function MotionControlPage() {
 
       const data = await res.json();
       if (res.ok) {
+        progress.setProgress(85, "Saving to gallery...");
+        progress.advanceStep("Saving to gallery...");
+
         addJob({
           id: data.jobId,
           userId: user?.id || "",
@@ -235,14 +246,17 @@ export default function MotionControlPage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
+        progress.complete("Your motion video is ready!");
         toast("Motion control started! Check your gallery.", "success");
         setError(null);
       } else {
+        progress.fail(data.error || "Generation failed.");
         setError(data.error || "Generation failed.");
         toast(data.error || "Generation failed", "error");
       }
     } catch (err) {
       console.error("Motion control generation failed:", err);
+      progress.fail("Network error. Please try again.");
       setError("Network error. Please try again.");
       toast("Network error.", "error");
     } finally {
@@ -803,10 +817,21 @@ export default function MotionControlPage() {
                   </div>
                 </div>
 
-                {error && (
+                {error && !progress.isActive && (
                   <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
                     {error}
                   </div>
+                )}
+
+                {(progress.isActive || progress.percent > 0) && (
+                  <GenerationProgress
+                    steps={progress.steps}
+                    percent={progress.percent}
+                    stageMessage={progress.stageMessage}
+                    showTimer
+                    timerActive={progress.isActive}
+                    compact
+                  />
                 )}
 
                 <Button
@@ -831,6 +856,19 @@ export default function MotionControlPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile progress tracker */}
+      {(progress.isActive || progress.percent > 0) && (
+        <div className="lg:hidden">
+          <GenerationProgress
+            steps={progress.steps}
+            percent={progress.percent}
+            stageMessage={progress.stageMessage}
+            showTimer
+            timerActive={progress.isActive}
+          />
+        </div>
+      )}
 
       {/* Mobile: Fixed Generate button at bottom */}
       <MobileActionBar>

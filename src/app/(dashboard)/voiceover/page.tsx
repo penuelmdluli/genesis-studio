@@ -9,7 +9,8 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
-import { GenesisButtonLoader, GenesisLoader } from "@/components/ui/genesis-loader";
+import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 import { Mic, Play, Square, Download, Zap, AlertCircle, RefreshCw } from "lucide-react";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
@@ -53,6 +54,7 @@ export default function VoiceoverPage() {
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
+  const progress = useGenerationProgress();
 
   const handlePreviewVoice = useCallback((voiceId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,9 +127,12 @@ export default function VoiceoverPage() {
     setAudioUrl(null);
     setJobId(null);
     setGenerationError(null);
+    progress.start(["Processing text", "Generating speech", "Saving audio"]);
 
     try {
       const selectedVoice = VOICE_OPTIONS.find((v) => v.id === selectedVoiceId);
+      progress.advanceStep("Sending request...");
+      progress.setProgress(20);
       const res = await fetch("/api/voiceover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,10 +145,13 @@ export default function VoiceoverPage() {
       });
 
       const data = await res.json();
+      progress.advanceStep("Processing audio...");
+      progress.setProgress(60);
 
       if (!res.ok) {
         const msg = data.error || "Generation failed. Please try again.";
         setGenerationError(msg);
+        progress.fail(msg);
         toast(msg, "error");
         return;
       }
@@ -154,15 +162,20 @@ export default function VoiceoverPage() {
       }
 
       setJobId(data.jobId);
+      progress.advanceStep("Finalizing...");
+      progress.setProgress(90);
 
       if (data.audioUrl) {
         setAudioUrl(data.audioUrl);
+        progress.complete("Your voiceover is ready!");
         toast("Voiceover ready! Your audio has been generated.", "success");
       } else {
+        progress.complete("Voiceover submitted for processing!");
         toast("Processing... Your voiceover is being generated.", "success");
       }
     } catch {
       setGenerationError("Network error. Please check your connection and try again.");
+      progress.fail("Network error. Please check your connection.");
       toast("Something went wrong. Please try again.", "error");
     } finally {
       setIsGenerating(false);
@@ -400,13 +413,17 @@ export default function VoiceoverPage() {
           )}
 
           {/* Processing State (no audio yet, but job submitted) */}
-          {isGenerating && !audioUrl && (
+          {progress.isActive && !audioUrl && (
             <Card className="border-zinc-800 bg-zinc-900/60">
-              <CardContent className="flex flex-col items-center gap-3 py-8">
-                <GenesisLoader size="md" />
-                <p className="text-sm text-zinc-400">
-                  Generating your voiceover... This may take up to a minute.
-                </p>
+              <CardContent className="py-6">
+                <GenerationProgress
+                  steps={progress.steps}
+                  percent={progress.percent}
+                  stageMessage={progress.stageMessage}
+                  showTimer
+                  timerActive={progress.isActive}
+                  footerMessage="Your voiceover is being generated... This may take up to a minute."
+                />
               </CardContent>
             </Card>
           )}

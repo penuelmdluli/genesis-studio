@@ -7,6 +7,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { PageTransition } from "@/components/ui/motion";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 import { ArrowUpCircle, Upload, Zap, Play } from "lucide-react";
 
 const PLAN_ORDER = ["free", "creator", "pro", "studio"] as const;
@@ -47,7 +48,7 @@ export default function UpscalePage() {
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const progress = useGenerationProgress();
   const [jobId, setJobId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -163,8 +164,10 @@ export default function UpscalePage() {
     }
 
     setIsProcessing(true);
-    setProgress(0);
+    progress.reset();
     setResultUrl(null);
+
+    progress.start(["Uploading video", "Analyzing frames", "Upscaling with AI", "Saving HD video"]);
 
     try {
       // Determine video URL: if file upload, use signed URL upload (bypasses Vercel 4.5MB limit)
@@ -179,6 +182,10 @@ export default function UpscalePage() {
       } else {
         throw new Error("No video selected");
       }
+
+      // Upload done, advance to step 2
+      progress.advanceStep("Analyzing video frames...");
+      progress.setProgress(25);
 
       const res = await fetch("/api/upscale", {
         method: "POST",
@@ -196,24 +203,29 @@ export default function UpscalePage() {
       if (!res.ok) {
         setError(data.error || "Upscale failed. Please try again.");
         toast(data.error || "Upscale failed", "error");
+        progress.fail(data.error || "Upscale failed");
         setIsProcessing(false);
         upscaleLockRef.current = false;
         return;
       }
+
+      // API accepted, advance to step 3
+      progress.advanceStep("AI is upscaling your video...");
+      progress.setProgress(40);
 
       setJobId(data.jobId);
       updateCreditBalance((user?.creditBalance ?? 0) - data.creditsCost);
       toast("Upscaling started! This may take a few minutes.", "success");
 
       // Simulate progress while polling for completion
+      let simulatedProgress = 40;
       const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 95) {
-            clearInterval(progressInterval);
-            return 95;
-          }
-          return prev + Math.random() * 8;
-        });
+        simulatedProgress += Math.random() * 6;
+        if (simulatedProgress >= 90) {
+          simulatedProgress = 90;
+          clearInterval(progressInterval);
+        }
+        progress.setProgress(Math.round(simulatedProgress));
       }, 2000);
 
       // Poll for completion
@@ -223,6 +235,7 @@ export default function UpscalePage() {
         if (Date.now() - pollStartTime > 600000) {
           clearInterval(progressInterval);
           clearInterval(pollInterval);
+          progress.fail("Upscaling timed out. Please check your gallery later.");
           setIsProcessing(false);
           setError("Upscaling timed out. Please check your gallery later or try again.");
           return;
@@ -234,13 +247,19 @@ export default function UpscalePage() {
             if (statusData.status === "completed" && statusData.outputVideoUrl) {
               clearInterval(progressInterval);
               clearInterval(pollInterval);
-              setProgress(100);
+              // Advance to final step then complete
+              progress.advanceStep("Saving your HD video...");
+              progress.setProgress(95);
+              setTimeout(() => {
+                progress.complete("Your video has been upscaled!");
+              }, 600);
               setResultUrl(statusData.outputVideoUrl);
               setIsProcessing(false);
               toast("Video upscaled successfully!", "success");
             } else if (statusData.status === "failed") {
               clearInterval(progressInterval);
               clearInterval(pollInterval);
+              progress.fail(statusData.errorMessage || "Upscaling failed. Credits have been refunded.");
               setIsProcessing(false);
               setError(statusData.errorMessage || "Upscaling failed. Credits have been refunded.");
               toast("Upscaling failed. Credits refunded.", "error");
@@ -254,6 +273,7 @@ export default function UpscalePage() {
       console.error("Upscale failed:", err);
       setError("Network error. Please check your connection and try again.");
       toast("Network error. Please try again.", "error");
+      progress.fail("Network error. Please check your connection.");
       setIsProcessing(false);
     } finally {
       upscaleLockRef.current = false;
@@ -548,22 +568,16 @@ export default function UpscalePage() {
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              {isProcessing && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Processing...</span>
-                    <span className="text-violet-400">
-                      {Math.round(progress)}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all duration-500"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
+              {/* Progress Tracker */}
+              {(isProcessing || progress.isActive || progress.percent > 0) && (
+                <GenerationProgress
+                  steps={progress.steps}
+                  percent={progress.percent}
+                  stageMessage={progress.stageMessage}
+                  showTimer
+                  timerActive={isProcessing}
+                  compact
+                />
               )}
 
               <Button

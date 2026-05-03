@@ -5,12 +5,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
+import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
-import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import {
   Captions,
   Upload,
@@ -100,6 +99,10 @@ export default function CaptionsPage() {
   const [burnedVideoUrl, setBurnedVideoUrl] = useState<string | null>(null);
   const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
 
+  // Premium progress trackers
+  const captionProgress = useGenerationProgress();
+  const burnTracker = useGenerationProgress();
+
   // Double-click protection
   const generateLockRef = useRef(false);
   const burnLockRef = useRef(false);
@@ -170,6 +173,7 @@ export default function CaptionsPage() {
     setBurnedVideoUrl(null);
     setIsProcessing(true);
     setProgress(5);
+    captionProgress.start(["Uploading video", "Transcribing audio", "Generating subtitles"]);
 
     let targetUrl = resolvedVideoUrl;
 
@@ -178,12 +182,16 @@ export default function CaptionsPage() {
       try {
         toast("Uploading video...", "info");
         setProgress(10);
+        captionProgress.setProgress(10, "Uploading video...");
         const { uploadFile } = await import("@/lib/upload-client");
         targetUrl = await uploadFile(videoFile, "video");
         setProgress(25);
+        captionProgress.setProgress(25);
+        captionProgress.advanceStep("Transcribing audio...");
       } catch {
         setError("Failed to upload video. Please try again.");
         toast("Upload failed. Please try again.", "error");
+        captionProgress.fail("Upload failed");
         setIsProcessing(false);
         generateLockRef.current = false;
         return;
@@ -226,6 +234,7 @@ export default function CaptionsPage() {
       setJobId(data.jobId);
       updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
       toast("Caption generation started!", "success");
+      captionProgress.advanceStep("Transcribing audio...");
 
       // Simulate progress while processing
       let currentProgress = 10;
@@ -235,7 +244,13 @@ export default function CaptionsPage() {
           currentProgress = 90;
           clearInterval(interval);
         }
-        setProgress(Math.round(currentProgress));
+        const rounded = Math.round(currentProgress);
+        setProgress(rounded);
+        captionProgress.setProgress(rounded);
+        // Advance to "Generating subtitles" step around 60%
+        if (rounded >= 60) {
+          captionProgress.advanceStep("Generating subtitles...");
+        }
       }, 2000);
 
       // Poll for completion (simplified — in production, use webhooks)
@@ -248,12 +263,14 @@ export default function CaptionsPage() {
               clearInterval(pollInterval);
               clearInterval(interval);
               setProgress(100);
+              captionProgress.complete("Captions generated!");
               setSrtContent(statusData.output.srt);
               setIsProcessing(false);
               toast("Captions generated successfully!", "success");
             } else if (statusData.status === "failed") {
               clearInterval(pollInterval);
               clearInterval(interval);
+              captionProgress.fail(statusData.errorMessage || "Caption generation failed");
               setError(statusData.errorMessage || "Caption generation failed.");
               setIsProcessing(false);
             }
@@ -270,6 +287,7 @@ export default function CaptionsPage() {
         if (isProcessing) {
           setIsProcessing(false);
           setProgress(0);
+          captionProgress.fail("Processing timed out");
           setError("Processing timed out. Your job may still complete — check back later.");
         }
       }, 300000);
@@ -277,6 +295,7 @@ export default function CaptionsPage() {
       console.error("Caption generation failed:", err);
       setError("Network error. Please check your connection and try again.");
       toast("Network error. Please try again.", "error");
+      captionProgress.fail("Network error");
       setIsProcessing(false);
     } finally {
       generateLockRef.current = false;
@@ -316,6 +335,7 @@ export default function CaptionsPage() {
     setBurnProgress(10);
     setBurnedVideoUrl(null);
     setError(null);
+    burnTracker.start(["Processing video", "Styling captions", "Burning into video", "Saving final video"]);
 
     try {
       const res = await fetch("/api/captions/burn", {
@@ -333,6 +353,7 @@ export default function CaptionsPage() {
       if (!res.ok) {
         setError(data.error || "Burn failed.");
         toast(data.error || "Burn failed", "error");
+        burnTracker.fail("Burn failed");
         setIsBurning(false);
         burnLockRef.current = false;
         return;
@@ -340,6 +361,7 @@ export default function CaptionsPage() {
 
       updateCreditBalance((user?.creditBalance ?? 0) - (data.creditsCost || 5));
       toast("Burning captions into video...", "success");
+      burnTracker.advanceStep("Styling captions...");
 
       // Simulated progress
       let currentProgress = 10;
@@ -349,7 +371,15 @@ export default function CaptionsPage() {
           currentProgress = 90;
           clearInterval(interval);
         }
-        setBurnProgress(Math.round(currentProgress));
+        const rounded = Math.round(currentProgress);
+        setBurnProgress(rounded);
+        burnTracker.setProgress(rounded);
+        // Advance steps at key percentages
+        if (rounded >= 40 && rounded < 50) {
+          burnTracker.advanceStep("Burning into video...");
+        } else if (rounded >= 75) {
+          burnTracker.advanceStep("Saving final video...");
+        }
       }, 3000);
 
       // Poll for completion
@@ -362,6 +392,7 @@ export default function CaptionsPage() {
               clearInterval(pollInterval);
               clearInterval(interval);
               setBurnProgress(100);
+              burnTracker.complete("Video saved!");
               setBurnedVideoUrl(statusData.output.videoUrl);
               setIsBurning(false);
               toast("Captions burned into video! Saved to gallery.", "success");
@@ -386,6 +417,7 @@ export default function CaptionsPage() {
             } else if (statusData.status === "failed") {
               clearInterval(pollInterval);
               clearInterval(interval);
+              burnTracker.fail(statusData.errorMessage || "Burn failed");
               setError(statusData.errorMessage || "Burn failed.");
               setIsBurning(false);
             }
@@ -402,12 +434,14 @@ export default function CaptionsPage() {
         if (isBurning) {
           setIsBurning(false);
           setBurnProgress(0);
+          burnTracker.fail("Burn timed out");
           setError("Burn timed out. Your job may still complete.");
         }
       }, 300000);
     } catch (err) {
       console.error("Burn failed:", err);
       setError("Network error. Please try again.");
+      burnTracker.fail("Network error");
       setIsBurning(false);
     } finally {
       burnLockRef.current = false;
@@ -651,15 +685,15 @@ export default function CaptionsPage() {
                 </div>
 
                 {/* Burn progress */}
-                {isBurning && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <GenesisButtonLoader />
-                      <span className="text-sm text-zinc-300">Burning captions into video...</span>
-                    </div>
-                    <Progress value={burnProgress} />
-                    <p className="text-xs text-zinc-400 text-center">{burnProgress}% — 5 credits</p>
-                  </div>
+                {(isBurning || burnTracker.percent === 100) && burnTracker.steps.length > 0 && (
+                  <GenerationProgress
+                    steps={burnTracker.steps}
+                    percent={burnTracker.percent}
+                    stageMessage={burnTracker.stageMessage}
+                    showTimer={true}
+                    timerActive={burnTracker.isActive}
+                    compact={true}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -763,15 +797,15 @@ export default function CaptionsPage() {
               </div>
 
               {/* Progress */}
-              {isProcessing && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <GenesisButtonLoader />
-                    <span className="text-sm text-zinc-300">Processing captions...</span>
-                  </div>
-                  <Progress value={progress} />
-                  <p className="text-xs text-zinc-400 text-center">{progress}%</p>
-                </div>
+              {(isProcessing || captionProgress.percent === 100) && captionProgress.steps.length > 0 && (
+                <GenerationProgress
+                  steps={captionProgress.steps}
+                  percent={captionProgress.percent}
+                  stageMessage={captionProgress.stageMessage}
+                  showTimer={true}
+                  timerActive={captionProgress.isActive}
+                  compact={true}
+                />
               )}
 
               <Button

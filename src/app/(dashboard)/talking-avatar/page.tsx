@@ -59,7 +59,7 @@ interface UseCase {
   id: string;
   name: string;
   icon: typeof Target;
-  category: "marketing" | "sales" | "content" | "business";
+  category: "marketing" | "sales" | "content" | "business" | "saas";
   description: string;
   sampleScript: string;
   suggestedTone: string;
@@ -224,6 +224,84 @@ const USE_CASES: UseCase[] = [
     suggestedDuration: 15,
     suggestedPlatform: "tiktok",
   },
+  // ─── SaaS / Tech Tool Templates ──────────────────────────────────
+  {
+    id: "saas-launch",
+    name: "SaaS Product Launch",
+    icon: Monitor,
+    category: "saas",
+    description: "Launch your software product with impact",
+    sampleScript: "We just launched something incredible. If you've ever struggled with [pain point], this changes everything. Our platform lets you [core benefit] in minutes, not hours. We're already trusted by [number] teams worldwide. Start your free trial — no credit card required. Link below.",
+    suggestedTone: "inspirational",
+    suggestedDuration: 30,
+    suggestedPlatform: "linkedin",
+  },
+  {
+    id: "saas-demo",
+    name: "Tool Demo / Walkthrough",
+    icon: Monitor,
+    category: "saas",
+    description: "Show your app in action with a spokesperson",
+    sampleScript: "Let me show you how easy it is. Step one — sign up in 30 seconds. Step two — connect your [integration]. Step three — watch the magic happen. What used to take your team an entire day now takes five minutes. Don't believe me? Try it free right now.",
+    suggestedTone: "friendly",
+    suggestedDuration: 30,
+    suggestedPlatform: "youtube",
+  },
+  {
+    id: "saas-vs-competitor",
+    name: "Why Switch to Us",
+    icon: TrendingUp,
+    category: "saas",
+    description: "Convert users from competing tools",
+    sampleScript: "If you're still using [old way], you're paying too much for too little. Our users save an average of 60% while getting 3x the features. The migration takes 5 minutes — we even import your existing data. Over 5,000 teams already switched this month. What are you waiting for?",
+    suggestedTone: "urgent",
+    suggestedDuration: 30,
+    suggestedPlatform: "tiktok",
+  },
+  {
+    id: "saas-feature-drop",
+    name: "New Feature Announcement",
+    icon: Sparkles,
+    category: "saas",
+    description: "Announce a powerful new feature update",
+    sampleScript: "Your number one request? We built it. Introducing [feature name] — now you can [capability] directly inside the platform. No workarounds, no third-party tools. It's available right now for all users. Go check it out and let us know what you think.",
+    suggestedTone: "inspirational",
+    suggestedDuration: 15,
+    suggestedPlatform: "tiktok",
+  },
+  {
+    id: "saas-social-proof",
+    name: "Customer Success Story",
+    icon: Star,
+    category: "saas",
+    description: "Share a real result from a customer",
+    sampleScript: "One of our customers went from spending 20 hours a week on [task] to just 2. That's 18 hours back — every single week. They didn't hire more people. They didn't change their process. They just started using our tool. If you want results like that, the link is right there.",
+    suggestedTone: "professional",
+    suggestedDuration: 30,
+    suggestedPlatform: "linkedin",
+  },
+  {
+    id: "saas-free-trial",
+    name: "Free Trial / Sign Up CTA",
+    icon: Zap,
+    category: "saas",
+    description: "Drive sign-ups with a compelling offer",
+    sampleScript: "Here's the deal — try it free for 14 days. No credit card. No commitment. If it doesn't save you at least 5 hours in your first week, just walk away. But I'm betting you won't want to. Join 10,000+ users who already made the switch. Link in bio — takes 30 seconds.",
+    suggestedTone: "urgent",
+    suggestedDuration: 15,
+    suggestedPlatform: "tiktok",
+  },
+  {
+    id: "saas-founder-story",
+    name: "Founder Story",
+    icon: Heart,
+    category: "saas",
+    description: "Tell the origin story of your tool",
+    sampleScript: "I built this because I was frustrated. Every tool out there was either too expensive, too complicated, or too limited. So I spent [time] building exactly what I wished existed. Now thousands of people use it every day. If you've felt that same frustration, this is for you.",
+    suggestedTone: "friendly",
+    suggestedDuration: 30,
+    suggestedPlatform: "youtube",
+  },
 ];
 
 const PLATFORM_PRESETS: PlatformPreset[] = [
@@ -298,6 +376,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   sales: "Sales",
   content: "Content",
   business: "Business",
+  saas: "SaaS / Tech",
 };
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -463,21 +542,41 @@ export default function TalkingAvatarPage() {
     setProductAiLoading(true);
     setError(null);
     try {
-      const prompt = `You are a world-class advertising copywriter. Write a compelling 30-second talking-head video script for a spokesperson presenting this product:
+      // Detect if this is a software/tech/SaaS product
+      const techKeywords = ["app", "software", "saas", "platform", "tool", "ai", "api", "dashboard", "automation", "cloud", "plugin", "extension", "website", "studio", "generator", "builder", "crm", "erp"];
+      const isTechProduct = techKeywords.some(k =>
+        productName.toLowerCase().includes(k) || (productDescription || "").toLowerCase().includes(k)
+      );
+
+      const techBoost = isTechProduct ? `
+IMPORTANT — This is a software/tech product. Use these SaaS-specific persuasion techniques:
+- Lead with the TRANSFORMATION, not the technology ("go from 5 hours to 5 minutes")
+- Mention ease of setup ("takes 30 seconds", "no code required", "works instantly")
+- Use competitor displacement language without naming competitors ("unlike what you're using now")
+- Include a low-friction CTA ("free trial", "no credit card", "just try it")
+- Reference scale/trust ("trusted by thousands", "10,000+ users", "teams at top companies")
+- Make the tech feel SIMPLE, not complex — the viewer should think "I could do that"
+- If it's an AI tool, emphasize the magic ("just describe what you want and watch it happen")` : "";
+
+      const prompt = `You are a world-class advertising copywriter who specializes in high-converting video ads. Write a compelling ${duration}-second talking-head video script for a spokesperson presenting this product:
 
 Product: ${productName}
 ${productDescription ? `Description: ${productDescription}` : ""}
 Platform: ${PLATFORM_PRESETS.find(p => p.id === selectedPlatform)?.name || "social media"}
 Tone: ${selectedTone}
+Duration: ${duration} seconds (~${Math.floor(duration * 2.5)} words)
+${techBoost}
 
 Rules:
-- Start with a scroll-stopping hook (question or bold statement)
-- Highlight 2-3 key benefits (not features)
-- Include social proof if possible ("thousands of customers", "top-rated")
-- End with a clear, urgent call-to-action
-- Keep it under 120 words, conversational, natural
-- The speaker should sound like they genuinely love this product
-- DO NOT use brackets or placeholders
+- Start with an IRRESISTIBLE hook — a question, bold claim, or pattern interrupt that stops the scroll
+- Focus on 2-3 key BENEFITS (what the user gets), never list features
+- Include social proof ("thousands of customers", "top-rated", real-sounding stats)
+- Build urgency or scarcity if natural ("limited time", "everyone's switching", "don't get left behind")
+- End with ONE clear, specific call-to-action that tells them exactly what to do next
+- Keep it under ${Math.floor(duration * 2.5)} words, conversational, like talking to a friend
+- The speaker should sound genuinely excited — not salesy, but passionate
+- Use short sentences. Punchy. Easy to follow while scrolling.
+- DO NOT use brackets, placeholders, or stage directions
 - Return ONLY the script text, no explanation`;
 
       const r = await fetch("/api/chat", {
@@ -511,14 +610,16 @@ Rules:
 Product: ${productName || "general product"}
 ${productDescription ? `Description: ${productDescription}` : ""}
 Target audience: ${selectedTone === "professional" ? "business professionals" : selectedTone === "friendly" ? "everyday consumers" : selectedTone === "urgent" ? "impulse buyers" : "general audience"}
+Platform: ${PLATFORM_PRESETS.find(p => p.id === selectedPlatform)?.name || "social media"}
 
-Write a SINGLE detailed prompt for generating a photorealistic headshot of the perfect spokesperson. Include:
-- Age range, gender (pick one), ethnicity (be diverse and inclusive)
-- Expression (warm smile, confident look, etc.)
-- Attire (what they'd wear for this product type)
-- Lighting and background (studio headshot style)
+Write a SINGLE detailed prompt for generating a photorealistic headshot of the perfect spokesperson. Think about:
+- WHO would the target audience trust? (Match their demographic — a tech founder for SaaS, a fitness model for health, a relatable person for consumer products)
+- Age range, gender (pick one), ethnicity (be diverse — vary each generation)
+- Expression that matches the tone (warm smile for friendly, confident look for professional, energetic for urgent)
+- Attire that matches the product industry (casual tech wear for apps, business casual for B2B, stylish for fashion/beauty)
+- Lighting and background (studio headshot style, clean)
 
-The photo must be: front-facing, clear face, shoulders visible, professional headshot quality, looking directly at camera.
+The photo must be: front-facing, clear face visible, shoulders visible, professional headshot quality, looking directly at camera, photorealistic.
 
 Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
 
@@ -968,6 +1069,28 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 Script ready — scroll down to customize voice, platform & generate
               </div>
             )}
+
+            {/* Quick-fill examples for inspiration */}
+            <div className="pt-2 border-t border-white/[0.06]">
+              <p className="text-[10px] text-zinc-400 mb-2">Quick-fill examples — click to try:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: "AI Video Platform", desc: "Create professional videos with AI in minutes. Text to video, talking avatars, auto-captions, background music. 10x faster than traditional editing." },
+                  { name: "Project Management App", desc: "Kanban boards, time tracking, team collaboration. Replace 5 tools with one. Used by 50,000+ teams." },
+                  { name: "E-commerce Store Builder", desc: "Launch your online store in 60 seconds. AI-designed templates, one-click payments, built-in marketing tools." },
+                  { name: "Fitness Coaching App", desc: "Personalized workout plans powered by AI. Track progress, get form feedback from your camera, join challenges." },
+                  { name: "Social Media Scheduler", desc: "Schedule posts across all platforms. AI writes captions, finds best posting times, tracks analytics." },
+                ].map((ex) => (
+                  <button
+                    key={ex.name}
+                    onClick={() => { setProductName(ex.name); setProductDescription(ex.desc); }}
+                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] border border-white/[0.08] text-zinc-400 hover:text-amber-300 hover:border-amber-500/30 transition-colors"
+                  >
+                    {ex.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

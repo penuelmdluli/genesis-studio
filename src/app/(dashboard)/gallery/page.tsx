@@ -33,7 +33,7 @@ type SortKey = "newest" | "oldest" | "name";
 type FormatFilter = "all" | "standard" | "reel" | "audio";
 
 export default function GalleryPage() {
-  const { videos, activeJobs, removeVideo, isInitialized } = useStore();
+  const { user, videos, activeJobs, removeVideo, isInitialized } = useStore();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -532,6 +532,16 @@ export default function GalleryPage() {
                   <Wand2 className="w-4 h-4" />
                   Brain Studio
                 </a>
+                {/* Upgrade prompt for free users */}
+                {user?.plan === "free" && (
+                  <a
+                    href="/pricing"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600/20 to-cyan-600/20 border border-violet-500/30 hover:border-violet-500/50 text-violet-300 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Remove Watermark — Upgrade
+                  </a>
+                )}
                 <button
                   onClick={() => setConfirmDeleteId(currentVideo.id)}
                   className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-red-500/20 text-white/40 hover:text-red-400 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 ml-auto"

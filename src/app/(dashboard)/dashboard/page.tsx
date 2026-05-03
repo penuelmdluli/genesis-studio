@@ -408,7 +408,7 @@ export default function DashboardPage() {
 
       {/* ====== QUICK ACTIONS ====== */}
       <MotionSection delay={0.27}>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
           <Link href="/generate" className="flex items-center gap-2 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/15 transition-all group">
             <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
             <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Generate Video</span>
@@ -421,9 +421,13 @@ export default function DashboardPage() {
             <Film className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Templates</span>
           </Link>
+          <Link href="/talking-avatar" className="flex items-center gap-2 p-3 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500/15 transition-all group">
+            <Mic className="w-4 h-4 text-pink-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Talking Avatar</span>
+          </Link>
           <Link href="/explore" className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all group">
             <ArrowUpRight className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Explore Feed</span>
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Explore</span>
           </Link>
         </div>
       </MotionSection>

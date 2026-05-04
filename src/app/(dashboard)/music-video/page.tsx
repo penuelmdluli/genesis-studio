@@ -26,6 +26,8 @@ import {
   FileAudio,
   User,
   Zap,
+  Rocket,
+  Loader2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -167,6 +169,14 @@ export default function MusicVideoPage() {
   const [selectedPlatform, setSelectedPlatform] = useState("tiktok");
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("9:16");
 
+  // Demo Quick Start
+  const [demoSongs, setDemoSongs] = useState<Array<{id: string, name: string, url: string, genre: string}>>([]);
+  const [demoCharacters, setDemoCharacters] = useState<Array<{id: string, name: string, url: string}>>([]);
+  const [loadingDemo, setLoadingDemo] = useState(false);
+  const [demoSongUrl, setDemoSongUrl] = useState<string | null>(null);
+  const [selectedDemoSong, setSelectedDemoSong] = useState<{id: string, name: string, url: string, genre: string} | null>(null);
+  const [selectedDemoCharacter, setSelectedDemoCharacter] = useState<{id: string, name: string, url: string} | null>(null);
+
   // Generation
   const [isGenerating, setIsGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -181,6 +191,20 @@ export default function MusicVideoPage() {
   const isLoading = !isInitialized;
   const userPlan = user?.plan || "free";
   const isPlanAllowed = userPlan === "creator" || userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
+
+  // ─── Load Demo Assets on Mount ────────────────────────────────────
+  useEffect(() => {
+    if (!isInitialized || !user) return;
+    setLoadingDemo(true);
+    fetch("/api/music-video/demo-assets")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.songs) setDemoSongs(data.songs);
+        if (data?.characters) setDemoCharacters(data.characters);
+      })
+      .catch(() => { /* silent — demo section just won't show */ })
+      .finally(() => setLoadingDemo(false));
+  }, [isInitialized, user]);
 
   // ─── Credit Calculation ───────────────────────────────────────────
 
@@ -221,6 +245,7 @@ export default function MusicVideoPage() {
   const removeFace = () => {
     setFaceFile(null);
     setFacePreview(null);
+    setSelectedDemoCharacter(null);
   };
 
   // ─── Music Upload ─────────────────────────────────────────────────
@@ -280,6 +305,8 @@ export default function MusicVideoPage() {
     setSongDuration(0);
     setClipStartSec(0);
     setIsPlaying(false);
+    setDemoSongUrl(null);
+    setSelectedDemoSong(null);
   };
 
   const playClipPreview = () => {
@@ -411,10 +438,28 @@ export default function MusicVideoPage() {
     setAspectRatio(p.aspectRatio);
   };
 
+  // ─── Demo Quick Start Handlers ─────────────────────────────────────
+
+  const handleSelectDemoSong = (song: typeof demoSongs[0]) => {
+    setSelectedDemoSong(song);
+    setDemoSongUrl(song.url);
+    setMusicFile(null);
+    setSelectedTrack(null);
+    setMusicMode("upload"); // Keep in upload mode visually but use demo URL
+  };
+
+  const handleSelectDemoCharacter = (char: typeof demoCharacters[0]) => {
+    setSelectedDemoCharacter(char);
+    setFaceFile(null);
+    setFacePreview(char.url);
+    setFaceMode("upload"); // Show the preview in upload mode
+    setSelectedCharacter(null);
+  };
+
   // ─── Generate ─────────────────────────────────────────────────────
 
-  const hasFace = faceMode === "upload" ? !!faceFile : !!selectedCharacter;
-  const hasMusic = musicMode === "upload" ? !!musicFile : !!selectedTrack;
+  const hasFace = faceMode === "upload" ? (!!faceFile || !!selectedDemoCharacter) : !!selectedCharacter;
+  const hasMusic = musicMode === "upload" ? (!!musicFile || !!demoSongUrl) : !!selectedTrack;
   const canGenerate =
     hasFace &&
     hasMusic &&
@@ -449,7 +494,10 @@ export default function MusicVideoPage() {
 
       // Get face image URL
       let faceUrl: string;
-      if (faceMode === "upload" && faceFile) {
+      if (selectedDemoCharacter) {
+        // Demo character — already a permanent R2 URL
+        faceUrl = selectedDemoCharacter.url;
+      } else if (faceMode === "upload" && faceFile) {
         toast("Uploading face photo...", "info");
         faceUrl = await uploadFile(faceFile, "image");
       } else if (selectedCharacter) {
@@ -482,7 +530,10 @@ export default function MusicVideoPage() {
 
       // Upload or resolve music
       let musicUrl: string;
-      if (musicMode === "upload" && musicFile) {
+      if (demoSongUrl) {
+        // Demo song — already a permanent R2 URL
+        musicUrl = demoSongUrl;
+      } else if (musicMode === "upload" && musicFile) {
         toast("Uploading song...", "info");
         musicUrl = await uploadFile(musicFile, "audio");
       } else if (selectedTrack) {
@@ -501,7 +552,7 @@ export default function MusicVideoPage() {
         body: JSON.stringify({
           faceImageUrl: faceUrl,
           musicUrl,
-          genre: selectedTrack ? selectedTrack.genre.toLowerCase().replace(/[^a-z]/g, "") : genre,
+          genre: selectedDemoSong ? selectedDemoSong.genre.toLowerCase().replace(/[^a-z]/g, "") : selectedTrack ? selectedTrack.genre.toLowerCase().replace(/[^a-z]/g, "") : genre,
           energy,
           scenes: sceneCount,
           stage: stage === "custom" ? customStage : stage,
@@ -639,6 +690,102 @@ export default function MusicVideoPage() {
         </Card>
       )}
 
+      {/* ─── QUICK START: One-Click Demo ────────────────────────────── */}
+      {(loadingDemo || demoSongs.length > 0 || demoCharacters.length > 0) && (
+        <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] via-pink-500/[0.02] to-violet-500/[0.03]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Rocket className="w-4 h-4 text-amber-400" />
+              Quick Start — No Upload Needed
+              <span className="ml-auto text-[10px] font-normal text-zinc-500">Try it instantly</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingDemo ? (
+              <div className="flex items-center justify-center gap-2 py-8">
+                <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                <span className="text-sm text-zinc-400">Loading demo assets...</span>
+              </div>
+            ) : (
+              <>
+                {/* Demo Songs */}
+                {demoSongs.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-zinc-400 mb-2">Ready-to-use songs (15s clips with vocals)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {demoSongs.map((song) => (
+                        <button
+                          key={song.id}
+                          onClick={() => handleSelectDemoSong(song)}
+                          className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
+                            selectedDemoSong?.id === song.id
+                              ? "bg-amber-500/15 border-2 border-amber-500/40 ring-1 ring-amber-500/20 shadow-lg shadow-amber-500/10"
+                              : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-amber-500/20"
+                          }`}
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
+                            <Music2 className="w-4 h-4 text-amber-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className={`text-xs font-bold block ${selectedDemoSong?.id === song.id ? "text-amber-300" : "text-zinc-200"}`}>
+                              {song.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">{song.genre} · 15s</span>
+                          </div>
+                          {selectedDemoSong?.id === song.id && (
+                            <CheckCircle2 className="w-4 h-4 text-amber-400 ml-auto flex-shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Demo Characters */}
+                {demoCharacters.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-zinc-400 mb-2">Ready-to-use characters</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {demoCharacters.map((char) => (
+                        <button
+                          key={char.id}
+                          onClick={() => handleSelectDemoCharacter(char)}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${
+                            selectedDemoCharacter?.id === char.id
+                              ? "bg-pink-500/15 border-2 border-pink-500/40 ring-1 ring-pink-500/20 shadow-lg shadow-pink-500/10"
+                              : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-pink-500/20"
+                          }`}
+                        >
+                          <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/[0.12]">
+                            <img src={char.url} alt={char.name} className="w-full h-full object-cover" />
+                          </div>
+                          <span className={`text-xs font-bold ${selectedDemoCharacter?.id === char.id ? "text-pink-300" : "text-zinc-200"}`}>
+                            {char.name}
+                          </span>
+                          {selectedDemoCharacter?.id === char.id && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-pink-400" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedDemoSong || selectedDemoCharacter) && (
+                  <p className="text-[10px] text-amber-400 text-center bg-amber-500/5 rounded-lg py-2 border border-amber-500/10">
+                    {selectedDemoSong && selectedDemoCharacter
+                      ? "Both selected — scroll down and hit \"Drop the Beat\" to create your video!"
+                      : selectedDemoSong
+                      ? "Song selected! Now pick a character above or upload your own face below."
+                      : "Character selected! Now pick a song above or upload your own below."}
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ─── STEP 1: Upload Section ───────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -672,7 +819,7 @@ export default function MusicVideoPage() {
                   Upload Photo
                 </button>
                 <button
-                  onClick={() => { setFaceMode("character"); setFaceFile(null); setFacePreview(null); }}
+                  onClick={() => { setFaceMode("character"); setFaceFile(null); setFacePreview(null); setSelectedDemoCharacter(null); }}
                   className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
                     faceMode === "character"
                       ? "bg-pink-500/20 text-pink-300 border border-pink-500/30"
@@ -709,6 +856,7 @@ export default function MusicVideoPage() {
                   )}
                 </>
               ) : (
+                <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {DEFAULT_CHARACTERS.map((char) => (
                     <button
@@ -748,6 +896,7 @@ export default function MusicVideoPage() {
                 <p className="text-[10px] text-zinc-500 text-center mt-2">
                   Click a character to see their AI-generated portrait (10 credits)
                 </p>
+                </>
               )}
               {selectedCharacter && faceMode === "character" && (
                 <p className="text-[10px] text-pink-400 mt-2 text-center">
@@ -776,7 +925,7 @@ export default function MusicVideoPage() {
                   Upload Song
                 </button>
                 <button
-                  onClick={() => { setMusicMode("library"); setMusicFile(null); }}
+                  onClick={() => { setMusicMode("library"); setMusicFile(null); setDemoSongUrl(null); setSelectedDemoSong(null); }}
                   className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
                     musicMode === "library"
                       ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
@@ -869,7 +1018,21 @@ export default function MusicVideoPage() {
                 </div>
               ) : (
                 <>
-                  {musicFile ? (
+                  {selectedDemoSong && !musicFile ? (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Music2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                          <span className="text-sm font-medium text-zinc-200 truncate">{selectedDemoSong.name}</span>
+                          <span className="text-[10px] text-amber-400 flex-shrink-0">Demo · {selectedDemoSong.genre}</span>
+                        </div>
+                        <button onClick={removeMusic} className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-all">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-amber-400/80">Quick Start song selected — ready to generate!</p>
+                    </div>
+                  ) : musicFile ? (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
                       {/* Song info + remove */}
                       <div className="flex items-center justify-between">
@@ -1014,7 +1177,7 @@ export default function MusicVideoPage() {
       </Card>
 
       {/* ─── STEP 2: Performance Settings ─────────────────────────── */}
-      <Card className={!faceFile || !hasMusic ? "opacity-50 pointer-events-none" : ""}>
+      <Card className={!hasFace || !hasMusic ? "opacity-50 pointer-events-none" : ""}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[10px] font-bold text-white">2</div>
@@ -1138,7 +1301,7 @@ export default function MusicVideoPage() {
       </Card>
 
       {/* ─── STEP 3: Platform & Aspect Ratio ──────────────────────── */}
-      <Card className={!faceFile || !musicFile ? "opacity-50 pointer-events-none" : ""}>
+      <Card className={!hasFace || !hasMusic ? "opacity-50 pointer-events-none" : ""}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[10px] font-bold text-white">3</div>
@@ -1198,7 +1361,7 @@ export default function MusicVideoPage() {
       </Card>
 
       {/* ─── Credit Breakdown & Generate ───────────────────────────── */}
-      <Card className={!faceFile || !musicFile ? "opacity-50 pointer-events-none" : "border-pink-500/20"}>
+      <Card className={!hasFace || !hasMusic ? "opacity-50 pointer-events-none" : "border-pink-500/20"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <Zap className="w-4 h-4 text-amber-400" />

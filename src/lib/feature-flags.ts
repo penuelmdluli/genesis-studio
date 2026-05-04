@@ -24,6 +24,7 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/collections": true,
   "/api-keys": true,
   "/product-ads": true,
+  "/music-video": true,
   // Hidden — not ready yet
   "/edit": false,
 };

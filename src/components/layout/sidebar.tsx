@@ -58,6 +58,7 @@ const baseNavItems: NavItem[] = [
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
   { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create", badge: "NEW" },
+  { href: "/music-video", label: "Music Video", icon: Radio, section: "Create", badge: "NEW" },
   { href: "/mimic", label: "Mimic Studio", icon: Zap, section: "Create" },
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },

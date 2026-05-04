@@ -76,14 +76,15 @@ const STAGE_OPTIONS = [
 const SCENE_OPTIONS = [2, 3, 4, 5, 6];
 const CREDITS_PER_SCENE = 20;
 
-// Default AI singer characters — with visual emoji avatars and style descriptions
+// Default AI singer characters — iconic, visually stunning
+// Portraits auto-generated on first view via /api/music-video/singer-portrait
 const DEFAULT_CHARACTERS = [
-  { id: "singer-male-1", name: "Marcus", desc: "Male, confident, urban style", avatar: "👨🏾‍🎤", style: "Hip-Hop / Trap", prompt: "Young confident Black male singer, 25 years old, short fade haircut, gold chain, streetwear, charismatic smile, studio headshot, professional lighting" },
-  { id: "singer-female-1", name: "Aria", desc: "Female, powerful vocals", avatar: "👩🏽‍🎤", style: "Pop / R&B", prompt: "Young mixed-race female singer, 23 years old, long braids, stylish outfit, fierce confident expression, studio headshot, dramatic lighting" },
-  { id: "singer-male-2", name: "Jay", desc: "Male, rockstar energy", avatar: "🧑🏻‍🎤", style: "Rock / Alternative", prompt: "White male rock singer, 28 years old, messy hair, leather jacket, intense gaze, tattoo on neck, studio headshot, moody lighting" },
-  { id: "singer-female-2", name: "Zara", desc: "Female, Afro-soul queen", avatar: "👩🏿‍🎤", style: "Afro-Soul / Gospel", prompt: "Beautiful Black female singer, 26 years old, natural afro hair, elegant earrings, warm soulful expression, studio headshot, golden lighting" },
-  { id: "singer-male-3", name: "Thabo", desc: "Male, Amapiano star", avatar: "🧑🏾‍🎤", style: "Amapiano / Afrobeats", prompt: "South African male artist, 24 years old, fresh designer outfit, confident smile, modern style, studio headshot, vibrant lighting" },
-  { id: "singer-female-3", name: "Naledi", desc: "Female, SA pop princess", avatar: "👩🏾‍🎤", style: "SA Pop / Dance", prompt: "South African female pop artist, 22 years old, colorful braids, bold makeup, radiant smile, trendy outfit, studio headshot, bright lighting" },
+  { id: "singer-male-1", name: "Marcus", desc: "The streets talk through him", avatar: "👨🏾‍🎤", style: "Hip-Hop / Trap", vibe: "Drake meets Nasty C energy", prompt: "Ultra-photorealistic portrait of a confident 25-year-old Black male hip-hop artist, fresh skin fade haircut, diamond stud earrings, designer streetwear hoodie, heavy gold Cuban link chain, strong jawline, intense confident gaze at camera, moody purple studio lighting, smoke in background, music video still quality, 8K detail" },
+  { id: "singer-female-1", name: "Aria", desc: "Voice that stops traffic", avatar: "👩🏽‍🎤", style: "Pop / R&B", vibe: "SZA meets Tyla energy", prompt: "Ultra-photorealistic portrait of a stunning 23-year-old mixed-race female pop artist, long flowing box braids with gold cuffs, glowing dewy skin, bold winged eyeliner, stylish crop top, delicate gold layered necklaces, fierce but warm expression, warm amber studio lighting, bokeh background, music video still quality, 8K detail" },
+  { id: "singer-male-2", name: "Jay", desc: "Born to burn the stage", avatar: "🧑🏻‍🎤", style: "Rock / Alternative", vibe: "Post Malone meets MGK energy", prompt: "Ultra-photorealistic portrait of an intense 28-year-old White male rock artist, messy bleached hair falling over one eye, face tattoos, silver lip ring, worn leather jacket with pins, smudged eyeliner, raw rebellious expression, red and blue neon lighting, concert smoke, music video still quality, 8K detail" },
+  { id: "singer-female-2", name: "Zara", desc: "Soul that heals nations", avatar: "👩🏿‍🎤", style: "Afro-Soul / Gospel", vibe: "Beyoncé meets Zahara energy", prompt: "Ultra-photorealistic portrait of a majestic 26-year-old Black female soul singer, voluminous natural afro hair, elegant gold statement earrings, off-shoulder flowing white dress, warm soulful eyes, slight knowing smile, golden hour sunlight, ethereal glow, music video still quality, 8K detail" },
+  { id: "singer-male-3", name: "Thabo", desc: "Amapiano in his DNA", avatar: "🧑🏾‍🎤", style: "Amapiano / Afrobeats", vibe: "Kabza De Small meets Focalistic", prompt: "Ultra-photorealistic portrait of a stylish 24-year-old South African male amapiano artist, clean shaven, designer bucket hat, Balenciaga oversized jacket, diamond-encrusted watch, infectious confident smile showing grills, vibrant colorful LED background, party energy, music video still quality, 8K detail" },
+  { id: "singer-female-3", name: "Naledi", desc: "SA's next global export", avatar: "👩🏾‍🎤", style: "SA Pop / Dance", vibe: "Tyla meets Elaine energy", prompt: "Ultra-photorealistic portrait of a gorgeous 22-year-old South African female pop artist, sleek long colorful braids, flawless makeup with glossy lips, trendy two-piece designer outfit, body glitter on collarbones, radiant megawatt smile, pink and purple neon ring light, music video still quality, 8K detail" },
 ];
 
 // ─── Sample Music Library ────────────────────────────────────────────
@@ -101,26 +102,26 @@ interface SampleTrack {
 }
 
 const SAMPLE_TRACKS: SampleTrack[] = [
-  // ─── South African ───
-  { id: "sa-amapiano-1", name: "Joburg Nights", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "groovy, log-drum, piano stabs", bpm: 115 },
-  { id: "sa-amapiano-2", name: "Shaya Bass", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "deep bass, percussive, township", bpm: 112 },
-  { id: "sa-amapiano-3", name: "Phola", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "smooth piano, vocal chops, sunset", bpm: 110 },
-  { id: "sa-gqom", name: "Durban Gqom", artist: "AI Studio", genre: "Gqom", region: "south-africa", duration: "0:30", mood: "dark, heavy bass, tribal drums", bpm: 124 },
-  { id: "sa-afrosoul", name: "Ubuntu Sunrise", artist: "AI Studio", genre: "Afro-Soul", region: "south-africa", duration: "0:30", mood: "warm, soulful, brass, uplifting", bpm: 95 },
-  { id: "sa-gospel", name: "Halala", artist: "AI Studio", genre: "Gospel", region: "south-africa", duration: "0:30", mood: "powerful choir, spiritual, triumphant", bpm: 100 },
-  { id: "sa-kwaito", name: "eKasi Vibes", artist: "AI Studio", genre: "Kwaito", region: "south-africa", duration: "0:30", mood: "classic kwaito beat, deep house", bpm: 105 },
-  { id: "sa-maskandi", name: "iZulu", artist: "AI Studio", genre: "Maskandi", region: "south-africa", duration: "0:30", mood: "guitar, traditional, storytelling", bpm: 88 },
+  // ─── South African (trending styles) ───
+  { id: "sa-amapiano-1", name: "Joburg Nights", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "amapiano log drum patterns, deep rolling bassline, jazzy piano stabs, vocal chops, Kabza De Small production style, groovy and hypnotic", bpm: 115 },
+  { id: "sa-amapiano-2", name: "Shaya Bass", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "heavy amapiano bass, shaker percussion, township organ stabs, Focalistic energy, high-energy dance floor anthem, punchy kicks", bpm: 112 },
+  { id: "sa-amapiano-3", name: "Phola", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "smooth soulful amapiano, gentle piano melody, soft pads, female vocal samples, sunset vibes, emotional and beautiful, De Mthuda style", bpm: 110 },
+  { id: "sa-gqom", name: "Durban Gqom", artist: "AI Studio", genre: "Gqom", region: "south-africa", duration: "0:30", mood: "dark broken beat gqom, heavy distorted bass, raw tribal drums, industrial percussion, Babes Wodumo energy, aggressive dancefloor", bpm: 124 },
+  { id: "sa-afrosoul", name: "Ubuntu Sunrise", artist: "AI Studio", genre: "Afro-Soul", region: "south-africa", duration: "0:30", mood: "warm African soul, live brass section, rich harmonies, Zahara-style emotional depth, uplifting strings, sunrise feeling, healing music", bpm: 95 },
+  { id: "sa-gospel", name: "Halala", artist: "AI Studio", genre: "Gospel", region: "south-africa", duration: "0:30", mood: "powerful South African gospel choir, triumphant brass, hand claps, spiritual intensity, Joyous Celebration style, building to crescendo, victorious", bpm: 100 },
+  { id: "sa-kwaito", name: "eKasi Vibes", artist: "AI Studio", genre: "Kwaito", region: "south-africa", duration: "0:30", mood: "classic kwaito groove, deep house drums, muted bass guitar, keyboard stabs, Arthur Mafokate era nostalgia, township party energy", bpm: 105 },
+  { id: "sa-maskandi", name: "iZulu", artist: "AI Studio", genre: "Maskandi", region: "south-africa", duration: "0:30", mood: "traditional Zulu maskandi guitar picking, concertina melody, call and response vocals, storytelling rhythm, Shwi noMtekhala style, cultural pride", bpm: 88 },
   // ─── Global Trending ───
-  { id: "gl-trap", name: "Drip Season", artist: "AI Studio", genre: "Trap", region: "global", duration: "0:30", mood: "808s, hi-hats, dark energy", bpm: 140 },
-  { id: "gl-drill", name: "London Drill", artist: "AI Studio", genre: "UK Drill", region: "global", duration: "0:30", mood: "sliding bass, dark, aggressive", bpm: 142 },
-  { id: "gl-rnb", name: "Midnight Drive", artist: "AI Studio", genre: "R&B", region: "global", duration: "0:30", mood: "smooth, sensual, neo-soul", bpm: 85 },
-  { id: "gl-pop", name: "Summer Energy", artist: "AI Studio", genre: "Pop", region: "global", duration: "0:30", mood: "bright, upbeat, radio-ready", bpm: 120 },
-  { id: "gl-afrobeats", name: "Lagos to London", artist: "AI Studio", genre: "Afrobeats", region: "global", duration: "0:30", mood: "percussion, guitar, danceable", bpm: 108 },
-  { id: "gl-reggaeton", name: "Fuego", artist: "AI Studio", genre: "Reggaeton", region: "global", duration: "0:30", mood: "dembow rhythm, latin heat", bpm: 96 },
-  { id: "gl-rock", name: "Electric Storm", artist: "AI Studio", genre: "Rock", region: "global", duration: "0:30", mood: "electric guitar, drums, power", bpm: 130 },
-  { id: "gl-electronic", name: "Neon Pulse", artist: "AI Studio", genre: "Electronic", region: "global", duration: "0:30", mood: "synths, drops, festival energy", bpm: 128 },
-  { id: "gl-lofi", name: "Chill Study", artist: "AI Studio", genre: "Lo-Fi", region: "global", duration: "0:30", mood: "vinyl crackle, mellow, jazz", bpm: 80 },
-  { id: "gl-acoustic", name: "Campfire", artist: "AI Studio", genre: "Acoustic", region: "global", duration: "0:30", mood: "guitar fingerpicking, warm, intimate", bpm: 90 },
+  { id: "gl-trap", name: "Drip Season", artist: "AI Studio", genre: "Trap", region: "global", duration: "0:30", mood: "hard-hitting 808 trap beat, crisp hi-hat rolls, dark atmospheric pads, Metro Boomin production style, menacing melody, heavy sub bass drops", bpm: 140 },
+  { id: "gl-drill", name: "London Drill", artist: "AI Studio", genre: "UK Drill", region: "global", duration: "0:30", mood: "UK drill sliding 808 bass, aggressive hi-hats, dark piano melody, Central Cee style, militant energy, bouncy rhythm pattern", bpm: 142 },
+  { id: "gl-rnb", name: "Midnight Drive", artist: "AI Studio", genre: "R&B", region: "global", duration: "0:30", mood: "silky modern R&B, warm Rhodes piano, soft 808 kicks, intimate vocal atmosphere, The Weeknd night-drive vibes, sensual and smooth", bpm: 85 },
+  { id: "gl-pop", name: "Summer Energy", artist: "AI Studio", genre: "Pop", region: "global", duration: "0:30", mood: "bright upbeat pop production, catchy synth hook, four-on-the-floor kick, Dua Lipa disco-pop energy, radio-ready mix, euphoric drop", bpm: 120 },
+  { id: "gl-afrobeats", name: "Lagos to London", artist: "AI Studio", genre: "Afrobeats", region: "global", duration: "0:30", mood: "infectious afrobeats rhythm, talking drum, guitar licks, Burna Boy vibes, dancehall fusion, tropical percussion, feel-good energy", bpm: 108 },
+  { id: "gl-reggaeton", name: "Fuego", artist: "AI Studio", genre: "Reggaeton", region: "global", duration: "0:30", mood: "classic dembow reggaeton rhythm, Latin percussion, Bad Bunny style atmospheric synths, perreo bass, summer heat, club energy", bpm: 96 },
+  { id: "gl-rock", name: "Electric Storm", artist: "AI Studio", genre: "Rock", region: "global", duration: "0:30", mood: "powerful electric guitar riff, driving drum fill, arena rock energy, Imagine Dragons epic build, distorted bass, stadium anthem", bpm: 130 },
+  { id: "gl-electronic", name: "Neon Pulse", artist: "AI Studio", genre: "Electronic", region: "global", duration: "0:30", mood: "festival EDM build and drop, massive supersaw synths, four-on-the-floor kick, Marshmello style euphoric melody, crowd energy, hands-up moment", bpm: 128 },
+  { id: "gl-lofi", name: "Chill Study", artist: "AI Studio", genre: "Lo-Fi", region: "global", duration: "0:30", mood: "dusty lo-fi hip hop beat, vinyl crackle and hiss, mellow jazz piano sample, tape-saturated drums, rainy day atmosphere, Nujabes inspired", bpm: 80 },
+  { id: "gl-acoustic", name: "Campfire", artist: "AI Studio", genre: "Acoustic", region: "global", duration: "0:30", mood: "intimate acoustic fingerpicking guitar, gentle brushed snare, warm upright bass, Ed Sheeran campfire energy, heartfelt and raw, sunset feeling", bpm: 90 },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -136,6 +137,8 @@ export default function MusicVideoPage() {
   const [faceMode, setFaceMode] = useState<"upload" | "character">("upload");
   const [selectedCharacter, setSelectedCharacter] = useState<typeof DEFAULT_CHARACTERS[0] | null>(null);
   const [generatingCharacter, setGeneratingCharacter] = useState(false);
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
+  const [loadingPortrait, setLoadingPortrait] = useState<string | null>(null);
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicMode, setMusicMode] = useState<"upload" | "library">("library");
   const [selectedTrack, setSelectedTrack] = useState<SampleTrack | null>(null);
@@ -242,6 +245,40 @@ export default function MusicVideoPage() {
 
   const removeMusic = () => {
     setMusicFile(null);
+  };
+
+  // ─── Singer Portrait Generation ────────────────────────────────────
+
+  const generatePortrait = async (char: typeof DEFAULT_CHARACTERS[0]) => {
+    if (characterPortraits[char.id]) return; // Already generated
+    setLoadingPortrait(char.id);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: char.prompt,
+          aspectRatio: "portrait",
+          numImages: 1,
+        }),
+      });
+      const data = await res.json();
+      if (data.images?.[0]) {
+        setCharacterPortraits(prev => ({ ...prev, [char.id]: data.images[0] }));
+      }
+    } catch {
+      // Silent fail — emoji fallback remains
+    } finally {
+      setLoadingPortrait(null);
+    }
+  };
+
+  const handleSelectCharacter = (char: typeof DEFAULT_CHARACTERS[0]) => {
+    setSelectedCharacter(char);
+    // Auto-generate portrait if not already done
+    if (!characterPortraits[char.id]) {
+      generatePortrait(char);
+    }
   };
 
   // ─── Music Preview ─────────────────────────────────────────────────
@@ -612,30 +649,45 @@ export default function MusicVideoPage() {
                   )}
                 </>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {DEFAULT_CHARACTERS.map((char) => (
                     <button
                       key={char.id}
-                      onClick={() => setSelectedCharacter(char)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
+                      onClick={() => handleSelectCharacter(char)}
+                      className={`relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all overflow-hidden ${
                         selectedCharacter?.id === char.id
-                          ? "bg-pink-500/15 border border-pink-500/30 ring-1 ring-pink-500/20 shadow-lg shadow-pink-500/10"
+                          ? "bg-pink-500/15 border-2 border-pink-500/40 ring-1 ring-pink-500/20 shadow-lg shadow-pink-500/10"
                           : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-pink-500/20"
                       }`}
                     >
-                      <span className="text-3xl">{char.avatar}</span>
+                      {/* Portrait or emoji */}
+                      <div className="relative w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-pink-500/10 to-violet-500/10">
+                        {characterPortraits[char.id] ? (
+                          <img src={characterPortraits[char.id]} alt={char.name} className="w-full h-full object-cover" />
+                        ) : loadingPortrait === char.id ? (
+                          <div className="w-5 h-5 border-2 border-pink-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span className="text-2xl">{char.avatar}</span>
+                        )}
+                      </div>
                       <div className="text-center">
-                        <span className={`text-xs font-semibold block ${selectedCharacter?.id === char.id ? "text-pink-300" : "text-zinc-200"}`}>
+                        <span className={`text-xs font-bold block ${selectedCharacter?.id === char.id ? "text-pink-300" : "text-zinc-200"}`}>
                           {char.name}
                         </span>
-                        <span className="text-[10px] text-zinc-400 block mt-0.5">{char.style}</span>
+                        <span className="text-[10px] text-violet-400 block">{char.style}</span>
+                        <span className="text-[9px] text-zinc-500 italic">{char.vibe}</span>
                       </div>
                       {selectedCharacter?.id === char.id && (
-                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">Selected</span>
+                        <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        </span>
                       )}
                     </button>
                   ))}
                 </div>
+                <p className="text-[10px] text-zinc-500 text-center mt-2">
+                  Click a character to see their AI-generated portrait (10 credits)
+                </p>
               )}
               {selectedCharacter && faceMode === "character" && (
                 <p className="text-[10px] text-pink-400 mt-2 text-center">

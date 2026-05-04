@@ -146,6 +146,8 @@ export async function POST(req: NextRequest) {
       aspectRatio,
       stage,
       customStage,
+      clipStartSec,
+      clipDuration,
     } = body as {
       faceImageUrl: string;
       musicUrl: string;
@@ -155,6 +157,8 @@ export async function POST(req: NextRequest) {
       aspectRatio: string;
       stage: string;
       customStage?: string;
+      clipStartSec?: number;
+      clipDuration?: number;
     };
 
     // Validate required fields
@@ -195,6 +199,34 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Music generation failed. Try uploading your own track." }, { status: 503 });
       }
     }
+    // Trim audio to the selected clip (best part of the song)
+    if (clipStartSec && clipStartSec > 0 && !finalMusicUrl.startsWith("__")) {
+      console.log(`[MUSIC-VIDEO] Trimming audio: start=${clipStartSec}s, duration=${clipDuration || 15}s`);
+      try {
+        const trimResult = await fal.subscribe("fal-ai/ffmpeg-api/compose", {
+          input: {
+            tracks: [{
+              id: "audio-trim",
+              type: "video", // FAL compose uses "video" type for both audio and video
+              keyframes: [{ timestamp: clipStartSec * 1000, duration: (clipDuration || 15) * 1000, url: finalMusicUrl }],
+            }],
+          },
+          logs: false,
+        });
+        const trimData = trimResult.data as Record<string, unknown>;
+        const trimmedUrl =
+          (trimData?.video_url as string) ||
+          (trimData?.video as { url?: string })?.url ||
+          "";
+        if (trimmedUrl) {
+          finalMusicUrl = trimmedUrl;
+          console.log(`[MUSIC-VIDEO] Audio trimmed to ${clipDuration}s clip: ${trimmedUrl.slice(0, 60)}...`);
+        }
+      } catch (trimErr) {
+        console.warn("[MUSIC-VIDEO] Audio trim failed, using full track:", trimErr);
+      }
+    }
+
     if (!genre) {
       return NextResponse.json({ error: "Genre is required" }, { status: 400 });
     }

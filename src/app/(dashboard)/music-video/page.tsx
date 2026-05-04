@@ -147,6 +147,15 @@ export default function MusicVideoPage() {
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Song clip trimming
+  const [clipDuration, setClipDuration] = useState<15 | 30>(15);
+  const [clipStartSec, setClipStartSec] = useState(0);
+  const [songDuration, setSongDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const songAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [songObjectUrl, setSongObjectUrl] = useState<string | null>(null);
+
   // Settings
   const [genre, setGenre] = useState("hiphop");
   const [energy, setEnergy] = useState("high");
@@ -216,6 +225,26 @@ export default function MusicVideoPage() {
 
   // ─── Music Upload ─────────────────────────────────────────────────
 
+  const loadSongAudio = (file: File) => {
+    setMusicFile(file);
+    setClipStartSec(0);
+    setCurrentTime(0);
+    // Create object URL for playback
+    if (songObjectUrl) URL.revokeObjectURL(songObjectUrl);
+    const url = URL.createObjectURL(file);
+    setSongObjectUrl(url);
+    // Load to get duration
+    const audio = new Audio(url);
+    audio.onloadedmetadata = () => {
+      setSongDuration(audio.duration);
+      // Default: start at 30% (usually near the chorus)
+      setClipStartSec(Math.floor(audio.duration * 0.3));
+    };
+    audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
+    audio.onended = () => setIsPlaying(false);
+    songAudioRef.current = audio;
+  };
+
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -223,7 +252,7 @@ export default function MusicVideoPage() {
       toast("Audio too large (max 50MB)", "error");
       return;
     }
-    setMusicFile(file);
+    loadSongAudio(file);
   };
 
   const handleMusicDrop = (e: React.DragEvent) => {
@@ -240,11 +269,40 @@ export default function MusicVideoPage() {
       toast("Audio too large (max 50MB)", "error");
       return;
     }
-    setMusicFile(file);
+    loadSongAudio(file);
   };
 
   const removeMusic = () => {
+    if (songAudioRef.current) { songAudioRef.current.pause(); songAudioRef.current = null; }
+    if (songObjectUrl) URL.revokeObjectURL(songObjectUrl);
+    setSongObjectUrl(null);
     setMusicFile(null);
+    setSongDuration(0);
+    setClipStartSec(0);
+    setIsPlaying(false);
+  };
+
+  const playClipPreview = () => {
+    if (!songAudioRef.current) return;
+    if (isPlaying) {
+      songAudioRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+    songAudioRef.current.currentTime = clipStartSec;
+    songAudioRef.current.play();
+    setIsPlaying(true);
+    // Auto-stop after clip duration
+    setTimeout(() => {
+      if (songAudioRef.current) songAudioRef.current.pause();
+      setIsPlaying(false);
+    }, clipDuration * 1000);
+  };
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   // ─── Singer Portrait Generation ────────────────────────────────────
@@ -449,6 +507,8 @@ export default function MusicVideoPage() {
           stage: stage === "custom" ? customStage : stage,
           customStage: stage === "custom" ? customStage : undefined,
           aspectRatio,
+          clipStartSec: musicMode === "upload" ? clipStartSec : 0,
+          clipDuration,
         }),
       });
 
@@ -810,21 +870,82 @@ export default function MusicVideoPage() {
               ) : (
                 <>
                   {musicFile ? (
-                    <div className="relative flex flex-col items-center justify-center h-36 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
-                      <div className="w-10 h-10 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-2">
-                        <Music2 className="w-5 h-5 text-violet-400" />
+                    <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                      {/* Song info + remove */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Music2 className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                          <span className="text-sm font-medium text-zinc-200 truncate">{musicFile.name}</span>
+                          <span className="text-[10px] text-zinc-400 flex-shrink-0">{formatTime(songDuration)}</span>
+                        </div>
+                        <button onClick={removeMusic} className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-all">
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                      <p className="text-sm font-medium text-zinc-200 text-center truncate max-w-full px-2">
-                        {musicFile.name}
-                      </p>
-                      <p className="text-[10px] text-zinc-400 mt-1">
-                        {(musicFile.size / (1024 * 1024)).toFixed(1)} MB
-                      </p>
+
+                      {/* Clip duration selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-zinc-400">Clip length:</span>
+                        {([15, 30] as const).map((d) => (
+                          <button
+                            key={d}
+                            onClick={() => setClipDuration(d)}
+                            className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                              clipDuration === d
+                                ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                                : "bg-white/[0.05] text-zinc-400 border border-white/[0.08]"
+                            }`}
+                          >
+                            {d}s
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Timeline slider — pick the start point */}
+                      {songDuration > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                            <span>Start: <strong className="text-violet-300">{formatTime(clipStartSec)}</strong></span>
+                            <span>End: <strong className="text-violet-300">{formatTime(Math.min(clipStartSec + clipDuration, songDuration))}</strong></span>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="range"
+                              min={0}
+                              max={Math.max(0, Math.floor(songDuration - clipDuration))}
+                              value={clipStartSec}
+                              onChange={(e) => setClipStartSec(Number(e.target.value))}
+                              className="w-full h-2 rounded-full appearance-none bg-white/[0.08] cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-violet-500 [&::-webkit-slider-thumb]:shadow-lg"
+                            />
+                            {/* Visual clip region indicator */}
+                            <div
+                              className="absolute top-0 h-2 rounded-full bg-violet-500/30 pointer-events-none"
+                              style={{
+                                left: `${(clipStartSec / Math.max(songDuration, 1)) * 100}%`,
+                                width: `${(clipDuration / Math.max(songDuration, 1)) * 100}%`,
+                              }}
+                            />
+                          </div>
+                          <p className="text-[9px] text-zinc-500 text-center">
+                            Drag to select the best {clipDuration}s — find the hook or chorus
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Play preview of selected clip */}
                       <button
-                        onClick={removeMusic}
-                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-all"
+                        onClick={playClipPreview}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                          isPlaying
+                            ? "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                            : "bg-white/[0.06] text-zinc-300 hover:bg-violet-500/10 border border-white/[0.10]"
+                        }`}
                       >
-                        <X className="w-4 h-4" />
+                        {isPlaying ? (
+                          <><span className="w-2.5 h-2.5 bg-violet-400 rounded-sm" /> Stop Preview</>
+                        ) : (
+                          <><Play className="w-3.5 h-3.5" /> Preview {clipDuration}s Clip ({formatTime(clipStartSec)} → {formatTime(clipStartSec + clipDuration)})</>
+                        )}
                       </button>
                     </div>
                   ) : (

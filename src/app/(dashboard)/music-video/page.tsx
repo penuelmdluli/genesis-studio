@@ -76,14 +76,14 @@ const STAGE_OPTIONS = [
 const SCENE_OPTIONS = [2, 3, 4, 5, 6];
 const CREDITS_PER_SCENE = 20;
 
-// Default AI singer characters users can pick from (generated on first use)
+// Default AI singer characters — with visual emoji avatars and style descriptions
 const DEFAULT_CHARACTERS = [
-  { id: "singer-male-1", name: "Marcus", desc: "Male, confident, urban style", prompt: "Young confident Black male singer, 25 years old, short fade haircut, gold chain, streetwear, charismatic smile, studio headshot, professional lighting" },
-  { id: "singer-female-1", name: "Aria", desc: "Female, powerful vocals look", prompt: "Young mixed-race female singer, 23 years old, long braids, stylish outfit, fierce confident expression, studio headshot, dramatic lighting" },
-  { id: "singer-male-2", name: "Jay", desc: "Male, rockstar energy", prompt: "White male rock singer, 28 years old, messy hair, leather jacket, intense gaze, tattoo on neck, studio headshot, moody lighting" },
-  { id: "singer-female-2", name: "Zara", desc: "Female, Afro-soul queen", prompt: "Beautiful Black female singer, 26 years old, natural afro hair, elegant earrings, warm soulful expression, studio headshot, golden lighting" },
-  { id: "singer-male-3", name: "Thabo", desc: "Male, Amapiano star", prompt: "South African male artist, 24 years old, fresh designer outfit, confident smile, modern style, studio headshot, vibrant lighting" },
-  { id: "singer-female-3", name: "Naledi", desc: "Female, SA pop princess", prompt: "South African female pop artist, 22 years old, colorful braids, bold makeup, radiant smile, trendy outfit, studio headshot, bright lighting" },
+  { id: "singer-male-1", name: "Marcus", desc: "Male, confident, urban style", avatar: "👨🏾‍🎤", style: "Hip-Hop / Trap", prompt: "Young confident Black male singer, 25 years old, short fade haircut, gold chain, streetwear, charismatic smile, studio headshot, professional lighting" },
+  { id: "singer-female-1", name: "Aria", desc: "Female, powerful vocals", avatar: "👩🏽‍🎤", style: "Pop / R&B", prompt: "Young mixed-race female singer, 23 years old, long braids, stylish outfit, fierce confident expression, studio headshot, dramatic lighting" },
+  { id: "singer-male-2", name: "Jay", desc: "Male, rockstar energy", avatar: "🧑🏻‍🎤", style: "Rock / Alternative", prompt: "White male rock singer, 28 years old, messy hair, leather jacket, intense gaze, tattoo on neck, studio headshot, moody lighting" },
+  { id: "singer-female-2", name: "Zara", desc: "Female, Afro-soul queen", avatar: "👩🏿‍🎤", style: "Afro-Soul / Gospel", prompt: "Beautiful Black female singer, 26 years old, natural afro hair, elegant earrings, warm soulful expression, studio headshot, golden lighting" },
+  { id: "singer-male-3", name: "Thabo", desc: "Male, Amapiano star", avatar: "🧑🏾‍🎤", style: "Amapiano / Afrobeats", prompt: "South African male artist, 24 years old, fresh designer outfit, confident smile, modern style, studio headshot, vibrant lighting" },
+  { id: "singer-female-3", name: "Naledi", desc: "Female, SA pop princess", avatar: "👩🏾‍🎤", style: "SA Pop / Dance", prompt: "South African female pop artist, 22 years old, colorful braids, bold makeup, radiant smile, trendy outfit, studio headshot, bright lighting" },
 ];
 
 // ─── Sample Music Library ────────────────────────────────────────────
@@ -140,6 +140,9 @@ export default function MusicVideoPage() {
   const [musicMode, setMusicMode] = useState<"upload" | "library">("library");
   const [selectedTrack, setSelectedTrack] = useState<SampleTrack | null>(null);
   const [trackRegion, setTrackRegion] = useState<"all" | "south-africa" | "global">("all");
+  const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Settings
   const [genre, setGenre] = useState("hiphop");
@@ -239,6 +242,71 @@ export default function MusicVideoPage() {
 
   const removeMusic = () => {
     setMusicFile(null);
+  };
+
+  // ─── Music Preview ─────────────────────────────────────────────────
+
+  const previewTrack = async (track: SampleTrack) => {
+    // If already playing this track, stop it
+    if (previewingTrack === track.id) {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+      setPreviewingTrack(null);
+      return;
+    }
+
+    // Stop any current preview
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+
+    setPreviewLoading(track.id);
+    setPreviewingTrack(null);
+
+    try {
+      // Generate a quick 10s preview via stable-audio
+      const res = await fetch("/api/music-video/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mood: track.mood, bpm: track.bpm, genre: track.genre }),
+      });
+
+      if (!res.ok) {
+        toast("Preview not available right now", "error");
+        setPreviewLoading(null);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl);
+        previewAudioRef.current = audio;
+        audio.oncanplaythrough = () => {
+          setPreviewLoading(null);
+          setPreviewingTrack(track.id);
+          audio.play();
+        };
+        audio.onended = () => {
+          setPreviewingTrack(null);
+          previewAudioRef.current = null;
+        };
+        audio.onerror = () => {
+          setPreviewLoading(null);
+          setPreviewingTrack(null);
+          toast("Couldn't load preview", "error");
+        };
+        audio.load();
+      } else {
+        setPreviewLoading(null);
+        toast("Preview generation failed", "error");
+      }
+    } catch {
+      setPreviewLoading(null);
+      toast("Preview not available", "error");
+    }
   };
 
   // ─── Platform Selection ───────────────────────────────────────────
@@ -544,26 +612,27 @@ export default function MusicVideoPage() {
                   )}
                 </>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {DEFAULT_CHARACTERS.map((char) => (
                     <button
                       key={char.id}
                       onClick={() => setSelectedCharacter(char)}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all ${
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
                         selectedCharacter?.id === char.id
-                          ? "bg-pink-500/15 border border-pink-500/30 ring-1 ring-pink-500/20"
+                          ? "bg-pink-500/15 border border-pink-500/30 ring-1 ring-pink-500/20 shadow-lg shadow-pink-500/10"
                           : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-pink-500/20"
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                        selectedCharacter?.id === char.id ? "bg-pink-500/20" : "bg-white/[0.06]"
-                      }`}>
-                        <User className={`w-5 h-5 ${selectedCharacter?.id === char.id ? "text-pink-400" : "text-zinc-400"}`} />
+                      <span className="text-3xl">{char.avatar}</span>
+                      <div className="text-center">
+                        <span className={`text-xs font-semibold block ${selectedCharacter?.id === char.id ? "text-pink-300" : "text-zinc-200"}`}>
+                          {char.name}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 block mt-0.5">{char.style}</span>
                       </div>
-                      <span className={`text-[11px] font-medium ${selectedCharacter?.id === char.id ? "text-pink-300" : "text-zinc-300"}`}>
-                        {char.name}
-                      </span>
-                      <span className="text-[9px] text-zinc-400 text-center leading-tight">{char.desc}</span>
+                      {selectedCharacter?.id === char.id && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">Selected</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -630,36 +699,54 @@ export default function MusicVideoPage() {
                   </div>
 
                   {/* Track list */}
-                  <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/[0.08] bg-white/[0.02] p-2">
+                  <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-white/[0.08] bg-white/[0.02] p-2">
                     {SAMPLE_TRACKS
                       .filter(t => trackRegion === "all" || t.region === trackRegion)
                       .map((track) => (
-                        <button
+                        <div
                           key={track.id}
                           onClick={() => setSelectedTrack(track)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all ${
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
                             selectedTrack?.id === track.id
                               ? "bg-violet-500/15 border border-violet-500/30"
                               : "bg-white/[0.02] border border-transparent hover:bg-white/[0.06]"
                           }`}
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            selectedTrack?.id === track.id ? "bg-violet-500/20" : "bg-white/[0.06]"
-                          }`}>
-                            <Music2 className={`w-4 h-4 ${selectedTrack?.id === track.id ? "text-violet-400" : "text-zinc-400"}`} />
-                          </div>
+                          {/* Play/Preview Button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); previewTrack(track); }}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                              previewingTrack === track.id
+                                ? "bg-violet-500 text-white animate-pulse"
+                                : previewLoading === track.id
+                                ? "bg-violet-500/30 text-violet-300"
+                                : "bg-white/[0.08] text-zinc-400 hover:bg-violet-500/20 hover:text-violet-300"
+                            }`}
+                            title={previewingTrack === track.id ? "Stop" : "Preview"}
+                          >
+                            {previewLoading === track.id ? (
+                              <div className="w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                            ) : previewingTrack === track.id ? (
+                              <span className="w-2.5 h-2.5 bg-white rounded-sm" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 ml-0.5" />
+                            )}
+                          </button>
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs font-medium truncate ${selectedTrack?.id === track.id ? "text-violet-300" : "text-zinc-300"}`}>
                               {track.name}
                             </p>
                             <p className="text-[10px] text-zinc-500 truncate">
-                              {track.genre} · {track.bpm} BPM · {track.duration}
+                              {track.genre} · {track.bpm} BPM · {track.mood.split(",")[0]}
                             </p>
                           </div>
                           {track.region === "south-africa" && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex-shrink-0">ZA</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex-shrink-0">🇿🇦</span>
                           )}
-                        </button>
+                          {selectedTrack?.id === track.id && (
+                            <CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                          )}
+                        </div>
                       ))}
                   </div>
                   {selectedTrack && (

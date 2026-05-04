@@ -135,9 +135,20 @@ export async function POST(req: NextRequest) {
           const { audioStream } = tts.toStream(text);
           const chunks: Buffer[] = [];
           for await (const chunk of audioStream) {
-            if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+            if (Buffer.isBuffer(chunk)) {
+              chunks.push(chunk);
+            } else if (chunk instanceof Uint8Array) {
+              chunks.push(Buffer.from(chunk));
+            } else if (chunk) {
+              chunks.push(Buffer.from(chunk as ArrayBuffer));
+            }
           }
           const audioBuffer = Buffer.concat(chunks);
+
+          if (audioBuffer.length === 0) {
+            console.warn("[TALKING AVATAR] TTS produced empty audio buffer — skipping upload");
+            throw new Error("TTS produced empty audio");
+          }
 
           // Upload TTS audio to R2
           const { uploadAudio, audioStorageKey } = await import("@/lib/storage");

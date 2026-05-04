@@ -140,7 +140,7 @@ export default function MusicVideoPage() {
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
   const [loadingPortrait, setLoadingPortrait] = useState<string | null>(null);
   const [musicFile, setMusicFile] = useState<File | null>(null);
-  const [musicMode, setMusicMode] = useState<"upload" | "library">("library");
+  const [musicMode, setMusicMode] = useState<"upload" | "library">("upload");
   const [selectedTrack, setSelectedTrack] = useState<SampleTrack | null>(null);
   const [trackRegion, setTrackRegion] = useState<"all" | "south-africa" | "global">("all");
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
@@ -700,21 +700,11 @@ export default function MusicVideoPage() {
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-2">
                 <FileAudio className="w-3 h-3 inline mr-1" />
-                Song / Music <span className="text-red-400">*</span>
+                Your Song <span className="text-red-400">*</span>
               </label>
 
-              {/* Tabs: Library vs Upload */}
+              {/* Tabs */}
               <div className="flex gap-1 p-1 rounded-lg bg-white/[0.05] border border-white/[0.08] mb-3">
-                <button
-                  onClick={() => { setMusicMode("library"); setMusicFile(null); }}
-                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
-                    musicMode === "library"
-                      ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                      : "text-zinc-400 hover:text-zinc-300"
-                  }`}
-                >
-                  Music Library
-                </button>
                 <button
                   onClick={() => { setMusicMode("upload"); setSelectedTrack(null); }}
                   className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
@@ -723,7 +713,17 @@ export default function MusicVideoPage() {
                       : "text-zinc-400 hover:text-zinc-300"
                   }`}
                 >
-                  Upload Own
+                  Upload Song
+                </button>
+                <button
+                  onClick={() => { setMusicMode("library"); setMusicFile(null); }}
+                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
+                    musicMode === "library"
+                      ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  AI Beats (No Vocals)
                 </button>
               </div>
 
@@ -828,24 +828,57 @@ export default function MusicVideoPage() {
                       </button>
                     </div>
                   ) : (
-                    <label
-                      className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      onDrop={handleMusicDrop}
-                    >
-                      <input
-                        ref={musicInputRef}
-                        type="file"
-                        accept="audio/mpeg,audio/wav,audio/mp3,.mp3,.wav"
-                        onChange={handleMusicUpload}
-                        className="hidden"
-                      />
-                      <Music2 className="w-6 h-6 text-violet-400 mb-2" />
-                      <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
-                        Drop your song or click
-                      </span>
-                      <span className="text-xs text-zinc-500 mt-1">MP3, WAV — max 50MB</span>
-                    </label>
+                    <div className="space-y-3">
+                      <label
+                        className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={handleMusicDrop}
+                      >
+                        <input
+                          ref={musicInputRef}
+                          type="file"
+                          accept="audio/mpeg,audio/wav,audio/mp3,.mp3,.wav"
+                          onChange={handleMusicUpload}
+                          className="hidden"
+                        />
+                        <Music2 className="w-6 h-6 text-violet-400 mb-2" />
+                        <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
+                          Upload your song (with lyrics)
+                        </span>
+                        <span className="text-xs text-zinc-500 mt-1">MP3, WAV — max 50MB</span>
+                      </label>
+
+                      {/* Trending song suggestions */}
+                      <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                        <p className="text-[10px] font-semibold text-zinc-300 mb-2 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          Trending songs that go viral as music videos:
+                        </p>
+                        <div className="grid grid-cols-1 gap-1">
+                          {[
+                            { song: "Water — Tyla", why: "Perfect for dance energy + lip-sync", genre: "Amapiano" },
+                            { song: "Mnike — Tyler ICU ft. Tumelo.za", why: "Iconic SA dance + vibe", genre: "Amapiano" },
+                            { song: "Siyathandana — Cassper Nyovest", why: "Emotional + powerful delivery", genre: "Afro-Pop" },
+                            { song: "Last Last — Burna Boy", why: "Global hit, high energy", genre: "Afrobeats" },
+                            { song: "Calm Down — Rema", why: "Smooth groove, viral potential", genre: "Afrobeats" },
+                            { song: "Snooze — SZA", why: "R&B vocal showcase", genre: "R&B" },
+                            { song: "HUMBLE. — Kendrick Lamar", why: "Intense rap delivery", genre: "Hip-Hop" },
+                            { song: "Blinding Lights — The Weeknd", why: "Iconic pop energy", genre: "Pop" },
+                            { song: "Jerusalema — Master KG", why: "Global SA anthem", genre: "Afro-House" },
+                            { song: "Osama — Zakes Bantwini", why: "Deep house vocal power", genre: "Deep House" },
+                          ].map((s) => (
+                            <div key={s.song} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04]">
+                              <span className="text-[11px] text-zinc-200 font-medium flex-1">{s.song}</span>
+                              <span className="text-[9px] text-zinc-500 hidden sm:block">{s.why}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{s.genre}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[9px] text-zinc-500 mt-2 text-center">
+                          Download from YouTube/Spotify → convert to MP3 → upload here. The AI lip-syncs to the actual vocals.
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -854,7 +887,7 @@ export default function MusicVideoPage() {
 
           <p className="text-[11px] text-zinc-500 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
             <Sparkles className="w-3 h-3 inline mr-1 text-pink-400" />
-            Clear front-facing photo works best. The AI will animate this person singing your song.
+            Upload a REAL song with lyrics — the AI will lip-sync the character to the actual vocals. That&apos;s what makes it go viral.
           </p>
         </CardContent>
       </Card>

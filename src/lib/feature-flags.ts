@@ -23,6 +23,7 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/brain/templates": true,
   "/collections": true,
   "/api-keys": true,
+  "/product-ads": true,
   // Hidden — not ready yet
   "/edit": false,
 };

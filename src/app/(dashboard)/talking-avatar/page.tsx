@@ -47,7 +47,6 @@ import {
   Palette,
   Music,
   Captions,
-  Package,
   CheckCircle2,
 } from "lucide-react";
 
@@ -59,7 +58,7 @@ interface UseCase {
   id: string;
   name: string;
   icon: typeof Target;
-  category: "marketing" | "sales" | "content" | "business" | "saas";
+  category: "marketing" | "sales" | "content" | "business";
   description: string;
   sampleScript: string;
   suggestedTone: string;
@@ -224,84 +223,6 @@ const USE_CASES: UseCase[] = [
     suggestedDuration: 15,
     suggestedPlatform: "tiktok",
   },
-  // ─── SaaS / Tech Tool Templates ──────────────────────────────────
-  {
-    id: "saas-launch",
-    name: "SaaS Product Launch",
-    icon: Monitor,
-    category: "saas",
-    description: "Launch your software product with impact",
-    sampleScript: "We just launched something incredible. If you've ever struggled with [pain point], this changes everything. Our platform lets you [core benefit] in minutes, not hours. We're already trusted by [number] teams worldwide. Start your free trial — no credit card required. Link below.",
-    suggestedTone: "inspirational",
-    suggestedDuration: 30,
-    suggestedPlatform: "linkedin",
-  },
-  {
-    id: "saas-demo",
-    name: "Tool Demo / Walkthrough",
-    icon: Monitor,
-    category: "saas",
-    description: "Show your app in action with a spokesperson",
-    sampleScript: "Let me show you how easy it is. Step one — sign up in 30 seconds. Step two — connect your [integration]. Step three — watch the magic happen. What used to take your team an entire day now takes five minutes. Don't believe me? Try it free right now.",
-    suggestedTone: "friendly",
-    suggestedDuration: 30,
-    suggestedPlatform: "youtube",
-  },
-  {
-    id: "saas-vs-competitor",
-    name: "Why Switch to Us",
-    icon: TrendingUp,
-    category: "saas",
-    description: "Convert users from competing tools",
-    sampleScript: "If you're still using [old way], you're paying too much for too little. Our users save an average of 60% while getting 3x the features. The migration takes 5 minutes — we even import your existing data. Over 5,000 teams already switched this month. What are you waiting for?",
-    suggestedTone: "urgent",
-    suggestedDuration: 30,
-    suggestedPlatform: "tiktok",
-  },
-  {
-    id: "saas-feature-drop",
-    name: "New Feature Announcement",
-    icon: Sparkles,
-    category: "saas",
-    description: "Announce a powerful new feature update",
-    sampleScript: "Your number one request? We built it. Introducing [feature name] — now you can [capability] directly inside the platform. No workarounds, no third-party tools. It's available right now for all users. Go check it out and let us know what you think.",
-    suggestedTone: "inspirational",
-    suggestedDuration: 15,
-    suggestedPlatform: "tiktok",
-  },
-  {
-    id: "saas-social-proof",
-    name: "Customer Success Story",
-    icon: Star,
-    category: "saas",
-    description: "Share a real result from a customer",
-    sampleScript: "One of our customers went from spending 20 hours a week on [task] to just 2. That's 18 hours back — every single week. They didn't hire more people. They didn't change their process. They just started using our tool. If you want results like that, the link is right there.",
-    suggestedTone: "professional",
-    suggestedDuration: 30,
-    suggestedPlatform: "linkedin",
-  },
-  {
-    id: "saas-free-trial",
-    name: "Free Trial / Sign Up CTA",
-    icon: Zap,
-    category: "saas",
-    description: "Drive sign-ups with a compelling offer",
-    sampleScript: "Here's the deal — try it free for 14 days. No credit card. No commitment. If it doesn't save you at least 5 hours in your first week, just walk away. But I'm betting you won't want to. Join 10,000+ users who already made the switch. Link in bio — takes 30 seconds.",
-    suggestedTone: "urgent",
-    suggestedDuration: 15,
-    suggestedPlatform: "tiktok",
-  },
-  {
-    id: "saas-founder-story",
-    name: "Founder Story",
-    icon: Heart,
-    category: "saas",
-    description: "Tell the origin story of your tool",
-    sampleScript: "I built this because I was frustrated. Every tool out there was either too expensive, too complicated, or too limited. So I spent [time] building exactly what I wished existed. Now thousands of people use it every day. If you've felt that same frustration, this is for you.",
-    suggestedTone: "friendly",
-    suggestedDuration: 30,
-    suggestedPlatform: "youtube",
-  },
 ];
 
 const PLATFORM_PRESETS: PlatformPreset[] = [
@@ -376,7 +297,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   sales: "Sales",
   content: "Content",
   business: "Business",
-  saas: "SaaS / Tech",
 };
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -413,21 +333,6 @@ export default function TalkingAvatarPage() {
   const [musicMood, setMusicMood] = useState("none");
   const [subtitleStyle, setSubtitleStyle] = useState("none");
 
-  // Product Ad Mode
-  const [isProductMode, setIsProductMode] = useState(false);
-  const [productImage, setProductImage] = useState<File | null>(null);
-  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
-  const [productName, setProductName] = useState("");
-  const [productDescription, setProductDescription] = useState("");
-  const [productAiLoading, setProductAiLoading] = useState(false);
-  const productInputRef = useRef<HTMLInputElement>(null);
-
-  // AI Face Suggestion
-  const [suggestedFaces, setSuggestedFaces] = useState<string[]>([]);
-  const [faceGenLoading, setFaceGenLoading] = useState(false);
-
-  // Product image URL (uploaded during generation, used by enhance)
-  const [uploadedProductUrl, setUploadedProductUrl] = useState<string | null>(null);
 
   // Enhancement state (post-processing after avatar generation)
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -508,12 +413,10 @@ export default function TalkingAvatarPage() {
   const userPlan = user?.plan || "free";
   const isPlanAllowed = userPlan === "creator" || userPlan === "pro" || userPlan === "studio" || !!user?.isOwner;
   const baseCreditCost = computeCreditCost(duration);
-  // Product intro: 15 for video generation + 10 extra if no image uploaded (AI generates one)
-  const productIntroCost = isProductMode ? (productImage ? 15 : 25) : 0;
-  const enhanceCost = productIntroCost + (musicMood !== "none" ? 3 : 0) + (subtitleStyle !== "none" ? 5 : 0);
+  const enhanceCost = (musicMood !== "none" ? 3 : 0) + (subtitleStyle !== "none" ? 5 : 0);
   const creditCost = baseCreditCost + enhanceCost;
   const hasEnoughCredits = user?.isOwner || (user?.creditBalance ?? 0) >= creditCost;
-  const wantsEnhancement = musicMood !== "none" || subtitleStyle !== "none" || isProductMode;
+  const wantsEnhancement = musicMood !== "none" || subtitleStyle !== "none";
 
   // ─── Use Case Selection ───────────────────────────────────────────
 
@@ -546,172 +449,6 @@ export default function TalkingAvatarPage() {
     }
   };
 
-  // ─── Product Ad Mode ───────────────────────────────────────────────
-
-  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { setError("Product image too large (max 10MB)."); return; }
-    setProductImage(file);
-    const reader = new FileReader();
-    reader.onload = () => setProductImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const generateProductScript = async () => {
-    if (!productName.trim()) { setError("Enter your product name first."); return; }
-    setProductAiLoading(true);
-    setError(null);
-    try {
-      // Detect if this is a software/tech/SaaS product
-      const techKeywords = ["app", "software", "saas", "platform", "tool", "ai", "api", "dashboard", "automation", "cloud", "plugin", "extension", "website", "studio", "generator", "builder", "crm", "erp"];
-      const isTechProduct = techKeywords.some(k =>
-        productName.toLowerCase().includes(k) || (productDescription || "").toLowerCase().includes(k)
-      );
-
-      const techBoost = isTechProduct ? `
-IMPORTANT — This is a software/tech product. Use these SaaS-specific persuasion techniques:
-- Lead with the TRANSFORMATION, not the technology ("go from 5 hours to 5 minutes")
-- Mention ease of setup ("takes 30 seconds", "no code required", "works instantly")
-- Use competitor displacement language without naming competitors ("unlike what you're using now")
-- Include a low-friction CTA ("free trial", "no credit card", "just try it")
-- Reference scale/trust ("trusted by thousands", "10,000+ users", "teams at top companies")
-- Make the tech feel SIMPLE, not complex — the viewer should think "I could do that"
-- If it's an AI tool, emphasize the magic ("just describe what you want and watch it happen")` : "";
-
-      const prompt = `You are a world-class advertising copywriter who specializes in high-converting video ads. Write a compelling ${duration}-second talking-head video script for a spokesperson presenting this product:
-
-Product: ${productName}
-${productDescription ? `Description: ${productDescription}` : ""}
-Platform: ${PLATFORM_PRESETS.find(p => p.id === selectedPlatform)?.name || "social media"}
-Tone: ${selectedTone}
-Duration: ${duration} seconds (~${Math.floor(duration * 2.5)} words)
-${techBoost}
-
-Rules:
-- Start with an IRRESISTIBLE hook — a question, bold claim, or pattern interrupt that stops the scroll
-- Focus on 2-3 key BENEFITS (what the user gets), never list features
-- Include social proof ("thousands of customers", "top-rated", real-sounding stats)
-- Build urgency or scarcity if natural ("limited time", "everyone's switching", "don't get left behind")
-- End with ONE clear, specific call-to-action that tells them exactly what to do next
-- Keep it under ${Math.floor(duration * 2.5)} words, conversational, like talking to a friend
-- The speaker should sound genuinely excited — not salesy, but passionate
-- Use short sentences. Punchy. Easy to follow while scrolling.
-- DO NOT use brackets, placeholders, or stage directions
-- Return ONLY the script text, no explanation`;
-
-      const r = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
-      });
-      const d = await r.json();
-      if (d.reply) {
-        setScriptText(d.reply);
-        setInputMode("script");
-        toast("Product ad script generated!", "success");
-      }
-    } catch {
-      setError("Failed to generate product script. Try again.");
-    } finally {
-      setProductAiLoading(false);
-    }
-  };
-
-  // ─── AI Face Suggestion ────────────────────────────────────────────
-
-  const suggestFaces = async () => {
-    setFaceGenLoading(true);
-    setError(null);
-    setSuggestedFaces([]);
-    try {
-      // Step 1: Ask AI to describe the ideal spokesperson
-      const descPrompt = `You are a casting director for a product advertisement video. Based on this product, describe the IDEAL spokesperson's appearance for a front-facing headshot photo.
-
-Product: ${productName || "general product"}
-${productDescription ? `Description: ${productDescription}` : ""}
-Target audience: ${selectedTone === "professional" ? "business professionals" : selectedTone === "friendly" ? "everyday consumers" : selectedTone === "urgent" ? "impulse buyers" : "general audience"}
-Platform: ${PLATFORM_PRESETS.find(p => p.id === selectedPlatform)?.name || "social media"}
-
-Write a SINGLE detailed prompt for generating a photorealistic headshot of the perfect spokesperson. Think about:
-- WHO would the target audience trust? (Match their demographic — a tech founder for SaaS, a fitness model for health, a relatable person for consumer products)
-- Age range, gender (pick one), ethnicity (be diverse — vary each generation)
-- Expression that matches the tone (warm smile for friendly, confident look for professional, energetic for urgent)
-- Attire that matches the product industry (casual tech wear for apps, business casual for B2B, stylish for fashion/beauty)
-- Lighting and background (studio headshot style, clean)
-
-The photo must be: front-facing, clear face visible, shoulders visible, professional headshot quality, looking directly at camera, photorealistic.
-
-Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
-
-      const chatRes = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: descPrompt }),
-      });
-      const chatData = await chatRes.json();
-      const facePrompt = chatData.reply || "Professional headshot of a confident person smiling warmly at camera, studio lighting, clean background, shoulders visible";
-
-      // Step 2: Generate 4 face options via FLUX Pro
-      toast("Generating spokesperson options...", "info");
-      const imgRes = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `${facePrompt}. Photorealistic professional headshot, front-facing, looking directly at camera, sharp focus on face, studio portrait photography, 85mm lens, shallow depth of field`,
-          aspectRatio: "portrait",
-          numImages: 4,
-        }),
-      });
-
-      const imgData = await imgRes.json();
-      if (imgData.images && imgData.images.length > 0) {
-        setSuggestedFaces(imgData.images);
-        if (imgData.creditsCost) {
-          updateCreditBalance((user?.creditBalance ?? 0) - imgData.creditsCost);
-        }
-        toast(`${imgData.images.length} spokesperson options generated!`, "success");
-      } else {
-        setError(imgData.error || "Failed to generate faces. Try again.");
-      }
-    } catch {
-      setError("Face generation failed. Try again.");
-    } finally {
-      setFaceGenLoading(false);
-    }
-  };
-
-  const selectSuggestedFace = async (imageUrl: string) => {
-    try {
-      let blob: Blob;
-      if (imageUrl.startsWith("data:")) {
-        // Convert base64 data URL to blob
-        const [header, b64Data] = imageUrl.split(",");
-        const mimeMatch = header.match(/data:([^;]+)/);
-        const mime = mimeMatch?.[1] || "image/jpeg";
-        const byteString = atob(b64Data);
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-        blob = new Blob([ab], { type: mime });
-      } else {
-        // Fetch regular URL
-        const res = await fetch(imageUrl);
-        blob = await res.blob();
-      }
-      const file = new File([blob], `ai-spokesperson-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
-      setFaceImage(file);
-      setFaceImagePreview(imageUrl);
-      setSuggestedFaces([]);
-      toast("Spokesperson selected!", "success");
-    } catch (err) {
-      console.error("Failed to select face:", err);
-      // Fallback: just set the preview URL directly, upload will use the URL
-      setFaceImagePreview(imageUrl);
-      setSuggestedFaces([]);
-      toast("Spokesperson selected!", "success");
-    }
-  };
 
   // ─── AI Script Actions ────────────────────────────────────────────
 
@@ -826,7 +563,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       { label: "Uploading files", status: "active" },
       { label: "Generating avatar video", status: "pending" },
     ];
-    if (isProductMode) steps.push({ label: "Creating product showcase", status: "pending" });
     if (musicMood !== "none") steps.push({ label: "Mixing background music", status: "pending" });
     if (subtitleStyle !== "none") steps.push({ label: "Burning captions", status: "pending" });
     steps.push({ label: "Finalizing video", status: "pending" });
@@ -841,12 +577,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       let audioUrl: string | undefined;
       if (inputMode === "audio" && audioFile) {
         audioUrl = await uploadFileToStorage(audioFile, "audio");
-      }
-
-      // Upload product image if in product ad mode
-      let uploadedProductImageUrl: string | undefined;
-      if (isProductMode && productImage) {
-        uploadedProductImageUrl = await uploadFileToStorage(productImage, "image");
       }
 
       // Resolve background prompt
@@ -876,7 +606,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       const data = await res.json();
       if (res.ok) {
         setJobId(data.jobId);
-        if (uploadedProductImageUrl) setUploadedProductUrl(uploadedProductImageUrl);
         updateCreditBalance((user?.creditBalance ?? 0) - data.creditsCost);
         toast("Avatar generation started! This may take a few minutes.", "success");
       } else {
@@ -903,8 +632,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
   const runEnhancement = useCallback(async (videoUrl: string) => {
     setIsEnhancing(true);
 
-    // Figure out which steps are enhancement steps and activate the first one
-    const hasProduct = !!(uploadedProductUrl || (isProductMode && productName));
     const hasMusic = musicMood !== "none";
     const hasCaptions = subtitleStyle !== "none";
 
@@ -915,10 +642,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       return prev;
     });
 
-    if (hasProduct) {
-      setEnhanceStage("Creating product showcase — AI is generating your intro scene...");
-      setProgressPercent(60);
-    } else if (hasMusic) {
+    if (hasMusic) {
       setEnhanceStage("Generating background music...");
       setProgressPercent(65);
     } else if (hasCaptions) {
@@ -933,7 +657,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       // Cycle through stage messages to show activity
       setEnhanceStage(prev => {
         if (!prev) return prev;
-        if (prev.includes("product showcase") && hasMusic) return "Mixing background music into your video...";
         if (prev.includes("background music") && hasCaptions) return "Burning captions — almost done...";
         if (prev.includes("Burning captions")) return "Finalizing and saving your video...";
         return prev;
@@ -962,8 +685,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         subtitleStyle: subtitleStyle !== "none" ? subtitleStyle : undefined,
         language,
         durationMs: duration * 1000,
-        productImageUrl: uploadedProductUrl || undefined,
-        productName: isProductMode ? productName : undefined,
         aspectRatio,
       };
       console.log("[AVATAR UI] Enhance payload:", JSON.stringify(enhancePayload));
@@ -997,7 +718,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
       setIsEnhancing(false);
       setEnhanceStage(null);
     }
-  }, [musicMood, subtitleStyle, language, duration, jobId, toast, uploadedProductUrl, isProductMode, productName, aspectRatio, stopTimer]);
+  }, [musicMood, subtitleStyle, language, duration, jobId, toast, aspectRatio, stopTimer]);
 
   useEffect(() => {
     if (!jobId || resultVideoUrl || isEnhancing) return;
@@ -1020,7 +741,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           setProgressPercent(55);
 
           if (wantsEnhancement) {
-            console.log("[AVATAR UI] Enhancement triggered. productUrl:", uploadedProductUrl, "musicMood:", musicMood, "subtitleStyle:", subtitleStyle, "isProductMode:", isProductMode);
+            console.log("[AVATAR UI] Enhancement triggered. musicMood:", musicMood, "subtitleStyle:", subtitleStyle);
             toast("Avatar generated! Enhancing...", "success");
             runEnhancement(data.outputVideoUrl);
           } else {
@@ -1080,48 +801,10 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
 
   return (
     <PageTransition className="space-y-6">
-      {/* ─── Hero Section ────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-950/40 via-zinc-900/80 to-fuchsia-950/30 p-6 sm:p-8">
-        {/* Animated gradient orbs */}
-        <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-violet-600/10 blur-3xl animate-pulse" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-fuchsia-600/10 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-
-        <div className="relative z-10">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-                  <Megaphone className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400">Marketing Studio</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
-                Turn Any Product Into a<br />
-                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-400 bg-clip-text text-transparent">
-                  High-Converting Video Ad
-                </span>
-              </h1>
-              <p className="text-sm text-zinc-400 mt-2 max-w-lg">
-                Upload your product, pick a face, and AI creates a professional spokesperson video with music and captions — ready to post on any platform.
-              </p>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex gap-6 mt-5 flex-wrap">
-            {[
-              { value: "90%", label: "cheaper than HeyGen" },
-              { value: "19", label: "templates ready" },
-              { value: "12", label: "AI voices" },
-              { value: "6", label: "platforms" },
-            ].map((stat) => (
-              <div key={stat.label} className="flex items-baseline gap-1.5">
-                <span className="text-lg font-bold text-white">{stat.value}</span>
-                <span className="text-[10px] text-zinc-400">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ─── Page Header ────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white">AI Avatar</h1>
+        <p className="text-sm text-zinc-400 mt-1">Upload a face photo and make it speak with AI lip-sync</p>
       </div>
 
       {/* Plan Gate */}
@@ -1141,44 +824,13 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         </Card>
       )}
 
-      {/* ─── Mode Toggle: Avatar Only vs Product Ad ─────────────────── */}
-      <div className="flex gap-1.5 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
-        <button
-          onClick={() => setIsProductMode(false)}
-          className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-            !isProductMode
-              ? "bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 text-violet-300 border border-violet-500/30 shadow-lg shadow-violet-600/10"
-              : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
-          }`}
-        >
-          <MessageCircle className="w-4 h-4" />
-          <div className="text-left">
-            <div>Spokesperson Video</div>
-            <div className="text-[10px] opacity-60 font-normal">Custom avatar with your script</div>
-          </div>
-        </button>
-        <button
-          onClick={() => setIsProductMode(true)}
-          className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-            isProductMode
-              ? "bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-600/10"
-              : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          <div className="text-left">
-            <div>Product Ad Studio</div>
-            <div className="text-[10px] opacity-60 font-normal">AI builds your entire ad</div>
-          </div>
-        </button>
-      </div>
 
       {/* What you get — only show when nothing is in progress */}
       {!jobId && !resultVideoUrl && !isEnhancing && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/[0.12]">
             <ImageIcon className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
-            <span className="text-[11px] text-zinc-300">{isProductMode ? "Product showcase intro" : "AI lip-sync avatar"}</span>
+            <span className="text-[11px] text-zinc-300">AI lip-sync avatar</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-fuchsia-500/[0.06] border border-fuchsia-500/[0.12]">
             <Wand2 className="w-3.5 h-3.5 text-fuchsia-400 flex-shrink-0" />
@@ -1195,107 +847,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
         </div>
       )}
 
-      {/* ─── Product Ad Mode ─────────────────────────────────────────── */}
-      {isProductMode && (
-        <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-orange-500/[0.03] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl" />
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                <Package className="w-3 h-3 text-white" />
-              </div>
-              What Are You Selling?
-              <span className="text-[10px] text-amber-400/60 font-normal ml-auto">AI does the rest</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Product Image */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                {productImagePreview ? (
-                  <div className="relative rounded-xl overflow-hidden border border-amber-500/20 bg-black/30 h-40">
-                    <img src={productImagePreview} alt="Product" className="w-full h-full object-contain" />
-                    <button
-                      onClick={() => { setProductImage(null); setProductImagePreview(null); if (productInputRef.current) productInputRef.current.value = ""; }}
-                      className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-amber-500/20 hover:border-amber-500/40 bg-white/[0.02] hover:bg-amber-500/5 cursor-pointer transition-all group">
-                    <input ref={productInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleProductImageUpload} className="hidden" />
-                    <Package className="w-6 h-6 text-amber-400/60 mb-2 group-hover:text-amber-400" />
-                    <span className="text-xs text-zinc-400 group-hover:text-amber-300">Upload product image</span>
-                    <span className="text-[10px] text-zinc-400 mt-0.5">Optional — helps AI context</span>
-                  </label>
-                )}
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Product Name *</label>
-                  <input
-                    type="text"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    placeholder="e.g. Genesis Studio, Nike Air Max, ..."
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.12] text-sm text-zinc-300 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">What does it do?</label>
-                  <Textarea
-                    value={productDescription}
-                    onChange={(e) => setProductDescription(e.target.value)}
-                    placeholder="Key benefits, target audience, unique features..."
-                    className="min-h-[60px] bg-white/[0.05] border-white/[0.12] text-sm text-zinc-300 placeholder:text-zinc-400 resize-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Generate Product Script Button */}
-            <Button
-              onClick={generateProductScript}
-              disabled={!productName.trim() || productAiLoading}
-              loading={productAiLoading}
-              className="w-full bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-medium rounded-xl shadow-lg shadow-amber-600/20 disabled:opacity-40"
-            >
-              <Wand2 className="w-4 h-4 mr-2" />
-              {productAiLoading ? "AI Writing Your Ad..." : "Generate Product Ad Script"}
-            </Button>
-
-            {scriptText && productName && (
-              <div className="flex items-center gap-2 text-[11px] text-emerald-400">
-                <CheckCircle2 className="w-3 h-3" />
-                Script ready — scroll down to customize voice, platform & generate
-              </div>
-            )}
-
-            {/* Quick-fill examples for inspiration */}
-            <div className="pt-2 border-t border-white/[0.06]">
-              <p className="text-[10px] text-zinc-400 mb-2">Quick-fill examples — click to try:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { name: "AI Video Platform", desc: "Create professional videos with AI in minutes. Text to video, talking avatars, auto-captions, background music. 10x faster than traditional editing." },
-                  { name: "Project Management App", desc: "Kanban boards, time tracking, team collaboration. Replace 5 tools with one. Used by 50,000+ teams." },
-                  { name: "E-commerce Store Builder", desc: "Launch your online store in 60 seconds. AI-designed templates, one-click payments, built-in marketing tools." },
-                  { name: "Fitness Coaching App", desc: "Personalized workout plans powered by AI. Track progress, get form feedback from your camera, join challenges." },
-                  { name: "Social Media Scheduler", desc: "Schedule posts across all platforms. AI writes captions, finds best posting times, tracks analytics." },
-                ].map((ex) => (
-                  <button
-                    key={ex.name}
-                    onClick={() => { setProductName(ex.name); setProductDescription(ex.desc); }}
-                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] border border-white/[0.08] text-zinc-400 hover:text-amber-300 hover:border-amber-500/30 transition-colors"
-                  >
-                    {ex.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ─── STEP 0: Use Case Templates ─────────────────────────────── */}
       <Card>
@@ -1381,7 +932,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">1</div>
-                {isProductMode ? "Your Spokesperson" : "Face Photo"}
+                Face Photo
                 <span className="text-[10px] text-zinc-400 font-normal ml-auto">{faceImage ? "Ready" : "Required"}</span>
               </CardTitle>
             </CardHeader>
@@ -1413,75 +964,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 </label>
               )}
 
-              {/* AI Suggest Face — visible in Product Ad Mode when no face selected and no suggestions showing */}
-              {isProductMode && !faceImage && suggestedFaces.length === 0 && (
-                <div className="mt-3">
-                  <button
-                    onClick={suggestFaces}
-                    disabled={faceGenLoading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 text-amber-300 hover:from-amber-600/30 hover:to-orange-600/30 transition-all text-sm font-medium disabled:opacity-50"
-                  >
-                    {faceGenLoading ? (
-                      <><GenesisButtonLoader /> Generating spokesperson options...</>
-                    ) : (
-                      <><Sparkles className="w-4 h-4" /> Suggest Spokesperson Face</>
-                    )}
-                  </button>
-                  <p className="text-[10px] text-zinc-400 mt-1.5 text-center">
-                    AI picks the ideal face for your {productName || "product"} ad (10 credits for 4 options)
-                  </p>
-                </div>
-              )}
-
-              {/* Loading state while generating faces */}
-              {faceGenLoading && suggestedFaces.length === 0 && (
-                <div className="mt-3 flex flex-col items-center justify-center py-8 rounded-xl bg-white/[0.04] border border-amber-500/20">
-                  <GenesisLoader size="sm" />
-                  <p className="text-sm text-amber-300 font-medium mt-3">Finding the perfect spokesperson...</p>
-                  <p className="text-[10px] text-zinc-400 mt-1">AI is analyzing your product and generating 4 face options</p>
-                </div>
-              )}
-
-              {/* Suggested Faces Grid */}
-              {suggestedFaces.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  <label className="block text-xs font-medium text-violet-300">Pick your spokesperson — click any face to use it</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {suggestedFaces.map((face, i) => (
-                      <button
-                        key={i}
-                        onClick={() => selectSuggestedFace(face)}
-                        className="relative rounded-xl overflow-hidden border-2 border-white/[0.12] hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/20 transition-all duration-200 cursor-pointer group aspect-[3/4] focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      >
-                        <img src={face} alt={`Spokesperson option ${i + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center pb-3">
-                          <span className="text-white text-xs font-semibold bg-violet-600 px-4 py-2 rounded-lg shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform duration-200">
-                            Select This Face
-                          </span>
-                        </div>
-                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">
-                          {i + 1}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={suggestFaces}
-                      disabled={faceGenLoading}
-                      className="flex-1 text-[11px] px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 hover:bg-amber-500/20 transition-colors font-medium disabled:opacity-50"
-                    >
-                      {faceGenLoading ? "Generating..." : "Generate New Options (10 credits)"}
-                    </button>
-                    <button
-                      onClick={() => setSuggestedFaces([])}
-                      className="text-[11px] px-3 py-2.5 rounded-lg bg-white/[0.05] border border-white/[0.10] text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.08] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1490,7 +972,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">2</div>
-                {isProductMode ? "Ad Script & Voice" : "Voice Input"}
+                Voice Input
                 <span className="text-[10px] text-zinc-400 font-normal ml-auto">{scriptText ? `${scriptText.split(/\s+/).filter(Boolean).length} words` : "Required"}</span>
               </CardTitle>
             </CardHeader>
@@ -1932,12 +1414,6 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
                 <span className="text-xs text-zinc-400">Tone</span>
                 <span className="text-xs text-zinc-300 capitalize">{selectedTone}</span>
               </div>
-              {isProductMode && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Product showcase intro{!productImage ? " (AI image)" : ""}</span>
-                  <span className="text-xs text-zinc-300">+{productImage ? 15 : 25}</span>
-                </div>
-              )}
               {musicMood !== "none" && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-400">Music ({musicMood})</span>
@@ -1971,18 +1447,14 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
             className="w-full h-14 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-500 hover:from-violet-500 hover:via-fuchsia-400 hover:to-amber-400 text-white font-semibold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 text-base"
           >
             {!isPlanAllowed ? (
-              <span className="flex items-center gap-2"><Lock className="w-4 h-4" />Upgrade to Create Ads</span>
-            ) : isProductMode ? (
-              <span className="flex items-center gap-2"><Megaphone className="w-5 h-5" />Create Product Ad</span>
+              <span className="flex items-center gap-2"><Lock className="w-4 h-4" />Upgrade to Create</span>
             ) : (
               <span className="flex items-center gap-2"><Play className="w-5 h-5" />Generate Video</span>
             )}
           </Button>
           {canGenerate && !isGenerating && (
             <p className="text-[10px] text-zinc-400 text-center">
-              {isProductMode
-                ? "Product showcase + spokesperson + music + captions"
-                : "AI lip-sync video ready in 1-3 minutes"}
+              AI lip-sync video ready in 1-3 minutes
             </p>
           )}
 
@@ -2002,7 +1474,7 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
               {resultVideoUrl ? (
                 <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Your Video Is Ready</>
               ) : (
-                <><Play className="w-4 h-4 text-violet-400" /> Creating Your {isProductMode ? "Product Ad" : "Video"}...</>
+                <><Play className="w-4 h-4 text-violet-400" /> Creating Your Video...</>
               )}
             </CardTitle>
           </CardHeader>
@@ -2127,10 +1599,8 @@ Return ONLY the image generation prompt, nothing else. Keep it under 80 words.`;
           loading={isGenerating}
           onClick={handleGenerate}
         >
-          {isGenerating ? "Creating your ad..." : !isPlanAllowed ? (
-            <><Lock className="w-4 h-4" /> Upgrade to Create Ads</>
-          ) : isProductMode ? (
-            <><Megaphone className="w-4 h-4" /> Create Product Ad — {creditCost} cr</>
+          {isGenerating ? "Creating your video..." : !isPlanAllowed ? (
+            <><Lock className="w-4 h-4" /> Upgrade to Create</>
           ) : (
             <><Play className="w-4 h-4" /> Generate Video — {creditCost} cr</>
           )}

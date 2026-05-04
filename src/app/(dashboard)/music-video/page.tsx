@@ -76,6 +76,53 @@ const STAGE_OPTIONS = [
 const SCENE_OPTIONS = [2, 3, 4, 5, 6];
 const CREDITS_PER_SCENE = 20;
 
+// Default AI singer characters users can pick from (generated on first use)
+const DEFAULT_CHARACTERS = [
+  { id: "singer-male-1", name: "Marcus", desc: "Male, confident, urban style", prompt: "Young confident Black male singer, 25 years old, short fade haircut, gold chain, streetwear, charismatic smile, studio headshot, professional lighting" },
+  { id: "singer-female-1", name: "Aria", desc: "Female, powerful vocals look", prompt: "Young mixed-race female singer, 23 years old, long braids, stylish outfit, fierce confident expression, studio headshot, dramatic lighting" },
+  { id: "singer-male-2", name: "Jay", desc: "Male, rockstar energy", prompt: "White male rock singer, 28 years old, messy hair, leather jacket, intense gaze, tattoo on neck, studio headshot, moody lighting" },
+  { id: "singer-female-2", name: "Zara", desc: "Female, Afro-soul queen", prompt: "Beautiful Black female singer, 26 years old, natural afro hair, elegant earrings, warm soulful expression, studio headshot, golden lighting" },
+  { id: "singer-male-3", name: "Thabo", desc: "Male, Amapiano star", prompt: "South African male artist, 24 years old, fresh designer outfit, confident smile, modern style, studio headshot, vibrant lighting" },
+  { id: "singer-female-3", name: "Naledi", desc: "Female, SA pop princess", prompt: "South African female pop artist, 22 years old, colorful braids, bold makeup, radiant smile, trendy outfit, studio headshot, bright lighting" },
+];
+
+// ─── Sample Music Library ────────────────────────────────────────────
+// AI-generated royalty-free tracks users can select instead of uploading
+
+interface SampleTrack {
+  id: string;
+  name: string;
+  artist: string;
+  genre: string;
+  region: "south-africa" | "global";
+  duration: string;
+  mood: string;
+  bpm: number;
+}
+
+const SAMPLE_TRACKS: SampleTrack[] = [
+  // ─── South African ───
+  { id: "sa-amapiano-1", name: "Joburg Nights", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "groovy, log-drum, piano stabs", bpm: 115 },
+  { id: "sa-amapiano-2", name: "Shaya Bass", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "deep bass, percussive, township", bpm: 112 },
+  { id: "sa-amapiano-3", name: "Phola", artist: "AI Studio", genre: "Amapiano", region: "south-africa", duration: "0:30", mood: "smooth piano, vocal chops, sunset", bpm: 110 },
+  { id: "sa-gqom", name: "Durban Gqom", artist: "AI Studio", genre: "Gqom", region: "south-africa", duration: "0:30", mood: "dark, heavy bass, tribal drums", bpm: 124 },
+  { id: "sa-afrosoul", name: "Ubuntu Sunrise", artist: "AI Studio", genre: "Afro-Soul", region: "south-africa", duration: "0:30", mood: "warm, soulful, brass, uplifting", bpm: 95 },
+  { id: "sa-gospel", name: "Halala", artist: "AI Studio", genre: "Gospel", region: "south-africa", duration: "0:30", mood: "powerful choir, spiritual, triumphant", bpm: 100 },
+  { id: "sa-kwaito", name: "eKasi Vibes", artist: "AI Studio", genre: "Kwaito", region: "south-africa", duration: "0:30", mood: "classic kwaito beat, deep house", bpm: 105 },
+  { id: "sa-maskandi", name: "iZulu", artist: "AI Studio", genre: "Maskandi", region: "south-africa", duration: "0:30", mood: "guitar, traditional, storytelling", bpm: 88 },
+  // ─── Global Trending ───
+  { id: "gl-trap", name: "Drip Season", artist: "AI Studio", genre: "Trap", region: "global", duration: "0:30", mood: "808s, hi-hats, dark energy", bpm: 140 },
+  { id: "gl-drill", name: "London Drill", artist: "AI Studio", genre: "UK Drill", region: "global", duration: "0:30", mood: "sliding bass, dark, aggressive", bpm: 142 },
+  { id: "gl-rnb", name: "Midnight Drive", artist: "AI Studio", genre: "R&B", region: "global", duration: "0:30", mood: "smooth, sensual, neo-soul", bpm: 85 },
+  { id: "gl-pop", name: "Summer Energy", artist: "AI Studio", genre: "Pop", region: "global", duration: "0:30", mood: "bright, upbeat, radio-ready", bpm: 120 },
+  { id: "gl-afrobeats", name: "Lagos to London", artist: "AI Studio", genre: "Afrobeats", region: "global", duration: "0:30", mood: "percussion, guitar, danceable", bpm: 108 },
+  { id: "gl-reggaeton", name: "Fuego", artist: "AI Studio", genre: "Reggaeton", region: "global", duration: "0:30", mood: "dembow rhythm, latin heat", bpm: 96 },
+  { id: "gl-rock", name: "Electric Storm", artist: "AI Studio", genre: "Rock", region: "global", duration: "0:30", mood: "electric guitar, drums, power", bpm: 130 },
+  { id: "gl-electronic", name: "Neon Pulse", artist: "AI Studio", genre: "Electronic", region: "global", duration: "0:30", mood: "synths, drops, festival energy", bpm: 128 },
+  { id: "gl-lofi", name: "Chill Study", artist: "AI Studio", genre: "Lo-Fi", region: "global", duration: "0:30", mood: "vinyl crackle, mellow, jazz", bpm: 80 },
+  { id: "gl-acoustic", name: "Campfire", artist: "AI Studio", genre: "Acoustic", region: "global", duration: "0:30", mood: "guitar fingerpicking, warm, intimate", bpm: 90 },
+];
+
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function MusicVideoPage() {
@@ -86,7 +133,13 @@ export default function MusicVideoPage() {
   // Uploads
   const [faceFile, setFaceFile] = useState<File | null>(null);
   const [facePreview, setFacePreview] = useState<string | null>(null);
+  const [faceMode, setFaceMode] = useState<"upload" | "character">("upload");
+  const [selectedCharacter, setSelectedCharacter] = useState<typeof DEFAULT_CHARACTERS[0] | null>(null);
+  const [generatingCharacter, setGeneratingCharacter] = useState(false);
   const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicMode, setMusicMode] = useState<"upload" | "library">("library");
+  const [selectedTrack, setSelectedTrack] = useState<SampleTrack | null>(null);
+  const [trackRegion, setTrackRegion] = useState<"all" | "south-africa" | "global">("all");
 
   // Settings
   const [genre, setGenre] = useState("hiphop");
@@ -197,9 +250,11 @@ export default function MusicVideoPage() {
 
   // ─── Generate ─────────────────────────────────────────────────────
 
+  const hasFace = faceMode === "upload" ? !!faceFile : !!selectedCharacter;
+  const hasMusic = musicMode === "upload" ? !!musicFile : !!selectedTrack;
   const canGenerate =
-    faceFile &&
-    musicFile &&
+    hasFace &&
+    hasMusic &&
     hasEnoughCredits &&
     isPlanAllowed &&
     !isLoading;
@@ -211,8 +266,8 @@ export default function MusicVideoPage() {
     setResultVideoUrl(null);
     setJobId(null);
 
-    if (!faceFile) { setError("Please upload a face photo."); generateLockRef.current = false; return; }
-    if (!musicFile) { setError("Please upload a song."); generateLockRef.current = false; return; }
+    if (!hasFace) { setError("Please upload a face or pick a character."); generateLockRef.current = false; return; }
+    if (!hasMusic) { setError("Please select or upload a song."); generateLockRef.current = false; return; }
     if (!hasEnoughCredits) { setError(`Need ${totalCreditCost} credits, have ${user?.creditBalance ?? 0}.`); generateLockRef.current = false; return; }
 
     setIsGenerating(true);
@@ -229,13 +284,50 @@ export default function MusicVideoPage() {
     try {
       const { uploadFile } = await import("@/lib/upload-client");
 
-      // Upload face
-      toast("Uploading face photo...", "info");
-      const faceUrl = await uploadFile(faceFile, "image");
+      // Get face image URL
+      let faceUrl: string;
+      if (faceMode === "upload" && faceFile) {
+        toast("Uploading face photo...", "info");
+        faceUrl = await uploadFile(faceFile, "image");
+      } else if (selectedCharacter) {
+        // Generate AI character face using FLUX Pro
+        toast("Generating AI singer face...", "info");
+        setGeneratingCharacter(true);
+        const imgRes = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `${selectedCharacter.prompt}, looking directly at camera, ready to perform, music artist energy`,
+            aspectRatio: "portrait",
+            numImages: 1,
+          }),
+        });
+        const imgData = await imgRes.json();
+        setGeneratingCharacter(false);
+        if (imgData.images?.[0]) {
+          // Convert data URL to file and upload
+          const res2 = await fetch(imgData.images[0]);
+          const blob = await res2.blob();
+          const file = new File([blob], "ai-singer.jpg", { type: "image/jpeg" });
+          faceUrl = await uploadFile(file, "image");
+        } else {
+          throw new Error("Failed to generate singer character");
+        }
+      } else {
+        throw new Error("No face source");
+      }
 
-      // Upload music
-      toast("Uploading song...", "info");
-      const musicUrl = await uploadFile(musicFile, "audio");
+      // Upload or resolve music
+      let musicUrl: string;
+      if (musicMode === "upload" && musicFile) {
+        toast("Uploading song...", "info");
+        musicUrl = await uploadFile(musicFile, "audio");
+      } else if (selectedTrack) {
+        // For library tracks, we pass the mood to generate AI music server-side
+        musicUrl = `__generate:${selectedTrack.mood}|${selectedTrack.bpm}|${selectedTrack.genre}`;
+      } else {
+        throw new Error("No music source");
+      }
 
       progress.advanceStep("Generating scenes...");
       progress.setProgress(15);
@@ -244,14 +336,14 @@ export default function MusicVideoPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          faceUrl,
+          faceImageUrl: faceUrl,
           musicUrl,
-          genre,
+          genre: selectedTrack ? selectedTrack.genre.toLowerCase().replace(/[^a-z]/g, "") : genre,
           energy,
-          sceneCount,
+          scenes: sceneCount,
           stage: stage === "custom" ? customStage : stage,
+          customStage: stage === "custom" ? customStage : undefined,
           aspectRatio,
-          platform: selectedPlatform,
         }),
       });
 
@@ -395,91 +487,228 @@ export default function MusicVideoPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Face Upload */}
+            {/* Face — Upload or Pick Character */}
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-2">
                 <User className="w-3 h-3 inline mr-1" />
-                Face / Character Photo <span className="text-red-400">*</span>
+                Singer / Character <span className="text-red-400">*</span>
               </label>
-              {facePreview ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30 aspect-square">
-                  <img src={facePreview} alt="Face" className="w-full h-full object-cover" />
-                  <button
-                    onClick={removeFace}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-all"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <label
-                  className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-pink-500/40 bg-white/[0.04] hover:bg-pink-500/5 cursor-pointer transition-all duration-300 group"
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={handleFaceDrop}
+
+              {/* Tabs */}
+              <div className="flex gap-1 p-1 rounded-lg bg-white/[0.05] border border-white/[0.08] mb-3">
+                <button
+                  onClick={() => { setFaceMode("upload"); setSelectedCharacter(null); }}
+                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
+                    faceMode === "upload"
+                      ? "bg-pink-500/20 text-pink-300 border border-pink-500/30"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
                 >
-                  <input
-                    ref={faceInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={handleFaceUpload}
-                    className="hidden"
-                  />
-                  <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center mb-2 group-hover:bg-pink-500/20 transition-colors">
-                    <User className="w-6 h-6 text-pink-400" />
-                  </div>
-                  <span className="text-sm font-medium text-zinc-400 group-hover:text-pink-300 transition-colors">
-                    Drop face photo or click
-                  </span>
-                  <span className="text-xs text-zinc-500 mt-1">PNG, JPEG, WebP — max 10MB</span>
-                </label>
+                  Upload Photo
+                </button>
+                <button
+                  onClick={() => { setFaceMode("character"); setFaceFile(null); setFacePreview(null); }}
+                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
+                    faceMode === "character"
+                      ? "bg-pink-500/20 text-pink-300 border border-pink-500/30"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  AI Singers
+                </button>
+              </div>
+
+              {faceMode === "upload" ? (
+                <>
+                  {facePreview ? (
+                    <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30 aspect-square">
+                      <img src={facePreview} alt="Face" className="w-full h-full object-cover" />
+                      <button
+                        onClick={removeFace}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-pink-500/40 bg-white/[0.04] hover:bg-pink-500/5 cursor-pointer transition-all group"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={handleFaceDrop}
+                    >
+                      <input ref={faceInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFaceUpload} className="hidden" />
+                      <User className="w-6 h-6 text-pink-400 mb-2" />
+                      <span className="text-sm font-medium text-zinc-400 group-hover:text-pink-300 transition-colors">Drop face photo or click</span>
+                      <span className="text-xs text-zinc-500 mt-1">PNG, JPEG, WebP — max 10MB</span>
+                    </label>
+                  )}
+                </>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {DEFAULT_CHARACTERS.map((char) => (
+                    <button
+                      key={char.id}
+                      onClick={() => setSelectedCharacter(char)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all ${
+                        selectedCharacter?.id === char.id
+                          ? "bg-pink-500/15 border border-pink-500/30 ring-1 ring-pink-500/20"
+                          : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-pink-500/20"
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                        selectedCharacter?.id === char.id ? "bg-pink-500/20" : "bg-white/[0.06]"
+                      }`}>
+                        <User className={`w-5 h-5 ${selectedCharacter?.id === char.id ? "text-pink-400" : "text-zinc-400"}`} />
+                      </div>
+                      <span className={`text-[11px] font-medium ${selectedCharacter?.id === char.id ? "text-pink-300" : "text-zinc-300"}`}>
+                        {char.name}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 text-center leading-tight">{char.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedCharacter && faceMode === "character" && (
+                <p className="text-[10px] text-pink-400 mt-2 text-center">
+                  AI will generate <strong>{selectedCharacter.name}</strong> as your singer (10 credits)
+                </p>
               )}
             </div>
 
-            {/* Music Upload */}
+            {/* Music — Library or Upload */}
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-2">
                 <FileAudio className="w-3 h-3 inline mr-1" />
                 Song / Music <span className="text-red-400">*</span>
               </label>
-              {musicFile ? (
-                <div className="relative flex flex-col items-center justify-center h-48 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
-                  <div className="w-12 h-12 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-3">
-                    <Music2 className="w-6 h-6 text-violet-400" />
+
+              {/* Tabs: Library vs Upload */}
+              <div className="flex gap-1 p-1 rounded-lg bg-white/[0.05] border border-white/[0.08] mb-3">
+                <button
+                  onClick={() => { setMusicMode("library"); setMusicFile(null); }}
+                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
+                    musicMode === "library"
+                      ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  Music Library
+                </button>
+                <button
+                  onClick={() => { setMusicMode("upload"); setSelectedTrack(null); }}
+                  className={`flex-1 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
+                    musicMode === "upload"
+                      ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  Upload Own
+                </button>
+              </div>
+
+              {musicMode === "library" ? (
+                <div className="space-y-2">
+                  {/* Region filter */}
+                  <div className="flex gap-1.5">
+                    {([
+                      { id: "all" as const, label: "All" },
+                      { id: "south-africa" as const, label: "South Africa" },
+                      { id: "global" as const, label: "Global" },
+                    ]).map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => setTrackRegion(r.id)}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
+                          trackRegion === r.id
+                            ? "bg-pink-500/20 text-pink-300 border border-pink-500/30"
+                            : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.06]"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-sm font-medium text-zinc-200 text-center truncate max-w-full px-2">
-                    {musicFile.name}
-                  </p>
-                  <p className="text-[10px] text-zinc-400 mt-1">
-                    {(musicFile.size / (1024 * 1024)).toFixed(1)} MB
-                  </p>
-                  <button
-                    onClick={removeMusic}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-all"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+
+                  {/* Track list */}
+                  <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/[0.08] bg-white/[0.02] p-2">
+                    {SAMPLE_TRACKS
+                      .filter(t => trackRegion === "all" || t.region === trackRegion)
+                      .map((track) => (
+                        <button
+                          key={track.id}
+                          onClick={() => setSelectedTrack(track)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all ${
+                            selectedTrack?.id === track.id
+                              ? "bg-violet-500/15 border border-violet-500/30"
+                              : "bg-white/[0.02] border border-transparent hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            selectedTrack?.id === track.id ? "bg-violet-500/20" : "bg-white/[0.06]"
+                          }`}>
+                            <Music2 className={`w-4 h-4 ${selectedTrack?.id === track.id ? "text-violet-400" : "text-zinc-400"}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-medium truncate ${selectedTrack?.id === track.id ? "text-violet-300" : "text-zinc-300"}`}>
+                              {track.name}
+                            </p>
+                            <p className="text-[10px] text-zinc-500 truncate">
+                              {track.genre} · {track.bpm} BPM · {track.duration}
+                            </p>
+                          </div>
+                          {track.region === "south-africa" && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex-shrink-0">ZA</span>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                  {selectedTrack && (
+                    <p className="text-[10px] text-violet-400 text-center">
+                      Selected: <strong>{selectedTrack.name}</strong> ({selectedTrack.genre}) — AI will generate this style for your video
+                    </p>
+                  )}
                 </div>
               ) : (
-                <label
-                  className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={handleMusicDrop}
-                >
-                  <input
-                    ref={musicInputRef}
-                    type="file"
-                    accept="audio/mpeg,audio/wav,audio/mp3,.mp3,.wav"
-                    onChange={handleMusicUpload}
-                    className="hidden"
-                  />
-                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-2 group-hover:bg-violet-500/20 transition-colors">
-                    <Music2 className="w-6 h-6 text-violet-400" />
-                  </div>
-                  <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
-                    Drop your song or click
-                  </span>
-                  <span className="text-xs text-zinc-500 mt-1">MP3, WAV — max 50MB</span>
-                </label>
+                <>
+                  {musicFile ? (
+                    <div className="relative flex flex-col items-center justify-center h-36 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
+                      <div className="w-10 h-10 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-2">
+                        <Music2 className="w-5 h-5 text-violet-400" />
+                      </div>
+                      <p className="text-sm font-medium text-zinc-200 text-center truncate max-w-full px-2">
+                        {musicFile.name}
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        {(musicFile.size / (1024 * 1024)).toFixed(1)} MB
+                      </p>
+                      <button
+                        onClick={removeMusic}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 bg-white/[0.04] hover:bg-violet-500/5 cursor-pointer transition-all duration-300 group"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={handleMusicDrop}
+                    >
+                      <input
+                        ref={musicInputRef}
+                        type="file"
+                        accept="audio/mpeg,audio/wav,audio/mp3,.mp3,.wav"
+                        onChange={handleMusicUpload}
+                        className="hidden"
+                      />
+                      <Music2 className="w-6 h-6 text-violet-400 mb-2" />
+                      <span className="text-sm font-medium text-zinc-400 group-hover:text-violet-300 transition-colors">
+                        Drop your song or click
+                      </span>
+                      <span className="text-xs text-zinc-500 mt-1">MP3, WAV — max 50MB</span>
+                    </label>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -492,7 +721,7 @@ export default function MusicVideoPage() {
       </Card>
 
       {/* ─── STEP 2: Performance Settings ─────────────────────────── */}
-      <Card className={!faceFile || !musicFile ? "opacity-50 pointer-events-none" : ""}>
+      <Card className={!faceFile || !hasMusic ? "opacity-50 pointer-events-none" : ""}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[10px] font-bold text-white">2</div>

@@ -164,6 +164,37 @@ export async function POST(req: NextRequest) {
     if (!musicUrl) {
       return NextResponse.json({ error: "Music audio file is required" }, { status: 400 });
     }
+
+    // Handle AI-generated music from library selection
+    let finalMusicUrl = musicUrl;
+    if (musicUrl.startsWith("__generate:")) {
+      const musicMeta = musicUrl.replace("__generate:", "");
+      const [mood, bpmStr, genreName] = musicMeta.split("|");
+      const bpm = parseInt(bpmStr) || 110;
+      console.log(`[MUSIC-VIDEO] Generating AI music: ${genreName} (${mood}, ${bpm} BPM)`);
+      try {
+        const musicResult = await fal.subscribe("fal-ai/stable-audio", {
+          input: {
+            prompt: `${mood}, ${genreName} style, ${bpm} bpm, instrumental, professional production quality, suitable for music video`,
+            seconds_total: Math.min(scenes * 5 + 5, 47),
+          },
+          logs: false,
+        });
+        const musicData = musicResult.data as Record<string, unknown>;
+        finalMusicUrl =
+          (musicData?.audio_file as { url?: string })?.url ||
+          (musicData?.audio_url as string) ||
+          "";
+        if (finalMusicUrl) {
+          console.log(`[MUSIC-VIDEO] AI music generated: ${finalMusicUrl.slice(0, 60)}...`);
+        } else {
+          return NextResponse.json({ error: "Failed to generate music. Try uploading your own." }, { status: 503 });
+        }
+      } catch (musicErr) {
+        console.error("[MUSIC-VIDEO] Music generation failed:", musicErr);
+        return NextResponse.json({ error: "Music generation failed. Try uploading your own track." }, { status: 503 });
+      }
+    }
     if (!genre) {
       return NextResponse.json({ error: "Genre is required" }, { status: 400 });
     }
@@ -244,14 +275,14 @@ export async function POST(req: NextRequest) {
       modelId: "kling-2.6",
       prompt: `Music Video: ${genre} | ${energy} energy | ${scenes} scenes | ${stage}`,
       inputImageUrl: faceImageUrl,
-      inputVideoUrl: musicUrl,
+      inputVideoUrl: finalMusicUrl,
       resolution: "720p",
       duration: totalDuration,
       fps: 30,
       isDraft: false,
       creditsCost,
       aspectRatio: ar.db,
-      audioUrl: musicUrl,
+      audioUrl: finalMusicUrl,
     });
 
     console.log(`[MUSIC-VIDEO] Job ${job.id} created: ${scenes} scenes, ${genre}, ${energy}, ${stage}`);
@@ -393,7 +424,41 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ── Step 4: Persist to R2 and update job ──
+      // ── Step 4: Overlay music audio onto merged video ──
+      console.log("[MUSIC-VIDEO] Composing music audio onto video...");
+      try {
+        const composeDurationMs = successfulVideos.length * durationPerScene * 1000;
+        const composeResult = await fal.subscribe("fal-ai/ffmpeg-api/compose", {
+          input: {
+            tracks: [
+              {
+                id: "video",
+                type: "video",
+                keyframes: [{ timestamp: 0, duration: composeDurationMs, url: finalVideoUrl }],
+              },
+              {
+                id: "music",
+                type: "audio",
+                keyframes: [{ timestamp: 0, duration: composeDurationMs, url: finalMusicUrl }],
+              },
+            ],
+          },
+          logs: false,
+        });
+        const composeData = composeResult.data as Record<string, unknown>;
+        const composedUrl =
+          (composeData?.video_url as string) ||
+          (composeData?.video as { url?: string })?.url ||
+          "";
+        if (composedUrl) {
+          finalVideoUrl = composedUrl;
+          console.log(`[MUSIC-VIDEO] Music composed onto video: ${composedUrl.slice(0, 80)}...`);
+        }
+      } catch (composeErr) {
+        console.warn("[MUSIC-VIDEO] Music compose failed, delivering video without audio:", composeErr);
+      }
+
+      // ── Step 5: Persist to R2 and update job ──
       console.log("[MUSIC-VIDEO] Persisting final video to R2...");
       const { persistExternalVideo, videoStorageKey, r2PublicUrl } = await import("@/lib/storage");
       const storageKey = videoStorageKey(user.id, `music-video-${Date.now()}`);

@@ -6,7 +6,7 @@
 name = "genesis-studio"
 main = ".open-next/worker.js"
 compatibility_date = "2025-05-26"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 [assets]
 directory = ".open-next/assets"
@@ -38,6 +38,8 @@ binding = "IMAGES"
 
 # Environment variables (secrets set via wrangler secret put)
 [vars]
+NODE_ENV = "production"
+OPEN_NEXT_DEBUG = "true"
 NEXT_PUBLIC_APP_URL = "https://ivideostudio.ai"
 NEXT_PUBLIC_APP_NAME = "Genesis Studio"
 R2_PUBLIC_URL = "https://cdn.ivideostudio.ai"

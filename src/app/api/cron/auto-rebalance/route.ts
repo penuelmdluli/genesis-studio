@@ -180,4 +180,4 @@ export async function GET(req: Request) {
   });
 }
 
-export { FB_PAGE_KEY }; // avoid unused import warning
+// FB_PAGE_KEY used internally above

@@ -6,7 +6,7 @@
 
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+// runtime removed for Cloudflare Workers compatibility (runs on edge by default)
 
 interface VideoRow {
   id: string;

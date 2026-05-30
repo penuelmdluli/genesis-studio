@@ -22,7 +22,7 @@ const SUPPORTED_LANGUAGES = [
   { code: "auto", name: "Auto-detect" },
 ];
 
-export { SUPPORTED_LANGUAGES };
+// SUPPORTED_LANGUAGES used internally
 
 export async function POST(req: NextRequest) {
   try {

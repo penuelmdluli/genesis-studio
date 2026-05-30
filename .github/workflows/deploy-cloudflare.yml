@@ -1,0 +1,42 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Prepare middleware for OpenNext
+        run: |
+          # OpenNext expects middleware.ts; Next.js 16 uses proxy.ts
+          # Move (not copy) to avoid "both detected" error
+          mv src/proxy.ts src/middleware.ts
+          # Replace proxy export with middleware export
+          sed -i 's/export const proxy = handler;/export const middleware = handler;/' src/middleware.ts
+
+      - name: Build with OpenNext
+        run: npx opennextjs-cloudflare build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

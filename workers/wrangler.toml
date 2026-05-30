@@ -1,0 +1,20 @@
+name = "genesis-cron"
+main = "cron-handler.js"
+compatibility_date = "2024-09-23"
+
+[triggers]
+crons = [
+  "0 5 * * *",
+  "0 13 * * *",
+  "0 3 * * *",
+  "0 9 * * *",
+  "*/5 * * * *",
+  "0 */6 * * *",
+  "*/1 * * * *",
+  "*/2 * * * *",
+  "*/30 * * * *",
+  "*/15 * * * *",
+]
+
+[vars]
+APP_URL = "https://ivideostudio.ai"

@@ -1,0 +1,41 @@
+# ============================================
+# GENESIS STUDIO — Cloudflare Workers Configuration
+# ============================================
+# Deploys as a Cloudflare Worker (not Pages) using OpenNext adapter
+
+name = "genesis-studio"
+main = ".open-next/worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "genesis-studio"
+database_id = "afdf38f7-e7a2-4be6-b580-75c5287ddb2e"
+
+# KV Namespace (rate limiting, sessions, idempotency)
+[[kv_namespaces]]
+binding = "KV"
+id = "ef281cb95f75490c84e5bca01f34a040"
+
+# R2 Bucket (video/image storage)
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "genesis-videos"
+
+# Custom domains — Cloudflare auto-creates DNS records
+# ivideostudio.ai nameservers are already on Cloudflare
+[[routes]]
+pattern = "ivideostudio.ai"
+custom_domain = true
+
+# Environment variables (secrets set via wrangler secret put)
+[vars]
+NEXT_PUBLIC_APP_URL = "https://ivideostudio.ai"
+NEXT_PUBLIC_APP_NAME = "Genesis Studio"
+R2_PUBLIC_URL = "https://cdn.ivideostudio.ai"

@@ -1,14 +1,6 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // ffmpeg-installer uses dynamic platform-specific requires that Turbopack
-  // can't bundle. Mark it as external so it's loaded at runtime from node_modules,
-  // and trace-include the binary so Vercel ships it with the serverless function.
-  serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "msedge-tts"],
-  outputFileTracingIncludes: {
-    "/api/**": ["./node_modules/@ffmpeg-installer/**/*"],
-  },
   async headers() {
     return [
       {
@@ -25,7 +17,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.io https://*.clerk.accounts.dev https://*.clerk.com https://clerk.genesisstudio.app https://challenges.cloudflare.com https://plausible.io https://browser.sentry-cdn.com; style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://cdn.genesisstudio.app https://img.clerk.com https://*.clerk.accounts.dev https://*.clerk.com https://*.fal.media https://fal.media https://*.cloudfront.net; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://cdn.genesisstudio.app https://*.fal.media https://fal.media https://*.cloudfront.net; font-src 'self' data: https://*.clerk.accounts.dev https://*.clerk.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.genesisstudio.app https://api.clerk.io https://clerk-telemetry.com https://img.clerk.com https://api.stripe.com https://*.fal.run https://queue.fal.run https://*.fal.media https://fal.media https://api.runpod.ai https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.r2.dev https://*.r2.cloudflarestorage.com https://cdn.genesisstudio.app https://plausible.io https://*.ingest.sentry.io; frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.genesisstudio.app https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://plausible.io https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://cdn.ivideostudio.ai https://*.fal.media https://fal.media https://*.cloudfront.net https://lh3.googleusercontent.com; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://cdn.ivideostudio.ai https://*.fal.media https://fal.media https://*.cloudfront.net; font-src 'self' data:; connect-src 'self' https://api.stripe.com https://*.fal.run https://queue.fal.run https://*.fal.media https://fal.media https://api.runpod.ai https://*.cloudfront.net https://*.r2.dev https://*.r2.cloudflarestorage.com https://cdn.ivideostudio.ai https://plausible.io https://static.cloudflareinsights.com; frame-src 'self' https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;",
           },
         ],
       },
@@ -51,20 +43,13 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
-      { protocol: "https", hostname: "cdn.genesisstudio.app" },
+      { protocol: "https", hostname: "cdn.ivideostudio.ai" },
       { protocol: "https", hostname: "**.fal.media" },
       { protocol: "https", hostname: "fal.media" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  // Suppress source map upload warnings when SENTRY_AUTH_TOKEN is not set
-  silent: !process.env.SENTRY_AUTH_TOKEN,
-  // Upload source maps for better stack traces
-  widenClientFileUpload: true,
-  // Disable telemetry
-  telemetry: false,
-});
+export default nextConfig;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function GET(
   req: NextRequest,
@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "Video ID required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Fetch the video
     const { data: video, error } = await supabase
@@ -64,12 +64,12 @@ export async function GET(
     // If we don't have enough, fill with tag-matched videos
     if (relatedVideos.length < 6 && video.tags && video.tags.length > 0) {
       const existingIds = [id, ...relatedVideos.map((v) => v.id)];
-      const { data: tagRelated } = await supabase
+      const { data: tagRelated } = await (supabase
         .from("explore_videos")
         .select("*")
         .eq("is_published", true)
         .eq("is_flagged", false)
-        .not("id", "in", `(${existingIds.join(",")})`)
+        .not("id", "in", `(${existingIds.join(",")})`) as any)
         .overlaps("tags", video.tags)
         .order("likes", { ascending: false })
         .limit(6 - relatedVideos.length);

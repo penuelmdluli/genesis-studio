@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getProviderHealthStatus } from "@/lib/vendor-failover";
 import { SERVICE_TIERS, SCALING_MILESTONES, estimateMonthlyCosts } from "@/lib/scaling";
@@ -9,7 +9,7 @@ import { checkVatThreshold } from "@/lib/tax";
  * Admin endpoint: Provider health, scaling thresholds, and business metrics.
  */
 export async function GET() {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId || !isOwnerClerkId(userId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

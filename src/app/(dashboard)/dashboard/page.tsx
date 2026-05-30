@@ -445,7 +445,7 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={() => {
-                const text = encodeURIComponent("I've been using Genesis Studio to create AI videos — it's insane! Try it free:\n\nhttps://genesisstudio.app/sign-up");
+                const text = encodeURIComponent("I've been using Genesis Studio to create AI videos — it's insane! Try it free:\n\nhttps://ivideostudio.ai/sign-up");
                 window.open(`https://wa.me/?text=${text}`, "_blank");
               }}
               className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors shrink-0"

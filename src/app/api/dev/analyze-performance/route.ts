@@ -20,7 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 120;
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: items, error } = await supabase

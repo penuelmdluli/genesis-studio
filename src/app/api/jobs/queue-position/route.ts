@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get user's active (queued/processing) jobs
     const { data: userJobs } = await supabase
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     // Count total queued jobs ahead of each user job
     const jobPositions = await Promise.all(
-      userJobs.map(async (job) => {
+      userJobs.map(async (job: any) => {
         const { count } = await supabase
           .from("generation_jobs")
           .select("id", { count: "exact", head: true })

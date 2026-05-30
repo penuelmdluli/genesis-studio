@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 type ExploreTab = "trending" | "latest" | "audio" | "motion" | "films" | "picks";
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Fetch one extra to determine if there's a next page
     const fetchLimit = limit + 1;
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
             .order("likes", { ascending: false });
           if (cursor) {
             const [cursorLikes, cursorId] = cursor.split("__");
-            query = query.or(
+            query = (query as any).or(
               `likes.lt.${cursorLikes},and(likes.eq.${cursorLikes},id.gt.${cursorId})`
             );
           }
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
             .order("likes", { ascending: false });
           if (cursor) {
             const [cursorLikes, cursorId] = cursor.split("__");
-            query = query.or(
+            query = (query as any).or(
               `likes.lt.${cursorLikes},and(likes.eq.${cursorLikes},id.gt.${cursorId})`
             );
           }
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
             .order("likes", { ascending: false });
           if (cursor) {
             const [cursorLikes, cursorId] = cursor.split("__");
-            query = query.or(
+            query = (query as any).or(
               `likes.lt.${cursorLikes},and(likes.eq.${cursorLikes},id.gt.${cursorId})`
             );
           }

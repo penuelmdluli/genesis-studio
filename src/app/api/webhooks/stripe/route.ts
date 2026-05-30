@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { grantSubscriptionCredits, addCreditPackCredits } from "@/lib/credits";
 import { sendPlanUpgradeEmail } from "@/lib/email";
 import { updateUserPlan } from "@/lib/db";
@@ -10,7 +10,7 @@ import Stripe from "stripe";
 
 /** Idempotency guard — returns true if this Stripe event was already processed. */
 async function isStripeEventProcessed(eventId: string): Promise<boolean> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data } = await supabase
     .from("webhook_events")
     .select("id")
@@ -21,7 +21,7 @@ async function isStripeEventProcessed(eventId: string): Promise<boolean> {
 }
 
 async function recordStripeEvent(eventId: string, eventType: string, userId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   await supabase.from("webhook_events").insert({
     reference: eventId,
     provider: "stripe",
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   try {
     switch (event.type) {

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Returns a 404 response if running in Vercel production
+ * Returns a 404 response if running in production
  * UNLESS a valid CRON_SECRET is provided (allows automated pipeline).
  * Use at the top of every /api/dev/* route handler.
  */
 export function blockInProduction(req?: NextRequest): NextResponse | null {
-  if (process.env.VERCEL_ENV === "production") {
+  if (process.env.NODE_ENV === "production") {
     // Allow authenticated cron/pipeline requests through in production
     if (req) {
       const secret =

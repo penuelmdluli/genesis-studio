@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, getJob } from "@/lib/db";
 
 export async function GET(
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params;
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
 
   if (!clerkId) {
     return new Response("Unauthorized", { status: 401 });

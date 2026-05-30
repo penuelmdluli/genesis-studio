@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { SaveReferral } from "@/components/auth/save-referral";
-import { SignUp } from "@clerk/nextjs";
+import { SignUpForm } from "@/components/auth/sign-up-form";
 import Link from "next/link";
 import { AuthBackgroundVideo } from "@/components/auth-background-video";
 
@@ -111,35 +111,7 @@ export default function SignUpPage() {
               <Suspense><SaveReferral /></Suspense>
     </div>
 
-          <SignUp
-            forceRedirectUrl="/onboarding/first-video"
-            appearance={{
-              elements: {
-                rootBox: "mx-auto w-full",
-                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40 rounded-2xl",
-                headerTitle: "text-white text-lg",
-                headerSubtitle: "text-zinc-400",
-                socialButtonsBlockButton:
-                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
-                    ? "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold"
-                    : "hidden",
-                socialButtonsBlockButtonText: "font-semibold text-zinc-900",
-                socialButtonsProviderIcon: "w-5 h-5",
-                dividerRow:
-                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
-                    ? undefined
-                    : "hidden",
-                formFieldInput:
-                  "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
-                formButtonPrimary:
-                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 shadow-lg shadow-violet-600/25 rounded-xl h-11 text-sm font-semibold",
-                footerActionLink: "text-violet-400 hover:text-violet-300 font-medium",
-                formFieldLabel: "text-zinc-400 text-sm",
-                dividerLine: "bg-white/[0.08]",
-                dividerText: "text-zinc-400 text-xs",
-              },
-            }}
-          />
+          <SignUpForm />
 
           <p className="text-center text-xs text-zinc-400 mt-6">
             Already have an account?{" "}

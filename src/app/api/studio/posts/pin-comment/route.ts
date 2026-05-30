@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStudioOwner } from "@/lib/studio/auth";
 import { updateStudioPost } from "@/lib/studio/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 const PINNED_COMMENT_TEXT = "Follow for more \u26A1\u{1F525}";
 const VIEW_THRESHOLD = 50;
@@ -26,12 +26,12 @@ export async function GET(req: NextRequest) {
       if (authResult instanceof NextResponse) return authResult;
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get posted items where pinned_comment_posted = false
-    const { data: posts, error: postsError } = await supabase
+    const { data: rawPosts, error: postsError } = await supabase
       .from("studio_posts")
-      .select("*, studio_pages:page_id(*)")
+      .select("*")
       .eq("pinned_comment_posted", false)
       .eq("status", "posted");
 
@@ -43,9 +43,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (!posts || posts.length === 0) {
+    if (!rawPosts || rawPosts.length === 0) {
       return NextResponse.json({ pinned: 0, checked: 0, errors: [] });
     }
+
+    // Fetch related studio_pages separately (D1 doesn't support join syntax)
+    const pageIds = [...new Set(rawPosts.map((p: any) => p.page_id).filter(Boolean))];
+    let pagesMap: Record<string, any> = {};
+    if (pageIds.length > 0) {
+      const { data: pages } = await supabase
+        .from("studio_pages")
+        .select("*")
+        .in("id", pageIds);
+      for (const pg of pages ?? []) {
+        pagesMap[pg.id] = pg;
+      }
+    }
+    const posts = rawPosts.map((p: any) => ({
+      ...p,
+      studio_pages: pagesMap[p.page_id] ?? null,
+    }));
 
     const errors: string[] = [];
     let pinnedCount = 0;

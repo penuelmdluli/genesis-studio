@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { getAuthUserId, getAuthUserProfile } from "@/lib/auth";
 import { getUserByClerkId, createUser } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
 import { sendWelcomeEmail } from "@/lib/email";
@@ -7,7 +7,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 
 export async function GET() {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -16,19 +16,18 @@ export async function GET() {
 
     // Auto-create user on first request
     if (!user) {
-      const clerkUser = await currentUser();
-      if (!clerkUser) {
+      const profile = await getAuthUserProfile();
+      if (!profile) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
-      const email = clerkUser.emailAddresses[0]?.emailAddress || "";
-      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "User";
+      const { email, name } = profile;
 
       user = await createUser({
         clerkId,
         email,
         name,
-        avatarUrl: clerkUser.imageUrl,
+        avatarUrl: profile.avatarUrl,
       });
 
       // Send welcome email (fire-and-forget)

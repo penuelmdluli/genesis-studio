@@ -5,7 +5,7 @@ import { isAutomationPaused } from "@/lib/automation-killswitch";
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { logFeedbackEvent } from "@/lib/intelligence";
 
 export const maxDuration = 60;
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
   // Find decisions older than 48 hours without outcomes
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     if (!avgData?.length) continue;
 
-    const pageAvg = avgData.reduce((s, p) => s + (p.performance_score || 0), 0) / avgData.length;
+    const pageAvg = avgData.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / avgData.length;
 
     // Find the next post made after this decision
     const { data: nextPosts } = await supabase
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     if (!nextPosts?.length) continue;
 
-    const postAvg = nextPosts.reduce((s, p) => s + (p.performance_score || 0), 0) / nextPosts.length;
+    const postAvg = nextPosts.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / nextPosts.length;
     const improvement = postAvg - pageAvg;
     const wasCorrect = improvement > 0;
 

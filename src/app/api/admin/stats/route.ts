@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { getProviderHealthStatus } from "@/lib/vendor-failover";
 import { getBudgetSummary } from "@/lib/api-budget";
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId || !isOwnerClerkId(clerkId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Run all queries in parallel
     const [

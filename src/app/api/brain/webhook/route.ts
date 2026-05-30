@@ -5,7 +5,7 @@ import {
   updateProduction,
 } from "@/lib/genesis-brain/orchestrator";
 import { startAssembly } from "@/lib/genesis-brain/assembly";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * RunPod webhook handler for Brain scene completion.
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     console.log(`[BRAIN WEBHOOK] Job ${runpodJobId} status: ${status}`);
 
     // Find the scene by runpod_job_id
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: sceneRow, error: findError } = await supabase
       .from("production_scenes")
       .select("*")

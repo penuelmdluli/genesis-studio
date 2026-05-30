@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * POST /api/admin/migrate-support
@@ -9,12 +9,12 @@ import { createSupabaseAdmin } from "@/lib/supabase";
  * Owner only. Safe to re-run.
  */
 export async function POST() {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !isOwnerClerkId(clerkId)) {
     return NextResponse.json({ error: "Owner access required" }, { status: 403 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results: string[] = [];
 
   // Test if support_tickets exists by trying to query it

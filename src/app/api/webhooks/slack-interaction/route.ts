@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { sendSlackAlert } from "@/lib/alerts";
 
 /**
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const action = payload.actions[0];
     const candidateId = action.value;
     const userName = payload.user?.name ?? "unknown";
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     switch (action.action_id) {
       case "approve_candidate": {

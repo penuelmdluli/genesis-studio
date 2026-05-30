@@ -4,12 +4,10 @@
  */
 
 import { redirect } from "next/navigation";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 // Only show in dev/preview (not production)
-const isProduction =
-  process.env.VERCEL_ENV === "production" &&
-  process.env.NODE_ENV === "production";
+const isProduction = process.env.NODE_ENV === "production";
 
 // ---------------------------------------------------------------------------
 // Data fetchers
@@ -17,7 +15,7 @@ const isProduction =
 
 async function fetchTrendingTopics() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const twentyFourHoursAgo = new Date(
       Date.now() - 24 * 60 * 60 * 1000
     ).toISOString();
@@ -42,7 +40,7 @@ async function fetchTrendingTopics() {
 
 async function fetchQueueStatusCounts() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const statuses = ["pending", "generating", "ready", "posted", "failed"];
     const counts: Record<string, number> = {};
 
@@ -69,7 +67,7 @@ async function fetchQueueStatusCounts() {
 
 async function fetchRecentGenerations() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_content_queue")
       .select("id, page_id, pillar, status, engine, cost_usd, created_at, generated_at, error_message")
@@ -89,7 +87,7 @@ async function fetchRecentGenerations() {
 
 async function fetchCostTotals() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const now = new Date();
 
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -107,8 +105,8 @@ async function fetchCostTotals() {
         .gte("created_at", since);
 
       if (error || !data) return { estimated: 0, actual: 0 };
-      return data.reduce(
-        (acc, row) => ({
+      return (data as { estimated_cost_usd: number; actual_cost_usd: number }[]).reduce(
+        (acc: { estimated: number; actual: number }, row: { estimated_cost_usd: number; actual_cost_usd: number }) => ({
           estimated: acc.estimated + (Number(row.estimated_cost_usd) || 0),
           actual: acc.actual + (Number(row.actual_cost_usd) || 0),
         }),
@@ -135,7 +133,7 @@ async function fetchCostTotals() {
 
 async function fetchEngineUsage() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_content_queue")
       .select("engine");
@@ -156,7 +154,7 @@ async function fetchEngineUsage() {
 
 async function fetchPageStatuses() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_content_queue")
       .select("page_id, status, posted_at")
@@ -198,7 +196,7 @@ async function fetchPageStatuses() {
 
 async function fetchRecentErrors() {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_content_queue")
       .select("id, page_id, pillar, engine, error_message, created_at")
@@ -249,7 +247,7 @@ async function fetchEngagementInsights(): Promise<{
   byPage: PillarAggregate[];
 }> {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("dev_content_queue")
@@ -347,7 +345,7 @@ async function fetchStuckItems(): Promise<
   Array<{ id: string; page_id: string; pillar: string; minutes_stuck: number }>
 > {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("dev_content_queue")
@@ -357,7 +355,7 @@ async function fetchStuckItems(): Promise<
       .order("created_at", { ascending: true })
       .limit(20);
     if (error || !data) return [];
-    return data.map((r) => ({
+    return (data as any[]).map((r: any) => ({
       id: r.id as string,
       page_id: r.page_id as string,
       pillar: r.pillar as string,

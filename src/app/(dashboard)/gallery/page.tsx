@@ -94,7 +94,7 @@ export default function GalleryPage() {
   };
 
   const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
-    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/explore/${video.id}`;
+    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/explore/${video.id}`;
     const shareText = `Check out this AI video: "${video.title}" — Made with Genesis Studio`;
 
     // Native share on mobile (opens WhatsApp, IG, etc.)
@@ -502,7 +502,7 @@ export default function GalleryPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with Genesis Studio 🎬\n\nhttps://genesisstudio.app/explore/${currentVideo.id}`);
+                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with Genesis Studio 🎬\n\nhttps://ivideostudio.ai/explore/${currentVideo.id}`);
                     window.open(`https://wa.me/?text=${text}`, "_blank");
                     toast("Opening WhatsApp...", "info");
                   }}

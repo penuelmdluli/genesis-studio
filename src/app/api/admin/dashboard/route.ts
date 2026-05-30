@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !isOwnerClerkId(clerkId)) {
     return NextResponse.json({ error: "Owner access required" }, { status: 403 });
   }
 
-  const sb = createSupabaseAdmin();
+  const sb = getDb();
   const now = new Date();
   const today = new Date(now); today.setUTCHours(0, 0, 0, 0);
   const week = new Date(now.getTime() - 7 * 86400000);
@@ -46,9 +46,9 @@ export async function GET() {
 
   // Jobs today
   const todayJobs = jobsTodayR.data || [];
-  const todayCompleted = todayJobs.filter((j) => j.status === "completed").length;
-  const todayFailed = todayJobs.filter((j) => j.status === "failed").length;
-  const todayProcessing = todayJobs.filter((j) => j.status === "processing" || j.status === "queued").length;
+  const todayCompleted = todayJobs.filter((j: any) => j.status === "completed").length;
+  const todayFailed = todayJobs.filter((j: any) => j.status === "failed").length;
+  const todayProcessing = todayJobs.filter((j: any) => j.status === "processing" || j.status === "queued").length;
 
   // Model success rates
   const modelJobs = modelStatsR.data || [];
@@ -156,7 +156,7 @@ export async function GET() {
     support: {
       openTickets: supportR.count || 0,
     },
-    recentActivity: (recentJobsR.data || []).map((j) => ({
+    recentActivity: (recentJobsR.data || []).map((j: any) => ({
       id: j.id, userId: j.user_id, status: j.status,
       model: j.model_id, credits: j.credits_cost, created: j.created_at,
     })),

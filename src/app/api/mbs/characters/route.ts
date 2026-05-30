@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/auth";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * Public list of active MBS characters for use as ready-made character
@@ -8,12 +8,12 @@ import { createSupabaseAdmin } from "@/lib/supabase";
  * may read this — admin mutation lives at /api/admin/mbs-config/characters.
  */
 export async function GET() {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("mbs_characters")
     .select("id, name, description, portrait_url")

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { persistExternalVideo, exploreVideoStorageKey } from "@/lib/storage";
 
 /**
@@ -18,7 +18,7 @@ import { persistExternalVideo, exploreVideoStorageKey } from "@/lib/storage";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId || !isOwnerClerkId(clerkId)) {
       return NextResponse.json({ error: "Unauthorized — owner only" }, { status: 403 });
     }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const dryRun = body.dryRun === true;
     const limit = Math.min(body.limit || 50, 100);
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Find explore_videos with external URLs (not already on our API)
     const { data: videos, error: fetchErr } = await supabase
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     if (dryRun) {
       return NextResponse.json({
         message: `Dry run: found ${videos.length} videos to migrate`,
-        videos: videos.map((v) => ({
+        videos: videos.map((v: any) => ({
           id: v.id,
           url: v.video_url?.slice(0, 80),
           prompt: v.prompt?.slice(0, 50),

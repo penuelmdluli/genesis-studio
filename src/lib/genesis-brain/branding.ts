@@ -13,10 +13,10 @@ export const OWNER_VOICEOVER_OUTRO =
   "Created with Genesis Studio. AI video generation for African creators. Try it free at genesis studio dot app.";
 
 // Watermark text burned into the bottom of owner videos
-export const OWNER_WATERMARK_TEXT = "genesisstudio.app";
+export const OWNER_WATERMARK_TEXT = "ivideostudio.ai";
 
 // Short marketing CTA for captions/subtitles
-export const OWNER_CAPTION_CTA = "Made with Genesis Studio — genesisstudio.app";
+export const OWNER_CAPTION_CTA = "Made with Genesis Studio — ivideostudio.ai";
 
 /**
  * Check if a user is an owner account (gets branding applied).
@@ -29,8 +29,8 @@ export function shouldApplyBranding(clerkId: string): boolean {
  * Check if a userId (not clerkId) is an owner. Requires DB lookup.
  */
 export async function shouldApplyBrandingByUserId(userId: string): Promise<boolean> {
-  const { createSupabaseAdmin } = await import("@/lib/supabase");
-  const sb = createSupabaseAdmin();
+  const { getDb } = await import("@/lib/db-driver");
+  const sb = getDb();
   const { data } = await sb.from("users").select("clerk_id").eq("id", userId).single();
   if (!data?.clerk_id) return false;
   return isOwnerClerkId(data.clerk_id);

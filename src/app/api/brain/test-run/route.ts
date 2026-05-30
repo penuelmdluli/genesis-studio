@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { planProduction, calculateBrainCredits } from "@/lib/genesis-brain/planner";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
 import {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Step 1: Get owner user
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const ownerClerkId = (process.env.OWNER_CLERK_IDS || "").split(",")[0].trim();
     const { data: ownerUser } = await supabase
       .from("users")

@@ -4,7 +4,7 @@
 // and detect AI artifacts before auto-posting.
 // ============================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { sendSlackAlert } from "@/lib/alerts";
 import { envString } from "@/lib/env";
 
@@ -15,17 +15,29 @@ interface QualityResult {
 }
 
 export async function runQualityCheck(jobId: string): Promise<QualityResult> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { data: job } = await supabase
     .from("mbs_jobs")
-    .select("*, mbs_characters(*)")
+    .select("*")
     .eq("id", jobId)
     .single();
 
   if (!job || !job.finished_video_url) {
     throw new Error(`Job ${jobId} not found or no finished video`);
   }
+
+  // Fetch related character data separately (D1 doesn't support join syntax)
+  let character: any = null;
+  if (job.character_id) {
+    const { data: charData } = await supabase
+      .from("mbs_characters")
+      .select("*")
+      .eq("id", job.character_id)
+      .single();
+    character = charData;
+  }
+  (job as any).mbs_characters = character;
 
   const apiKey = envString("GENESIS_CLAUDE_KEY") || envString("ANTHROPIC_API_KEY");
   if (!apiKey) {
@@ -34,7 +46,6 @@ export async function runQualityCheck(jobId: string): Promise<QualityResult> {
     return { score: 80, verdict: "auto_post", notes: { degraded: true } };
   }
 
-  const character = job.mbs_characters;
   const characterDesc = character?.description ?? "MBS character";
 
   // Use Claude to assess quality from the video URL metadata

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockFrom = vi.fn();
 
 vi.mock("./supabase", () => ({
-  createSupabaseAdmin: vi.fn(() => ({
+  getDb: vi.fn(() => ({
     from: mockFrom,
   })),
 }));

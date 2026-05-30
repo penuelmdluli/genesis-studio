@@ -4,7 +4,7 @@
  * for content seeds across the 4 pillars.
  */
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export type PillarStyle = "war" | "ai" | "sa" | "human";
 
@@ -92,7 +92,7 @@ export async function preloadSeeds(
   styles: PillarStyle[] = ["war", "ai", "sa", "human"],
   boostPriority = 50,
 ): Promise<{ queued: number; cancelled: number }> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // 1. Cancel existing pending seeds for this page — fresh slate
   const { data: existing } = await supabase
@@ -101,13 +101,13 @@ export async function preloadSeeds(
     .eq("page_id", pageId)
     .eq("status", "pending");
   const toCancel = (existing || []).filter(
-    (r) => r.input_data?.provider === "balanced-recovery" || r.input_data?.provider === "war-pulse" || r.input_data?.provider === "ai-apocalypse-pulse" || r.input_data?.provider === "laser-focus-preload"
+    (r: any) => r.input_data?.provider === "balanced-recovery" || r.input_data?.provider === "war-pulse" || r.input_data?.provider === "ai-apocalypse-pulse" || r.input_data?.provider === "laser-focus-preload"
   );
   if (toCancel.length > 0) {
     await supabase
       .from("dev_content_queue")
       .update({ status: "cancelled" })
-      .in("id", toCancel.map((r) => r.id));
+      .in("id", toCancel.map((r: any) => r.id));
   }
 
   // 2. Insert fresh seeds matching the requested styles

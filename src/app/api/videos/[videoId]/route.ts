@@ -1,31 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  S3Client,
-  HeadObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
-import { auth } from "@clerk/nextjs/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/auth";
+import { getDb } from "@/lib/db-driver";
 import { getUserByClerkId, deleteVideo } from "@/lib/db";
-import { r2PublicUrl } from "@/lib/storage";
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+import { r2PublicUrl, deleteFile, verifyR2Upload } from "@/lib/storage";
 
 async function findVideoKeyInR2(
   userId: string,
   jobId: string
 ): Promise<string | null> {
-  // Try possible key formats in order of likelihood
   const candidates = [
     `videos/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}`,
@@ -36,12 +18,8 @@ async function findVideoKeyInR2(
 
   for (const key of candidates) {
     try {
-      const head = await R2.send(
-        new HeadObjectCommand({ Bucket: BUCKET, Key: key })
-      );
-      if ((head.ContentLength ?? 0) > 0) {
-        return key;
-      }
+      await verifyR2Upload(key, 1);
+      return key;
     } catch {
       // Key doesn't exist, try next
     }
@@ -56,7 +34,7 @@ export async function GET(
   try {
     const { videoId } = await params;
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: video } = await supabase
       .from("videos")
       .select("user_id, job_id, is_public")
@@ -74,7 +52,7 @@ export async function GET(
     const hasCronAccess = cronSecret === process.env.CRON_SECRET;
 
     if (!video.is_public && !hasCronAccess) {
-      const { userId: clerkId } = await auth();
+      const clerkId = await getAuthUserId();
       if (!clerkId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
@@ -85,7 +63,6 @@ export async function GET(
     }
 
     // Find the video file in R2 (tries multiple key formats)
-    // For Brain Studio videos, job_id is null — use videoId as R2 key instead
     const r2LookupId = video.job_id || videoId;
     const key = await findVideoKeyInR2(video.user_id, r2LookupId);
     if (!key) {
@@ -95,9 +72,8 @@ export async function GET(
       );
     }
 
-    // Redirect to the public R2 URL (custom domain or pub-*.r2.dev).
-    // Bytes flow R2 → browser directly, never through Vercel.
-    // Range requests are handled natively by R2 on the redirected URL.
+    // Redirect to the public R2 URL (custom domain).
+    // Bytes flow R2 → browser directly, never through the Worker.
     const publicUrl = r2PublicUrl(key);
 
     return NextResponse.redirect(publicUrl, {
@@ -126,8 +102,7 @@ export async function DELETE(
   try {
     const { videoId } = await params;
 
-    // Auth: must be signed in
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -136,8 +111,7 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Look up the video (need job_id for R2 key)
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: video } = await supabase
       .from("videos")
       .select("id, user_id, job_id")
@@ -148,12 +122,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
-    // Only the owner can delete
     if (video.user_id !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 1. Delete from R2 storage (try all key formats, ignore errors)
+    // Delete from R2 storage (try all key formats, ignore errors)
     const keyCandidates = [
       `videos/${video.user_id}/${video.job_id}.mp4`,
       `videos/${video.user_id}/${video.job_id}`,
@@ -164,16 +137,14 @@ export async function DELETE(
 
     for (const key of keyCandidates) {
       try {
-        await R2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+        await deleteFile(key);
       } catch {
         // Key might not exist, that's fine
       }
     }
 
-    // 2. Delete from database
     await deleteVideo(videoId, user.id);
 
-    // 3. Also clean up the generation job record
     await supabase
       .from("generation_jobs")
       .update({ status: "deleted" })

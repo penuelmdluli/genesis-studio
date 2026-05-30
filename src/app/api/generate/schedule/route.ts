@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { generateSchema } from "@/lib/validation";
 import { estimateCreditCost } from "@/lib/utils";
 
@@ -11,7 +11,7 @@ import { estimateCreditCost } from "@/lib/utils";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       parsed.data.isDraft || false
     );
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get total reserved credits from pending scheduled jobs
     const { data: pendingJobs } = await supabase
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       .eq("status", "pending");
 
     const reservedCredits = (pendingJobs || []).reduce(
-      (sum, j) => sum + ((j as Record<string, number>).credits_reserved || 0),
+      (sum: any, j: any) => sum + ((j as Record<string, number>).credits_reserved || 0),
       0
     );
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
  */
 export async function GET() {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -113,7 +113,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("scheduled_generations")
       .select("id, params, credits_reserved, scheduled_at, status, created_at")

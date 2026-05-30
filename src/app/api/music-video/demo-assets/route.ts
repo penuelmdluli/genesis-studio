@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { fal } from "@fal-ai/client";
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { uploadToR2, uploadAudio, uploadThumbnail, r2PublicUrl } from "@/lib/storage";
+import { uploadToR2, uploadAudio, uploadThumbnail, r2PublicUrl, fileExists } from "@/lib/storage";
 
 fal.config({ credentials: process.env.FAL_KEY || "" });
 
 export const maxDuration = 60;
 
-// ─── R2 Client (reuse same config as storage.ts) ─────────────────────────────
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 
 // ─── Demo Asset Definitions ──────────────────────────────────────────────────
 
@@ -69,12 +55,7 @@ const DEMO_CHARACTERS = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function existsOnR2(key: string): Promise<boolean> {
-  try {
-    await R2.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
-    return true;
-  } catch {
-    return false;
-  }
+  return fileExists(key);
 }
 
 async function generateAndStoreSong(song: typeof DEMO_SONGS[0]): Promise<string> {
@@ -153,7 +134,7 @@ async function generateAndStoreCharacter(char: typeof DEMO_CHARACTERS[0]): Promi
  */
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = await auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

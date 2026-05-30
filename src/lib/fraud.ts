@@ -3,7 +3,7 @@
  * Detects and blocks: stolen cards, account farming, API abuse.
  */
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 
 // --- Rate Limiting (in-memory, per-instance) ---
 
@@ -93,7 +93,7 @@ export async function checkAccountFraud(userId: string, email: string): Promise<
   }
 
   // Check rapid credit consumption (all credits used within 1 hour of signup)
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: user } = await supabase
     .from("users")
     .select("credit_balance, created_at")

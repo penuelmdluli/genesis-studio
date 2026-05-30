@@ -30,7 +30,7 @@ import {
   generatePerSceneVoiceover,
   selectMusic,
 } from "./audio";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { createVideo } from "@/lib/db";
 import { uploadVideo, videoStorageKey, verifyR2Upload, r2PublicUrl } from "@/lib/storage";
 import { refundCredits } from "@/lib/credits";
@@ -100,7 +100,7 @@ export async function startAssembly(
     const production = (await getProduction(productionId))!;
     if (!production) return;
     const plan = production.plan!;
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // ---- Audio Recovery ----
     // If after() died before audio generation, generate missing audio now.
@@ -379,7 +379,7 @@ export async function pollAssembly(productionId: string): Promise<void> {
     console.error(`[ASSEMBLY POLL] Error for ${productionId}:`, err);
 
     // Track consecutive poll failures — fail production after 5 in a row
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: prodRow } = await supabase
       .from("productions")
       .select("assembly_state")

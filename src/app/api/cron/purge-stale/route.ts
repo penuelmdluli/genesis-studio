@@ -16,7 +16,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export const maxDuration = 60;
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const summary = {
     stale_ready_demoted: 0,
     stuck_assembling_failed: 0,
@@ -94,7 +94,7 @@ export async function GET(req: Request) {
     .lt("started_at", cutoff);
 
   if (stuck && stuck.length > 0) {
-    const ids = stuck.map((s) => s.id);
+    const ids = stuck.map((s: any) => s.id);
     await supabase
       .from("productions")
       .update({

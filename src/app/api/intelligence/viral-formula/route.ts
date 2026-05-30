@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { requireOwnerOrNotFound } from "@/lib/owner-only";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { extractViralFormula } from "@/lib/intelligence";
 
 export async function GET(req: NextRequest) {
   const ownerCheck = await requireOwnerOrNotFound();
   if (ownerCheck instanceof NextResponse) return ownerCheck;
 
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const pageId = req.nextUrl.searchParams.get("pageId");
   if (!pageId) return NextResponse.json({ error: "pageId required" }, { status: 400 });
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("viral_formulas")
     .select("*")
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const ownerCheck2 = await requireOwnerOrNotFound();
   if (ownerCheck2 instanceof NextResponse) return ownerCheck2;
 
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pageId } = await req.json();
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await extractViralFormula(pageId);
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data } = await supabase
       .from("viral_formulas")
       .select("*")

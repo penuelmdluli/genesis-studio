@@ -4,7 +4,7 @@
 // Cycles through all 10 before allowing reuse.
 // ============================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 interface Character {
   id: string;
@@ -16,7 +16,7 @@ interface Character {
 }
 
 export async function pickCharacterForStyle(danceStyle?: string): Promise<Character> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get all active characters
   const { data: characters } = await supabase
@@ -37,11 +37,11 @@ export async function pickCharacterForStyle(danceStyle?: string): Promise<Charac
     .limit(3);
 
   const recentCharIds = new Set(
-    (recentJobs ?? []).map(j => j.character_id).filter(Boolean)
+    (recentJobs ?? []).map((j: any) => j.character_id).filter(Boolean)
   );
 
   // Exclude recently used characters
-  const available = characters.filter(c => !recentCharIds.has(c.id));
+  const available = characters.filter((c: any) => !recentCharIds.has(c.id));
 
   // If all are excluded (shouldn't happen with 10 chars, 3 exclusions), use all
   const pool = available.length > 0 ? available : characters;

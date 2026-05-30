@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 300;
@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     // Pull posts from the last 30 days that have at least one platform post_id.
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data: items, error } = await supabase

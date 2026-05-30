@@ -2,13 +2,13 @@
 // GENESIS STUDIO — Credit Ledger System
 // ============================================
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 import { CreditTransactionType } from "@/types";
 import { sendLowCreditsEmail } from "./email";
 import { assertWithinDailyBudget, DailySpendCapExceeded } from "./spend-guard";
 
 function getSupabase() {
-  return createSupabaseAdmin();
+  return getDb();
 }
 
 /** Check if a user is an owner (skips credit deduction, costs still tracked). */

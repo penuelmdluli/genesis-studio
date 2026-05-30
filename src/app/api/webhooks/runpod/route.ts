@@ -20,8 +20,8 @@ export async function POST(req: NextRequest) {
     const { id: runpodJobId, status, output, error: jobError, executionTime } = body;
 
     // Find our job by RunPod job ID
-    const { createSupabaseAdmin } = await import("@/lib/supabase");
-    const supabase = createSupabaseAdmin();
+    const { getDb } = await import("@/lib/db-driver");
+    const supabase = getDb();
     const { data: job } = await supabase
       .from("generation_jobs")
       .select("*")

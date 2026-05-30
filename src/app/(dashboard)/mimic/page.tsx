@@ -417,7 +417,7 @@ export default function MimicStudioPage() {
   };
 
   const handleShare = async () => {
-    const shareUrl = jobId ? `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/explore/${jobId}` : (process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app");
+    const shareUrl = jobId ? `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/explore/${jobId}` : (process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai");
     const shareText = "Check out this AI video I made with Genesis Studio Mimic Studio!";
 
     if (typeof navigator !== "undefined" && navigator.share) {

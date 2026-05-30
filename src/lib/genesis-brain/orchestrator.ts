@@ -15,7 +15,7 @@ import { selectProviderChain } from "@/lib/provider-router";
 import { persistExternalVideo } from "@/lib/storage";
 import { AI_MODELS } from "@/lib/constants";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * Create a new production record in the database
@@ -26,7 +26,7 @@ export async function createProduction(
   plan?: ScenePlan,
   totalCredits?: number
 ): Promise<Production> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { data, error } = await supabase
     .from("productions")
@@ -74,7 +74,7 @@ export async function updateProduction(
     completed_at: string;
   }>
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { error } = await supabase
     .from("productions")
     .update(updates)
@@ -87,7 +87,7 @@ export async function updateProduction(
  * Get production by ID
  */
 export async function getProduction(productionId: string): Promise<Production | null> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("productions")
     .select("*")
@@ -106,7 +106,7 @@ export async function getUserProductions(
   limit: number = 20,
   offset: number = 0
 ): Promise<Production[]> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("productions")
     .select("*")
@@ -125,7 +125,7 @@ export async function createProductionScenes(
   productionId: string,
   plan: ScenePlan
 ): Promise<ProductionScene[]> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const records = plan.scenes.map((scene) => ({
     production_id: productionId,
     scene_number: scene.sceneNumber,
@@ -160,7 +160,7 @@ export async function updateProductionScene(
     progress: number;
   }>
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { error } = await supabase
     .from("production_scenes")
     .update(updates)
@@ -173,7 +173,7 @@ export async function updateProductionScene(
  * Get all scenes for a production
  */
 export async function getProductionScenes(productionId: string): Promise<ProductionScene[]> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("production_scenes")
     .select("*")
@@ -279,7 +279,7 @@ export async function executeProduction(
               output_video_url: hostedUrl,
               progress: 100,
             });
-            const supabase = createSupabaseAdmin();
+            const supabase = getDb();
             await supabase
               .from("production_scenes")
               .update({ provider: "stock", model_id: "stock-footage" })
@@ -353,7 +353,7 @@ export async function executeProduction(
               progress: 10,
             });
 
-            const supabase = createSupabaseAdmin();
+            const supabase = getDb();
             await supabase
               .from("production_scenes")
               .update({ provider: "runpod-comfyui" })
@@ -385,7 +385,7 @@ export async function executeProduction(
             progress: 10,
           });
 
-          const supabase = createSupabaseAdmin();
+          const supabase = getDb();
           await supabase
             .from("production_scenes")
             .update({
@@ -557,7 +557,7 @@ export async function executeProduction(
     // so sound design is never lost to nested conditionals.
     if (input.soundEffects) {
       try {
-        const supabase = createSupabaseAdmin();
+        const supabase = getDb();
         // Merge with existing assembly_state rather than overwriting
         const { data: currentRow } = await supabase
           .from("productions")
@@ -608,7 +608,7 @@ export async function executeProduction(
             console.log(`[BRAIN] Per-scene voiceover clips: ${clips.length} saved`);
             const defaultTransition = enhancedPlan.scenes[0]?.transitionOut || "crossfade";
             // Merge with existing state (which may already contain soundAssets)
-            const supabase = createSupabaseAdmin();
+            const supabase = getDb();
             const { data: currentRow } = await supabase
               .from("productions")
               .select("assembly_state")
@@ -792,7 +792,7 @@ export async function resubmitStuckScenes(
           progress: 10,
         });
 
-        const supabase = createSupabaseAdmin();
+        const supabase = getDb();
         await supabase
           .from("production_scenes")
           .update({

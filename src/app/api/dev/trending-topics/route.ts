@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { aggregateAllSources } from "@/lib/news/aggregator";
 import { blockInProduction } from "@/lib/dev-only";
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_trending_topics")
       .select("*")
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { error } = await supabase
       .from("dev_trending_topics")
       .upsert(

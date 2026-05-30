@@ -1,9 +1,8 @@
 // Client-side upload helpers
-// Uploads files directly to Supabase Storage via signed URLs
-// Flow: 1) Get signed URL from our API  2) Upload directly to Supabase  3) Return public URL
-// This bypasses Vercel's 4.5MB body limit since the file never passes through our server.
+// Uploads files directly to R2 via signed URLs
+// Flow: 1) Get signed URL from our API  2) Upload directly to R2  3) Return public URL
 
-/** Upload a file to Supabase Storage via signed URL */
+/** Upload a file to R2 via signed URL */
 export async function uploadFile(
   file: File,
   purpose: "video" | "image" | "audio"
@@ -32,7 +31,7 @@ export async function uploadFile(
 
   const { uploadUrl, token, publicUrl } = await res.json();
 
-  // Step 2: Upload file directly to Supabase Storage (no Vercel limit)
+  // Step 2: Upload file directly to R2
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",
     headers: {

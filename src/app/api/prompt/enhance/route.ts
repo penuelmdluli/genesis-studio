@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/fraud";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
@@ -13,7 +13,7 @@ Rules:
 - Output ONLY the enhanced prompt, nothing else.`;
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

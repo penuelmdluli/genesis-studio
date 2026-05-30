@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Verify the video exists and is published
     const { data: video, error: videoError } = await supabase

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     if (action === "add") {
       const { error } = await supabase
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     const { data: favorites } = await supabase
       .from("video_favorites")
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id);
 
     return NextResponse.json({
-      favorites: (favorites || []).map((f) => f.video_id),
+      favorites: (favorites || []).map((f: any) => f.video_id),
     });
   } catch (error) {
     console.error("[FAVORITES] Error:", error);

@@ -1,4 +1,4 @@
-import { SignIn } from "@clerk/nextjs";
+import { SignInForm } from "@/components/auth/sign-in-form";
 import Link from "next/link";
 import { AuthBackgroundVideo } from "@/components/auth-background-video";
 
@@ -82,37 +82,7 @@ export default function SignInPage() {
             <p className="text-sm text-zinc-400">Sign in to continue creating</p>
           </div>
 
-          <SignIn
-            appearance={{
-              elements: {
-                rootBox: "mx-auto w-full",
-                card: "bg-[#111118]/90 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40 rounded-2xl",
-                headerTitle: "text-white text-lg",
-                headerSubtitle: "text-zinc-400",
-                // Google OAuth hidden until Clerk + Google Cloud config is verified
-                // See docs/runbooks/google-oauth-fix.md for re-enabling
-                socialButtonsBlockButton:
-                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
-                    ? "bg-white text-zinc-900 border border-white hover:bg-zinc-100 transition-all rounded-xl h-11 shadow-md font-semibold"
-                    : "hidden",
-                socialButtonsBlockButtonText: "font-semibold text-zinc-900",
-                socialButtonsProviderIcon: "w-5 h-5",
-                dividerRow:
-                  process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true"
-                    ? undefined
-                    : "hidden",
-                dividerLine: "bg-white/[0.08]",
-                dividerText: "text-zinc-400 text-xs",
-                formFieldInput:
-                  "bg-white/[0.04] border-white/[0.1] text-white rounded-xl h-11 focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50",
-                formButtonPrimary:
-                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 shadow-lg shadow-violet-600/25 rounded-xl h-11 text-sm font-semibold",
-                footerActionLink: "text-violet-400 hover:text-violet-300 font-medium",
-                formFieldLabel: "text-zinc-400 text-sm",
-                identityPreviewEditButton: "text-violet-400",
-              },
-            }}
-          />
+          <SignInForm />
 
           <p className="text-center text-xs text-zinc-400 mt-6">
             Don&apos;t have an account?{" "}

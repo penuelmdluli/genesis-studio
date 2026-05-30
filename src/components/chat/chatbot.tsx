@@ -46,7 +46,7 @@ export function ChatBot() {
       if (data.escalated) {
         setMessages((prev) => [...prev, {
           role: "assistant",
-          content: "📧 Our team has been notified and will reach out to you shortly. You can also email hello@genesisstudio.app for immediate help."
+          content: "📧 Our team has been notified and will reach out to you shortly. You can also email hello@ivideostudio.ai for immediate help."
         }]);
       }
     } catch {

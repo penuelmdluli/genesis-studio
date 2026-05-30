@@ -19,7 +19,7 @@ import { isAutomationPaused } from "@/lib/automation-killswitch";
  */
 
 import { NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { preloadSeeds, PillarStyle } from "@/lib/content-seeds/balanced";
 
 export const maxDuration = 60;
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const cutoff = new Date(Date.now() - LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
 
   // 1. Get posted queue items in last 14d, join with their content_style

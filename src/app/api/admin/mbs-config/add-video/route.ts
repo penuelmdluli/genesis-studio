@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { downloadAndPersist } from "@/lib/mbs/scraper";
 import { envString } from "@/lib/env";
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "videoUrl required" }, { status: 400 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Check for duplicate
   const { data: existing } = await supabase

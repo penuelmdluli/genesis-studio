@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
@@ -12,7 +12,7 @@ import { autoPublishToExplore } from "@/lib/auto-publish";
 import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { ModelId, GenerationType } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function GET(
   req: NextRequest,
@@ -20,7 +20,7 @@ export async function GET(
 ) {
   try {
     const { jobId } = await params;
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -246,7 +246,7 @@ export async function GET(
         if (runpodStatus.status === "COMPLETED" && runpodStatus.output) {
           // Guard: check if video was already created for this job
           // (webhook may have already processed this completion)
-          const supabase = createSupabaseAdmin();
+          const supabase = getDb();
           const { data: existingVideo } = await supabase
             .from("videos")
             .select("id, url")

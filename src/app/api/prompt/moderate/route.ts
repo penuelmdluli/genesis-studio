@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const ANTHROPIC_API_KEY = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
@@ -22,7 +22,7 @@ If the prompt is safe, respond: { "safe": true }
 If the prompt is unsafe, respond with safe: false, a brief reason, and the category name from the list above.`;
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

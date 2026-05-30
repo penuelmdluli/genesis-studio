@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { refundCredits } from "@/lib/credits";
 import { updateJobStatus } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { auditAllVideos } from "@/lib/video-health";
 
 export async function POST(req: NextRequest) {
   try {
     // Owner-only access
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId || !isOwnerClerkId(clerkId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fix mode: mark broken videos' jobs as failed and refund credits
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const fixed: string[] = [];
     const fixErrors: { videoId: string; error: string }[] = [];
 

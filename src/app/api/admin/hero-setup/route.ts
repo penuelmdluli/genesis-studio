@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 import { fal } from "@fal-ai/client";
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Step 1: Find best featured videos
     log("Fetching featured videos...");
@@ -72,8 +72,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Build permanent video URLs
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app").trim();
-    const heroVideoUrls = videos.map((v) => {
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai").trim();
+    const heroVideoUrls = videos.map((v: any) => {
       // If video_url is already a proxy path, make it absolute
       if (v.video_url?.startsWith("/api/")) {
         return `${appUrl}${v.video_url}`;
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     });
 
     log(`Hero video URLs:`);
-    heroVideoUrls.forEach((u, i) => log(`  [${i}]: ${u}`));
+    heroVideoUrls.forEach((u: any, i: any) => log(`  [${i}]: ${u}`));
 
     // Step 3: Extract poster frame from top video
     // FAL needs a publicly accessible URL. Our videos are in R2 behind a proxy,
@@ -245,7 +245,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: featured, error } = await supabase
     .from("explore_videos")
     .select("id, video_url, thumbnail_url, prompt, views, likes")
@@ -257,7 +257,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     featuredCount: featured?.length || 0,
-    videos: (featured || []).map(v => ({
+    videos: (featured || []).map((v: any) => ({
       id: v.id,
       videoUrl: v.video_url,
       thumbnailUrl: v.thumbnail_url,

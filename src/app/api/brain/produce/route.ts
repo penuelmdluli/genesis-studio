@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 
 // Brain production needs time for TTS (voiceover), music generation, and scene submissions
 export const maxDuration = 120; // 2 minutes
@@ -11,7 +11,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -69,9 +69,8 @@ export async function POST(req: NextRequest) {
       soundEffects: soundEffectsFlag === true,
     };
 
-    // Use after() to keep the serverless function alive after the response is sent.
-    // Without this, Vercel kills the function immediately after the response,
-    // which terminates audio generation (TTS + music) mid-flight.
+    // Use after() to keep the function alive after the response is sent,
+    // so audio generation (TTS + music) can complete.
     sendSlackAlert({
       level: "info",
       title: "Brain Studio production started",

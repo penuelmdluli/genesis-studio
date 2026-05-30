@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { requireOwnerOrNotFound } from "@/lib/owner-only";
 import { getPageIntelligenceSummary } from "@/lib/intelligence";
 
@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const ownerCheck = await requireOwnerOrNotFound();
   if (ownerCheck instanceof NextResponse) return ownerCheck;
 
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const pageId = req.nextUrl.searchParams.get("pageId");

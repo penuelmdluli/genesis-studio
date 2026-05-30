@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStudioOwner } from "@/lib/studio/auth";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 interface NicheBreakdown {
   niche: string;
@@ -39,7 +39,7 @@ export async function GET() {
     const authResult = await requireStudioOwner();
     if (authResult instanceof NextResponse) return authResult;
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Calculate the start of the current week (Monday)
     const now = new Date();
@@ -100,10 +100,10 @@ export async function GET() {
 
     // Fetch related video and page data for enrichment
     const videoIds = [
-      ...new Set((weekPosts || []).map((p) => p.video_id).filter(Boolean)),
+      ...new Set((weekPosts || []).map((p: any) => p.video_id).filter(Boolean)),
     ];
     const pageIds = [
-      ...new Set((weekPosts || []).map((p) => p.page_id).filter(Boolean)),
+      ...new Set((weekPosts || []).map((p: any) => p.page_id).filter(Boolean)),
     ];
 
     const [videosResult, pagesResult] = await Promise.all([
@@ -139,26 +139,26 @@ export async function GET() {
     const posts = weekPosts || [];
 
     const todayVideos = videos.filter(
-      (v) => v.created_at >= todayStartISO
+      (v: any) => v.created_at >= todayStartISO
     );
     const todayPosts = posts.filter(
-      (p) => p.created_at >= todayStartISO
+      (p: any) => p.created_at >= todayStartISO
     );
 
-    const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
+    const totalViews = posts.reduce((sum: any, p: any) => sum + (p.views || 0), 0);
     const totalReactions = posts.reduce(
-      (sum, p) => sum + (p.reactions || 0),
+      (sum: any, p: any) => sum + (p.reactions || 0),
       0
     );
-    const totalShares = posts.reduce((sum, p) => sum + (p.shares || 0), 0);
+    const totalShares = posts.reduce((sum: any, p: any) => sum + (p.shares || 0), 0);
     const totalComments = posts.reduce(
-      (sum, p) => sum + (p.comments || 0),
+      (sum: any, p: any) => sum + (p.comments || 0),
       0
     );
     const avgScore =
       posts.length > 0
         ? Math.round(
-            (posts.reduce((sum, p) => sum + (p.performance_score || 0), 0) /
+            (posts.reduce((sum: any, p: any) => sum + (p.performance_score || 0), 0) /
               posts.length) *
               100
           ) / 100
@@ -195,25 +195,25 @@ export async function GET() {
     // Per-niche breakdown
     const niches = ["news", "finance", "motivation", "entertainment"];
     const nicheBreakdowns: NicheBreakdown[] = niches.map((niche) => {
-      const nicheVideos = videos.filter((v) => v.niche === niche);
-      const nicheVideoIds = new Set(nicheVideos.map((v) => v.id));
-      const nichePosts = posts.filter((p) => nicheVideoIds.has(p.video_id));
+      const nicheVideos = videos.filter((v: any) => v.niche === niche);
+      const nicheVideoIds = new Set(nicheVideos.map((v: any) => v.id));
+      const nichePosts = posts.filter((p: any) => nicheVideoIds.has(p.video_id));
 
-      const nViews = nichePosts.reduce((s, p) => s + (p.views || 0), 0);
+      const nViews = nichePosts.reduce((s: any, p: any) => s + (p.views || 0), 0);
       const nReactions = nichePosts.reduce(
-        (s, p) => s + (p.reactions || 0),
+        (s: any, p: any) => s + (p.reactions || 0),
         0
       );
-      const nShares = nichePosts.reduce((s, p) => s + (p.shares || 0), 0);
+      const nShares = nichePosts.reduce((s: any, p: any) => s + (p.shares || 0), 0);
       const nComments = nichePosts.reduce(
-        (s, p) => s + (p.comments || 0),
+        (s: any, p: any) => s + (p.comments || 0),
         0
       );
       const nAvgScore =
         nichePosts.length > 0
           ? Math.round(
               (nichePosts.reduce(
-                (s, p) => s + (p.performance_score || 0),
+                (s: any, p: any) => s + (p.performance_score || 0),
                 0
               ) /
                 nichePosts.length) *

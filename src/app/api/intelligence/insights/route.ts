@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { requireOwnerOrNotFound } from "@/lib/owner-only";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function GET(req: NextRequest) {
   const ownerCheck = await requireOwnerOrNotFound();
   if (ownerCheck instanceof NextResponse) return ownerCheck;
 
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const pageId = req.nextUrl.searchParams.get("pageId");
   const insightType = req.nextUrl.searchParams.get("insightType");
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   let query = supabase
     .from("content_intelligence")
     .select("*")

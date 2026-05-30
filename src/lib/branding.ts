@@ -1,7 +1,7 @@
 // ============================================
 // Video Branding Pipeline
 //
-// Free tier: videos get "Made with genesisstudio.app" watermark
+// Free tier: videos get "Made with ivideostudio.ai" watermark
 // Creator+: no watermark (clean output = upgrade incentive)
 // ============================================
 
@@ -41,7 +41,7 @@ export async function brandVideo(options: BrandingOptions): Promise<string> {
         stroke_width: 1,
         caption_position: "bottom",
         // The "subtitle" is actually our watermark text
-        srt_content: "1\n00:00:00,000 --> 99:59:59,999\nMade with genesisstudio.app",
+        srt_content: "1\n00:00:00,000 --> 99:59:59,999\nMade with ivideostudio.ai",
       } as Record<string, unknown> & { video_url: string },
     });
 

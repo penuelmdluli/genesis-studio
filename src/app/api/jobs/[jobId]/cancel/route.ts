@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, getJob, updateJobStatus } from "@/lib/db";
 import { cancelRunPodJob } from "@/lib/runpod";
 import { refundCredits } from "@/lib/credits";
@@ -11,7 +11,7 @@ export async function POST(
 ) {
   try {
     const { jobId } = await params;
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

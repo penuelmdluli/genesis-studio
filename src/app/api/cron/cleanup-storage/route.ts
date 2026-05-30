@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getDb } from "@/lib/db-driver";
 import { STORAGE_LIMITS } from "@/lib/profitability";
 import { deleteFile } from "@/lib/storage";
 
@@ -10,7 +10,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * Daily storage cleanup cron job
  * Deletes expired videos based on plan retention policies
  *
- * Run via: Vercel Cron or external scheduler
+ * Run via: Cloudflare Workers Cron
  * Schedule: Daily at 3:00 AM UTC
  */
 export async function GET(req: Request) {
@@ -20,10 +20,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getDb();
 
   const results = { checked: 0, deleted: 0, errors: 0, plans: {} as Record<string, number> };
 

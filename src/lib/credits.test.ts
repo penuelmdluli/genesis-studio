@@ -10,7 +10,7 @@ const mockOrder = vi.fn().mockReturnThis();
 const mockRange = vi.fn();
 
 vi.mock("./supabase", () => ({
-  createSupabaseAdmin: vi.fn(() => ({
+  getDb: vi.fn(() => ({
     from: mockFrom,
   })),
 }));

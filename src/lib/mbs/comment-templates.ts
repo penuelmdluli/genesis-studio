@@ -35,12 +35,12 @@ const CTA = [
 ];
 
 const MIMIC_PROMO = [
-  "Want YOUR character to dance like this? Create your own AI video FREE at genesisstudio.app/mimic",
-  "You can make videos like this too! Try Mimic Studio FREE: genesisstudio.app/mimic",
-  "Make ANY character dance to ANY video! Try it free: genesisstudio.app/mimic",
-  "This was made with AI! Create your own dance videos at genesisstudio.app/mimic",
-  "Think you can do better? Make your OWN AI dance video FREE: genesisstudio.app/mimic",
-  "Turn your photo into a dancer! Free AI tool: genesisstudio.app/mimic",
+  "Want YOUR character to dance like this? Create your own AI video FREE at ivideostudio.ai/mimic",
+  "You can make videos like this too! Try Mimic Studio FREE: ivideostudio.ai/mimic",
+  "Make ANY character dance to ANY video! Try it free: ivideostudio.ai/mimic",
+  "This was made with AI! Create your own dance videos at ivideostudio.ai/mimic",
+  "Think you can do better? Make your OWN AI dance video FREE: ivideostudio.ai/mimic",
+  "Turn your photo into a dancer! Free AI tool: ivideostudio.ai/mimic",
 ];
 
 function pick(arr: string[]): string {

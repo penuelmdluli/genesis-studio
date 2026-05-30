@@ -22,7 +22,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { refundCredits } from "@/lib/credits";
 import { blockInProduction } from "@/lib/dev-only";
 
@@ -34,7 +34,7 @@ async function failAndRefund(
   productionId: string,
   reason: string
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   try {
     const { data: prod } = await supabase
       .from("productions")
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const dryRun = Boolean(body?.dryRun);
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const staleCutoff = new Date(
       Date.now() - STALE_MINUTES * 60 * 1000,
     ).toISOString();

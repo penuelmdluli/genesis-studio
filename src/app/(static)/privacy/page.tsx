@@ -73,7 +73,7 @@ export default function PrivacyPage() {
               <li><strong className="text-zinc-200">RunPod / FAL.AI:</strong> AI video generation processing</li>
               <li><strong className="text-zinc-200">PayStack / Stripe:</strong> Payment processing</li>
               <li><strong className="text-zinc-200">Resend:</strong> Transactional email delivery</li>
-              <li><strong className="text-zinc-200">Vercel:</strong> Application hosting</li>
+              <li><strong className="text-zinc-200">Cloudflare:</strong> Application hosting &amp; CDN</li>
             </ul>
             <p className="mt-2">Each service has its own privacy policy. We only share the minimum data required for each service to function.</p>
           </section>

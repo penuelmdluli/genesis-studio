@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatBot } from "@/components/chat/chatbot";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import Script from "next/script";
 import "./globals.css";
 
@@ -21,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"),
   title: {
     default: "Genesis Studio | AI Video Generation Platform",
     template: "%s | Genesis Studio",
@@ -83,49 +81,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider
-      appearance={{
-        variables: {
-          colorPrimary: "#7c3aed",
-          colorBackground: "#0A0A0F",
-          colorInputBackground: "#111118",
-          colorInputText: "#ffffff",
-          colorText: "#ffffff",
-          colorTextSecondary: "#e4e4e7",
-          colorTextOnPrimaryBackground: "#ffffff",
-          colorNeutral: "#ffffff",
-        },
-        elements: {
-          // UserProfile modal — every label, heading, and value visible white
-          profileSectionTitle: "text-white",
-          profileSectionTitleText: "text-white font-semibold",
-          profileSectionContent: "text-white",
-          profileSectionPrimaryButton: "text-white",
-          profilePage: "text-white",
-          headerTitle: "text-white",
-          headerSubtitle: "text-zinc-200",
-          navbarButton: "text-zinc-200 hover:text-white",
-          navbarButtonIcon: "text-zinc-200",
-          formFieldLabel: "text-zinc-100 font-medium",
-          formFieldLabelRow: "text-zinc-100",
-          formFieldHintText: "text-zinc-300",
-          formFieldInfoText: "text-zinc-300",
-          formFieldInputShowPasswordButton: "text-zinc-200",
-          identityPreviewText: "text-white",
-          identityPreviewEditButton: "text-violet-300",
-          accordionTriggerButton: "text-white",
-          menuButton: "text-zinc-100 hover:text-white",
-          menuList: "text-white",
-          breadcrumbsItem: "text-zinc-200",
-          breadcrumbsItemDivider: "text-zinc-400",
-          badge: "text-white",
-          dividerText: "text-zinc-300",
-          formButtonReset: "text-zinc-200 hover:text-white",
-          footerActionText: "text-zinc-200",
-          footerActionLink: "text-violet-300 hover:text-violet-200",
-        },
-      }}
-    >
+    <AuthProvider>
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
@@ -139,16 +95,21 @@ export default function RootLayout({
           <ChatBot />
           <CookieConsent />
           <RegisterServiceWorker />
-          <Analytics />
-          <SpeedInsights />
+          {/* Cloudflare Web Analytics */}
           <Script
             defer
-            data-domain="genesisstudio.app"
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={`{"token": "${process.env.NEXT_PUBLIC_CF_ANALYTICS_TOKEN || ""}"}`}
+            strategy="afterInteractive"
+          />
+          <Script
+            defer
+            data-domain="ivideostudio.ai"
             src="https://plausible.io/js/script.js"
             strategy="afterInteractive"
           />
         </body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }

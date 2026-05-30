@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
-import {
-  S3Client,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+import { getAuthUserId } from "@/lib/auth";
+import { getDb } from "@/lib/db-driver";
+import { headObject } from "@/lib/storage";
 const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",").filter(s => s.trim());
 
 /**
@@ -29,12 +14,12 @@ const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",").filter(s => s.t
  */
 export async function GET(req: NextRequest) {
   // Auth: owner only
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !OWNER_IDS.includes(clerkId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get all completed videos with their jobs
   const { data: videos, error } = await supabase
@@ -71,25 +56,23 @@ export async function GET(req: NextRequest) {
     } else {
       // Check 2: R2 file exists
       const r2Key = `videos/${video.user_id}/${video.job_id}.mp4`;
-      try {
-        const head = await R2.send(
-          new HeadObjectCommand({ Bucket: BUCKET, Key: r2Key })
-        );
-        result.r2FileSize = head.ContentLength;
-        result.r2ContentType = head.ContentType;
+      const head = await headObject(r2Key);
+      if (!head) {
+        result.status = "BROKEN";
+        result.reason = `R2 file not found: ${r2Key}`;
+      } else {
+        result.r2FileSize = head.size;
+        result.r2ContentType = head.contentType;
 
-        if (!head.ContentLength || head.ContentLength < 1000) {
+        if (head.size < 1000) {
           result.status = "BROKEN";
-          result.reason = `R2 file too small: ${head.ContentLength} bytes`;
-        } else if (!head.ContentType?.includes("video")) {
+          result.reason = `R2 file too small: ${head.size} bytes`;
+        } else if (!head.contentType?.includes("video")) {
           result.status = "BROKEN";
-          result.reason = `Wrong content type: ${head.ContentType}`;
+          result.reason = `Wrong content type: ${head.contentType}`;
         } else {
           result.status = "HEALTHY";
         }
-      } catch {
-        result.status = "BROKEN";
-        result.reason = `R2 file not found: ${r2Key}`;
       }
     }
 

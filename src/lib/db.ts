@@ -2,7 +2,7 @@
 // GENESIS STUDIO — Database Operations
 // ============================================
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 import {
   GenerationJob,
   JobStatus,
@@ -15,7 +15,7 @@ import {
 } from "@/types";
 
 function getSupabase() {
-  return createSupabaseAdmin();
+  return getDb();
 }
 
 // --- User Operations ---
@@ -314,22 +314,29 @@ export async function getUserApiKeys(userId: string) {
 }
 
 export async function validateApiKey(keyHash: string) {
-  const { data, error } = await getSupabase()
+  const { data: key, error } = await getSupabase()
     .from("api_keys")
-    .select("*, users(*)")
+    .select("*")
     .eq("key_hash", keyHash)
     .eq("is_active", true)
     .single();
 
-  if (error) return null;
+  if (error || !key) return null;
+
+  // Fetch the associated user
+  const { data: user } = await getSupabase()
+    .from("users")
+    .select("*")
+    .eq("id", key.user_id)
+    .single();
 
   // Update last used timestamp
   await getSupabase()
     .from("api_keys")
     .update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id);
+    .eq("id", key.id);
 
-  return data;
+  return { ...key, users: user };
 }
 
 export async function revokeApiKey(keyId: string, userId: string) {

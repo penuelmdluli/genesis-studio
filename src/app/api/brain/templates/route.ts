@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * GET /api/brain/templates — List templates (user's own + public)
  */
 export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const filter = req.nextUrl.searchParams.get("filter") || "all";
 
     let query = supabase
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       query = query.eq("is_public", true);
     } else {
       // all = user's own + public
-      query = query.or(`user_id.eq.${user.id},is_public.eq.true`);
+      query = (query as any).or(`user_id.eq.${user.id},is_public.eq.true`);
     }
 
     const limit = parseInt(req.nextUrl.searchParams.get("limit") || "50");
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({
-      templates: (data || []).map((t) => ({
+      templates: (data || []).map((t: any) => ({
         id: t.id,
         name: t.name,
         description: t.description,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "name and concept are required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("production_templates")
       .insert({
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -147,7 +147,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "templateId required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Only allow deleting own templates
     const { error } = await supabase

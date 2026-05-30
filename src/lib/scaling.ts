@@ -40,14 +40,14 @@ export const SERVICE_TIERS: ServiceTier[] = [
     notes: "$0.02/MAU after 10K",
   },
   {
-    service: "Vercel",
-    currentTier: "Pro",
-    monthlyLimit: "1TB bandwidth, 100GB-hours serverless",
-    monthlyCost: 20,
-    upgradeAt: "100GB-hours or 1TB bandwidth",
+    service: "Cloudflare Workers",
+    currentTier: "Paid",
+    monthlyLimit: "10M requests, 50ms CPU/req",
+    monthlyCost: 5,
+    upgradeAt: "10M+ requests or need higher CPU limits",
     upgradeTier: "Enterprise",
-    upgradeCost: 150,
-    notes: "Functions timeout: 60s Pro, 900s Enterprise",
+    upgradeCost: 100,
+    notes: "Workers + D1 + R2 + KV bundled pricing",
   },
   {
     service: "FAL.AI",
@@ -114,9 +114,8 @@ export function estimateMonthlyCosts(activeUsers: number, videosPerDay: number):
   const gpuCost = videosPerDay * 30 * avgGpuCostPerVideo;
 
   const services = [
-    { service: "Supabase", cost: activeUsers > 500 ? 25 : 0 },
+    { service: "Cloudflare (D1+KV+R2+Workers)", cost: 25 },
     { service: "Clerk", cost: activeUsers > 10000 ? 25 + (activeUsers - 10000) * 0.02 : 0 },
-    { service: "Vercel", cost: 20 },
     { service: "GPU (FAL+RunPod)", cost: gpuCost },
     { service: "R2 Storage", cost: Math.max(0, (activeUsers * 0.5 - 10) * 0.015) }, // ~0.5GB per user
     { service: "Resend", cost: activeUsers > 1000 ? 20 : 0 },
@@ -138,11 +137,11 @@ export function estimateMonthlyCosts(activeUsers: number, videosPerDay: number):
  */
 export const SCALING_MILESTONES = [
   { users: 100, action: "Enable Supabase PITR backups" },
-  { users: 500, action: "Upgrade Supabase to Pro ($25/mo)" },
+  { users: 500, action: "Monitor Cloudflare D1 row limits. Consider Workers Paid plan." },
   { users: 1000, action: "Upgrade Resend to Pro ($20/mo). Enable weekly digests." },
   { users: 2500, action: "Set up Sentry error monitoring ($29/mo)" },
   { users: 5000, action: "Negotiate FAL.AI volume pricing. Consider RunPod reserved GPUs." },
   { users: 10000, action: "Clerk starts charging ($0.02/MAU). Review all costs." },
-  { users: 25000, action: "Consider Vercel Enterprise. Hire DevOps." },
-  { users: 50000, action: "Multi-region deployment. CDN for video delivery." },
+  { users: 25000, action: "Consider Cloudflare Enterprise. Hire DevOps." },
+  { users: 50000, action: "Multi-region D1 replicas. R2 custom domains for video delivery." },
 ];

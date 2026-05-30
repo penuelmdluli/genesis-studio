@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 // Sample phrases per language for voice previews
@@ -34,7 +34,7 @@ const CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = await auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

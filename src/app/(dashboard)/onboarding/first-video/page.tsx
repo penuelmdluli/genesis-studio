@@ -282,7 +282,7 @@ export default function FirstVideoPage() {
                 variant="secondary"
                 size="sm"
                 onClick={() => {
-                  const text = encodeURIComponent("I just made an AI video in 60 seconds — you need to try this! 🎬\n\nhttps://genesisstudio.app/sign-up");
+                  const text = encodeURIComponent("I just made an AI video in 60 seconds — you need to try this! 🎬\n\nhttps://ivideostudio.ai/sign-up");
                   window.open(`https://wa.me/?text=${text}`, "_blank");
                 }}
               >
@@ -292,7 +292,7 @@ export default function FirstVideoPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  navigator.clipboard.writeText("https://genesisstudio.app/sign-up");
+                  navigator.clipboard.writeText("https://ivideostudio.ai/sign-up");
                   toast("Link copied!", "success");
                 }}
               >

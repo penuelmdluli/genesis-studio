@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { persistExternalVideo } from "@/lib/storage";
 import { updateProductionScene } from "@/lib/genesis-brain/orchestrator";
 import { startAssembly } from "@/lib/genesis-brain/assembly";
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ComfyUI-Webhook] Job ${runpodJobId} status: ${status}`);
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Look up the job in comfyui_jobs
     const { data: job, error: findError } = await supabase
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
             progress: 100,
           });
 
-          const supabase2 = createSupabaseAdmin();
+          const supabase2 = getDb();
           await supabase2.from("production_scenes").update({
             provider: "runpod-comfyui",
           }).eq("id", job.scene_id);
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
               .eq("production_id", job.production_id);
 
             const allDone = allScenes?.every(
-              (s) => s.status === "completed" || s.status === "failed"
+              (s: any) => s.status === "completed" || s.status === "failed"
             );
 
             if (allDone) {

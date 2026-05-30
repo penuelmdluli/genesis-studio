@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateITN } from "@/lib/payfast";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { addCreditPackCredits, grantSubscriptionCredits } from "@/lib/credits";
 import { updateUserPlan } from "@/lib/db";
 import { PlanId } from "@/types";
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // --- Idempotency: check if this PayFast payment was already processed ---
     if (pfPaymentId) {

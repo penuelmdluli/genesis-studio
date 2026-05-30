@@ -1,50 +1,23 @@
 // ============================================
-// GENESIS STUDIO — Distributed Rate Limiting (Upstash)
-// Supplements the in-memory rate limiter in fraud.ts.
-// Provides cross-instance persistence in serverless.
-// Gracefully degrades: if Upstash not configured,
-// falls back to in-memory only (fraud.ts handles that).
+// GENESIS STUDIO — Distributed Rate Limiting (Cloudflare KV)
 // ============================================
+// Supplements the in-memory rate limiter in fraud.ts.
+// Uses Cloudflare KV with TTL for sliding window rate limiting.
+// Gracefully degrades: if KV not available, falls back to
+// in-memory only (fraud.ts handles that).
 
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { NextResponse } from "next/server";
-import { envString } from "./env";
+import { getKV } from "./cf-env";
 
-let redis: Redis | null = null;
-let redisInitialized = false;
-
-function getRedis(): Redis | null {
-  if (redisInitialized) return redis;
-  redisInitialized = true;
-  try {
-    const url = envString("UPSTASH_REDIS_REST_URL");
-    const token = envString("UPSTASH_REDIS_REST_TOKEN");
-    if (!url || !token) return null;
-    redis = new Redis({ url, token });
-    return redis;
-  } catch {
-    return null;
-  }
+interface RateLimitConfig {
+  tokens: number;
+  windowSeconds: number;
 }
 
-type WindowSize = `${number} s` | `${number} m` | `${number} h` | `${number} d`;
-
-const limiterCache = new Map<string, Ratelimit>();
-
-function getLimiter(name: string, tokens: number, window: WindowSize): Ratelimit | null {
-  if (limiterCache.has(name)) return limiterCache.get(name)!;
-  const r = getRedis();
-  if (!r) return null;
-  const limiter = new Ratelimit({
-    redis: r,
-    limiter: Ratelimit.slidingWindow(tokens, window),
-    analytics: true,
-    prefix: "genesis",
-  });
-  limiterCache.set(name, limiter);
-  return limiter;
-}
+const RATE_LIMITS: Record<string, RateLimitConfig> = {
+  freeTierDaily: { tokens: 5, windowSeconds: 86400 },
+  generationDaily: { tokens: 500, windowSeconds: 86400 },
+};
 
 /**
  * Check the distributed rate limiter. Returns a 429 response if exceeded,
@@ -54,23 +27,40 @@ export async function enforceDistributedRateLimit(
   userId: string,
   plan: string
 ): Promise<NextResponse | null> {
-  const limiter = plan === "free"
-    ? getLimiter("freeTierDaily", 5, "1 d")
-    : getLimiter("generationDaily", 500, "1 d");
-  if (!limiter) return null;
+  const config = plan === "free"
+    ? RATE_LIMITS.freeTierDaily
+    : RATE_LIMITS.generationDaily;
 
-  const result = await limiter.limit(userId);
-  if (!result.success) {
-    return NextResponse.json(
-      {
-        error: "Rate limit exceeded. Please wait before trying again.",
-        retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
-      },
-      {
-        status: 429,
-        headers: { "Retry-After": String(Math.ceil((result.reset - Date.now()) / 1000)) },
-      }
-    );
+  try {
+    const kv = getKV();
+    const windowKey = Math.floor(Date.now() / (config.windowSeconds * 1000));
+    const key = `ratelimit:${userId}:${windowKey}`;
+
+    const current = await kv.get(key, { type: "text" });
+    const count = current ? parseInt(current, 10) : 0;
+
+    if (count >= config.tokens) {
+      const retryAfter = config.windowSeconds;
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded. Please wait before trying again.",
+          retryAfter,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfter) },
+        }
+      );
+    }
+
+    // Increment counter with TTL
+    await kv.put(key, String(count + 1), {
+      expirationTtl: config.windowSeconds,
+    });
+
+    return null;
+  } catch {
+    // KV not available — gracefully degrade (allow request through)
+    return null;
   }
-  return null;
 }

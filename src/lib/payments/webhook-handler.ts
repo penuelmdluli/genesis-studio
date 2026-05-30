@@ -4,7 +4,7 @@
 // Handles credit granting for Yoco, Paystack, and PayFast.
 // Includes idempotency protection to prevent double-crediting.
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { grantSubscriptionCredits, addCreditPackCredits } from "@/lib/credits";
 import { updateUserPlan } from "@/lib/db";
 import { PlanId } from "@/types";
@@ -28,7 +28,7 @@ async function isDuplicateWebhook(
   provider: string
 ): Promise<boolean> {
   if (!reference) return false;
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data } = await supabase
     .from("webhook_events")
     .select("id")
@@ -48,7 +48,7 @@ async function recordWebhookEvent(
   userId: string,
   metadata: Record<string, string>
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   await supabase.from("webhook_events").insert({
     reference,
     provider,
@@ -153,7 +153,7 @@ export async function processWebhookPayment(
     return { success: false, message: "Missing userId in metadata" };
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: user } = await supabase
     .from("users")
     .select("*")

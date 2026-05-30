@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 const VALID_PLATFORMS = [
   "whatsapp",
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Verify video exists
     const { data: video, error: videoError } = await supabase

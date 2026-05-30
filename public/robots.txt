@@ -10,5 +10,5 @@ Disallow: /settings
 Disallow: /api-keys
 Disallow: /onboarding
 
-Sitemap: https://genesisstudio.app/sitemap.xml
+Sitemap: https://ivideostudio.ai/sitemap.xml
 

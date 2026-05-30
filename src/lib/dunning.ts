@@ -10,7 +10,7 @@
  * Triggered by Stripe webhook: invoice.payment_failed
  */
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 import { sendDunningEmail, sendDowngradeEmail } from "./email-retention";
 
 interface DunningState {
@@ -33,7 +33,7 @@ export async function handleFailedPayment(params: {
   userEmail: string;
   userName: string;
 }) {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Check if dunning record already exists
   const { data: existing } = await supabase
@@ -69,17 +69,35 @@ export async function handleFailedPayment(params: {
  * Executes the Day 0/3/7/30 schedule.
  */
 export async function processDunningQueue() {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const now = new Date();
 
   // Get all active dunning records
-  const { data: records } = await supabase
+  const { data: rawRecords } = await supabase
     .from("dunning_records")
-    .select("*, users!inner(email, name, plan)")
+    .select("*")
     .in("status", ["retry_pending", "emailed"])
     .order("failed_at", { ascending: true });
 
-  if (!records || records.length === 0) return { processed: 0 };
+  if (!rawRecords || rawRecords.length === 0) return { processed: 0 };
+
+  // Fetch related user data separately (D1 doesn't support join syntax)
+  // The original used !inner, so we skip records where the user doesn't exist
+  const userIds = [...new Set(rawRecords.map((r: any) => r.user_id).filter(Boolean))];
+  let usersMap: Record<string, { email: string; name: string; plan: string }> = {};
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, email, name, plan")
+      .in("id", userIds);
+    for (const u of users ?? []) {
+      usersMap[u.id] = { email: u.email, name: u.name, plan: u.plan };
+    }
+  }
+  // Filter out records with no matching user (equivalent to !inner join)
+  const records = rawRecords
+    .filter((r: any) => usersMap[r.user_id])
+    .map((r: any) => ({ ...r, users: usersMap[r.user_id] }));
 
   let processed = 0;
 
@@ -144,7 +162,7 @@ export async function processDunningQueue() {
  * Mark a dunning record as recovered (payment succeeded).
  */
 export async function recoverDunningRecord(invoiceId: string) {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   await supabase
     .from("dunning_records")
     .update({ status: "recovered" })

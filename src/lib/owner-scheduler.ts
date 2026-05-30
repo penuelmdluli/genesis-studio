@@ -11,7 +11,7 @@
  * - Anti-pattern jitter: ±15 minutes so posts look natural
  */
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 const SA_OFFSET_HOURS = 2;
 const MAX_POSTS_PER_DAY = 3;
@@ -37,7 +37,7 @@ export async function getPostingSlot(
   pageId: string,
   pageName: string
 ): Promise<ScheduleResult> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const now = new Date();
 
   // Get all booked slots for the next 7 days on this page
@@ -53,7 +53,7 @@ export async function getPostingSlot(
       .order("created_at", { ascending: false });
 
     if (records) {
-      bookedSlots = records.map((r) => {
+      bookedSlots = records.map((r: any) => {
         const t = r.scheduled_for || r.posted_at || r.created_at;
         return new Date(t);
       });
@@ -141,7 +141,7 @@ export async function recordOwnerPost(
   action: "posted" | "scheduled",
   scheduledFor?: Date
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   try {
     await supabase.from("owner_scheduled_posts").insert({
       page_id: pageId,

@@ -4,7 +4,7 @@
 // Paid-tier users opt-in from Gallery
 // ============================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { brandVideo, getPlanTier } from "@/lib/branding";
 import { persistExternalVideo, exploreVideoStorageKey } from "@/lib/storage";
 import { randomUUID } from "crypto";
@@ -75,7 +75,7 @@ export async function autoPublishToExplore(
       // Fall through with branded URL — better than no publish at all
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Check if already published (prevent duplicates from webhook retries)
     const { data: existing } = await supabase

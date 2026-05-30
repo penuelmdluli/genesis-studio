@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { r2PublicUrl } from "@/lib/storage";
 import { autoPostMimicToMBS, autoPostBrainToPages, autoPostSingleVideo } from "@/lib/owner-autopost";
 
@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId || !isOwnerClerkId(clerkId)) {
       return NextResponse.json({ error: "Owner access required" }, { status: 403 });
     }
@@ -24,7 +24,7 @@ export async function POST(
     const { videoId } = await params;
     const { targetPages } = await req.json().catch(() => ({ targetPages: "auto" }));
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: video } = await supabase
       .from("videos")
       .select("id, user_id, title, prompt, model_id, url, job_id")

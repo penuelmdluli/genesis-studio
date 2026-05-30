@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * GET /api/admin/support — list all support tickets (escalated chats)
@@ -10,12 +10,12 @@ import { createSupabaseAdmin } from "@/lib/supabase";
  */
 
 export async function GET() {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !isOwnerClerkId(clerkId)) {
     return NextResponse.json({ error: "Owner access required" }, { status: 403 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: tickets } = await supabase
     .from("support_tickets")
     .select("*")
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !isOwnerClerkId(clerkId)) {
     return NextResponse.json({ error: "Owner access required" }, { status: 403 });
   }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ticketId and reply required" }, { status: 400 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get the ticket
   const { data: ticket } = await supabase

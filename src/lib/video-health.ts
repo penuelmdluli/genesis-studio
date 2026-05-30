@@ -2,23 +2,8 @@
 // GENESIS STUDIO — Video Health Check Utility
 // ============================================
 
-import {
-  S3Client,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { createSupabaseAdmin } from "./supabase";
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+import { getDb } from "./db-driver";
+import { headObject } from "./storage";
 
 export interface VideoHealthResult {
   videoId: string;
@@ -43,7 +28,7 @@ export interface AuditResult {
 export async function checkVideoHealth(
   videoId: string
 ): Promise<VideoHealthResult> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { data: video, error: dbError } = await supabase
     .from("videos")
@@ -64,49 +49,37 @@ export async function checkVideoHealth(
 
   const key = `videos/${video.user_id}/${video.job_id}.mp4`;
 
-  try {
-    const head = await R2.send(
-      new HeadObjectCommand({ Bucket: BUCKET, Key: key })
-    );
+  const head = await headObject(key);
 
-    const size = head.ContentLength ?? 0;
-    const contentType = head.ContentType ?? null;
-
-    if (size === 0) {
-      return {
-        videoId: video.id,
-        jobId: video.job_id,
-        status: "empty_file",
-        fileSize: 0,
-        contentType,
-        error: "File exists but is empty (0 bytes)",
-      };
-    }
-
+  if (!head) {
     return {
       videoId: video.id,
       jobId: video.job_id,
-      status: "healthy",
-      fileSize: size,
-      contentType,
-    };
-  } catch (err) {
-    // R2 returns NoSuchKey for missing files
-    const isNotFound =
-      err instanceof Error &&
-      (err.name === "NoSuchKey" || err.name === "NotFound");
-
-    return {
-      videoId: video.id,
-      jobId: video.job_id,
-      status: isNotFound ? "missing_file" : "broken",
+      status: "missing_file",
       fileSize: null,
       contentType: null,
-      error: isNotFound
-        ? "File not found in R2 storage"
-        : `Storage error: ${err instanceof Error ? err.message : "Unknown"}`,
+      error: "File not found in R2 storage",
     };
   }
+
+  if (head.size === 0) {
+    return {
+      videoId: video.id,
+      jobId: video.job_id,
+      status: "empty_file",
+      fileSize: 0,
+      contentType: head.contentType,
+      error: "File exists but is empty (0 bytes)",
+    };
+  }
+
+  return {
+    videoId: video.id,
+    jobId: video.job_id,
+    status: "healthy",
+    fileSize: head.size,
+    contentType: head.contentType,
+  };
 }
 
 /**
@@ -116,7 +89,7 @@ export async function checkVideoHealth(
 export async function auditAllVideos(
   userId?: string
 ): Promise<AuditResult> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   let query = supabase
     .from("videos")
@@ -142,7 +115,7 @@ export async function auditAllVideos(
   for (let i = 0; i < videos.length; i += batchSize) {
     const batch = videos.slice(i, i + batchSize);
     const batchResults = await Promise.all(
-      batch.map((v) => checkVideoHealth(v.id))
+      batch.map((v: any) => checkVideoHealth(v.id))
     );
 
     for (const result of batchResults) {

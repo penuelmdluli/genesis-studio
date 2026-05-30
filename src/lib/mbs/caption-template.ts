@@ -61,7 +61,7 @@ Inspired by @${opts.creatorHandle}
 
 ${cta}
 
-🎬 Create YOUR own AI dance video FREE → genesisstudio.app
+🎬 Create YOUR own AI dance video FREE → ivideostudio.ai
 
 ${hashtags}${styleTag}`;
 }

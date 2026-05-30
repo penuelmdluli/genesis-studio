@@ -431,8 +431,8 @@ export async function submitRunPodComfyUIJobAsync(
   const jobId = submitData.id;
 
   // Insert tracking row
-  const { createSupabaseAdmin } = await import("@/lib/supabase");
-  const supabase = createSupabaseAdmin();
+  const { getDb } = await import("@/lib/db-driver");
+  const supabase = getDb();
   await supabase.from("comfyui_jobs").insert({
     user_id: input.userId || null,
     production_id: input.productionId || null,

@@ -1,10 +1,9 @@
 /**
  * Genesis Studio — Lightweight analytics event tracking.
- * Events are stored in Supabase for the admin dashboard.
- * Also fires Vercel Analytics custom events when available.
+ * Events are stored in D1 for the admin dashboard.
  */
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 
 export type AnalyticsEvent =
   | "generation_started"
@@ -34,7 +33,7 @@ interface EventPayload {
  */
 export function trackEvent({ event, userId, properties }: EventPayload) {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     supabase
       .from("analytics_events")
       .insert({
@@ -55,16 +54,9 @@ export function trackEvent({ event, userId, properties }: EventPayload) {
 }
 
 /**
- * Client-side analytics (calls Vercel Analytics if loaded).
+ * Client-side analytics placeholder.
+ * Cloudflare Web Analytics handles page-level metrics automatically.
  */
-export function trackClientEvent(event: string, properties?: Record<string, string | number>) {
-  try {
-    // Vercel Analytics custom events
-    const w = window as unknown as Record<string, unknown>;
-    if (typeof window !== "undefined" && typeof w.va === "function") {
-      (w.va as (cmd: string, data: Record<string, unknown>) => void)("event", { name: event, ...properties });
-    }
-  } catch {
-    // Never throw
-  }
+export function trackClientEvent(_event: string, _properties?: Record<string, string | number>) {
+  // Cloudflare Web Analytics handles this — no custom client events needed
 }

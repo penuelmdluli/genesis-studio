@@ -4,7 +4,7 @@
 // and stores them in post_performance table
 // ============================================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 const FB_GRAPH_BASE = "https://graph.facebook.com/v19.0";
 
@@ -169,7 +169,7 @@ export function getPerformanceTier(score: number): string {
 export async function fetchAllPageInsights(pageId: string): Promise<{
   fetched: number; updated: number; locked: number; errors: number;
 }> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const stats = { fetched: 0, updated: 0, locked: 0, errors: 0 };
 
   const token = getTokenForPage(pageId);
@@ -274,7 +274,7 @@ export async function fetchAllPageInsights(pageId: string): Promise<{
 }
 
 async function markExtremePerformers(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Reset flags
   await supabase
@@ -295,8 +295,8 @@ async function markExtremePerformers(pageId: string): Promise<void> {
   const top10Pct = Math.max(1, Math.ceil(allPosts.length * 0.1));
   const bottom10Pct = Math.max(1, Math.ceil(allPosts.length * 0.1));
 
-  const bestIds = allPosts.slice(0, top10Pct).map((p) => p.id);
-  const worstIds = allPosts.slice(-bottom10Pct).map((p) => p.id);
+  const bestIds = allPosts.slice(0, top10Pct).map((p: any) => p.id);
+  const worstIds = allPosts.slice(-bottom10Pct).map((p: any) => p.id);
 
   if (bestIds.length) {
     await supabase
@@ -330,7 +330,7 @@ export async function recordPostForLearning(params: {
   pillar?: string;
   engine?: string;
 }): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const now = new Date();
 
   await supabase.from("post_performance").insert({
@@ -362,7 +362,7 @@ export async function logFeedbackEvent(
   details: Record<string, unknown>,
   error?: string,
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   await supabase.from("feedback_system_logs").insert({
     event_type: eventType,
     page_id: pageId,

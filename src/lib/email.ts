@@ -6,7 +6,7 @@
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
 interface SendEmailParams {
   to: string;
@@ -161,7 +161,7 @@ export async function sendSupportReply(email: string, name: string, reply: strin
       <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; margin-bottom: 24px;">
         <p style="color: #a1a1aa; font-size: 13px; margin: 0;">"${originalMessage.slice(0, 500)}"</p>
       </div>
-      <p style="color: #a1a1aa; margin-bottom: 24px;">If you need more help, just reply to this email or use the chat on <a href="${APP_URL}" style="color: #8b5cf6;">genesisstudio.app</a>.</p>
+      <p style="color: #a1a1aa; margin-bottom: 24px;">If you need more help, just reply to this email or use the chat on <a href="${APP_URL}" style="color: #8b5cf6;">ivideostudio.ai</a>.</p>
       <a href="${APP_URL}/dashboard" style="${buttonStyle}">Back to Genesis Studio</a>
     `),
   });

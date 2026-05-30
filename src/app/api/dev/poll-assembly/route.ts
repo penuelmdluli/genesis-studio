@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import {
   getProduction,
   getProductionScenes,
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { productionId } = body as { productionId?: string };
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Find productions to poll
     let productionIds: string[] = [];

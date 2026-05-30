@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/auth";
+import { getDb } from "@/lib/db-driver";
 import { refundCredits } from "@/lib/credits";
 import { checkVideoHealth } from "@/lib/video-health";
 
@@ -14,12 +14,12 @@ const OWNER_IDS = (process.env.OWNER_CLERK_IDS || "").split(",").filter(s => s.t
  * Owner-only endpoint.
  */
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = await auth();
+  const clerkId = await getAuthUserId();
   if (!clerkId || !OWNER_IDS.includes(clerkId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get all videos that have an associated job
   const { data: videos, error } = await supabase

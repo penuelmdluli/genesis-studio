@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOwnerOrNotFound } from "@/lib/owner-only";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { buildCaption } from "@/lib/mbs/caption-template";
 
 /**
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "referenceVideoUrl and characterId required" }, { status: 400 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get character
   const { data: character } = await supabase
@@ -75,14 +75,14 @@ export async function GET(req: NextRequest) {
   const ownerCheck = await requireOwnerOrNotFound();
   if (ownerCheck instanceof NextResponse) return ownerCheck;
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const limit = parseInt(searchParams.get("limit") ?? "20", 10);
 
   let query = supabase
     .from("mbs_jobs")
-    .select("*, mbs_characters(name, portrait_url)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -91,5 +91,23 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ jobs: data });
+  // Fetch related character data separately (D1 doesn't support join syntax)
+  const jobs = data ?? [];
+  const characterIds = [...new Set(jobs.map((j: any) => j.character_id).filter(Boolean))];
+  let charactersMap: Record<string, { name: string; portrait_url: string }> = {};
+  if (characterIds.length > 0) {
+    const { data: characters } = await supabase
+      .from("mbs_characters")
+      .select("id, name, portrait_url")
+      .in("id", characterIds);
+    for (const c of characters ?? []) {
+      charactersMap[c.id] = { name: c.name, portrait_url: c.portrait_url };
+    }
+  }
+  const jobsWithCharacters = jobs.map((j: any) => ({
+    ...j,
+    mbs_characters: charactersMap[j.character_id] ?? null,
+  }));
+
+  return NextResponse.json({ jobs: jobsWithCharacters });
 }

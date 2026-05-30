@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { planProduction } from "@/lib/genesis-brain/planner";
 import { createProduction, executeProduction } from "@/lib/genesis-brain/orchestrator";
 import { consistencyEngine } from "@/lib/genesis-brain/consistency";
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { queueItemId } = body as { queueItemId?: string };
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get pending items — also recover items stuck at "generating" for >5 min
     let queueItems: QueueItem[] = [];
@@ -397,7 +397,7 @@ export async function POST(req: NextRequest) {
     // executeProduction submits scenes to RunPod (fast API calls) then generates audio.
     // This is the lightweight part — the heavy Claude+FLUX work is already done above.
     after(async () => {
-      const bgSupabase = createSupabaseAdmin();
+      const bgSupabase = getDb();
       try {
         await executeProduction(production.id, DEV_USER_ID, DEV_CLERK_ID, plan, brainInput);
         console.log(`[DEV PRODUCE] Production ${production.id} DONE for ${pageName}`);

@@ -5,7 +5,7 @@
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
 async function sendEmail(to: string, subject: string, html: string) {
   if (!RESEND_API_KEY) {

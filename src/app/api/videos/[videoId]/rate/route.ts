@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 type Rating = "great" | "okay" | "bad";
 
@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -27,7 +27,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid rating. Must be: great, okay, or bad" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Verify the video belongs to this user
     const { data: video } = await supabase

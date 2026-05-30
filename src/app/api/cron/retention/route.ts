@@ -1,6 +1,6 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { sendCreditsExpiryEmail, sendWinBackEmail, sendWeeklyDigestEmail } from "@/lib/email-retention";
 
 /**
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results = { expiryEmails: 0, winBackEmails: 0, digestEmails: 0 };
 
   try {
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         if (!weekJobs || weekJobs.length === 0) continue;
 
         const videosCreated = weekJobs.length;
-        const creditsUsed = weekJobs.reduce((s, j) => s + (j.credits_cost || 0), 0);
+        const creditsUsed = weekJobs.reduce((s: any, j: any) => s + (j.credits_cost || 0), 0);
 
         // Find top model
         const modelCounts: Record<string, number> = {};

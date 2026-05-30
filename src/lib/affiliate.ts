@@ -2,7 +2,7 @@
 // GENESIS STUDIO — Affiliate Program
 // ============================================
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 
 export const AFFILIATE_CONFIG = {
   commissionRate: 0.20, // 20% recurring commission
@@ -56,7 +56,7 @@ export function decodeAffiliateCode(code: string): string {
  * Record a new referral when someone signs up via an affiliate link.
  */
 export async function recordReferral(affiliateUserId: string, referredUserId: string, referredEmail: string) {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { error } = await supabase
     .from("affiliate_referrals")
@@ -77,7 +77,7 @@ export async function recordReferral(affiliateUserId: string, referredUserId: st
  * When a referred user subscribes, calculate and record commission.
  */
 export async function recordCommission(referredUserId: string, paymentAmountUSD: number) {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Find the affiliate who referred this user
   const { data: referral } = await supabase
@@ -116,7 +116,7 @@ export async function recordCommission(referredUserId: string, paymentAmountUSD:
  * Get affiliate stats for a user's dashboard.
  */
 export async function getAffiliateStats(userId: string, baseUrl: string): Promise<AffiliateStats> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { data: referrals } = await supabase
     .from("affiliate_referrals")
@@ -124,8 +124,8 @@ export async function getAffiliateStats(userId: string, baseUrl: string): Promis
     .eq("affiliate_user_id", userId);
 
   const allReferrals = referrals || [];
-  const activeSubscribers = allReferrals.filter(r => r.status === "subscribed").length;
-  const totalEarnings = allReferrals.reduce((sum, r) => sum + (r.commission_earned || 0), 0);
+  const activeSubscribers = allReferrals.filter((r: any) => r.status === "subscribed").length;
+  const totalEarnings = allReferrals.reduce((sum: any, r: any) => sum + (r.commission_earned || 0), 0);
 
   // Get pending payout
   const { data: payouts } = await supabase
@@ -134,7 +134,7 @@ export async function getAffiliateStats(userId: string, baseUrl: string): Promis
     .eq("affiliate_user_id", userId)
     .eq("status", "pending");
 
-  const pendingPayout = (payouts || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const pendingPayout = (payouts || []).reduce((sum: any, p: any) => sum + (p.amount || 0), 0);
 
   return {
     totalReferrals: allReferrals.length,

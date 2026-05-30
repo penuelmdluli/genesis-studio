@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { UserButton, useAuth } from "@clerk/nextjs";
+import { UserButton } from "@/components/auth/user-button";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -64,11 +65,7 @@ export function Navbar() {
                       Dashboard
                     </Button>
                   </Link>
-                  <UserButton
-                    appearance={{
-                      elements: { avatarBox: "w-8 h-8 rounded-lg" },
-                    }}
-                  />
+                  <UserButton />
                 </>
               )}
 

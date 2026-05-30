@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStudioOwner } from "@/lib/studio/auth";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 interface PostWithPage {
   id: string;
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       if (authResult instanceof NextResponse) return authResult;
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get all posts with status='posted' and a facebook_post_id,
     // joining through studio_videos to studio_pages for access tokens

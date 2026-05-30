@@ -4,7 +4,7 @@
 // if credit limits are somehow bypassed.
 // ============================================
 
-import { createSupabaseAdmin } from "./supabase";
+import { getDb } from "./db-driver";
 import { sendSlackAlert } from "./alerts";
 
 const CREDIT_TO_USD = 0.024;
@@ -37,7 +37,7 @@ export async function assertWithinDailyBudget(
   const cap = DAILY_USD_CAP[tier] ?? DAILY_USD_CAP.free;
   const sinceIso = new Date(Date.now() - 86_400_000).toISOString();
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data, error } = await supabase
     .from("credit_transactions")
     .select("amount")
@@ -51,7 +51,7 @@ export async function assertWithinDailyBudget(
   }
 
   const spentCredits = (data ?? []).reduce(
-    (sum, row) => sum + Math.abs(row.amount),
+    (sum: any, row: any) => sum + Math.abs(row.amount),
     0
   );
   const spentUsd = spentCredits * CREDIT_TO_USD;

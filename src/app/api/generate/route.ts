@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
@@ -16,7 +16,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Distributed rate limiting (Upstash — cross-instance, persists across cold starts)
+    // Distributed rate limiting (Cloudflare KV — cross-instance, persists across cold starts)
     const distributedBlock = await enforceDistributedRateLimit(user.id, user.plan);
     if (distributedBlock) return distributedBlock;
 

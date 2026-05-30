@@ -1,6 +1,6 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { submitKlingMotion, getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
 import { persistExternalVideo } from "@/lib/storage";
 import { postVideoToFacebookPage, crossPostVideo } from "@/lib/social/facebook";
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ paused: true });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results = { submitted: 0, completed: 0, posted: 0, errors: 0 };
 
   try {
@@ -335,11 +335,11 @@ export async function GET(req: NextRequest) {
     const postingEnabled = envString("MBS_POSTING_ENABLED") !== "false";
     if (postingEnabled) {
       const now = new Date().toISOString();
-      const { data: readyJobs } = await supabase
+      const { data: readyJobs } = await (supabase
         .from("mbs_jobs")
         .select("*")
         .eq("status", "scheduled")
-        .not("finished_video_url", "is", null)
+        .not("finished_video_url", "is", null) as any)
         .or(`scheduled_for.is.null,scheduled_for.lte.${now}`)
         .limit(1);
 

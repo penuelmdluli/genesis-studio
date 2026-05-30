@@ -3,7 +3,7 @@
 // Reads performance data and extracts actionable intelligence
 // ============================================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { logFeedbackEvent } from "./fb-insights-fetcher";
 
 // Classify hook text into pattern
@@ -40,7 +40,7 @@ async function upsertInsight(
   avgEngRate: number,
   topPostId?: string,
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   // Delete old insight of same type+key for this page
@@ -71,7 +71,7 @@ async function upsertInsight(
 // ── Analysis Functions ──
 
 export async function analyzeTopicPerformance(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, topic_category, performance_score, views, engagement_rate")
@@ -91,10 +91,10 @@ export async function analyzeTopicPerformance(pageId: string): Promise<void> {
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 3)
     .map(([cat, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
-      const best = g.sort((a, b) => (b.performance_score || 0) - (a.performance_score || 0))[0];
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
+      const best = g.sort((a: any, b: any) => (b.performance_score || 0) - (a.performance_score || 0))[0];
       return { cat, count: g.length, avgScore, avgViews, avgEng, bestId: best.id };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
@@ -117,7 +117,7 @@ export async function analyzeTopicPerformance(pageId: string): Promise<void> {
 }
 
 export async function analyzeBestPostingTime(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, hour_of_day, performance_score, views, engagement_rate")
@@ -133,14 +133,14 @@ export async function analyzeBestPostingTime(pageId: string): Promise<void> {
     (groups[h] ||= []).push(p);
   }
 
-  const overallAvg = posts.reduce((s, p) => s + (p.views || 0), 0) / posts.length;
+  const overallAvg = posts.reduce((s: any, p: any) => s + (p.views || 0), 0) / posts.length;
 
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 2)
     .map(([hour, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
       return { hour: parseInt(hour), count: g.length, avgScore, avgViews, avgEng };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
@@ -154,7 +154,7 @@ export async function analyzeBestPostingTime(pageId: string): Promise<void> {
 }
 
 export async function analyzeBestDay(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, day_of_week, performance_score, views, engagement_rate")
@@ -174,9 +174,9 @@ export async function analyzeBestDay(pageId: string): Promise<void> {
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 2)
     .map(([day, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
       return { day: parseInt(day), name: dayNames[parseInt(day)], count: g.length, avgScore, avgViews, avgEng };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
@@ -189,7 +189,7 @@ export async function analyzeBestDay(pageId: string): Promise<void> {
 }
 
 export async function analyzeVideoLength(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, video_duration_seconds, performance_score, views, engagement_rate, completion_rate")
@@ -208,11 +208,11 @@ export async function analyzeVideoLength(pageId: string): Promise<void> {
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 2)
     .map(([bucket, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
-      const avgCompletion = g.reduce((s, p) => s + (p.completion_rate || 0), 0) / g.length;
-      const avgDuration = g.reduce((s, p) => s + (p.video_duration_seconds || 0), 0) / g.length;
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
+      const avgCompletion = g.reduce((s: any, p: any) => s + (p.completion_rate || 0), 0) / g.length;
+      const avgDuration = g.reduce((s: any, p: any) => s + (p.video_duration_seconds || 0), 0) / g.length;
       return { bucket, count: g.length, avgScore, avgViews, avgEng, avgCompletion, avgDuration };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
@@ -228,7 +228,7 @@ export async function analyzeVideoLength(pageId: string): Promise<void> {
 }
 
 export async function analyzeMusicPerformance(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, music_style, performance_score, views, engagement_rate")
@@ -247,9 +247,9 @@ export async function analyzeMusicPerformance(pageId: string): Promise<void> {
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 2)
     .map(([style, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
       return { style, count: g.length, avgScore, avgViews, avgEng };
     })
     .sort((a, b) => b.avgScore - a.avgScore);
@@ -263,7 +263,7 @@ export async function analyzeMusicPerformance(pageId: string): Promise<void> {
 }
 
 export async function analyzeHookPerformance(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: posts } = await supabase
     .from("post_performance")
     .select("id, hook_text, performance_score, views, avg_watch_time_seconds, engagement_rate")
@@ -279,15 +279,15 @@ export async function analyzeHookPerformance(pageId: string): Promise<void> {
     (groups[pattern] ||= []).push(p);
   }
 
-  const overallAvgWatch = posts.reduce((s, p) => s + (p.avg_watch_time_seconds || 0), 0) / posts.length;
+  const overallAvgWatch = posts.reduce((s: any, p: any) => s + (p.avg_watch_time_seconds || 0), 0) / posts.length;
 
   const ranked = Object.entries(groups)
     .filter(([, g]) => g.length >= 2)
     .map(([pattern, g]) => {
-      const avgScore = g.reduce((s, p) => s + (p.performance_score || 0), 0) / g.length;
-      const avgViews = g.reduce((s, p) => s + (p.views || 0), 0) / g.length;
-      const avgEng = g.reduce((s, p) => s + (p.engagement_rate || 0), 0) / g.length;
-      const avgWatch = g.reduce((s, p) => s + (p.avg_watch_time_seconds || 0), 0) / g.length;
+      const avgScore = g.reduce((s: any, p: any) => s + (p.performance_score || 0), 0) / g.length;
+      const avgViews = g.reduce((s: any, p: any) => s + (p.views || 0), 0) / g.length;
+      const avgEng = g.reduce((s: any, p: any) => s + (p.engagement_rate || 0), 0) / g.length;
+      const avgWatch = g.reduce((s: any, p: any) => s + (p.avg_watch_time_seconds || 0), 0) / g.length;
       return { pattern, count: g.length, avgScore, avgViews, avgEng, avgWatch };
     })
     .sort((a, b) => b.avgWatch - a.avgWatch);
@@ -303,7 +303,7 @@ export async function analyzeHookPerformance(pageId: string): Promise<void> {
 }
 
 export async function extractViralFormula(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Get top 10% performers
   const { data: allPosts } = await supabase
@@ -341,8 +341,8 @@ export async function extractViralFormula(pageId: string): Promise<void> {
   const topMusic = Object.entries(musicCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const topHook = Object.entries(hookCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-  const avgViralScore = top10Pct.reduce((s, p) => s + (p.viral_score || 0), 0) / top10Pct.length;
-  const avgViews = Math.round(top10Pct.reduce((s, p) => s + (p.views || 0), 0) / top10Pct.length);
+  const avgViralScore = top10Pct.reduce((s: any, p: any) => s + (p.viral_score || 0), 0) / top10Pct.length;
+  const avgViews = Math.round(top10Pct.reduce((s: any, p: any) => s + (p.views || 0), 0) / top10Pct.length);
 
   const formulaName = `${topCategory || "mixed"}_${topHour || "any"}h_${avgDuration}s`;
 
@@ -368,7 +368,7 @@ export async function extractViralFormula(pageId: string): Promise<void> {
 }
 
 export async function detectTrendingPatterns(pageId: string): Promise<void> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -431,7 +431,7 @@ export async function detectTrendingPatterns(pageId: string): Promise<void> {
 
 // Master analysis runner
 export async function runFullAnalysis(pageId: string): Promise<{ insightsGenerated: number }> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Check minimum post count
   const { count } = await supabase
@@ -481,12 +481,12 @@ export async function runFullAnalysis(pageId: string): Promise<{ insightsGenerat
 
 // Get all active page IDs from existing posts
 export async function getAllActivePageIds(): Promise<string[]> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data } = await supabase
     .from("post_performance")
     .select("page_id")
     .limit(1000);
 
   if (!data) return [];
-  return [...new Set(data.map((d) => d.page_id))];
+  return [...new Set(data.map((d: any) => d.page_id))] as string[];
 }

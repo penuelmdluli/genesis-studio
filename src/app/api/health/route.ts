@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
-import { S3Client, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { getDb } from "@/lib/db-driver";
+import { verifyR2Upload } from "@/lib/storage";
 
 const TIMEOUT_MS = 2000;
 
@@ -13,13 +13,13 @@ function withTimeout<T>(promise: PromiseLike<T>, ms = TIMEOUT_MS): Promise<T> {
   ]);
 }
 
-async function checkSupabase(): Promise<"ok" | "error"> {
+async function checkD1(): Promise<"ok" | "error"> {
   try {
-    const supabase = createSupabaseAdmin();
+    const db = getDb();
     const result = await withTimeout(
-      supabase.from("users").select("id").limit(1)
+      db.from("users").select("id").limit(1) as any
     );
-    return result.error ? "error" : "ok";
+    return (result as any).error ? "error" : "ok";
   } catch {
     return "error";
   }
@@ -27,30 +27,12 @@ async function checkSupabase(): Promise<"ok" | "error"> {
 
 async function checkR2(): Promise<"ok" | "error"> {
   try {
-    if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID) return "error";
-    const r2 = new S3Client({
-      region: "auto",
-      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-      },
-      forcePathStyle: true,
-    });
-    try {
-      await withTimeout(
-        r2.send(new HeadObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME || "genesis-videos",
-          Key: "health-check-probe",
-        }))
-      );
-    } catch (err: unknown) {
-      const code = (err as { name?: string }).name;
-      if (code === "NotFound" || code === "NoSuchKey") return "ok";
-      throw err;
-    }
+    await withTimeout(verifyR2Upload("health-check-probe", 0) as any);
     return "ok";
-  } catch {
+  } catch (err: unknown) {
+    const msg = (err as Error)?.message || "";
+    // "not found" means R2 is reachable, file just doesn't exist
+    if (msg.includes("not found")) return "ok";
     return "error";
   }
 }
@@ -77,7 +59,6 @@ async function checkRunpod(): Promise<"ok" | "error"> {
         headers: { Authorization: `Bearer ${process.env.RUNPOD_API_KEY}` },
       })
     );
-    // Any response (even 404) proves connectivity
     return res.status < 500 ? "ok" : "error";
   } catch {
     return "error";
@@ -85,21 +66,22 @@ async function checkRunpod(): Promise<"ok" | "error"> {
 }
 
 export async function GET() {
-  const [supabase, r2, fal, runpod] = await Promise.all([
-    checkSupabase(),
+  const [d1, r2, fal, runpod] = await Promise.all([
+    checkD1(),
     checkR2(),
     checkFal(),
     checkRunpod(),
   ]);
 
-  const allOk = supabase === "ok" && r2 === "ok";
+  const allOk = d1 === "ok" && r2 === "ok";
 
   return NextResponse.json(
     {
       status: allOk ? (fal === "ok" && runpod === "ok" ? "ok" : "degraded") : "down",
       timestamp: new Date().toISOString(),
-      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
-      deps: { supabase, r2, fal, runpod },
+      version: process.env.GIT_COMMIT_SHA?.slice(0, 7) || "dev",
+      runtime: "cloudflare-workers",
+      deps: { d1, r2, fal, runpod },
     },
     { status: allOk ? 200 : 503 }
   );

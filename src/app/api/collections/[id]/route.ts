@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -19,7 +19,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     const { data: collection } = await supabase
       .from("video_collections")
@@ -32,17 +32,28 @@ export async function GET(
       return NextResponse.json({ error: "Collection not found" }, { status: 404 });
     }
 
-    // Get videos in this collection
+    // Get video IDs in this collection
     const { data: items } = await supabase
       .from("video_collection_items")
-      .select("video_id, videos(*)")
+      .select("video_id")
       .eq("collection_id", id)
       .order("added_at", { ascending: false });
+
+    // Fetch full video records separately (D1 doesn't support join syntax)
+    const videoIds = (items || []).map((item: any) => item.video_id).filter(Boolean);
+    let videos: any[] = [];
+    if (videoIds.length > 0) {
+      const { data: videoData } = await supabase
+        .from("videos")
+        .select("*")
+        .in("id", videoIds);
+      videos = videoData ?? [];
+    }
 
     return NextResponse.json({
       collection: {
         ...collection,
-        videos: (items || []).map((item) => item.videos).filter(Boolean),
+        videos,
       },
     });
   } catch (error) {
@@ -56,7 +67,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -68,7 +79,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await req.json();
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Add or remove a video from collection
     if (body.action === "add_video" && body.videoId) {
@@ -117,7 +128,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -128,7 +139,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Delete items first (cascade might not be set up)
     await supabase

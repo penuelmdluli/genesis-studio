@@ -61,17 +61,13 @@ export const NET_REVENUE_MULTIPLIER = (1 / (1 + VAT_RATE)) * (1 - PAYMENT_PROCES
 // MONTHLY FIXED COSTS (USD) — must be covered by subscriptions
 // ============================================
 export const FIXED_COSTS_MONTHLY = {
-  supabase: 25,       // Database + Storage + Edge Functions
+  cloudflare: 25,     // Workers + D1 + R2 + KV + CDN + DDoS + SSL
   clerk: 25,          // Authentication + User Management
-  cloudflare: 20,     // CDN + DDoS + SSL
-  upstash: 10,        // Redis/Queue
-  vercel: 20,         // Hosting (Pro plan)
   resend: 20,         // Transactional email (welcome, receipts, alerts)
   domains: 5,         // Domain renewals (genesis-studio.com etc)
   claude_api: 30,     // Claude API for Brain Studio planner
-  analytics: 0,       // Vercel Analytics (included in Pro)
   monitoring: 0,      // Error tracking (Sentry free tier)
-  total: 155,
+  total: 105,
 };
 
 /**

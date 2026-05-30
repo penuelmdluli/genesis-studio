@@ -17,16 +17,14 @@ interface AlertPayload {
 const sentDedupeKeys = new Set<string>();
 
 function getEnvTag(): string {
-  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "local";
+  const env = process.env.NODE_ENV ?? "local";
   if (env === "production") return "PROD";
-  if (env === "preview") return "PREVIEW";
   return "LOCAL";
 }
 
 function getEnvEmoji(): string {
-  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "local";
+  const env = process.env.NODE_ENV ?? "local";
   if (env === "production") return ":large_green_circle:";
-  if (env === "preview") return ":large_yellow_circle:";
   return ":white_circle:";
 }
 
@@ -42,9 +40,7 @@ export async function sendSlackAlert(payload: AlertPayload): Promise<void> {
 
   const envEmoji = getEnvEmoji();
   const envTag = getEnvTag();
-  const deploymentUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "localhost";
+  const deploymentUrl = process.env.NEXT_PUBLIC_APP_URL || "localhost";
 
   const levelEmoji =
     payload.level === "critical" ? ":rotating_light:" :

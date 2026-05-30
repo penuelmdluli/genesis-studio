@@ -1,4 +1,4 @@
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,7 +73,7 @@ export interface StudioPost {
 // ---------------------------------------------------------------------------
 
 function getSupabase() {
-  return createSupabaseAdmin();
+  return getDb();
 }
 
 // ---------------------------------------------------------------------------

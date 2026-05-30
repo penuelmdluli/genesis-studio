@@ -16,7 +16,7 @@
 // - full         : Run the full learn-and-adapt loop end-to-end
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { aggregateAllSources, UnifiedNewsItem } from "@/lib/news/aggregator";
 import { getAllDevPages, DevPageConfig } from "@/lib/dev-pages";
 import { selectEngine, createCostEntry } from "@/lib/dev-engine-router";
@@ -102,7 +102,7 @@ function scoreTopicForPage(
  */
 async function computeLearnedPillarBoost(): Promise<Record<string, number>> {
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: items } = await supabase
@@ -248,7 +248,7 @@ async function handleFetchTrends(): Promise<{
     return { count: 0, topics: [] };
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const rows = topics.map((t) => ({
     id: t.id,
@@ -289,7 +289,7 @@ async function handleGenerate(): Promise<{
 }> {
   console.log("[DEV SCHEDULER] Generating content with smart niche scoring...");
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const pages = getAllDevPages().filter((p) => p.enabled);
 
   // 1. Fetch ALL pending topics ordered by viral_potential
@@ -341,7 +341,7 @@ async function handleGenerate(): Promise<{
   }
 
   const topicsBefore = topics.length;
-  const filteredTopics = topics.filter((t) => {
+  const filteredTopics = topics.filter((t: any) => {
     const norm = normalizeTitle(String(t.title || ""));
     if (recentNormalizedTitles.has(norm)) {
       console.log(
@@ -392,8 +392,8 @@ async function handleGenerate(): Promise<{
 
     // Score all available (unassigned) topics for this page
     const scored = topics
-      .filter((t) => !assignedTopicIds.has(t.id))
-      .map((t) => {
+      .filter((t: any) => !assignedTopicIds.has(t.id))
+      .map((t: any) => {
         const score = scoreTopicForPage(
           {
             niches: t.niches,
@@ -411,8 +411,8 @@ async function handleGenerate(): Promise<{
           page.content_pillars[0];
         return { topic: t, score, pillar: matchedPillar };
       })
-      .filter((s) => s.score > 0) // Must have niche overlap
-      .sort((a, b) => b.score - a.score);
+      .filter((s: any) => s.score > 0) // Must have niche overlap
+      .sort((a: any, b: any) => b.score - a.score);
 
     // Pick top N
     const picks = scored.slice(0, topicsPerCycle);
@@ -528,7 +528,7 @@ async function handleProduce(): Promise<{
 
   const appUrl = getAppUrl();
   const cronSecret = getCronSecret();
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Pull every fresh pending item across all pages and rank within each page
   // by niche_score. We then take the BEST item per page so every active page
@@ -691,7 +691,7 @@ async function handlePost(): Promise<{
 }> {
   console.log("[DEV SCHEDULER] Posting completed videos...");
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const appUrl = getAppUrl();
   const cronSecret = getCronSecret();
 
@@ -709,7 +709,7 @@ async function handlePost(): Promise<{
       await supabase
         .from("dev_content_queue")
         .update({ status: "ready" })
-        .in("id", wedged.map((w) => w.id));
+        .in("id", wedged.map((w: any) => w.id));
       console.log(
         `[DEV SCHEDULER] Recovered ${wedged.length} items wedged in 'posting' state`,
       );
@@ -725,7 +725,7 @@ async function handlePost(): Promise<{
     .from("dev_content_queue")
     .select("*")
     .eq("status", "ready")
-    .order("generated_at", { ascending: true, nullsFirst: false })
+    .order("generated_at", { ascending: true, nullsFirst: false } as any)
     .limit(200);
 
   if (error) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 /**
  * POST /api/webhooks/clerk
@@ -8,7 +8,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
  * Syncs user profile (name, email, avatar) to Supabase.
  *
  * Setup: Clerk Dashboard → Webhooks → Add Endpoint
- * URL: https://genesisstudio.app/api/webhooks/clerk
+ * URL: https://ivideostudio.ai/api/webhooks/clerk
  * Events: user.created, user.updated
  *
  * Security: Svix HMAC-SHA256 signature is verified using
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No user data" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const clerkId = userData.id;
     const email = userData.email_addresses?.[0]?.email_address || null;
     const firstName = userData.first_name || "";

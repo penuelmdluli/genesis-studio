@@ -3,7 +3,7 @@
 // Selects best trending topics based on page intelligence
 // ============================================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 interface ScoredTopic {
   id: string;
@@ -23,7 +23,7 @@ export async function selectBestTopic(
   pageId: string,
   preferredCategory?: string,
 ): Promise<ScoredTopic | null> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Load page intelligence
   const { data: insights } = await supabase
@@ -33,12 +33,12 @@ export async function selectBestTopic(
     .eq("is_active", true);
 
   const bestCategories = (insights || [])
-    .filter((i) => i.insight_type === "best_topic_category")
-    .map((i) => i.insight_key);
+    .filter((i: any) => i.insight_type === "best_topic_category")
+    .map((i: any) => i.insight_key);
 
   const worstCategories = (insights || [])
-    .filter((i) => i.insight_type === "worst_topic_category")
-    .map((i) => i.insight_key);
+    .filter((i: any) => i.insight_type === "worst_topic_category")
+    .map((i: any) => i.insight_key);
 
   // Load available trending topics (unused)
   const { data: topics } = await supabase
@@ -51,7 +51,7 @@ export async function selectBestTopic(
   if (!topics?.length) return null;
 
   // Score each topic
-  const scored: ScoredTopic[] = topics.map((t) => {
+  const scored: ScoredTopic[] = topics.map((t: any) => {
     let score = t.viral_potential || 5;
 
     // Boost if matches best performing category

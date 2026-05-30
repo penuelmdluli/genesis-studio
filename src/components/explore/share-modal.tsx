@@ -18,7 +18,7 @@ interface ShareModalProps {
   video: ExploreVideo;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
 function buildShareUrl(videoId: string): string {
   return `${BASE_URL}/explore/${videoId}`;

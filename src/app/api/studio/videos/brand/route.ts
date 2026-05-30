@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStudioOwner } from "@/lib/studio/auth";
 import { updateStudioVideo } from "@/lib/studio/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data: video, error: fetchError } = await supabase
       .from("studio_videos")
       .select("*")

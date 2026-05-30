@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createVideo } from "@/lib/db";
 import { getKlingMotionStatus, getKlingMotionResult } from "@/lib/providers/fal-kling-i2v";
 import { persistExternalVideo } from "@/lib/storage";
 import { extractAndUploadThumbnail, extractThumbnailFromUrl } from "@/lib/thumbnails";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { recordSpend } from "@/lib/spend-tracker";
 
 export async function GET(
@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -23,7 +23,7 @@ export async function GET(
     }
 
     const { jobId } = await params;
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     const { data: job, error: jobError } = await supabase
       .from("mimic_jobs")

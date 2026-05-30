@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth, SignInButton } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { ShareModal } from "@/components/explore/share-modal";
@@ -79,7 +79,7 @@ function InstagramIcon({ className }: { className?: string }) {
 }
 
 // ─── Constants ────────────────────────────────────────────────
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
 // Model labels removed — clients don't need to see model names
 
@@ -489,21 +489,20 @@ export function VideoShareContent({
                 <ArrowRight className="w-4 h-4 opacity-60" />
               </button>
             ) : (
-              <SignInButton mode="modal" forceRedirectUrl={`/generate?seed_from=${video.id}&utm_source=explore`}>
-                <button
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2.5 px-6 py-4 rounded-xl",
-                    "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400",
-                    "text-white font-semibold text-base",
-                    "shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35",
-                    "transition-all duration-200 press-effect"
-                  )}
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Recreate This Video
-                  <ArrowRight className="w-4 h-4 opacity-60" />
-                </button>
-              </SignInButton>
+              <Link
+                href={`/sign-in?redirect_url=${encodeURIComponent(`/generate?seed_from=${video.id}&utm_source=explore`)}`}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2.5 px-6 py-4 rounded-xl",
+                  "bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400",
+                  "text-white font-semibold text-base",
+                  "shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35",
+                  "transition-all duration-200 press-effect"
+                )}
+              >
+                <Sparkles className="w-5 h-5" />
+                Recreate This Video
+                <ArrowRight className="w-4 h-4 opacity-60" />
+              </Link>
             )}
 
             <Link

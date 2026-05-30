@@ -3,7 +3,7 @@ import { processDunningQueue } from "@/lib/dunning";
 
 /**
  * Cron job: Process failed payment recovery (dunning).
- * Run daily via Vercel Cron or external scheduler.
+ * Run daily via Cloudflare Workers Cron.
  * GET /api/cron/dunning?secret=xxx
  */
 export async function GET(req: NextRequest) {

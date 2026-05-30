@@ -12,7 +12,7 @@ export default defineConfig({
     ["list"],
   ],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "https://genesisstudio.app",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "https://ivideostudio.ai",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

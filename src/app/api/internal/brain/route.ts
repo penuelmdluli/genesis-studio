@@ -14,7 +14,7 @@ import {
   resubmitStuckScenes,
 } from "@/lib/genesis-brain/orchestrator";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { ModelId, BrainInput } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
 
       // Poll FAL/RunPod scenes
       if (production.status === "generating") {
-        const supabase = createSupabaseAdmin();
+        const supabase = getDb();
         for (const scene of scenes) {
           if (scene.status !== "processing" || !scene.runpodJobId) continue;
 
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
         }
 
         // If assembly_state is null, startAssembly failed — retry it
-        const supabaseCheck = createSupabaseAdmin();
+        const supabaseCheck = getDb();
         const { data: prodRow } = await supabaseCheck
           .from("productions")
           .select("assembly_state")
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
           if (retryCount < 3) {
             console.log(`[INTERNAL BRAIN] assembly_state is null — retrying startAssembly (attempt ${retryCount + 1}/3)`);
             try {
-              const supabaseRetry = createSupabaseAdmin();
+              const supabaseRetry = getDb();
               await supabaseRetry.from("productions").update({ assembly_retry_count: retryCount + 1 } as Record<string, unknown>).eq("id", productionId);
               const { startAssembly } = await import("@/lib/genesis-brain/assembly");
               await startAssembly(productionId);

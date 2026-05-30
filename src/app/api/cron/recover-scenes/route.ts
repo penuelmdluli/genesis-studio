@@ -20,31 +20,15 @@ import { isAutomationPaused } from "@/lib/automation-killswitch";
  */
 
 import { NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getDb } from "@/lib/db-driver";
+import { uploadVideo, getSignedDownloadUrl } from "@/lib/storage";
 
 export const maxDuration = 300; // 5 min — needed for up to 20 scene base64 uploads
 
 const WAN22_ENDPOINT = process.env.RUNPOD_ENDPOINT_WAN22 || "dm5mng5h7034q7";
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 const MAX_SCENES_PER_RUN = 20;
 const MIN_AGE_MS = 3 * 60 * 1000; // 3 min — avoid racing with fresh submissions
 const EXPIRED_AGE_MS = 90 * 60 * 1000; // 90 min — RunPod purges results after ~1h
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
 
 interface SceneRow {
   id: string;
@@ -84,19 +68,8 @@ async function uploadVideoFromBase64(
 ): Promise<string> {
   const buf = Buffer.from(base64, "base64");
   const key = `brain-scenes/${productionId.substring(0, 8)}/${sceneNumber}.mp4`;
-  await R2.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: buf,
-      ContentType: "video/mp4",
-    })
-  );
-  return await getSignedUrl(
-    R2,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-    { expiresIn: 86400 }
-  );
+  await uploadVideo(key, buf, "video/mp4");
+  return await getSignedDownloadUrl(key, 86400);
 }
 
 export async function GET(req: Request) {
@@ -110,7 +83,7 @@ export async function GET(req: Request) {
   }
 
   const startedAt = Date.now();
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   // Find stuck processing scenes — with a job_id, older than 3 min
   const cutoff = new Date(Date.now() - MIN_AGE_MS).toISOString();
@@ -293,9 +266,9 @@ export async function GET(req: Request) {
 
     const everyScene = allScenes || [];
     const allDone = everyScene.every(
-      (s) => s.status === "completed" || s.status === "failed"
+      (s: any) => s.status === "completed" || s.status === "failed"
     );
-    const anyCompleted = everyScene.some((s) => s.status === "completed");
+    const anyCompleted = everyScene.some((s: any) => s.status === "completed");
 
     if (allDone && anyCompleted) {
       // Check if production is still in generating/processing — avoid double-trigger
@@ -365,8 +338,8 @@ export async function GET(req: Request) {
         .select("status")
         .eq("production_id", p.id);
       if (!sceneStatuses || sceneStatuses.length === 0) continue;
-      const allDone = sceneStatuses.every((s) => s.status === "completed" || s.status === "failed");
-      const anyCompleted = sceneStatuses.some((s) => s.status === "completed");
+      const allDone = sceneStatuses.every((s: any) => s.status === "completed" || s.status === "failed");
+      const anyCompleted = sceneStatuses.some((s: any) => s.status === "completed");
       if (allDone && anyCompleted) {
         await supabase.from("productions").update({ status: "assembling", progress: 70 }).eq("id", p.id);
         try {
@@ -401,7 +374,7 @@ export async function GET(req: Request) {
   if (assembling && assembling.length > 0) {
     const { pollAssembly } = await import("@/lib/genesis-brain/assembly");
     await Promise.all(
-      assembling.map(async (p) => {
+      assembling.map(async (p: any) => {
         try {
           await pollAssembly(p.id);
           assemblyAdvanced++;

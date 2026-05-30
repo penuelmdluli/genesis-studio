@@ -1,27 +1,12 @@
 // ============================================
-// GENESIS STUDIO — Daily Spend Tracker (Upstash)
+// GENESIS STUDIO — Daily Spend Tracker (Cloudflare KV)
 // Tracks per-provider daily GPU/API spend.
 // Circuit breaker: auto-disables provider when cap hit.
 // ============================================
 
-import { Redis } from "@upstash/redis";
 import { sendSlackAlert } from "./alerts";
-import { envNumber, envString } from "./env";
-
-let redis: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (redis) return redis;
-  try {
-    const url = envString("UPSTASH_REDIS_REST_URL");
-    const token = envString("UPSTASH_REDIS_REST_TOKEN");
-    if (!url || !token) return null;
-    redis = new Redis({ url, token });
-    return redis;
-  } catch {
-    return null;
-  }
-}
+import { envNumber } from "./env";
+import { getKV } from "./cf-env";
 
 function todayKey(provider: string): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -29,18 +14,25 @@ function todayKey(provider: string): string {
 }
 
 export async function recordSpend(provider: string, costUsd: number): Promise<void> {
-  const r = getRedis();
-  if (!r) return;
-  const key = todayKey(provider);
-  await r.incrbyfloat(key, costUsd);
-  await r.expire(key, 60 * 60 * 48);
+  try {
+    const kv = getKV();
+    const key = todayKey(provider);
+    const current = await kv.get(key, { type: "text" });
+    const newVal = (current ? parseFloat(current) : 0) + costUsd;
+    await kv.put(key, String(newVal), { expirationTtl: 60 * 60 * 48 });
+  } catch {
+    // Graceful degradation
+  }
 }
 
 export async function getDailySpend(provider: string): Promise<number> {
-  const r = getRedis();
-  if (!r) return 0;
-  const val = await r.get<string>(todayKey(provider));
-  return val ? parseFloat(String(val)) : 0;
+  try {
+    const kv = getKV();
+    const val = await kv.get(todayKey(provider), { type: "text" });
+    return val ? parseFloat(val) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function isOverDailyProviderCap(provider: string): Promise<{

@@ -17,13 +17,9 @@
     "@clerk/nextjs": "^7.0.8",
     "@fal-ai/client": "^1.9.5",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@opennextjs/cloudflare": "^1.19.11",
     "@sentry/nextjs": "^10.51.0",
     "@stripe/stripe-js": "^9.0.1",
-    "@supabase/supabase-js": "^2.101.1",
-    "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
@@ -52,6 +48,7 @@
     "jsdom": "^29.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.2",
+    "wrangler": "^4.95.0"
   }
 }

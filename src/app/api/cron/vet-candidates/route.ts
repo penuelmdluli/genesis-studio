@@ -1,6 +1,6 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { downloadAndPersist, fetchVideoMetadata } from "@/lib/mbs/scraper";
 import { vetCandidate, generateSuggestions } from "@/lib/mbs/brand-safety";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -22,16 +22,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results = { processed: 0, approved: 0, review: 0, rejected: 0, errors: 0 };
 
   // Get discovered candidates (limit 3 per run to manage costs + timeout)
-  const { data: candidates } = await supabase
+  const { data: rawCandidates } = await supabase
     .from("mbs_candidates")
-    .select("*, mbs_source_creators(handle, display_name)")
+    .select("*")
     .eq("status", "discovered")
     .order("discovered_at", { ascending: true })
     .limit(3);
+
+  // Fetch related creator data separately (D1 doesn't support join syntax)
+  const creatorIds = [...new Set((rawCandidates ?? []).map((c: any) => c.source_creator_id).filter(Boolean))];
+  let creatorsMap: Record<string, { handle: string; display_name: string }> = {};
+  if (creatorIds.length > 0) {
+    const { data: creators } = await supabase
+      .from("mbs_source_creators")
+      .select("id, handle, display_name")
+      .in("id", creatorIds);
+    for (const cr of creators ?? []) {
+      creatorsMap[cr.id] = { handle: cr.handle, display_name: cr.display_name };
+    }
+  }
+  const candidates = (rawCandidates ?? []).map((c: any) => ({
+    ...c,
+    mbs_source_creators: creatorsMap[c.source_creator_id] ?? null,
+  }));
 
   for (const candidate of candidates ?? []) {
     try {

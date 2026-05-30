@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 
 /**
@@ -10,7 +10,7 @@ import { isOwnerClerkId } from "@/lib/credits";
  */
 export async function GET() {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId || !isOwnerClerkId(clerkId)) {
       return NextResponse.json({ suggestions: [] });
     }

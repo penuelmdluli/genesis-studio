@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
-// POST /api/upload — returns a signed upload URL for direct client-to-Supabase upload
-// Client uploads directly to Supabase Storage (no Vercel body size limit, no CORS issues)
+// POST /api/upload — returns a signed upload URL for direct client-to-R2 upload
+// Client uploads directly to R2 Storage via presigned URL
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -63,10 +63,10 @@ export async function POST(req: NextRequest) {
     const prefix = purpose === "video" ? "videos" : purpose === "audio" ? "audio" : "images";
     const path = `${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Create a signed upload URL (client uploads directly to Supabase, bypasses RLS)
-    const { data: signedData, error: signedError } = await supabase.storage
+    const { data: signedData, error: signedError } = await (supabase as any).storage
       .from("uploads")
       .createSignedUploadUrl(path);
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the public URL for the file (FAL/RunPod will fetch from this)
-    const { data: publicData } = supabase.storage
+    const { data: publicData } = (supabase as any).storage
       .from("uploads")
       .getPublicUrl(path);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuth as useUser } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {

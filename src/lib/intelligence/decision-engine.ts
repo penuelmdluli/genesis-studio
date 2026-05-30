@@ -4,7 +4,7 @@
 // how future content is generated
 // ============================================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 
 interface ProductionConfig {
   category?: string;
@@ -40,7 +40,7 @@ export async function applyIntelligenceToProduction(
   pageId: string,
   productionConfig: ProductionConfig,
 ): Promise<{ config: ProductionConfig; decisions: AIDecision[] }> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const decisions: AIDecision[] = [];
   const improved = { ...productionConfig };
 
@@ -191,7 +191,7 @@ export async function getPageIntelligenceSummary(pageId: string): Promise<{
   lastAnalysis: string | null;
   hasViralFormula: boolean;
 }> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const [postsResult, lockedResult, decisionsResult, correctResult, insightsResult, formulaResult] = await Promise.all([
     supabase.from("post_performance").select("id", { count: "exact", head: true }).eq("page_id", pageId),
@@ -204,7 +204,7 @@ export async function getPageIntelligenceSummary(pageId: string): Promise<{
 
   const lockedPosts = lockedResult.data || [];
   const avgScore = lockedPosts.length > 0
-    ? lockedPosts.reduce((s, p) => s + ((p as Record<string, number>).performance_score || 0), 0) / lockedPosts.length
+    ? lockedPosts.reduce((s: any, p: any) => s + ((p as Record<string, number>).performance_score || 0), 0) / lockedPosts.length
     : 0;
 
   return {

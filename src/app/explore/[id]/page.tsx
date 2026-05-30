@@ -117,7 +117,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     video.prompt.length > 80
       ? video.prompt.slice(0, 80) + "..."
       : video.prompt;
-  const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/api/og?id=${id}`;
+  const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/api/og?id=${id}`;
 
   return {
     title: `"${promptPreview}" — Genesis Studio`,

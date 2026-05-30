@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { PLANS } from "@/lib/constants";
 import { getProvider, getDefaultProvider } from "@/lib/payments";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       const customer = await createStripeCustomer(user.email, user.name);
       customerId = customer.id;
 
-      const supabase = createSupabaseAdmin();
+      const supabase = getDb();
       await supabase
         .from("users")
         .update({ stripe_customer_id: customerId })

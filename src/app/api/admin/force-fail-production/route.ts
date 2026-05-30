@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { refundCredits } from "@/lib/credits";
 
 export const maxDuration = 60;
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   const staleMinutes = Number(
     new URL(req.url).searchParams.get("staleMinutes") || "20",
   );
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
 
   const { data: assembling, error } = await supabase
     .from("productions")
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const staleCutoff = Date.now() - staleMinutes * 60 * 1000;
 
   const wedged = (assembling || [])
-    .map((p) => {
+    .map((p: any) => {
       const state = p.assembly_state as Record<string, unknown> | null;
       const phase = (state?.phase as string | undefined) || null;
       const updatedMs = p.started_at ? new Date(p.started_at).getTime() : 0;
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         reasons,
       };
     })
-    .filter((p) => p.wedged);
+    .filter((p: any) => p.wedged);
 
   return NextResponse.json({
     staleMinutes,
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
 
   // mode: "all_wedged" — auto-select all wedged assembling productions
   if (body.mode === "all_wedged") {
-    const supabaseDisc = createSupabaseAdmin();
+    const supabaseDisc = getDb();
     const staleMinutes = Number(body.staleMinutes || 20);
     const staleCutoff = Date.now() - staleMinutes * 60 * 1000;
     const { data } = await supabaseDisc
@@ -125,13 +125,13 @@ export async function POST(req: NextRequest) {
       .eq("status", "assembling")
       .limit(200);
     const auto = (data || [])
-      .filter((p) => {
+      .filter((p: any) => {
         const state = p.assembly_state as Record<string, unknown> | null;
         const phase = state?.phase as string | undefined;
         const updatedMs = p.started_at ? new Date(p.started_at).getTime() : 0;
         return !state || !phase || (updatedMs > 0 && updatedMs < staleCutoff);
       })
-      .map((p) => p.id as string);
+      .map((p: any) => p.id as string);
     ids = [...new Set([...ids, ...auto])];
   }
 
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
   }
 
   const reason = body.reason || "Manually force-failed by admin";
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results: ForceFailResult[] = [];
 
   for (const productionId of ids) {

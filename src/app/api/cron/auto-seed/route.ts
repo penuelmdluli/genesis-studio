@@ -14,7 +14,7 @@ import { isAutomationPaused } from "@/lib/automation-killswitch";
  */
 
 import { NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { preloadSeeds } from "@/lib/content-seeds/balanced";
 
 export const maxDuration = 60;
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const { data: pending } = await supabase
     .from("dev_content_queue")
     .select("id, input_data")
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     .eq("status", "pending");
 
   const seedCount = (pending || []).filter(
-    (r) => r.input_data?.provider === "balanced-recovery"
+    (r: any) => r.input_data?.provider === "balanced-recovery"
   ).length;
 
   console.log(`[AUTO-SEED] Seed items pending: ${seedCount}/${MIN_PENDING_SEEDS}`);

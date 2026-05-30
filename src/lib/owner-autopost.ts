@@ -57,7 +57,7 @@ const HOOKS = [
 
 const CTAS = [
   "👇 Try it yourself — 50 FREE credits, no card needed",
-  "🔗 Make your own at genesisstudio.app — it takes 60 seconds",
+  "🔗 Make your own at ivideostudio.ai — it takes 60 seconds",
   "💡 Every creator in Africa needs this tool. Share this with someone who creates content",
   "🚀 Built in South Africa. Used by creators worldwide. Your turn",
   "✨ Stop paying for stock footage. Start creating with AI",
@@ -78,7 +78,7 @@ ${prompt.slice(0, 200)}
 
 ${cta}
 
-🔗 https://genesisstudio.app
+🔗 https://ivideostudio.ai
 
 #MzansiBabyStars #BabyDance #CuteKids #SouthAfrica #AIVideo #GenesisStudio #MadeWithAI #ViralVideo #DanceChallenge #Mzansi #AIGenerated #FYP`;
 }
@@ -95,7 +95,7 @@ ${concept.slice(0, 300)}
 
 ${cta}
 
-🔗 https://genesisstudio.app
+🔗 https://ivideostudio.ai
 
 #TechPulseAfrica #Africa2050 #AIVideo #GenesisStudio #AfricanTech #Innovation #MadeWithAI #BreakingNews #FutureOfAfrica #AIGenerated #ContentCreator #FYP`;
 }
@@ -110,7 +110,7 @@ ${prompt.slice(0, 250)}
 
 ${cta}
 
-🔗 https://genesisstudio.app
+🔗 https://ivideostudio.ai
 
 #GenesisStudio #AIVideo #MadeWithAI #TextToVideo #AIGenerated #CreatorTools #AfricanCreators #ContentCreation #FYP #Viral`;
 }
@@ -119,7 +119,7 @@ ${cta}
 
 const VIDEO_TITLES = [
   "🚨 This was made by AI in 60 seconds",
-  "🔥 AI just created this — genesisstudio.app",
+  "🔥 AI just created this — ivideostudio.ai",
   "⚡ Made with Genesis Studio — try it FREE",
   "💥 AI Video Generation is HERE",
   "🤯 60 seconds. One prompt. This is the result.",
@@ -279,8 +279,8 @@ export async function autoPostBrainToPages(
   videoUrl: string,
   concept: string
 ): Promise<void> {
-  const { createSupabaseAdmin } = await import("@/lib/supabase");
-  const sb = createSupabaseAdmin();
+  const { getDb } = await import("@/lib/db-driver");
+  const sb = getDb();
   const { data } = await sb.from("users").select("clerk_id").eq("id", userId).single();
   if (!data?.clerk_id || !isOwnerClerkId(data.clerk_id)) return;
 

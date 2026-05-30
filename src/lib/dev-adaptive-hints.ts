@@ -15,7 +15,7 @@
  * (returns undefined / empty map). Consumers must handle that.
  */
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { ModelId } from "@/types";
 
 const LOOKBACK_DAYS = 30;
@@ -72,7 +72,7 @@ export async function computeAdaptiveHints(): Promise<AdaptiveHints> {
   };
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const since = new Date(
       Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();

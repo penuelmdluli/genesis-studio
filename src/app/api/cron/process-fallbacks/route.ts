@@ -1,6 +1,6 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { updateProductionScene } from "@/lib/genesis-brain/orchestrator";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
   // Find failed ComfyUI jobs not yet picked up for fallback

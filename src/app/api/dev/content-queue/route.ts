@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { selectEngine, createCostEntry } from "@/lib/dev-engine-router";
 import { blockInProduction } from "@/lib/dev-only";
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { searchParams } = req.nextUrl;
 
     const status = searchParams.get("status");
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     // Build cost tracking entry
     const costEntry = createCostEntry(engineSelection, body.pillar, body.page_id);
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Insert into content queue
     const { data, error } = await supabase
@@ -245,7 +245,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
     const { data, error } = await supabase
       .from("dev_content_queue")
       .update(updateData)

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { REFERRAL_REWARDS } from "@/lib/constants";
 
 // GET: Get user's referral code + stats
 export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Get or create referral code
     const { data: existingCode } = await supabase
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       rewardPerReferral: REFERRAL_REWARDS.referrerCredits,
       refereeBonus: REFERRAL_REWARDS.refereeCredits,
       referrals: referrals || [],
-      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://genesisstudio.app"}/sign-up?ref=${referralCode?.code || ""}`,
+      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/sign-up?ref=${referralCode?.code || ""}`,
     });
   } catch (error) {
     console.error("Referral error:", error);
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 // POST: Redeem a referral code (called during signup)
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Referral code required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Find the referral code
     const { data: referralCode } = await supabase

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, isOwnerClerkId, refundCredits } from "@/lib/credits";
 import { submitKlingMotion } from "@/lib/providers/fal-kling-i2v";
 import { downloadAndPersist } from "@/lib/mbs/scraper";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { checkRateLimit } from "@/lib/fraud";
 import { recordSpend } from "@/lib/spend-tracker";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -14,7 +14,7 @@ const CREDIT_COST = 1500;
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const clerkId = await getAuthUserId();
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     const duration = Math.max(3, Math.min(30, durationSec));
     const ownerAccount = isOwnerClerkId(clerkId);
-    const supabase = createSupabaseAdmin();
+    const supabase = getDb();
 
     // Deduct credits upfront (non-owners)
     if (!ownerAccount) {

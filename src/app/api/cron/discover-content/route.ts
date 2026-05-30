@@ -1,6 +1,6 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { listCreatorPosts } from "@/lib/mbs/scraper";
 import { envString } from "@/lib/env";
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const results = { creatorsChecked: 0, candidatesAdded: 0, errors: 0 };
 
   // ONLY verified + active creators
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .eq("active", true)
     .eq("verified", true)
-    .order("last_checked_at", { ascending: true, nullsFirst: true })
+    .order("last_checked_at", { ascending: true, nullsFirst: true } as any)
     .limit(5);
 
   for (const creator of creators ?? []) {

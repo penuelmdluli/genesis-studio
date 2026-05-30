@@ -3,14 +3,14 @@
 // Finds optimal time slots with anti-pattern jitter.
 // ============================================
 
-import { createSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db-driver";
 import { envString } from "@/lib/env";
 
 // SA timezone offset (UTC+2)
 const SA_OFFSET_HOURS = 2;
 
 export async function scheduleJob(jobId: string): Promise<Date> {
-  const supabase = createSupabaseAdmin();
+  const supabase = getDb();
   const pageId = envString("FB_MBS_PAGE_ID") ?? "";
 
   // Get config

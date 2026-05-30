@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/fraud";
 import { checkBudget, recordApiCall } from "@/lib/api-budget";
 
 const ANTHROPIC_API_KEY = process.env.GENESIS_CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
 
-const SYSTEM_PROMPT = `You are Genesis — the AI assistant for Genesis Studio (genesisstudio.app), an AI video platform.
+const SYSTEM_PROMPT = `You are Genesis — the AI assistant for Genesis Studio (ivideostudio.ai), an AI video platform.
 
 RULES:
 1. MAX 2 sentences per response. Never more. Be direct.
@@ -37,7 +37,7 @@ Tone: Helpful, brief, warm. Like a friend who knows the product well.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -153,8 +153,8 @@ export async function POST(req: NextRequest) {
 
       // Save ticket to database for admin support inbox
       try {
-        const { createSupabaseAdmin } = await import("@/lib/supabase");
-        const sb = createSupabaseAdmin();
+        const { getDb } = await import("@/lib/db-driver");
+        const sb = getDb();
         await sb.from("support_tickets").insert({
           user_id: user?.id || userId,
           user_email: user?.email || null,

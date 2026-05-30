@@ -1,63 +1,130 @@
 // ============================================
 // GENESIS STUDIO — Cloudflare R2 Storage
 // ============================================
+// Uses native R2 binding when running on Cloudflare Workers.
+// Falls back to S3-compatible API for local development.
 
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getR2 } from "@/lib/cf-env";
 
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
 /**
- * Build a public URL for an R2 object. Uses the configured R2_PUBLIC_URL
- * (custom domain or pub-*.r2.dev). Falls back to the API proxy route.
- * NEVER returns a raw r2.cloudflarestorage.com URL — those lack CORS headers
- * and cannot be loaded by browsers.
+ * Build a public URL for an R2 object.
  */
 export function r2PublicUrl(key: string): string {
   if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
     return `${PUBLIC_URL.replace(/\/$/, "")}/${encodeURI(key)}`;
   }
-  // Fallback: serve through the API proxy (works but bytes flow through Vercel)
   return `/api/r2-proxy/${encodeURI(key)}`;
 }
 
-export async function uploadVideo(
+async function putObject(
   key: string,
-  body: Buffer | ReadableStream,
-  contentType = "video/mp4"
-): Promise<string> {
-  await R2.send(
+  body: ArrayBuffer | Uint8Array | ReadableStream | string,
+  contentType: string
+): Promise<void> {
+  try {
+    const r2 = getR2();
+    await r2.put(key, body as any, {
+      httpMetadata: { contentType },
+    });
+  } catch {
+    // Fallback to S3 API for local dev
+    await putObjectS3(key, body, contentType);
+  }
+}
+
+export async function headObject(key: string): Promise<{ size: number; contentType: string } | null> {
+  try {
+    const r2 = getR2();
+    const head = await r2.head(key);
+    if (!head) return null;
+    return {
+      size: head.size,
+      contentType: head.httpMetadata?.contentType || "",
+    };
+  } catch {
+    return headObjectS3(key);
+  }
+}
+
+async function deleteObject(key: string): Promise<void> {
+  try {
+    const r2 = getR2();
+    await r2.delete(key);
+  } catch {
+    await deleteObjectS3(key);
+  }
+}
+
+// --- S3 fallback for local development ---
+
+async function getS3Client() {
+  const { S3Client: S3 } = await import("@aws-sdk/client-s3");
+  return new S3({
+    region: "auto",
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
+    forcePathStyle: true,
+  });
+}
+
+const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+
+async function putObjectS3(
+  key: string,
+  body: ArrayBuffer | Uint8Array | ReadableStream | string,
+  contentType: string
+): Promise<void> {
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = await getS3Client();
+  const buf = body instanceof ArrayBuffer ? Buffer.from(body) : body;
+  await client.send(
     new PutObjectCommand({
       Bucket: BUCKET,
       Key: key,
-      Body: body as Buffer,
+      Body: buf as Buffer,
       ContentType: contentType,
     })
   );
+}
 
-  // If a public custom domain is configured, use direct URL.
-  // Otherwise return the key — caller should construct the appropriate URL.
+async function headObjectS3(key: string): Promise<{ size: number; contentType: string } | null> {
+  const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = await getS3Client();
+  try {
+    const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return {
+      size: head.ContentLength ?? 0,
+      contentType: head.ContentType ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function deleteObjectS3(key: string): Promise<void> {
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = await getS3Client();
+  await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+// --- Public API ---
+
+export async function uploadVideo(
+  key: string,
+  body: Buffer | ReadableStream | ArrayBuffer,
+  contentType = "video/mp4"
+): Promise<string> {
+  const buf = body instanceof Buffer ? body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) : body;
+  await putObject(key, buf as ArrayBuffer, contentType);
+
   if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
     return `${PUBLIC_URL}/${key}`;
   }
-  // Return the storage key — videos are served via /api/videos/[videoId]
   return key;
 }
 
@@ -66,19 +133,31 @@ export async function uploadThumbnail(
   body: Buffer,
   contentType = "image/jpeg"
 ): Promise<string> {
-  await R2.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    })
-  );
-
+  await putObject(key, body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as any, contentType);
   if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
     return `${PUBLIC_URL}/${key}`;
   }
   return key;
+}
+
+export async function uploadAudio(
+  key: string,
+  body: Buffer,
+  contentType = "audio/mpeg"
+): Promise<string> {
+  await putObject(key, body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as any, contentType);
+  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
+    return `${PUBLIC_URL}/${key}`;
+  }
+  return key;
+}
+
+export async function uploadToR2(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  await putObject(key, body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as any, contentType);
 }
 
 export async function getSignedUploadUrl(
@@ -86,67 +165,66 @@ export async function getSignedUploadUrl(
   contentType: string,
   expiresIn = 3600
 ): Promise<string> {
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    ContentType: contentType,
-  });
-
-  return getSignedUrl(R2, command, { expiresIn });
+  // Signed URLs require the S3 API — not available via native R2 binding
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const client = await getS3Client();
+  return getSignedUrl(
+    client,
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    { expiresIn }
+  );
 }
 
 export async function getSignedDownloadUrl(
   key: string,
   expiresIn = 3600
 ): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-  });
-
-  return getSignedUrl(R2, command, { expiresIn });
-}
-
-export async function deleteFile(key: string): Promise<void> {
-  await R2.send(
-    new DeleteObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-    })
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const client = await getS3Client();
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    { expiresIn }
   );
 }
 
-/**
- * Verify an uploaded file exists in R2 and meets minimum requirements.
- * Returns file size if healthy, throws if broken.
- */
+export async function deleteFile(key: string): Promise<void> {
+  await deleteObject(key);
+}
+
+export async function fileExists(key: string): Promise<boolean> {
+  const head = await headObject(key);
+  return head !== null && head.size > 0;
+}
+
 export async function verifyR2Upload(
   key: string,
   minBytes = 5000
 ): Promise<{ size: number; contentType: string }> {
-  const head = await R2.send(
-    new HeadObjectCommand({ Bucket: BUCKET, Key: key })
-  );
+  const head = await headObject(key);
+  if (!head) {
+    throw new Error(`R2 file not found: ${key}`);
+  }
 
-  const size = head.ContentLength ?? 0;
-  const contentType = head.ContentType ?? "";
-
-  if (size < minBytes) {
+  if (head.size < minBytes) {
     throw new Error(
-      `R2 file too small: ${size} bytes (minimum ${minBytes}). File may be corrupt.`
+      `R2 file too small: ${head.size} bytes (minimum ${minBytes}). File may be corrupt.`
     );
   }
 
-  if (!contentType.includes("video") && !contentType.includes("octet-stream")) {
+  if (!head.contentType.includes("video") && !head.contentType.includes("octet-stream")) {
     throw new Error(
-      `R2 file has wrong content type: ${contentType}. Expected video/*.`
+      `R2 file has wrong content type: ${head.contentType}. Expected video/*.`
     );
   }
 
-  return { size, contentType };
+  return head;
 }
 
-// Generate storage keys
+// --- Storage key generators ---
+
 export function videoStorageKey(userId: string, jobId: string): string {
   return `videos/${userId}/${jobId}.mp4`;
 }
@@ -163,28 +241,25 @@ export function audioStorageKey(userId: string, jobId: string): string {
   return `audio/${userId}/${jobId}.mp3`;
 }
 
-/**
- * Download a video from an external URL and persist it to R2.
- * Returns the permanent API URL: /api/explore/video/{key}
- * Used to prevent FAL/RunPod URL expiration.
- */
+export function exploreVideoStorageKey(exploreId: string): string {
+  return `explore/${exploreId}.mp4`;
+}
+
 export async function persistExternalVideo(
   externalUrl: string,
   storageKey: string
 ): Promise<string> {
-  // Retry logic: FAL/RunPod URLs can be transiently flaky. We retry on
-  // network errors and 5xx responses, but fail fast on 403/404/410 which
-  // indicate a truly expired URL.
   const MAX_ATTEMPTS = 3;
   let lastErr: Error | null = null;
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s hard timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90_000);
       const res = await fetch(externalUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
+
       if (!res.ok) {
-        // Fast-fail on expiry codes — retry won't help
         if (res.status === 403 || res.status === 404 || res.status === 410) {
           throw new Error(
             `External video URL expired (${res.status} ${res.statusText}): ${externalUrl.slice(0, 80)}`
@@ -192,11 +267,14 @@ export async function persistExternalVideo(
         }
         throw new Error(`Failed to download video: ${res.status} ${res.statusText}`);
       }
-      const buffer = Buffer.from(await res.arrayBuffer());
-      if (buffer.length < 5000) {
-        throw new Error(`Downloaded video too small: ${buffer.length} bytes`);
+
+      const arrayBuffer = await res.arrayBuffer();
+      if (arrayBuffer.byteLength < 5000) {
+        throw new Error(`Downloaded video too small: ${arrayBuffer.byteLength} bytes`);
       }
-      await uploadVideo(storageKey, buffer);
+
+      await putObject(storageKey, arrayBuffer, "video/mp4");
+
       if (attempt > 1) {
         console.log(
           `[STORAGE] persistExternalVideo succeeded on attempt ${attempt}: ${storageKey}`
@@ -205,7 +283,6 @@ export async function persistExternalVideo(
       return storageKey;
     } catch (err) {
       lastErr = err instanceof Error ? err : new Error(String(err));
-      // Don't retry expiry errors
       if (lastErr.message.includes("expired")) throw lastErr;
       if (attempt < MAX_ATTEMPTS) {
         const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
@@ -217,44 +294,4 @@ export async function persistExternalVideo(
     }
   }
   throw lastErr || new Error("persistExternalVideo failed after retries");
-}
-
-export function exploreVideoStorageKey(exploreId: string): string {
-  return `explore/${exploreId}.mp4`;
-}
-
-// Generic upload for any file type (used by server-side proxy upload)
-export async function uploadToR2(
-  key: string,
-  body: Buffer,
-  contentType: string
-): Promise<void> {
-  await R2.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    })
-  );
-}
-
-export async function uploadAudio(
-  key: string,
-  body: Buffer,
-  contentType = "audio/mpeg"
-): Promise<string> {
-  await R2.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    })
-  );
-
-  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
-    return `${PUBLIC_URL}/${key}`;
-  }
-  return key;
 }

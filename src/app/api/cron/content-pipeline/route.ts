@@ -3,7 +3,7 @@ import { isAutomationPaused } from "@/lib/automation-killswitch";
  * Content Pipeline Cron — Twice Daily
  *
  * GET /api/cron/content-pipeline
- * Auth: Bearer CRON_SECRET (Vercel Cron sends this automatically)
+ * Auth: Bearer CRON_SECRET (Cloudflare Cron Worker sends this automatically)
  *
  * Schedule: 05:00 UTC (07:00 SAST) + 13:00 UTC (15:00 SAST)
  *

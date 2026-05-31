@@ -123,7 +123,7 @@ export function HeroVideo() {
                 muted
                 loop
                 playsInline
-                crossOrigin="anonymous"
+
                 preload={isActive ? "auto" : "metadata"}
                 className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ease-in-out"
                 style={{ opacity: isActive ? 1 : 0 }}
@@ -142,7 +142,6 @@ export function HeroVideo() {
             muted
             loop
             playsInline
-            crossOrigin="anonymous"
             preload="auto"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
               videoLoaded ? "opacity-100" : "opacity-0"

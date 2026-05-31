@@ -42,7 +42,6 @@ export function AuthBackgroundVideo() {
           muted
           loop
           playsInline
-          crossOrigin="anonymous"
           preload={i === idx ? "auto" : "metadata"}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ease-in-out"
           style={{ opacity: i === idx ? 0.45 : 0 }}

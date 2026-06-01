@@ -114,6 +114,9 @@ const capabilities = [
 // ============================================
 
 export default function LandingPage() {
+  // Real platform stats
+  const [stats, setStats] = useState<{ totalVideos: number; totalUsers: number; videosToday: number } | null>(null);
+
   // Community feed
   const [feedTab, setFeedTab] = useState<FeedTab>("trending");
   const [feedVideos, setFeedVideos] = useState<ExploreVideo[]>([]);
@@ -149,6 +152,11 @@ export default function LandingPage() {
   useEffect(() => {
     fetchFeed(feedTab);
   }, [feedTab, fetchFeed]);
+
+  // Fetch real stats
+  useEffect(() => {
+    fetch("/api/stats").then(r => r.ok ? r.json() : null).then(setStats).catch(() => {});
+  }, []);
 
   // ---- Modal handlers ----
   const handleRecreate = useCallback((video: ExploreVideo) => {
@@ -199,7 +207,7 @@ export default function LandingPage() {
               <Link href="/sign-up" className="w-full sm:w-auto">
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
-                  Start Free — 100 Credits
+                  Get 100 Free Credits
                 </Button>
               </Link>
               <Link href="#community" className="w-full sm:w-auto">
@@ -214,21 +222,26 @@ export default function LandingPage() {
             </p>
           </MotionSection>
 
-          {/* Stats */}
+          {/* Real stats from DB */}
           <MotionSection delay={0.4} className="mt-8 sm:mt-12">
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm text-zinc-400">
               <span className="flex items-center gap-2">
-                <AnimatedCounter value={12000} suffix="+" className="font-semibold text-white" />
-                <span>videos created</span>
+                <AnimatedCounter value={stats?.totalVideos ?? 0} suffix="+" className="font-semibold text-white" />
+                <span>videos generated</span>
               </span>
               <span className="hidden sm:inline text-zinc-400">|</span>
-              <span className="flex items-center gap-2">
-                <AnimatedCounter value={2000} suffix="+" className="font-semibold text-white" />
-                <span>creators</span>
-              </span>
-              <span className="hidden sm:inline text-zinc-400">|</span>
+              {(stats?.videosToday ?? 0) > 0 && (
+                <>
+                  <span className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" /></span>
+                    <AnimatedCounter value={stats?.videosToday ?? 0} className="font-semibold text-white" />
+                    <span>made today</span>
+                  </span>
+                  <span className="hidden sm:inline text-zinc-400">|</span>
+                </>
+              )}
               <span className="hidden sm:block text-zinc-400">
-                Powered by 10+ AI models
+                Powered by 12 AI models
               </span>
             </div>
           </MotionSection>
@@ -451,7 +464,7 @@ export default function LandingPage() {
                         variant={isPopular ? "primary" : "secondary"}
                         className="w-full"
                       >
-                        {plan.price === 0 ? "Start Free" : "Subscribe"}
+                        {plan.price === 0 ? "Get 100 Free Credits" : "Subscribe"}
                         <ArrowRight className="w-4 h-4" />
                       </Button>
                     </Link>
@@ -517,16 +530,16 @@ export default function LandingPage() {
           <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-8 sm:p-12 md:p-16 text-center">
             <MotionSection>
               <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                Your first video is free.
+                Create your first AI video now.
               </h2>
               <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
-                100 credits. No credit card. Generate your first AI video in under 60 seconds.
+                100 free credits. No credit card. Your first video renders in under 60 seconds.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href="/sign-up">
                   <Button size="lg" className="text-base px-10 py-4">
                     <Sparkles className="w-5 h-5" />
-                    Start Free
+                    Get 100 Free Credits
                   </Button>
                 </Link>
                 <Link href="/mimic">

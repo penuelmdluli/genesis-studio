@@ -16,8 +16,8 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-8">
             <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
               <h3 className="text-lg font-semibold text-white mb-2">Email</h3>
-              <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">
-                hello@genesis-studio.app
+              <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">
+                hello@ivideostudio.ai
               </a>
             </div>
             <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
@@ -31,7 +31,7 @@ export default function ContactPage() {
             <h3 className="text-lg font-semibold text-white mb-2">For Enterprise</h3>
             <p className="text-sm text-zinc-400">
               Need custom volumes, white-label solutions, or API access for your business?
-              Email us at <a href="mailto:enterprise@genesis-studio.app" className="text-violet-400 hover:text-violet-300">enterprise@genesis-studio.app</a>.
+              Email us at <a href="mailto:enterprise@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">enterprise@ivideostudio.ai</a>.
             </p>
           </div>
         </div>

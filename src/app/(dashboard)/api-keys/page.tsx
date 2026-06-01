@@ -22,7 +22,7 @@ interface ApiKeyDisplay {
 const codeExamples = [
   {
     lang: "cURL",
-    code: `curl -X POST https://api.genesisstudio.ai/api/v1/generate \\
+    code: `curl -X POST https://api.ivideostudio.ai/api/v1/generate \\
   -H "Authorization: Bearer gs_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{"prompt": "A sunset over the ocean", "model": "ltx-video"}'`,
@@ -32,7 +32,7 @@ const codeExamples = [
     code: `import requests
 
 response = requests.post(
-    "https://api.genesisstudio.ai/api/v1/generate",
+    "https://api.ivideostudio.ai/api/v1/generate",
     headers={"Authorization": "Bearer gs_your_api_key"},
     json={"prompt": "A sunset over the ocean", "model": "ltx-video"}
 )
@@ -41,7 +41,7 @@ print(response.json())`,
   {
     lang: "Node.js",
     code: `const response = await fetch(
-  "https://api.genesisstudio.ai/api/v1/generate",
+  "https://api.ivideostudio.ai/api/v1/generate",
   {
     method: "POST",
     headers: {

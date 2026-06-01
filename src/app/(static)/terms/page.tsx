@@ -45,7 +45,7 @@ export default function TermsPage() {
               <li><strong className="text-zinc-200">Failed generations:</strong> Credits are automatically refunded when a generation fails due to a system error.</li>
               <li><strong className="text-zinc-200">Subscriptions:</strong> You may cancel at any time. Refunds for the current billing period are available within 7 days of purchase if no credits have been used.</li>
               <li><strong className="text-zinc-200">Credit packs:</strong> Refundable within 14 days of purchase if no credits have been used.</li>
-              <li><strong className="text-zinc-200">How to request:</strong> Email <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a> with your account email and reason for refund.</li>
+              <li><strong className="text-zinc-200">How to request:</strong> Email <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a> with your account email and reason for refund.</li>
             </ul>
           </section>
 
@@ -71,7 +71,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">8. DMCA and Copyright</h2>
-            <p className="mb-2">We respect intellectual property rights. If you believe content on Genesis Studio infringes your copyright, submit a DMCA takedown notice to <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a> with:</p>
+            <p className="mb-2">We respect intellectual property rights. If you believe content on Genesis Studio infringes your copyright, submit a DMCA takedown notice to <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a> with:</p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li>Identification of the copyrighted work</li>
               <li>URL of the infringing content on our platform</li>
@@ -120,7 +120,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">16. Contact</h2>
-            <p>For questions about these Terms, contact us at <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a>.</p>
+            <p>For questions about these Terms, contact us at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>.</p>
           </section>
         </div>
       </main>

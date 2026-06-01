@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SaveReferral } from "@/components/auth/save-referral";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import Link from "next/link";
+import { Logo } from "@/components/brand/logo";
 import { AuthBackgroundVideo } from "@/components/auth-background-video";
 
 export default function SignUpPage() {
@@ -17,13 +18,10 @@ export default function SignUpPage() {
       {/* Left panel - premium branding */}
       <div className="hidden lg:flex flex-1 items-center justify-center p-12 relative">
         <div className="max-w-md relative z-10">
-          <Link href="/" className="flex items-center gap-2.5 mb-12">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-violet-600/30">
-              G
-                <Suspense><SaveReferral /></Suspense>
-    </div>
-            <span className="text-2xl font-bold gradient-text">Genesis Studio</span>
-          </Link>
+          <div className="mb-12">
+            <Logo size="lg" />
+            <Suspense><SaveReferral /></Suspense>
+          </div>
 
           <h1 className="text-4xl font-bold text-zinc-100 mb-4 leading-[1.15]">
             Create AI videos
@@ -100,13 +98,10 @@ export default function SignUpPage() {
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 relative z-10">
         <div className="w-full max-w-[420px]">
           <div className="lg:hidden text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white">
-                G
-                  <Suspense><SaveReferral /></Suspense>
-    </div>
-              <span className="text-xl font-bold gradient-text">Genesis Studio</span>
-            </Link>
+            <div className="inline-flex mb-3">
+              <Logo size="md" />
+              <Suspense><SaveReferral /></Suspense>
+            </div>
             <p className="text-sm text-zinc-400 font-medium">100 free credits. No card needed.</p>
               <Suspense><SaveReferral /></Suspense>
     </div>

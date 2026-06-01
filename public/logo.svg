@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="play" x1="18" y1="12" x2="38" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e4e4e7"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="48" height="48" rx="12" fill="url(#bg)"/>
+  <!-- Play triangle (video platform identity) -->
+  <path d="M18 12.5v23a1.5 1.5 0 0 0 2.25 1.3l19.5-11.5a1.5 1.5 0 0 0 0-2.6L20.25 11.2A1.5 1.5 0 0 0 18 12.5z" fill="url(#play)" opacity="0.95"/>
+  <!-- G letterform cut into the play button -->
+  <path d="M28 20h5v2h-3v4h3v2h-5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z" fill="url(#bg)" opacity="0.9"/>
+</svg>

@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     const rateCheck = checkRateLimit(userId, "chat:user");
     if (!rateCheck.allowed) {
       return NextResponse.json({
-        reply: `You've reached the chat limit (20 messages/hour). Try again in ${Math.ceil((rateCheck.resetAt - Date.now()) / 60_000)} minutes, or email hello@genesis-studio.app for help.`,
+        reply: `You've reached the chat limit (20 messages/hour). Try again in ${Math.ceil((rateCheck.resetAt - Date.now()) / 60_000)} minutes, or email hello@ivideostudio.ai for help.`,
       });
     }
 
@@ -64,13 +64,13 @@ export async function POST(req: NextRequest) {
     const budgetCheck = checkBudget("claude:chat");
     if (!budgetCheck.allowed) {
       return NextResponse.json({
-        reply: "The AI assistant is taking a break right now. For help, email hello@genesis-studio.app or check our docs at /docs.",
+        reply: "The AI assistant is taking a break right now. For help, email hello@ivideostudio.ai or check our docs at /docs.",
       });
     }
 
     if (!ANTHROPIC_API_KEY) {
       return NextResponse.json({
-        reply: "The AI assistant is not configured yet. Please contact support at hello@genesis-studio.app for help.",
+        reply: "The AI assistant is not configured yet. Please contact support at hello@ivideostudio.ai for help.",
       });
     }
 
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       console.error("[chat] Anthropic API error:", res.status);
       return NextResponse.json({
-        reply: "I'm having trouble connecting right now. Try again in a moment, or email hello@genesis-studio.app for help.",
+        reply: "I'm having trouble connecting right now. Try again in a moment, or email hello@ivideostudio.ai for help.",
       });
     }
 

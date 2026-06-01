@@ -62,7 +62,7 @@ export default function DocsPage() {
           <div className="mt-8 pt-8 border-t border-white/10">
             <p className="text-sm text-zinc-400">
               Need help? Contact us at{" "}
-              <a href="mailto:hello@genesis-studio.app" className="text-violet-400">hello@genesis-studio.app</a>
+              <a href="mailto:hello@ivideostudio.ai" className="text-violet-400">hello@ivideostudio.ai</a>
             </p>
           </div>
         </div>

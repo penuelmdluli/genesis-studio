@@ -90,7 +90,7 @@ export default function PrivacyPage() {
               <li><strong className="text-zinc-200">Restriction:</strong> Request restriction of data processing</li>
               <li><strong className="text-zinc-200">Withdrawal:</strong> Withdraw consent at any time</li>
             </ul>
-            <p className="mt-2">To exercise any of these rights, email us at <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a>. We will respond within 30 days.</p>
+            <p className="mt-2">To exercise any of these rights, email us at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>. We will respond within 30 days.</p>
           </section>
 
           <section>
@@ -110,12 +110,12 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">11. Information Officer</h2>
-            <p>In accordance with POPIA, our Information Officer can be contacted at <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a>. Complaints may also be lodged with the Information Regulator of South Africa.</p>
+            <p>In accordance with POPIA, our Information Officer can be contacted at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>. Complaints may also be lodged with the Information Regulator of South Africa.</p>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">12. Contact</h2>
-            <p>For privacy concerns or data requests, contact us at <a href="mailto:hello@genesis-studio.app" className="text-violet-400 hover:text-violet-300">hello@genesis-studio.app</a>.</p>
+            <p>For privacy concerns or data requests, contact us at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>.</p>
           </section>
         </div>
       </main>

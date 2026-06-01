@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { Logo } from "@/components/brand/logo";
 
 const navLinks = [
   { href: "/explore", label: "Explore" },
@@ -23,14 +24,7 @@ export function Navbar() {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.10] glass">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-violet-600/20">
-                G
-              </div>
-              <span className="text-lg font-bold gradient-text">
-                Genesis Studio
-              </span>
-            </Link>
+            <Logo size="md" />
 
             <div className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (

@@ -62,6 +62,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  alternates: {
+    canonical: "https://ivideostudio.ai",
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

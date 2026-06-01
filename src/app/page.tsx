@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/brand/logo";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -564,14 +565,9 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-violet-600/20">
-                  G
-                </div>
-                <span className="text-lg font-bold gradient-text">
-                  Genesis Studio
-                </span>
-              </Link>
+              <div className="mb-4">
+                <Logo size="sm" />
+              </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
                 AI video creation platform built in South Africa. 10+ models, Hollywood quality.
               </p>

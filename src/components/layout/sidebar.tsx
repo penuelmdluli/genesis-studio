@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@/components/auth/user-button";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/logo";
 import { useStore } from "@/hooks/use-store";
 import { isRouteVisibleAtLaunch } from "@/lib/feature-flags";
 import {
@@ -142,19 +143,12 @@ export function Sidebar() {
       >
         {/* Logo + Mobile close */}
         <div className="flex items-center gap-2.5 p-4 h-16 border-b border-white/[0.10]">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-lg shadow-violet-600/20">
-            G
-          </div>
-          {(sidebarOpen || mobileMenuOpen) && (
-            <span className="text-lg font-bold gradient-text truncate flex-1">
-              Genesis Studio
-            </span>
-          )}
+          <Logo size="sm" showText={sidebarOpen || mobileMenuOpen} />
           {/* Mobile close button */}
           {mobileMenuOpen && (
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-300 transition-colors md:hidden"
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-300 transition-colors md:hidden ml-auto"
               aria-label="Close menu"
             >
               <X className="w-4 h-4" />

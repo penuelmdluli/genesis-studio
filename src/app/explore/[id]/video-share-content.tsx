@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LogoMark } from "@/components/brand/logo";
 import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
@@ -582,7 +583,7 @@ export function VideoShareContent({
       {!isSignedIn && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-[#111118]/90 border border-white/[0.12] backdrop-blur-xl shadow-lg">
           <Link href="/?utm_source=explore_share" className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
-            <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-[10px] font-bold text-white">G</div>
+            <LogoMark size={20} />
             Made with Genesis Studio
           </Link>
         </div>

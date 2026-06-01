@@ -9,32 +9,33 @@ const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 // Map model IDs to RunPod endpoint IDs
 // Only RunPod-hosted models need endpoint mappings
 // FAL.AI models (kling, veo, seedance) are handled by src/lib/fal.ts
-const ENDPOINT_MAP: Partial<Record<ModelId, string>> = {
-  "wan-2.2": process.env.RUNPOD_ENDPOINT_WAN22 || "",
-  "hunyuan-video": process.env.RUNPOD_ENDPOINT_HUNYUAN || "",
-  "ltx-video": process.env.RUNPOD_ENDPOINT_LTX || "",
-  "wan-2.1-turbo": process.env.RUNPOD_ENDPOINT_WAN21_TURBO || "",
-  "mochi-1": process.env.RUNPOD_ENDPOINT_MOCHI || "",
-  "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
-};
+//
+// IMPORTANT: Read env vars lazily (inside function), NOT at module load time.
+// On Cloudflare Workers, process.env is only populated after the request
+// context starts via populateProcessEnv(). Module-level reads get empty strings.
 
-// Wan 2.2 uses separate Hub endpoints for t2v vs i2v.
-// If the i2v endpoint env var is set to the Hub TEMPLATE NAME (not an endpoint ID),
-// it's not a real endpoint — fall back to the t2v endpoint which accepts `image` param.
-const WAN22_I2V_ENDPOINT_RAW = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
-// Endpoint IDs are typically 14 lowercase-alphanumeric chars. Template names have hyphens.
-const WAN22_I2V_ENDPOINT = /^[a-z0-9]{10,20}$/.test(WAN22_I2V_ENDPOINT_RAW)
-  ? WAN22_I2V_ENDPOINT_RAW
-  : "";
+function getEndpointMap(): Partial<Record<ModelId, string>> {
+  return {
+    "wan-2.2": process.env.RUNPOD_ENDPOINT_WAN22 || "",
+    "hunyuan-video": process.env.RUNPOD_ENDPOINT_HUNYUAN || "",
+    "ltx-video": process.env.RUNPOD_ENDPOINT_LTX || "",
+    "wan-2.1-turbo": process.env.RUNPOD_ENDPOINT_WAN21_TURBO || "",
+    "mochi-1": process.env.RUNPOD_ENDPOINT_MOCHI || "",
+    "mimic-motion": process.env.RUNPOD_ENDPOINT_MIMIC_MOTION || "",
+  };
+}
 
 // Get the correct endpoint for a model, considering generation type
 function getEndpointForModel(modelId: ModelId, type?: GenerationType): string {
+  const endpoints = getEndpointMap();
+
   if (modelId === "wan-2.2" && (type === "i2v" || type === "motion")) {
-    // Verified: the t2v endpoint accepts `image` input for i2v mode when no
-    // dedicated i2v endpoint is deployed. This is how we route i2v jobs.
-    return WAN22_I2V_ENDPOINT || ENDPOINT_MAP["wan-2.2"] || "";
+    // Wan 2.2 i2v: use dedicated i2v endpoint if available, else fall back to t2v
+    const i2vRaw = process.env.RUNPOD_ENDPOINT_WAN22_I2V || "";
+    const i2vEndpoint = /^[a-z0-9]{10,20}$/.test(i2vRaw) ? i2vRaw : "";
+    return i2vEndpoint || endpoints["wan-2.2"] || "";
   }
-  return ENDPOINT_MAP[modelId] || "";
+  return endpoints[modelId] || "";
 }
 
 interface RunPodRunResponse {
@@ -122,7 +123,7 @@ export async function cancelRunPodJob(
   modelId: ModelId,
   jobId: string
 ): Promise<void> {
-  const endpointId = ENDPOINT_MAP[modelId];
+  const endpointId = getEndpointMap()[modelId];
   if (!endpointId) {
     throw new Error(`No RunPod endpoint configured for model: ${modelId}`);
   }

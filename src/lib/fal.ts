@@ -9,8 +9,14 @@ import { fal } from "@fal-ai/client";
 import { ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 
-// Configure FAL client
-fal.config({ credentials: process.env.FAL_KEY || "" });
+// Configure FAL client lazily — on Workers, process.env is empty at module load
+let falConfigured = false;
+function ensureFalConfig() {
+  if (!falConfigured) {
+    fal.config({ credentials: process.env.FAL_KEY || "" });
+    falConfigured = true;
+  }
+}
 
 interface FalSubmitResult {
   request_id: string;
@@ -99,7 +105,7 @@ export async function submitFalJob(params: {
 
   console.log(`[FAL] Submitting to ${falModelId}: "${params.prompt.substring(0, 80)}..."`);
 
-  // Use queue API for async (avoids Vercel timeout)
+  ensureFalConfig();
   const result = await fal.queue.submit(falModelId, { input });
 
   return {
@@ -127,6 +133,7 @@ export async function getFalJobStatus(
   }
 
   try {
+    ensureFalConfig();
     const status = await fal.queue.status(falModelId, {
       requestId,
       logs: false,
@@ -156,6 +163,7 @@ export async function getFalJobResult(
     throw new Error(`No FAL.AI model ID for ${modelId}`);
   }
 
+  ensureFalConfig();
   const result = await fal.queue.result(falModelId, {
     requestId,
   });

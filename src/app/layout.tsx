@@ -62,6 +62,11 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // Google Search Console verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+  // to the token from GSC (HTML-tag method) so the meta tag renders in <head>.
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : undefined,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

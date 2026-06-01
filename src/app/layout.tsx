@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"),
+  metadataBase: new URL("https://ivideostudio.ai"),
   title: {
     default: "Genesis Studio | AI Video Generation Platform",
     template: "%s | Genesis Studio",
@@ -61,9 +61,6 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-  },
-  alternates: {
-    canonical: "https://ivideostudio.ai",
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {

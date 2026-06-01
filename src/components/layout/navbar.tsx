@@ -16,7 +16,7 @@ const navLinks = [
 ];
 
 export function Navbar() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -92,7 +92,7 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {!isSignedIn && (
+              {!isSignedIn ? (
                 <Link
                   href="/sign-in"
                   className="px-4 py-3 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-colors"
@@ -100,6 +100,29 @@ export function Navbar() {
                 >
                   Sign In
                 </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="px-4 py-3 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="px-4 py-3 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Settings
+                  </Link>
+                  <button
+                    className="px-4 py-3 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.04] transition-colors text-left"
+                    onClick={() => { setMobileOpen(false); signOut(); }}
+                  >
+                    Sign Out
+                  </button>
+                </>
               )}
             </div>
           </div>

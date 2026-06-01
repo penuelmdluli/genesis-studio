@@ -30,6 +30,10 @@ const PUBLIC_PREFIXES = [
   "/tutorials",
   "/explore/",
   "/api/",
+  "/robots",
+  "/sitemap",
+  "/opengraph-image",
+  "/twitter-image",
 ];
 
 // ── Edge caching configuration ──────────────────────────────────

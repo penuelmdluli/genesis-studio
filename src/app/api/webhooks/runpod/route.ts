@@ -131,6 +131,8 @@ export async function POST(req: NextRequest) {
         audioTrackId: job.audio_track_id,
       });
 
+      // TODO: Add "Made with Genesis Studio" watermark for free-tier outputs
+
       await updateJobStatus(job.id, {
         status: "completed",
         progress: 100,

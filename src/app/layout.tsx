@@ -5,6 +5,8 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ChatBot } from "@/components/chat/chatbot";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
+import { EmailCapture } from "@/components/email-capture";
+import { WebSiteSchema } from "@/components/structured-data";
 import Script from "next/script";
 import "./globals.css";
 
@@ -89,12 +91,14 @@ export default function RootLayout({
         <head>
           <meta name="theme-color" content="#7c3aed" />
           <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+          <WebSiteSchema />
         </head>
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
           <CookieConsent />
           <RegisterServiceWorker />
+          <EmailCapture />
           {/* Cloudflare Web Analytics */}
           <Script
             defer

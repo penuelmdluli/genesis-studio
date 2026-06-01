@@ -66,6 +66,46 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://ivideostudio.ai/blog/free-ai-video-maker-no-watermark</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/blog/ai-video-vs-stock-footage</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/blog/brain-studio-ai-short-films</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/blog/mimic-studio-dance-transfer</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/generate</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/brain</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/music-video</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ivideostudio.ai/talking-avatar</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://ivideostudio.ai/tutorials</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

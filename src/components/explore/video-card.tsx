@@ -214,6 +214,15 @@ export function ExploreVideoCard({
             </div>
           )}
 
+          {/* Bottom-left: Free tier badge */}
+          {video.isFreeTier && (
+            <div className="absolute bottom-12 left-3 z-10">
+              <span className="px-1.5 py-0.5 rounded bg-white/20 backdrop-blur-sm text-[9px] font-bold text-white/70 uppercase tracking-wider border border-white/10">
+                Free
+              </span>
+            </div>
+          )}
+
           {/* Top-right: Badges */}
           <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
             {/* Audio badge */}

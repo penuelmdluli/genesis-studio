@@ -23,20 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Prepare middleware for OpenNext
+      - name: Prepare for OpenNext build
         run: |
           # OpenNext expects middleware.ts; Next.js 16 uses proxy.ts
-          # Move (not copy) to avoid "both detected" error
-          mv src/proxy.ts src/middleware.ts
-          # Replace proxy export with middleware export
-          sed -i 's/export const proxy = handler;/export const middleware = handler;/' src/middleware.ts
+          # middleware.ts exists in repo, just remove proxy.ts to avoid conflict
+          rm -f src/proxy.ts
 
       - name: Build with OpenNext
         run: npx opennextjs-cloudflare build
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+        run: npx opennextjs-cloudflare deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

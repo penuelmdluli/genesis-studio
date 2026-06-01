@@ -36,6 +36,8 @@ import {
   Zap,
 } from "lucide-react";
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
+import { trackEvent } from "@/lib/analytics-events";
+import { AppSchema, FAQSchema } from "@/components/structured-data";
 
 // No hardcoded videos — everything pulled from API/database
 
@@ -204,7 +206,7 @@ export default function LandingPage() {
 
           <MotionSection delay={0.2}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 w-full sm:w-auto px-4 sm:px-0">
-              <Link href="/sign-up" className="w-full sm:w-auto">
+              <Link href="/sign-up" className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
                   Get 100 Free Credits
@@ -536,7 +538,7 @@ export default function LandingPage() {
                 100 free credits. No credit card. Your first video renders in under 60 seconds.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href="/sign-up">
+                <Link href="/sign-up" onClick={() => trackEvent("cta_click", { location: "footer" })}>
                   <Button size="lg" className="text-base px-10 py-4">
                     <Sparkles className="w-5 h-5" />
                     Get 100 Free Credits
@@ -699,6 +701,10 @@ export default function LandingPage() {
           video={recreateVideo}
         />
       )}
+
+      {/* JSON-LD Structured Data for SEO */}
+      <AppSchema />
+      <FAQSchema />
     </div>
   );
 }

@@ -145,29 +145,47 @@ export async function POST(req: NextRequest) {
     });
 
     // Route to the correct provider (FAL.AI or RunPod)
+    // FAL auto-fallback: if FAL fails (balance exhausted, forbidden), retry on RunPod Wan 2.2
+    let usedFallback = false;
+    let actualModelId = body.modelId;
     try {
       if (model.provider === "fal") {
         // FAL.AI — premium models with native audio
-        const falResult = await submitFalJob({
-          modelId: body.modelId,
-          type: effectiveType as "t2v" | "i2v",
-          prompt: body.prompt,
-          negativePrompt: body.negativePrompt,
-          imageUrl: body.inputImageUrl,
-          duration,
-          aspectRatio: body.aspectRatio,
-          enableAudio: body.enableAudio,
-          seed: body.seed,
-        });
+        try {
+          const falResult = await submitFalJob({
+            modelId: body.modelId,
+            type: effectiveType as "t2v" | "i2v",
+            prompt: body.prompt,
+            negativePrompt: body.negativePrompt,
+            imageUrl: body.inputImageUrl,
+            duration,
+            aspectRatio: body.aspectRatio,
+            enableAudio: body.enableAudio,
+            seed: body.seed,
+          });
 
-        await updateJobStatus(job.id, {
-          runpodJobId: falResult.request_id, // reuse field for FAL request ID
-          status: "queued",
-        });
-      } else {
-        // RunPod — open-source models
+          await updateJobStatus(job.id, {
+            runpodJobId: falResult.request_id,
+            status: "queued",
+          });
+        } catch (falError) {
+          const falMsg = falError instanceof Error ? falError.message : String(falError);
+          // Auto-fallback to RunPod Wan 2.2 on FAL billing/auth errors
+          if (falMsg.includes("Forbidden") || falMsg.includes("locked") || falMsg.includes("balance") || falMsg.includes("403")) {
+            console.warn(`[FAL_FALLBACK] ${body.modelId} failed (${falMsg}), falling back to wan-2.2`);
+            usedFallback = true;
+            actualModelId = "wan-2.2" as ModelId;
+            // Fall through to RunPod block below
+          } else {
+            throw falError; // Re-throw non-billing errors
+          }
+        }
+      }
+
+      if (model.provider !== "fal" || usedFallback) {
+        // RunPod — open-source models (or FAL fallback)
         const runpodInput = buildRunPodInput({
-          modelId: body.modelId,
+          modelId: actualModelId,
           type: effectiveType,
           prompt: body.prompt,
           negativePrompt: body.negativePrompt,
@@ -187,7 +205,7 @@ export async function POST(req: NextRequest) {
         const webhookUrl = `${appUrl}/api/webhooks/runpod`;
 
         const runpodJob = await submitRunPodJob(
-          body.modelId,
+          actualModelId,
           runpodInput,
           webhookUrl,
           effectiveType
@@ -208,11 +226,13 @@ export async function POST(req: NextRequest) {
         message: `User: ${user.name} (${user.email})\nModel: ${model.name} | ${body.duration}s | ${creditCost} credits`,
       }).catch(() => {});
 
+      const fallbackModel = usedFallback ? AI_MODELS[actualModelId] : null;
       return NextResponse.json({
         jobId: job.id,
         status: "queued",
-        estimatedTime: model.avgGenerationTime * (body.isDraft ? 0.3 : 1),
+        estimatedTime: (fallbackModel || model).avgGenerationTime * (body.isDraft ? 0.3 : 1),
         creditsCost: creditCost,
+        ...(usedFallback && { fallbackModel: fallbackModel?.name, fallbackNote: `${model.name} is temporarily unavailable. Routed to ${fallbackModel?.name} instead.` }),
       });
     } catch (gpuError) {
       console.error("GPU submission error:", gpuError);

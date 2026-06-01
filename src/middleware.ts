@@ -33,6 +33,7 @@ const PUBLIC_PREFIXES = [
   "/robots",
   "/sitemap",
   "/opengraph-image",
+  "/google",
   "/twitter-image",
 ];
 

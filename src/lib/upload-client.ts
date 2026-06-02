@@ -1,25 +1,22 @@
 // Client-side upload helpers
-// Uploads files directly to R2 via signed URLs
-// Flow: 1) Get signed URL from our API  2) Upload directly to R2  3) Return public URL
+// Uploads files to R2 via our API endpoint (which streams to R2)
 
-/** Upload a file to R2 via signed URL */
+/** Upload a file to R2 via the upload API */
 export async function uploadFile(
   file: File,
   purpose: "video" | "image" | "audio"
 ): Promise<string> {
-  // Step 1: Get signed upload URL from our API (tiny JSON request)
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("purpose", purpose);
+
   const res = await fetch("/api/upload", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      filename: file.name,
-      contentType: file.type,
-      purpose,
-    }),
+    body: formData,
   });
 
   if (!res.ok) {
-    let msg = "Failed to get upload URL";
+    let msg = "Failed to upload file";
     try {
       const err = await res.json();
       msg = err.error || msg;
@@ -29,23 +26,6 @@ export async function uploadFile(
     throw new Error(msg);
   }
 
-  const { uploadUrl, token, publicUrl } = await res.json();
-
-  // Step 2: Upload file directly to R2
-  const uploadRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type,
-      Authorization: `Bearer ${token}`,
-    },
-    body: file,
-  });
-
-  if (!uploadRes.ok) {
-    const text = await uploadRes.text().catch(() => "");
-    throw new Error(`Upload failed (${uploadRes.status}): ${text.slice(0, 100)}`);
-  }
-
-  // Step 3: Return the public URL
-  return publicUrl;
+  const { publicUrl, url } = await res.json();
+  return publicUrl || url;
 }

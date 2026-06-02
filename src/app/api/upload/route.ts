@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
-import { getDb } from "@/lib/db-driver";
+import { getR2 } from "@/lib/cf-env";
+import { r2PublicUrl } from "@/lib/storage";
 
-// POST /api/upload — returns a signed upload URL for direct client-to-R2 upload
-// Client uploads directly to R2 Storage via presigned URL
+// POST /api/upload — accepts file directly, stores in R2, returns public URL
+// On Workers we can't generate presigned URLs for R2, so the client
+// uploads to this endpoint and we stream it to R2.
 export async function POST(req: NextRequest) {
   try {
     const clerkId = await getAuthUserId();
@@ -17,29 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const body = await req.json();
-    const { filename, contentType, purpose } = body;
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    const purpose = (formData.get("purpose") as string) || "image";
 
-    if (!filename || !contentType) {
-      return NextResponse.json(
-        { error: "filename and contentType are required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size (client reports expected size)
-    const fileSize = body.fileSize as number | undefined;
-    if (fileSize) {
-      const isVideo = contentType.startsWith("video/");
-      const isAudio = contentType.startsWith("audio/");
-      const maxSize = isVideo ? 500 * 1024 * 1024 : isAudio ? 50 * 1024 * 1024 : 20 * 1024 * 1024; // 500MB video, 50MB audio, 20MB image
-      if (fileSize > maxSize) {
-        const limitMB = Math.round(maxSize / (1024 * 1024));
-        return NextResponse.json(
-          { error: `File too large. Maximum size is ${limitMB}MB for ${isVideo ? "videos" : isAudio ? "audio" : "images"}.` },
-          { status: 413 }
-        );
-      }
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     // Validate file type
@@ -48,51 +33,46 @@ export async function POST(req: NextRequest) {
       "video/mp4", "video/webm", "video/quicktime",
       "audio/mpeg", "audio/wav", "audio/mp3",
     ];
-    if (!allowedTypes.includes(contentType)) {
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
+    }
+
+    // Validate size
+    const isVideo = file.type.startsWith("video/");
+    const isAudio = file.type.startsWith("audio/");
+    const maxSize = isVideo ? 500 * 1024 * 1024 : isAudio ? 50 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (file.size > maxSize) {
+      const limitMB = Math.round(maxSize / (1024 * 1024));
       return NextResponse.json(
-        { error: "Unsupported file type" },
-        { status: 400 }
+        { error: `File too large. Maximum ${limitMB}MB for ${isVideo ? "videos" : isAudio ? "audio" : "images"}.` },
+        { status: 413 }
       );
     }
 
-    // Sanitize filename - only allow safe characters
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
+    // Build storage key
+    const ext = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "bin";
+    const prefix = purpose === "video" ? "uploads/videos" : purpose === "audio" ? "uploads/audio" : "uploads/images";
+    const key = `${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    // Build storage path
-    const ext = safeFilename.split(".").pop() || "bin";
-    const prefix = purpose === "video" ? "videos" : purpose === "audio" ? "audio" : "images";
-    const path = `${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    // Upload to R2
+    const r2 = getR2();
+    const arrayBuffer = await file.arrayBuffer();
+    await r2.put(key, arrayBuffer, {
+      httpMetadata: { contentType: file.type },
+    });
 
-    const supabase = getDb();
-
-    // Create a signed upload URL (client uploads directly to Supabase, bypasses RLS)
-    const { data: signedData, error: signedError } = await (supabase as any).storage
-      .from("uploads")
-      .createSignedUploadUrl(path);
-
-    if (signedError || !signedData) {
-      console.error("Signed URL error:", signedError);
-      return NextResponse.json(
-        { error: "Failed to create upload URL" },
-        { status: 500 }
-      );
-    }
-
-    // Get the public URL for the file (FAL/RunPod will fetch from this)
-    const { data: publicData } = (supabase as any).storage
-      .from("uploads")
-      .getPublicUrl(path);
+    const publicUrl = r2PublicUrl(key);
 
     return NextResponse.json({
-      uploadUrl: signedData.signedUrl,
-      token: signedData.token,
-      path,
-      publicUrl: publicData.publicUrl,
+      url: publicUrl,
+      publicUrl,
+      key,
+      path: key,
     });
   } catch (error) {
-    console.error("Upload presign error:", error);
+    console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "Failed to generate upload URL" },
+      { error: "Failed to upload file" },
       { status: 500 }
     );
   }

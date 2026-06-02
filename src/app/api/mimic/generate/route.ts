@@ -122,8 +122,34 @@ export async function POST(req: NextRequest) {
       // If user provided a social media URL, download it to R2
       let finalVideoUrl = referenceVideoUrl;
       if (referenceUrl && !referenceVideoUrl) {
-        const result = await downloadVideoFromUrl(referenceUrl, user.id, job.id);
-        finalVideoUrl = result.publicUrl;
+        let downloaded = false;
+
+        // Try 1: In-Worker lightweight downloader (TikTok, Instagram, Twitter, direct URLs)
+        try {
+          const result = await downloadVideoFromUrl(referenceUrl, user.id, job.id);
+          finalVideoUrl = result.publicUrl;
+          downloaded = true;
+        } catch (dlErr) {
+          console.warn(`[Mimic] In-Worker download failed: ${dlErr instanceof Error ? dlErr.message : dlErr}`);
+        }
+
+        // Try 2: Fall back to Render scraper service (yt-dlp — handles Facebook, complex URLs)
+        if (!downloaded) {
+          try {
+            const { downloadAndPersist } = await import("@/lib/mbs/scraper");
+            const { r2Key } = await downloadAndPersist(referenceUrl);
+            const r2Pub = process.env.R2_PUBLIC_URL || "https://cdn.ivideostudio.ai";
+            finalVideoUrl = `${r2Pub}/${r2Key}`;
+            downloaded = true;
+            console.log(`[Mimic] Scraper downloaded: ${r2Key}`);
+          } catch (scraperErr) {
+            console.warn(`[Mimic] Scraper fallback failed: ${scraperErr instanceof Error ? scraperErr.message : scraperErr}`);
+          }
+        }
+
+        if (!downloaded) {
+          throw new Error("Could not download video from this URL. Please download it manually and upload the file.");
+        }
 
         await supabase.from("mimic_jobs").update({
           reference_video_url: finalVideoUrl,

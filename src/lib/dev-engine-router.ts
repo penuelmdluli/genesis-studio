@@ -74,42 +74,41 @@ export function selectEngine(
     };
   }
 
-  // PRIORITY: Use RunPod models (user has credits there)
+  // PRIORITY: Use RunPod models (user has credits there).
+  // Wan 2.2 has been RETIRED as the default engine — it requires H100-class
+  // GPUs, which caused chronic "GPU supply low" / cold-start / timeout issues.
+  // Hunyuan + LTX run on widely-available RTX 4090s and are far more reliable.
+  // Wan 2.2 remains reachable only via an explicit learnedOverride above.
 
-  // HERO content — explicit flagship override
-  if (contentType === "hero") {
+  // SPEED TIER — time-sensitive content ships fast on LTX-Video: ~3x faster
+  // than Hunyuan, ~$0.01/gen, runs on cheap, always-available GPUs. Quality is
+  // secondary when minutes-old stories need to go out immediately.
+  const SPEED_PILLARS = new Set<string>([
+    "breaking_news",
+    "breaking-news",
+    "news",
+    "geopolitics",
+  ]);
+  if (SPEED_PILLARS.has(pillar)) {
     return {
-      modelId: "wan-2.2" as ModelId,
+      modelId: "ltx-video" as ModelId,
       provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
-      reason: "Hero content — Wan 2.2 flagship (quality over speed)",
-    };
-  }
-
-  // TIER 1 — FLAGSHIP: Only "hero" / explicit "premium_episode" still pay the
-  // Wan 2.2 premium. Afrofuturism, folklore, MBS episodes, African cities, and
-  // baby scenarios are downgraded to hunyuan-video: 25% cheaper ($0.02 →
-  // $0.015), ~35% faster (120s → 75s), and the quality gap is small enough that
-  // the cost/speed win dominates at our volume. If any pillar visibly regresses
-  // we can hoist it back with contentType="premium_episode".
-  if (contentType === "premium_episode") {
-    return {
-      modelId: "wan-2.2" as ModelId,
-      provider: "runpod-hub",
-      estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
+      estimatedCostUsd: ENGINE_COSTS["ltx-video"],
       reason:
-        "Flagship tier — Wan 2.2 (explicit premium_episode override)",
+        "Speed tier — LTX-Video (fast, high GPU availability) for time-sensitive pillar",
     };
   }
 
-  // wan-2.2 is the only RunPod endpoint with active workers.
-  // Anti-avatar prompts enforced in planner to block default faces.
+  // WORKHORSE — Hunyuan Video is now the default engine for ~90% of content:
+  // best natural motion/physics, mature ecosystem, strong cost/quality/speed
+  // ratio, and it runs reliably on available GPUs. Covers hero/premium too,
+  // since it is the highest-quality engine we can serve dependably.
   return {
-    modelId: "wan-2.2" as ModelId,
+    modelId: "hunyuan-video" as ModelId,
     provider: "runpod-hub",
-    estimatedCostUsd: ENGINE_COSTS["wan-2.2"],
+    estimatedCostUsd: ENGINE_COSTS["hunyuan-video"],
     reason:
-      "Wan 2.2 flagship — only RunPod endpoint with active workers",
+      "Workhorse — Hunyuan Video (best quality/cost/reliability; replaces Wan 2.2 as primary)",
   };
 }
 

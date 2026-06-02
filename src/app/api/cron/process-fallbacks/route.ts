@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           const webhookUrl = `${appUrl}/api/brain/webhook`;
 
           const runpodInput = buildRunPodInput({
-            modelId: "wan-2.2",
+            modelId: "hunyuan-video",
             type: "t2v",
             prompt: job.prompt || scene.prompt || "",
             resolution: scene.resolution || "720p",
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
             aspectRatio: "landscape",
           });
 
-          const runpodJob = await submitRunPodJob("wan-2.2", runpodInput, webhookUrl);
+          const runpodJob = await submitRunPodJob("hunyuan-video", runpodInput, webhookUrl);
 
           await updateProductionScene(job.scene_id, {
             status: "processing",

@@ -145,8 +145,27 @@ export async function GET(
 
       recordSpend("fal-kling-i2v-mimic", result.costUsd).catch(() => {});
 
-      // Owner auto-post: Mimic videos → Mzansi Baby Stars page
+      // Auto-publish to Explore feed (fire-and-forget)
       if (r2PersistOk) {
+        import("@/lib/auto-publish").then(({ autoPublishToExplore }) =>
+          autoPublishToExplore({
+            jobId: job.id,
+            userId: user.id,
+            prompt: job.prompt || "Mimic Studio dance video",
+            modelId: "mimic-motion",
+            videoUrl: outputUrl,
+            thumbnailUrl,
+            duration: job.duration_sec || 10,
+            resolution: "720p",
+            hasAudio: !!job.keep_video_sound,
+            type: "motion",
+            userPlan: user.plan,
+            creatorName: user.name || "Genesis Studio",
+            creatorAvatarUrl: user.avatar_url || null,
+          })
+        ).catch((e) => console.error("[Mimic] Auto-publish to explore failed:", e));
+
+        // Owner auto-post: Mimic videos → Mzansi Baby Stars page
         import("@/lib/owner-autopost").then(({ autoPostMimicToMBS }) =>
           autoPostMimicToMBS(clerkId, r2Key, job.prompt || "Mimic Studio dance video")
         ).catch((e) => console.error("[Mimic] Auto-post failed:", e));

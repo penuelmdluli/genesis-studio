@@ -121,32 +121,74 @@ export async function POST(req: NextRequest) {
         }).eq("id", job.id);
       }
 
-      // Submit to Kling Motion Control
-      const { requestId } = await submitKlingMotion({
-        prompt: prompt || "Person performing dance moves, high quality, cinematic",
-        characterImageUrl,
-        referenceVideoUrl: finalVideoUrl!,
-        characterOrientation: "video",
-        keepOriginalSound: keepVideoSound,
-      });
+      // Try FAL Kling Motion Control first, fall back to RunPod MimicMotion
+      let provider = "fal";
+      let trackingId = "";
 
-      await supabase.from("mimic_jobs").update({
-        status: "submitted",
-        fal_request_id: requestId,
-      }).eq("id", job.id);
+      try {
+        const { requestId } = await submitKlingMotion({
+          prompt: prompt || "Person performing dance moves, high quality, cinematic",
+          characterImageUrl,
+          referenceVideoUrl: finalVideoUrl!,
+          characterOrientation: "video",
+          keepOriginalSound: keepVideoSound,
+        });
+        trackingId = requestId;
 
-      recordSpend("fal-kling-i2v-mimic", 0).catch(() => {}); // actual cost tracked on completion
+        await supabase.from("mimic_jobs").update({
+          status: "submitted",
+          fal_request_id: requestId,
+        }).eq("id", job.id);
+
+        recordSpend("fal-kling-i2v-mimic", 0).catch(() => {});
+      } catch (falErr) {
+        // FAL failed (likely balance exhausted) — fall back to RunPod MimicMotion
+        const falMsg = falErr instanceof Error ? falErr.message : String(falErr);
+        console.warn(`[Mimic] FAL failed (${falMsg}), falling back to RunPod MimicMotion`);
+        provider = "runpod";
+
+        const { submitRunPodJob, buildRunPodInput } = await import("@/lib/runpod");
+        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+
+        const runpodInput = buildRunPodInput({
+          modelId: "mimic-motion" as any,
+          type: "motion",
+          prompt: prompt || "Person performing dance moves",
+          inputImageUrl: characterImageUrl,
+          inputVideoUrl: finalVideoUrl!,
+          resolution: "720p",
+          duration: duration,
+          fps: 24,
+          aspectRatio: "portrait",
+        });
+
+        const runpodJob = await submitRunPodJob(
+          "mimic-motion" as any,
+          runpodInput,
+          `${appUrl}/api/webhooks/runpod`
+        );
+
+        trackingId = runpodJob.id;
+
+        await supabase.from("mimic_jobs").update({
+          status: "submitted",
+          fal_request_id: runpodJob.id, // reuse field for RunPod job ID
+        }).eq("id", job.id);
+
+        recordSpend("runpod-mimic-motion", 0).catch(() => {});
+      }
 
       sendSlackAlert({
         level: "info",
         title: "Mimic Studio generation started",
-        message: `User: ${user.name} (${user.email})\nDuration: ${duration}s | Credits: ${CREDIT_COST}`,
+        message: `User: ${user.name} (${user.email})\nDuration: ${duration}s | Credits: ${CREDIT_COST} | Provider: ${provider}`,
       }).catch(() => {});
 
       return NextResponse.json({
         jobId: job.id,
         status: "submitted",
         creditsCost: CREDIT_COST,
+        provider,
       });
     } catch (submitErr) {
       console.error("[Mimic] Submission error:", submitErr);

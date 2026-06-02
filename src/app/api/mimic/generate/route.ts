@@ -60,6 +60,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Reference video URL or upload is required" }, { status: 400 });
     }
 
+    // If user pasted a social media link but no direct video upload,
+    // check if the scraper service is configured
+    if (referenceUrl && !referenceVideoUrl) {
+      const scraperUrl = process.env.SCRAPER_SERVICE_URL;
+      if (!scraperUrl) {
+        return NextResponse.json(
+          { error: "Social media link import is temporarily unavailable. Please download the video and upload it directly instead." },
+          { status: 400 }
+        );
+      }
+    }
+
     const duration = Math.max(3, Math.min(30, durationSec));
     const ownerAccount = isOwnerClerkId(clerkId);
     const supabase = getDb();

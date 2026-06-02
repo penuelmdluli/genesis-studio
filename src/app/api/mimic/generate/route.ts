@@ -3,7 +3,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, isOwnerClerkId, refundCredits } from "@/lib/credits";
 import { submitKlingMotion } from "@/lib/providers/fal-kling-i2v";
-import { downloadAndPersist } from "@/lib/mbs/scraper";
+import { downloadVideoFromUrl } from "@/lib/video-downloader";
 import { getDb } from "@/lib/db-driver";
 import { checkRateLimit } from "@/lib/fraud";
 import { recordSpend } from "@/lib/spend-tracker";
@@ -60,13 +60,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Reference video URL or upload is required" }, { status: 400 });
     }
 
-    // If user pasted a social media link but no direct video upload,
-    // check if the scraper service is configured
+    // Social media link validation
     if (referenceUrl && !referenceVideoUrl) {
-      const scraperUrl = process.env.SCRAPER_SERVICE_URL;
-      if (!scraperUrl) {
+      // YouTube blocks direct downloads
+      if (referenceUrl.includes("youtube.com") || referenceUrl.includes("youtu.be")) {
         return NextResponse.json(
-          { error: "Social media link import is temporarily unavailable. Please download the video and upload it directly instead." },
+          { error: "YouTube videos can't be imported directly. Please download the video first and upload it." },
           { status: 400 }
         );
       }
@@ -120,12 +119,11 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // If user provided a social media URL, scrape it via Railway
+      // If user provided a social media URL, download it to R2
       let finalVideoUrl = referenceVideoUrl;
       if (referenceUrl && !referenceVideoUrl) {
-        const { r2Key } = await downloadAndPersist(referenceUrl);
-        const r2Pub = envString("R2_PUBLIC_URL") ?? "";
-        finalVideoUrl = `${r2Pub}/${r2Key}`;
+        const result = await downloadVideoFromUrl(referenceUrl, user.id, job.id);
+        finalVideoUrl = result.publicUrl;
 
         await supabase.from("mimic_jobs").update({
           reference_video_url: finalVideoUrl,

@@ -108,9 +108,13 @@ async function resolveVideoUrl(url: string): Promise<string | null> {
     return null; // YouTube blocks direct downloads
   }
 
-  // Facebook — needs Graph API, handled in mimic route
+  // Facebook — requires auth, try Graph API then fail with clear instructions
   if (url.includes("facebook.com")) {
-    return await resolveFacebook(url);
+    const fbUrl = await resolveFacebook(url);
+    if (fbUrl) return fbUrl;
+    throw new Error(
+      "Facebook requires login to access videos. Please open the reel in your browser, download it (click ⋯ → Save video), then upload the file here."
+    );
   }
 
   // Unknown URL — try following redirects to see if it ends at a video

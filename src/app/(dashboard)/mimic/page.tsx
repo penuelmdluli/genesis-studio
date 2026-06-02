@@ -310,12 +310,33 @@ export default function MimicStudioPage() {
           if (pollRef.current) clearInterval(pollRef.current);
           localStorage.removeItem(STORAGE_KEY);
 
+          // Refresh gallery so the video shows immediately
+          fetch("/api/videos").then(r => r.ok ? r.json() : null).then(d => {
+            if (d?.videos) {
+              const { setVideos } = useStore.getState();
+              setVideos(d.videos.map((v: Record<string, unknown>) => ({
+                id: v.id as string,
+                title: (v.title as string) || "",
+                url: (v.url as string) || "",
+                thumbnailUrl: (v.thumbnail_url as string) || "",
+                modelId: (v.model_id as string) || "",
+                prompt: (v.prompt as string) || "",
+                resolution: (v.resolution as string) || "",
+                duration: (v.duration as number) || 0,
+                fps: (v.fps as number) || 24,
+                aspectRatio: (v.aspect_ratio as string) || "landscape",
+                audioUrl: (v.audio_url as string) || undefined,
+                createdAt: (v.created_at as string) || "",
+              })));
+            }
+          }).catch(() => {});
+
           // In-app notification (bell icon)
           addNotification({
             type: "success",
             title: "Mimic video is ready!",
-            message: "Your character mimic video has finished rendering. View it now.",
-            link: "/mimic",
+            message: "Your character mimic video has finished rendering. View it in Gallery.",
+            link: "/gallery",
           });
 
           // Browser notification (background tab)

@@ -68,15 +68,8 @@ export async function listCreatorPosts(
 export async function downloadAndPersist(
   sourceUrl: string
 ): Promise<{ r2Key: string; durationSec: number }> {
-  if (sourceUrl.includes("facebook.com")) {
-    const accessToken = envString("FB_PAGE_TOKEN_mzansi_baby_stars") || envString("FB_PAGE_TOKEN_tech_news");
-    if (!accessToken) throw new Error("No FB page token for Facebook download");
-    const data = await scraperFetch("/download-facebook", {
-      url: sourceUrl,
-      accessToken,
-    });
-    return { r2Key: data.r2Key, durationSec: data.durationSec ?? 0 };
-  }
+  // Always use yt-dlp generic download — works for all platforms including Facebook
+  // The Facebook Graph API path is unreliable (needs specific page tokens)
   const data = await scraperFetch("/download", { url: sourceUrl });
   return { r2Key: data.r2Key, durationSec: data.durationSec ?? 0 };
 }

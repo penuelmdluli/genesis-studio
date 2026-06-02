@@ -26,7 +26,9 @@ export function formatFileSize(bytes: number): string {
 
 export function formatRelativeTime(date: string): string {
   const now = new Date();
-  const then = new Date(date);
+  // D1 timestamps may lack timezone suffix — ensure they're parsed as UTC
+  const normalized = date.includes("T") || date.includes("Z") || date.includes("+") ? date : date.replace(" ", "T") + "Z";
+  const then = new Date(normalized);
   const diffMs = now.getTime() - then.getTime();
   const diffSecs = Math.floor(diffMs / 1000);
   const diffMins = Math.floor(diffSecs / 60);

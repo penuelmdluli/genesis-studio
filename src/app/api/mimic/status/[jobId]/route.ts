@@ -145,6 +145,11 @@ export async function GET(
 
       recordSpend("fal-kling-i2v-mimic", result.costUsd).catch(() => {});
 
+      // Send email notification (fire-and-forget)
+      import("@/lib/email").then(({ sendVideoReadyEmail }) => {
+        sendVideoReadyEmail(user.email, user.name, job.id);
+      }).catch(() => {});
+
       // Auto-publish to Explore feed (fire-and-forget)
       if (r2PersistOk) {
         import("@/lib/auto-publish").then(({ autoPublishToExplore }) =>

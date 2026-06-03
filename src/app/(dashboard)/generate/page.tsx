@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
+import { TrendingBar } from "@/components/trending-bar";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
   { value: "t2v", label: "Text to Video", icon: Film, desc: "Generate from text prompt" },
@@ -419,6 +420,10 @@ export default function GeneratePage() {
           Create AI-generated {isReel ? "reels" : "videos"} from text, images, or other videos{isReel ? " — optimized for social media" : ""}.
         </p>
       </div>
+
+      <TrendingBar onSelectTrend={(trend) => {
+        setFormField("prompt", trend.prompt);
+      }} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Controls */}

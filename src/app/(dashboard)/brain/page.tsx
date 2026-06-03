@@ -51,6 +51,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { GenesisLoader, GenesisButtonLoader } from "@/components/ui/genesis-loader";
+import { TrendingBar } from "@/components/trending-bar";
 import { VideoStyle, AspectRatio, ScenePlan, SceneDefinition, TransitionType, ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 import { formatDuration } from "@/lib/utils";
@@ -465,6 +466,10 @@ export default function BrainStudioPage() {
         {/* ═══ STATE 1: INPUT ═══ */}
         {!isRestoring && !isLocked && brainState === "input" && (
           <div className="space-y-6">
+            <TrendingBar onSelectTrend={(trend) => {
+              setConcept(trend.prompt);
+            }} />
+
             <Card className="glass-strong">
               <CardContent className="p-6 space-y-6">
                 {/* Trending War Topics — Owner Only */}

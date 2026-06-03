@@ -12,6 +12,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { uploadFile } from "@/lib/upload-client";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { TrendingBar } from "@/components/trending-bar";
 import {
   Zap,
   Upload,
@@ -515,6 +516,10 @@ export default function MimicStudioPage() {
           ))}
         </div>
       </div>
+
+      <TrendingBar filter="dance" onSelectTrend={(trend) => {
+        if (trend.prompt) setPrompt(trend.prompt);
+      }} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Inputs */}

@@ -12,6 +12,7 @@ import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
 import { uploadFile } from "@/lib/upload-client";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { TrendingBar } from "@/components/trending-bar";
 import {
   Music2,
   Upload,
@@ -25,6 +26,7 @@ import {
   FileAudio,
   Smartphone,
   Monitor,
+  Wand2,
 } from "lucide-react";
 
 // ─── Data ────────────────────────────────────────────────────────────
@@ -42,13 +44,26 @@ const GENRES = [
   { id: "amapiano", name: "Amapiano", emoji: "🪩" },
 ];
 
+const BACKING_TRACKS = [
+  { id: "bt-amapiano", name: "Amapiano Groove", genre: "amapiano", bpm: 115, url: "/audio/amapiano-groove.mp3" },
+  { id: "bt-trap", name: "Trap Beat", genre: "hiphop", bpm: 140, url: "/audio/trap-beat.mp3" },
+  { id: "bt-rnb", name: "Smooth R&B", genre: "rnb", bpm: 90, url: "/audio/smooth-rnb.mp3" },
+  { id: "bt-pop", name: "Pop Energy", genre: "pop", bpm: 120, url: "/audio/pop-energy.mp3" },
+  { id: "bt-gospel", name: "Gospel Piano", genre: "gospel", bpm: 80, url: "/audio/gospel-piano.mp3" },
+  { id: "bt-drill", name: "UK Drill", genre: "hiphop", bpm: 142, url: "/audio/uk-drill.mp3" },
+  { id: "bt-afro", name: "Afrobeats Hit", genre: "afrobeats", bpm: 108, url: "/audio/afrobeats-hit.mp3" },
+  { id: "bt-acoustic", name: "Acoustic Ballad", genre: "acoustic", bpm: 75, url: "/audio/acoustic-ballad.mp3" },
+];
+
+const MOODS = ["hype", "emotional", "romantic", "dark", "motivational", "fun", "spiritual"] as const;
+
 const DURATIONS = [
   { value: 15, label: "15s" },
   { value: 30, label: "30s" },
   { value: 60, label: "60s" },
 ];
 
-type SongSource = "lyrics" | "upload";
+type SongSource = "lyrics" | "upload" | "ai-generate";
 type JobStatus = "idle" | "uploading" | "generating_song" | "creating_lipsync" | "finalizing" | "completed" | "failed";
 
 const PROGRESS_STEPS = [
@@ -86,7 +101,14 @@ export default function AiSingerPage() {
   const [genre, setGenre] = useState("pop");
   const [songFile, setSongFile] = useState<File | null>(null);
   const [songFileName, setSongFileName] = useState("");
+  const [songUrl, setSongUrl] = useState<string | null>(null);
+  const [selectedBackingTrack, setSelectedBackingTrack] = useState<string | null>(null);
   const songInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Generate
+  const [aiTheme, setAiTheme] = useState("");
+  const [aiMood, setAiMood] = useState<typeof MOODS[number] | "">("");
+  const [isGeneratingLyrics, setIsGeneratingLyrics] = useState(false);
 
   // Settings
   const [duration, setDuration] = useState(30);
@@ -105,7 +127,7 @@ export default function AiSingerPage() {
   const creditCost = 30 + duration;
   const hasEnoughCredits = user?.isOwner || credits >= creditCost;
   const hasFace = !!faceFile;
-  const hasSong = songSource === "lyrics" ? lyrics.trim().length > 20 : !!songFile;
+  const hasSong = songSource === "lyrics" || songSource === "ai-generate" ? lyrics.trim().length > 20 : !!(songFile || songUrl);
   const canGenerate = hasFace && hasSong && hasEnoughCredits && !isGenerating;
 
   // ─── Cleanup ──────────────────────────────────────────────────────
@@ -171,7 +193,53 @@ export default function AiSingerPage() {
   const removeSong = () => {
     setSongFile(null);
     setSongFileName("");
+    setSongUrl(null);
+    setSelectedBackingTrack(null);
     if (songInputRef.current) songInputRef.current.value = "";
+  };
+
+  // ─── AI Lyrics Generation ────────────────────────────────────────
+
+  const handleGenerateLyrics = async () => {
+    if (!aiTheme.trim() || isGeneratingLyrics) return;
+    setIsGeneratingLyrics(true);
+    try {
+      const res = await fetch("/api/ai-singer/generate-lyrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theme: aiTheme.trim(),
+          genre,
+          mood: aiMood || undefined,
+          duration,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || "Failed to generate lyrics", "error");
+        return;
+      }
+      if (data.lyrics) setLyrics(data.lyrics);
+      if (data.title) setSongTitle(data.title);
+      setSongSource("lyrics");
+      toast("Lyrics generated! Review and edit them below.", "success");
+    } catch {
+      toast("Network error generating lyrics", "error");
+    } finally {
+      setIsGeneratingLyrics(false);
+    }
+  };
+
+  // ─── Backing Track Selection ──────────────────────────────────────
+
+  const handleSelectBackingTrack = (track: typeof BACKING_TRACKS[number]) => {
+    setSongUrl(track.url);
+    setSelectedBackingTrack(track.id);
+    setSongFile(null);
+    setSongFileName(track.name);
+    setSongSource("upload");
+    setGenre(track.genre);
+    toast(`Selected: ${track.name}`, "info");
   };
 
   // ─── Polling ──────────────────────────────────────────────────────
@@ -229,10 +297,12 @@ export default function AiSingerPage() {
       toast("Uploading face image...", "info");
       const faceImageUrl = await uploadFile(faceFile!, "image");
 
-      let songUrl: string | undefined;
+      let resolvedSongUrl: string | undefined;
       if (songSource === "upload" && songFile) {
         toast("Uploading song...", "info");
-        songUrl = await uploadFile(songFile, "audio");
+        resolvedSongUrl = await uploadFile(songFile, "audio");
+      } else if (songSource === "upload" && songUrl) {
+        resolvedSongUrl = songUrl;
       }
 
       setJobStatus("generating_song");
@@ -242,9 +312,9 @@ export default function AiSingerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           faceImageUrl,
-          lyrics: songSource === "lyrics" ? lyrics.trim() : undefined,
+          lyrics: songSource === "lyrics" || songSource === "ai-generate" ? lyrics.trim() : undefined,
           genre,
-          songUrl,
+          songUrl: resolvedSongUrl,
           songTitle: songTitle.trim() || undefined,
           duration,
           aspectRatio,
@@ -312,6 +382,18 @@ export default function AiSingerPage() {
         </div>
       </div>
 
+      {/* Trending Bar */}
+      <TrendingBar
+        filter="music"
+        onSelectTrend={(trend) => {
+          if (trend.lyrics) {
+            setLyrics(trend.lyrics);
+            setSongSource("lyrics");
+          }
+          if (trend.title) setSongTitle(trend.title);
+        }}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ─── Left Panel: Inputs ────────────────────────────────────── */}
         <div className="lg:col-span-3 space-y-4">
@@ -368,6 +450,7 @@ export default function AiSingerPage() {
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
                   { key: "lyrics" as const, label: "Write Lyrics", icon: Mic2 },
+                  { key: "ai-generate" as const, label: "AI Write For Me", icon: Wand2 },
                   { key: "upload" as const, label: "Upload Song", icon: FileAudio },
                 ] as const).map((tab) => (
                   <button
@@ -425,10 +508,124 @@ export default function AiSingerPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Backing Tracks */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-2">Or pick a backing track:</label>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+                      {BACKING_TRACKS.map((track) => (
+                        <button
+                          key={track.id}
+                          onClick={() => handleSelectBackingTrack(track)}
+                          className={`flex-shrink-0 flex flex-col items-start gap-0.5 p-2.5 rounded-xl transition-all duration-200 min-w-[120px] ${
+                            selectedBackingTrack === track.id
+                              ? "bg-violet-500/15 border border-violet-500/40 ring-1 ring-violet-500/20"
+                              : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-violet-500/20"
+                          }`}
+                        >
+                          <span className={`text-[11px] font-semibold ${selectedBackingTrack === track.id ? "text-violet-300" : "text-zinc-300"}`}>
+                            {track.name}
+                          </span>
+                          <span className="text-[10px] text-zinc-500">{track.genre} &middot; {track.bpm} BPM</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : songSource === "ai-generate" ? (
+                <div className="space-y-3">
+                  {/* Theme Input */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Theme</label>
+                    <Input
+                      placeholder="e.g. breakup song about moving on, party anthem for summer"
+                      value={aiTheme}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiTheme(e.target.value)}
+                      className="bg-white/[0.05] border-white/[0.12] text-sm"
+                    />
+                  </div>
+
+                  {/* Mood Selector */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Mood</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {MOODS.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setAiMood(aiMood === m ? "" : m)}
+                          className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all duration-200 ${
+                            aiMood === m
+                              ? "bg-pink-500/20 text-pink-300 border border-pink-500/40"
+                              : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10] hover:border-pink-500/20"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Genre Selector */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-2">Genre</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {GENRES.map((g) => (
+                        <button
+                          key={g.id}
+                          onClick={() => setGenre(g.id)}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl text-left transition-all duration-200 ${
+                            genre === g.id
+                              ? "bg-pink-500/15 border border-pink-500/40 ring-1 ring-pink-500/20 shadow-lg shadow-pink-500/10"
+                              : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-pink-500/20"
+                          }`}
+                        >
+                          <span className="text-base">{g.emoji}</span>
+                          <span className={`text-[11px] font-semibold ${genre === g.id ? "text-pink-300" : "text-zinc-300"}`}>
+                            {g.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Generate Button */}
+                  <Button
+                    variant="primary"
+                    className="w-full"
+                    disabled={!aiTheme.trim() || isGeneratingLyrics}
+                    loading={isGeneratingLyrics}
+                    onClick={handleGenerateLyrics}
+                  >
+                    <Wand2 className="w-4 h-4 mr-1.5" />
+                    Generate Lyrics (5 credits)
+                  </Button>
+
+                  {/* Backing Tracks */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-2">Or pick a backing track:</label>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+                      {BACKING_TRACKS.map((track) => (
+                        <button
+                          key={track.id}
+                          onClick={() => handleSelectBackingTrack(track)}
+                          className={`flex-shrink-0 flex flex-col items-start gap-0.5 p-2.5 rounded-xl transition-all duration-200 min-w-[120px] ${
+                            selectedBackingTrack === track.id
+                              ? "bg-violet-500/15 border border-violet-500/40 ring-1 ring-violet-500/20"
+                              : "bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-violet-500/20"
+                          }`}
+                        >
+                          <span className={`text-[11px] font-semibold ${selectedBackingTrack === track.id ? "text-violet-300" : "text-zinc-300"}`}>
+                            {track.name}
+                          </span>
+                          <span className="text-[10px] text-zinc-500">{track.genre} &middot; {track.bpm} BPM</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div>
-                  {songFile ? (
+                  {songFile || songUrl ? (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
@@ -617,9 +814,9 @@ export default function AiSingerPage() {
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Song</span>
                     <span className={hasSong ? "text-violet-300" : "text-zinc-500"}>
-                      {songSource === "lyrics"
+                      {songSource === "lyrics" || songSource === "ai-generate"
                         ? lyrics.length > 20 ? "Lyrics provided" : "Not written"
-                        : songFile ? songFileName.slice(0, 20) : "Not uploaded"}
+                        : songFile || songUrl ? songFileName.slice(0, 20) || "Backing track" : "Not uploaded"}
                     </span>
                   </div>
                   <div className="flex justify-between">

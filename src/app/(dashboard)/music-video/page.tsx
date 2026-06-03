@@ -11,6 +11,7 @@ import {
   GenerationProgress,
   useGenerationProgress,
 } from "@/components/ui/generation-progress";
+import { TrendingBar } from "@/components/trending-bar";
 import {
   Music2,
   Upload,
@@ -672,6 +673,10 @@ export default function MusicVideoPage() {
           </div>
         </div>
       </div>
+
+      <TrendingBar filter="music" onSelectTrend={() => {
+        // Music video page uses multi-step wizard — trend shown for inspiration only
+      }} />
 
       {/* Plan Gate */}
       {!isPlanAllowed && !isLoading && (

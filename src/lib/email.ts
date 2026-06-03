@@ -4,9 +4,13 @@
  * Install: npm install resend
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+function getEmailConfig() {
+  return {
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>",
+    APP_URL: process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai",
+  };
+}
 
 interface SendEmailParams {
   to: string;
@@ -15,6 +19,7 @@ interface SendEmailParams {
 }
 
 async function sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
+  const { RESEND_API_KEY, FROM_EMAIL } = getEmailConfig();
   if (!RESEND_API_KEY) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email");
     return false;
@@ -66,6 +71,7 @@ const buttonStyle = `
 `;
 
 function wrap(content: string): string {
+  const { APP_URL } = getEmailConfig();
   return `
     <div style="${baseStyle}">
       <div style="max-width: 560px; margin: 0 auto;">
@@ -83,6 +89,7 @@ function wrap(content: string): string {
 }
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
     subject: "Welcome to Genesis Studio! Your 100 free credits are ready",
@@ -104,6 +111,7 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
 }
 
 export async function sendVideoReadyEmail(email: string, name: string, videoId: string): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
     subject: "Your video is ready!",
@@ -118,6 +126,7 @@ export async function sendVideoReadyEmail(email: string, name: string, videoId: 
 }
 
 export async function sendLowCreditsEmail(email: string, name: string, balance: number): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
     subject: "Low credits — top up to keep creating",
@@ -133,6 +142,7 @@ export async function sendLowCreditsEmail(email: string, name: string, balance: 
 }
 
 export async function sendPlanUpgradeEmail(email: string, name: string, plan: string): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
     subject: `You're now on the ${plan} plan!`,
@@ -148,6 +158,7 @@ export async function sendPlanUpgradeEmail(email: string, name: string, plan: st
 }
 
 export async function sendSupportReply(email: string, name: string, reply: string, originalMessage: string): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
     subject: "Re: Your Genesis Studio support request",

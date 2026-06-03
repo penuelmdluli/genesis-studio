@@ -6,14 +6,17 @@
 
 import { getR2 } from "@/lib/cf-env";
 
-const PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
+function getPublicUrl(): string {
+  return process.env.R2_PUBLIC_URL || "";
+}
 
 /**
  * Build a public URL for an R2 object.
  */
 export function r2PublicUrl(key: string): string {
-  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
-    return `${PUBLIC_URL.replace(/\/$/, "")}/${encodeURI(key)}`;
+  const publicUrl = getPublicUrl();
+  if (publicUrl && !publicUrl.includes("r2.cloudflarestorage.com")) {
+    return `${publicUrl.replace(/\/$/, "")}/${encodeURI(key)}`;
   }
   return `/api/r2-proxy/${encodeURI(key)}`;
 }
@@ -72,7 +75,9 @@ async function getS3Client() {
   });
 }
 
-const BUCKET = process.env.R2_BUCKET_NAME || "genesis-videos";
+function getBucket(): string {
+  return process.env.R2_BUCKET_NAME || "genesis-videos";
+}
 
 async function putObjectS3(
   key: string,
@@ -84,7 +89,7 @@ async function putObjectS3(
   const buf = body instanceof ArrayBuffer ? Buffer.from(body) : body;
   await client.send(
     new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: getBucket(),
       Key: key,
       Body: buf as Buffer,
       ContentType: contentType,
@@ -96,7 +101,7 @@ async function headObjectS3(key: string): Promise<{ size: number; contentType: s
   const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
   const client = await getS3Client();
   try {
-    const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    const head = await client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key }));
     return {
       size: head.ContentLength ?? 0,
       contentType: head.ContentType ?? "",
@@ -109,7 +114,7 @@ async function headObjectS3(key: string): Promise<{ size: number; contentType: s
 async function deleteObjectS3(key: string): Promise<void> {
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
   const client = await getS3Client();
-  await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  await client.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
 }
 
 // --- Public API ---
@@ -122,8 +127,9 @@ export async function uploadVideo(
   const buf = body instanceof Buffer ? body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) : body;
   await putObject(key, buf as ArrayBuffer, contentType);
 
-  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
-    return `${PUBLIC_URL}/${key}`;
+  const publicUrl = getPublicUrl();
+  if (publicUrl && !publicUrl.includes("r2.cloudflarestorage.com")) {
+    return `${publicUrl}/${key}`;
   }
   return key;
 }
@@ -134,8 +140,9 @@ export async function uploadThumbnail(
   contentType = "image/jpeg"
 ): Promise<string> {
   await putObject(key, body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as any, contentType);
-  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
-    return `${PUBLIC_URL}/${key}`;
+  const publicUrl = getPublicUrl();
+  if (publicUrl && !publicUrl.includes("r2.cloudflarestorage.com")) {
+    return `${publicUrl}/${key}`;
   }
   return key;
 }
@@ -146,8 +153,9 @@ export async function uploadAudio(
   contentType = "audio/mpeg"
 ): Promise<string> {
   await putObject(key, body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as any, contentType);
-  if (PUBLIC_URL && !PUBLIC_URL.includes("r2.cloudflarestorage.com")) {
-    return `${PUBLIC_URL}/${key}`;
+  const publicUrl = getPublicUrl();
+  if (publicUrl && !publicUrl.includes("r2.cloudflarestorage.com")) {
+    return `${publicUrl}/${key}`;
   }
   return key;
 }
@@ -171,7 +179,7 @@ export async function getSignedUploadUrl(
   const client = await getS3Client();
   return getSignedUrl(
     client,
-    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    new PutObjectCommand({ Bucket: getBucket(), Key: key, ContentType: contentType }),
     { expiresIn }
   );
 }
@@ -185,7 +193,7 @@ export async function getSignedDownloadUrl(
   const client = await getS3Client();
   return getSignedUrl(
     client,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    new GetObjectCommand({ Bucket: getBucket(), Key: key }),
     { expiresIn }
   );
 }

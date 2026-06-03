@@ -3,12 +3,14 @@
  * Win-back campaigns, credit expiry warnings, weekly digests, dunning.
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+// Env reads deferred to function scope — module-level reads break Cloudflare Workers
+function getResendApiKey() { return process.env.RESEND_API_KEY; }
+function getFromEmail() { return process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>"; }
+function getAppUrl() { return process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"; }
 
 async function sendEmail(to: string, subject: string, html: string) {
-  if (!RESEND_API_KEY) {
+  const apiKey = getResendApiKey();
+  if (!apiKey) {
     console.debug("[EMAIL-RETENTION] No RESEND_API_KEY, skipping");
     return;
   }
@@ -16,10 +18,10 @@ async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+    body: JSON.stringify({ from: getFromEmail(), to, subject, html }),
   });
 
   if (!res.ok) {
@@ -53,7 +55,7 @@ export async function sendDunningEmail(to: string, name: string) {
         Please update your payment method to keep your plan active and avoid losing access to premium features.
       </p>
       <p style="margin:24px 0;">
-        <a href="${APP_URL}/settings" style="${btn}">Update Payment Method</a>
+        <a href="${getAppUrl()}/settings" style="${btn}">Update Payment Method</a>
       </p>
       <p style="color:#71717a;font-size:13px;">
         If you've already updated your payment, please disregard this email. Your plan will be downgraded in 4 days if not resolved.
@@ -73,7 +75,7 @@ export async function sendDowngradeEmail(to: string, name: string) {
         Your videos and data are safe — you can resubscribe anytime to get your credits and features back.
       </p>
       <p style="margin:24px 0;">
-        <a href="${APP_URL}/pricing" style="${btn}">Resubscribe Now</a>
+        <a href="${getAppUrl()}/pricing" style="${btn}">Resubscribe Now</a>
       </p>
     </div></div>`
   );
@@ -92,7 +94,7 @@ export async function sendCreditsExpiryEmail(to: string, name: string, credits: 
         Don't let them go to waste — create something amazing!
       </p>
       <p style="margin:24px 0;">
-        <a href="${APP_URL}/generate" style="${btn}">Generate a Video</a>
+        <a href="${getAppUrl()}/generate" style="${btn}">Generate a Video</a>
       </p>
     </div></div>`
   );
@@ -124,7 +126,7 @@ export async function sendWeeklyDigestEmail(to: string, name: string, stats: {
         You have ${stats.creditsRemaining} credits remaining. Your most-used model: ${stats.topModel}.
       </p>
       <p style="margin:24px 0;">
-        <a href="${APP_URL}/generate" style="${btn}">Keep Creating</a>
+        <a href="${getAppUrl()}/generate" style="${btn}">Keep Creating</a>
       </p>
     </div></div>`
   );
@@ -142,7 +144,7 @@ export async function sendWinBackEmail(to: string, name: string, bonusCredits: n
         Come back and see what's new — we've added new models and features!
       </p>
       <p style="margin:24px 0;">
-        <a href="${APP_URL}/dashboard" style="${btn}">Claim Your Credits</a>
+        <a href="${getAppUrl()}/dashboard" style="${btn}">Claim Your Credits</a>
       </p>
       <p style="color:#71717a;font-size:13px;">
         Credits expire in 14 days. One-time offer.

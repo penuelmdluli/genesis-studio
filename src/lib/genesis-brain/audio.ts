@@ -12,8 +12,14 @@ import { getAfricanVoiceConfig, isAfricanLanguage } from "@/lib/africa/voice-con
 import { formatScriptForTTS } from "@/lib/africa/script-formatter";
 import { applyPronunciationCorrections } from "@/lib/africa/pronunciation-guide";
 
-// Configure FAL client (may already be configured elsewhere, but safe to call again)
-fal.config({ credentials: process.env.FAL_KEY || "" });
+// Configure FAL client lazily — must not read process.env at module level (breaks Cloudflare Workers)
+let _falConfigured = false;
+function ensureFalConfigured() {
+  if (!_falConfigured) {
+    fal.config({ credentials: process.env.FAL_KEY || "" });
+    _falConfigured = true;
+  }
+}
 
 const KOKORO_ENDPOINTS: Record<string, string> = {
   "en-US": "fal-ai/kokoro/american-english",
@@ -87,6 +93,7 @@ export async function generateVoiceover(
     console.warn("[BRAIN AUDIO] FAL_KEY not set — skipping voiceover");
     return { type: "voiceover", url: "", duration: estimateVoiceoverDuration(script), metadata: { skipped: true } };
   }
+  ensureFalConfigured();
 
   // Format script for African TTS: pronunciation corrections, pauses, emphasis
   const africanConfig = getAfricanVoiceConfig(language);
@@ -221,6 +228,7 @@ export async function generatePerSceneVoiceover(
   if (!falKey) {
     return { clips: [], fullUrl: "", fullDuration: 0, sceneAudioDurations: {} };
   }
+  ensureFalConfigured();
 
   // African languages get optimized voice params
   const africanConfig = getAfricanVoiceConfig(language);
@@ -419,6 +427,7 @@ export async function selectMusic(
   // --- Primary: AI-generated music via FAL stable-audio ---
   const falKey = process.env.FAL_KEY;
   if (falKey) {
+    ensureFalConfigured();
     try {
       const prompt = buildMusicPrompt(mood, tempo, genre);
       console.log(`[BRAIN AUDIO] Generating AI music: "${prompt}" (${duration}s)`);
@@ -631,6 +640,7 @@ export async function generateVideoAudio(
       metadata: { skipped: true, reason: "FAL_KEY not configured" },
     };
   }
+  ensureFalConfigured();
 
   try {
     console.log(`[BRAIN AUDIO] MMAudio V2: generating audio for ${duration}s video`);
@@ -711,6 +721,7 @@ export async function submitMMAudioJob(
   duration: number,
   negativePrompt?: string
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/mmaudio-v2", {
     input: {
       video_url: videoUrl,
@@ -731,6 +742,7 @@ export async function submitMergeAudioVideoJob(
   videoUrl: string,
   audioUrl: string
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/merge-audio-video", {
     input: { video_url: videoUrl, audio_url: audioUrl },
   });
@@ -743,6 +755,7 @@ export async function submitMergeAudioVideoJob(
 export async function submitMergeVideosJob(
   videoUrls: string[]
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/merge-videos", {
     input: { video_urls: videoUrls },
   });
@@ -756,6 +769,7 @@ export async function checkFalQueueStatus(
   falModelId: string,
   requestId: string
 ): Promise<{ status: string; error?: string }> {
+  ensureFalConfigured();
   try {
     const status = await fal.queue.status(falModelId, { requestId, logs: false });
     return { status: status.status };
@@ -771,6 +785,7 @@ export async function getFalQueueResult(
   falModelId: string,
   requestId: string
 ): Promise<Record<string, unknown>> {
+  ensureFalConfigured();
   const result = await fal.queue.result(falModelId, { requestId });
   return result.data as Record<string, unknown>;
 }
@@ -789,6 +804,7 @@ export async function trimMediaToDuration(
   durationMs: number
 ): Promise<string> {
   if (!mediaUrl || !durationMs || durationMs <= 0) return mediaUrl;
+  ensureFalConfigured();
   try {
     // Use compose with a single video-type track — FAL treats audio files as
     // media and produces an output of exactly the keyframe duration.
@@ -853,6 +869,7 @@ export async function submitComposeVideoJob(
   },
   soundBedUrl?: string // Pre-mixed + loudnormed sound design audio (already at -35 LUFS)
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   // ── MASTER CLOCK ENFORCEMENT ──
   // Music must be pre-trimmed to EXACT durationMs. FAL compose extends output
   // to the longest track, so even a 1-second overrun would leave music playing
@@ -1006,6 +1023,7 @@ export async function submitTrimVideoJob(
   videoUrl: string,
   endTimeSec: number
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/workflow-utilities/trim-video", {
     input: {
       video_url: videoUrl,
@@ -1021,6 +1039,7 @@ export async function submitSpeedAdjustJob(
   videoUrl: string,
   targetDurationMs: number
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/compose", {
     input: {
       tracks: [{
@@ -1043,6 +1062,7 @@ export async function submitSpeedAdjustJob(
  * Returns 0 if metadata cannot be retrieved.
  */
 export async function getMediaDuration(mediaUrl: string): Promise<number> {
+  ensureFalConfigured();
   try {
     const result = await fal.subscribe("fal-ai/ffmpeg-api/metadata", {
       input: { media_url: mediaUrl },
@@ -1068,6 +1088,7 @@ export async function submitLoudnormJob(
   audioUrl: string,
   targetLufs: number = -24
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/loudnorm", {
     input: {
       audio_url: audioUrl,
@@ -1109,6 +1130,7 @@ export async function assembleScenes(
     console.warn("[BRAIN ASSEMBLY] FAL_KEY not set — returning first scene");
     return { videoUrl: sceneVideoUrls[0], duration: 0 };
   }
+  ensureFalConfigured();
 
   try {
     console.log(`[BRAIN ASSEMBLY] Merging ${sceneVideoUrls.length} scenes via FAL merge-videos`);
@@ -1177,6 +1199,7 @@ export async function mergeAudioOntoVideo(
 
   const falKey = process.env.FAL_KEY;
   if (!falKey) return videoUrl;
+  ensureFalConfigured();
 
   try {
     console.log("[BRAIN AUDIO] Merging MMAudio onto silent video");
@@ -1260,6 +1283,7 @@ export const SUPPORTED_LANGUAGES = [
 export async function submitWhisperJob(
   audioUrl: string
 ): Promise<{ requestId: string }> {
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/whisper", {
     input: {
       audio_url: audioUrl,
@@ -1277,6 +1301,7 @@ export async function submitWhisperJob(
 export async function transcribeForSubtitles(
   audioUrl: string
 ): Promise<Array<{ start: number; end: number; text: string }>> {
+  ensureFalConfigured();
   try {
     const result = await fal.subscribe("fal-ai/whisper", {
       input: {
@@ -1369,6 +1394,7 @@ export async function submitFinalNormJob(
 ): Promise<{ requestId: string }> {
   // Use loudnorm on the video's audio track
   // The loudnorm endpoint accepts audio_url — for videos, it extracts the audio track
+  ensureFalConfigured();
   const result = await fal.queue.submit("fal-ai/ffmpeg-api/loudnorm", {
     input: {
       audio_url: videoUrl,

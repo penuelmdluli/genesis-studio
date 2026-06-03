@@ -52,12 +52,12 @@ export async function autoPublishToExplore(
   }
 
   try {
-    // Brand the video with watermark + prompt overlay + outro
+    // Brand the video with watermark + outro via Render scraper
+    const exploreIdForBranding = randomUUID();
     const brandedUrl = await brandVideo({
       videoUrl: params.videoUrl,
-      prompt: params.prompt,
+      outputR2Key: `explore-branded/${exploreIdForBranding}.mp4`,
       plan: "free",
-      creatorName: params.creatorName,
     });
 
     // Persist branded video to R2 permanent storage

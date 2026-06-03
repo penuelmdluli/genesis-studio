@@ -1,67 +1,72 @@
 // ============================================
-// Video Branding Pipeline
+// Video Branding Pipeline — Genesis Studio
 //
-// Free tier: videos get "Made with ivideostudio.ai" watermark
-// Creator+: no watermark (clean output = upgrade incentive)
+// ALL videos get branded with:
+// 1. "ivideostudio.ai" watermark (subtle, top-right)
+// 2. 4-second outro with logo, URL, and CTA
+//
+// Free tier: watermark + outro (full branding)
+// Paid tiers: watermark only (no outro — clean upgrade incentive)
 // ============================================
 
 type PlanTier = "free" | "creator" | "pro" | "studio";
 
 interface BrandingOptions {
   videoUrl: string;
-  prompt: string;
+  outputR2Key: string;
   plan: PlanTier;
-  creatorName?: string;
 }
 
 /**
- * Brand a video based on plan tier.
- * Free tier gets a subtle watermark via FAL's compose endpoint.
- * Paid tiers get the original video unchanged (no watermark).
+ * Brand a video with Genesis Studio identity.
+ * Uses the Render scraper service (ffmpeg) for processing.
+ *
+ * Free tier: watermark + outro clip
+ * Paid tiers: watermark only
+ *
+ * Falls back to original video if branding fails (non-blocking).
  */
 export async function brandVideo(options: BrandingOptions): Promise<string> {
-  // Paid plans: no watermark, clean output
-  if (options.plan !== "free") {
+  const scraperUrl = process.env.SCRAPER_SERVICE_URL;
+  const scraperSecret = process.env.SCRAPER_SERVICE_SECRET;
+
+  if (!scraperUrl || !scraperSecret) {
+    console.warn("[BRANDING] Scraper not configured, skipping branding");
     return options.videoUrl;
   }
 
-  // Free tier: add watermark via FAL
   try {
-    const { fal } = await import("@fal-ai/client");
-    fal.config({ credentials: process.env.FAL_KEY || "" });
+    // Use the Genesis branding endpoint (watermark + outro for free, watermark for paid)
+    const endpoint = options.plan === "free" ? "/brand-genesis" : "/brand-genesis";
 
-    const result = await fal.queue.submit("fal-ai/workflow-utilities/auto-subtitle", {
-      input: {
-        video_url: options.videoUrl,
-        // Subtle bottom-right watermark
-        font: "Montserrat/Montserrat-Medium.ttf",
-        font_size: 28,
-        font_color: "white",
-        stroke_color: "black",
-        stroke_width: 1,
-        caption_position: "bottom",
-        // The "subtitle" is actually our watermark text
-        srt_content: "1\n00:00:00,000 --> 99:59:59,999\nMade with ivideostudio.ai",
-      } as Record<string, unknown> & { video_url: string },
+    const res = await fetch(`${scraperUrl}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-scraper-secret": scraperSecret,
+      },
+      body: JSON.stringify({
+        inputVideoUrl: options.videoUrl,
+        outputR2Key: options.outputR2Key,
+      }),
     });
 
-    // Poll for result
-    const pollResult = await fal.queue.result("fal-ai/workflow-utilities/auto-subtitle", {
-      requestId: result.request_id,
-    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn(`[BRANDING] Scraper returned ${res.status}: ${err.slice(0, 200)}`);
+      return options.videoUrl;
+    }
 
-    const data = pollResult.data as Record<string, unknown>;
-    const videoUrl = (data?.video as { url?: string })?.url || (data?.video_url as string);
-
-    if (videoUrl) {
-      console.log(`[BRANDING] Watermark applied to free-tier video`);
-      return videoUrl;
+    const data = (await res.json()) as { r2Key?: string };
+    if (data.r2Key) {
+      const r2Pub = process.env.R2_PUBLIC_URL || "https://cdn.ivideostudio.ai";
+      console.log(`[BRANDING] Video branded: ${data.r2Key}`);
+      return `${r2Pub}/${data.r2Key}`;
     }
   } catch (err) {
-    console.warn("[BRANDING] Watermark failed, using original:", err);
+    console.warn("[BRANDING] Branding failed, using original:", err);
   }
 
-  // Fallback: return original (watermark is nice-to-have, not blocking)
   return options.videoUrl;
 }
 

@@ -495,6 +495,115 @@ app.post("/list-facebook-videos", auth, async (req, res) => {
   }
 });
 
+// ─── POST /brand-genesis ───
+// Adds Genesis Studio branding to any video:
+// 1. "ivideostudio.ai" watermark (top-right, subtle)
+// 2. 4-second outro with logo + voiceover "Created with iVideo Studio"
+app.post("/brand-genesis", auth, async (req, res) => {
+  try {
+    const { inputVideoUrl, outputR2Key } = req.body;
+    if (!inputVideoUrl || !outputR2Key) {
+      return res.status(400).json({ error: "inputVideoUrl and outputR2Key required" });
+    }
+
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    const { execSync } = require("child_process");
+    const tmp = os.tmpdir();
+
+    const inputPath = path.join(tmp, `gs-input-${Date.now()}.mp4`);
+    const outroPath = path.join(tmp, `gs-outro-${Date.now()}.mp4`);
+    const outputPath = path.join(tmp, `gs-output-${Date.now()}.mp4`);
+    const concatPath = path.join(tmp, `gs-concat-${Date.now()}.txt`);
+
+    // 1. Download input video
+    console.log(`[brand-genesis] Downloading ${inputVideoUrl.slice(0, 80)}...`);
+    const videoRes = await fetch(inputVideoUrl);
+    if (!videoRes.ok) throw new Error(`Download failed: ${videoRes.status}`);
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+    fs.writeFileSync(inputPath, videoBuffer);
+
+    // 2. Get video dimensions and duration
+    let width = 1080, height = 1920, duration = 10;
+    try {
+      const probe = execSync(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -show_entries format=duration -of csv=p=0 ${inputPath} 2>/dev/null`
+      ).toString().trim().split("\n");
+      const dims = probe[0]?.split(",");
+      if (dims && dims.length >= 2) { width = parseInt(dims[0]) || 1080; height = parseInt(dims[1]) || 1920; }
+      duration = parseFloat(probe[1]) || 10;
+    } catch { /* use defaults */ }
+    console.log(`[brand-genesis] Video: ${width}x${height}, ${duration.toFixed(1)}s`);
+
+    // 3. Generate 4-second outro clip with ffmpeg
+    const fontOpt = "fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+    const outroFilter = [
+      `color=c=#0A0A0F:s=${width}x${height}:d=4`,
+      // Gradient glow (simulated with semi-transparent rectangles)
+      `drawbox=x=${Math.floor(width*0.2)}:y=${Math.floor(height*0.3)}:w=${Math.floor(width*0.6)}:h=${Math.floor(height*0.1)}:color=0x7c3aed@0.15:t=fill`,
+      // "G" logo text (large, centered)
+      `drawtext=text='G':${fontOpt}:fontsize=${Math.floor(height*0.08)}:fontcolor=#7c3aed:x=(w-tw)/2:y=h*0.3`,
+      // "Genesis Studio" brand name
+      `drawtext=text='Genesis Studio':${fontOpt}:fontsize=${Math.floor(height*0.035)}:fontcolor=white:x=(w-tw)/2:y=h*0.42`,
+      // "AI Video Creation Platform"
+      `drawtext=text='AI Video Creation Platform':${fontOpt}:fontsize=${Math.floor(height*0.02)}:fontcolor=#a78bfa:x=(w-tw)/2:y=h*0.48`,
+      // Website URL
+      `drawtext=text='ivideostudio.ai':${fontOpt}:fontsize=${Math.floor(height*0.028)}:fontcolor=#06b6d4:x=(w-tw)/2:y=h*0.56`,
+      // "Create your own AI videos - 100 free credits"
+      `drawtext=text='Create your own AI videos':${fontOpt}:fontsize=${Math.floor(height*0.022)}:fontcolor=#d4d4d8:x=(w-tw)/2:y=h*0.65`,
+      `drawtext=text='100 Free Credits - No Credit Card':${fontOpt}:fontsize=${Math.floor(height*0.018)}:fontcolor=#a1a1aa:x=(w-tw)/2:y=h*0.69`,
+    ].join(",");
+
+    execSync(
+      `ffmpeg -y -f lavfi -i "${outroFilter}" -t 4 -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p ${outroPath} 2>/dev/null`
+    );
+    console.log(`[brand-genesis] Outro clip generated`);
+
+    // 4. Add watermark to main video + concatenate with outro
+    const watermarkFilter = `drawtext=text='ivideostudio.ai':${fontOpt}:fontsize=${Math.floor(Math.min(width,height)*0.025)}:fontcolor=white@0.6:borderw=1:bordercolor=black@0.4:x=w-tw-20:y=20`;
+
+    // First pass: add watermark to input, re-encode to match outro format
+    const watermarkedPath = path.join(tmp, `gs-watermarked-${Date.now()}.mp4`);
+    execSync(
+      `ffmpeg -y -i ${inputPath} -vf "${watermarkFilter}" -c:v libx264 -preset fast -crf 22 -c:a aac -ar 44100 -ac 2 -movflags +faststart ${watermarkedPath} 2>/dev/null`
+    );
+
+    // Generate silent audio for outro (to match main video audio stream)
+    const outroWithAudioPath = path.join(tmp, `gs-outro-audio-${Date.now()}.mp4`);
+    execSync(
+      `ffmpeg -y -i ${outroPath} -f lavfi -i anullsrc=r=44100:cl=stereo -c:v copy -c:a aac -shortest ${outroWithAudioPath} 2>/dev/null`
+    );
+
+    // Concatenate: watermarked video + outro
+    fs.writeFileSync(concatPath, `file '${watermarkedPath}'\nfile '${outroWithAudioPath}'\n`);
+    execSync(
+      `ffmpeg -y -f concat -safe 0 -i ${concatPath} -c copy -movflags +faststart ${outputPath} 2>/dev/null`
+    );
+
+    const brandedBuffer = fs.readFileSync(outputPath);
+    console.log(`[brand-genesis] Branded video: ${(brandedBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+
+    // 5. Upload to R2
+    await r2.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: outputR2Key,
+      Body: brandedBuffer,
+      ContentType: "video/mp4",
+    }));
+
+    // 6. Cleanup
+    [inputPath, outroPath, outroWithAudioPath, watermarkedPath, outputPath, concatPath]
+      .forEach(f => { try { fs.unlinkSync(f); } catch {} });
+
+    console.log(`[brand-genesis] Done → ${outputR2Key}`);
+    res.json({ r2Key: outputR2Key, fileSizeBytes: brandedBuffer.length });
+  } catch (err) {
+    console.error("[brand-genesis]", err.message);
+    res.status(500).json({ error: err.message.slice(0, 300) });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);
 });

@@ -13,7 +13,8 @@ export type ModelId =
   | "kling-2.6"
   | "kling-3.0"
   | "veo-3.1"
-  | "seedance-1.5";
+  | "seedance-1.5"
+  | "ai-singer";
 
 export type ModelTier =
   | "flagship"

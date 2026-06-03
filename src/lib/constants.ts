@@ -163,6 +163,22 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     falModelIdI2V: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
     maxDuration: 10,
   },
+  "ai-singer": {
+    id: "ai-singer",
+    name: "AI Singer",
+    provider: "fal",
+    tier: "flagship",
+    types: ["i2v"],
+    maxDuration: 60,
+    maxResolution: "1080p",
+    avgGenerationTime: 180,
+    creditCost: { "720p": 1.5, "1080p": 2.5 },
+    hasAudio: true,
+    description: "Generate music from lyrics + lip-synced video. ACE-Step + Kling LipSync.",
+    falModelId: "fal-ai/ace-step",
+    gpuRequirement: "N/A (cloud API)",
+    license: "Commercial",
+  },
 };
 
 // --- Pricing Plans ---

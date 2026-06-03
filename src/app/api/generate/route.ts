@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     // Route to the correct provider (FAL.AI or RunPod)
     // FAL auto-fallback: if FAL fails (balance exhausted, forbidden), retry on RunPod Wan 2.2
     let usedFallback = false;
-    let actualModelId = body.modelId;
+    let actualModelId: string = body.modelId;
     try {
       if (model.provider === "fal") {
         // FAL.AI — premium models with native audio
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
       if (model.provider !== "fal" || usedFallback) {
         // RunPod — open-source models (or FAL fallback)
         const runpodInput = buildRunPodInput({
-          modelId: actualModelId,
+          modelId: actualModelId as ModelId,
           type: effectiveType,
           prompt: body.prompt,
           negativePrompt: body.negativePrompt,
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         const webhookUrl = `${appUrl}/api/webhooks/runpod`;
 
         const runpodJob = await submitRunPodJob(
-          actualModelId,
+          actualModelId as ModelId,
           runpodInput,
           webhookUrl,
           effectiveType
@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
         message: `User: ${user.name} (${user.email})\nModel: ${model.name} | ${body.duration}s | ${creditCost} credits`,
       }).catch(() => {});
 
-      const fallbackModel = usedFallback ? AI_MODELS[actualModelId] : null;
+      const fallbackModel = usedFallback ? AI_MODELS[actualModelId as ModelId] : null;
       return NextResponse.json({
         jobId: job.id,
         status: "queued",

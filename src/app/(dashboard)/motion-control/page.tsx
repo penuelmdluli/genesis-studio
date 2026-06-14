@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import {
   VolumeX,
   Link as LinkIcon,
   Clock,
+  Download,
 } from "lucide-react";
 import {
   FUN_EFFECTS,
@@ -90,6 +91,76 @@ export default function MotionControlPage() {
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   const progress = useGenerationProgress();
+
+  // Download image with branding overlay (canvas-based, instant, no server needed)
+  const downloadBrandedImage = useCallback(async (imageSrc: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = imageSrc;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Draw original image
+      ctx.drawImage(img, 0, 0);
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const barH = Math.round(h * 0.14);
+
+      // Semi-transparent dark gradient bar at bottom
+      const gradient = ctx.createLinearGradient(0, h - barH * 1.5, 0, h);
+      gradient.addColorStop(0, "rgba(0,0,0,0)");
+      gradient.addColorStop(0.4, "rgba(0,0,0,0.6)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.85)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, h - barH * 1.5, w, barH * 1.5);
+
+      // Logo text — top left
+      ctx.font = `bold ${Math.round(w * 0.035)}px 'Arial Black', Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillText("GENESIS STUDIO", 20, Math.round(w * 0.05));
+
+      // Website URL — bottom right, big and cyan
+      const urlSize = Math.round(w * 0.055);
+      ctx.font = `bold ${urlSize}px 'Arial Black', Arial, sans-serif`;
+      ctx.fillStyle = "#00BFFF";
+      const urlText = "ivideostudio.ai";
+      const urlWidth = ctx.measureText(urlText).width;
+      ctx.fillText(urlText, w - urlWidth - 25, h - Math.round(barH * 0.25));
+
+      // Tagline — bottom center
+      const tagSize = Math.round(w * 0.038);
+      ctx.font = `${tagSize}px Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      const tagText = "Create AI Videos FREE";
+      const tagWidth = ctx.measureText(tagText).width;
+      ctx.fillText(tagText, (w - tagWidth) / 2, h - Math.round(barH * 0.65));
+
+      // "Made with AI" small text
+      ctx.font = `${Math.round(w * 0.025)}px Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillText("Made with AI", 20, h - Math.round(barH * 0.25));
+
+      // Download
+      const link = document.createElement("a");
+      link.download = `genesis-studio-${Date.now()}.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.95);
+      link.click();
+
+      toast("Branded image downloaded!", "success");
+    } catch {
+      toast("Failed to download image", "error");
+    }
+  }, [toast]);
 
   // isLoading already defined from isInitialized above
 
@@ -580,18 +651,30 @@ export default function MotionControlPage() {
             </CardHeader>
             <CardContent>
               {characterImagePreview ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
-                  <img
-                    src={characterImagePreview}
-                    alt="Character"
-                    className="w-full h-48 object-contain"
-                  />
-                  <button
-                    onClick={clearCharacterImage}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="relative rounded-xl overflow-hidden border border-white/[0.12] bg-black/30">
+                    <img
+                      src={characterImagePreview}
+                      alt="Character"
+                      className="w-full h-48 object-contain"
+                    />
+                    <button
+                      onClick={clearCharacterImage}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-red-500/80 text-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* Download branded version for social media */}
+                  {user?.isOwner && (
+                    <button
+                      onClick={() => downloadBrandedImage(characterImagePreview)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 text-xs font-medium transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download Branded (for social media)
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -751,13 +834,23 @@ export default function MotionControlPage() {
                       {generatedCharacters.length > 0 && (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {generatedCharacters.map((imgSrc, i) => (
-                            <button
-                              key={i}
-                              onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
-                              className="aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
-                            >
-                              <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
-                            </button>
+                            <div key={i} className="relative group">
+                              <button
+                                onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
+                                className="w-full aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
+                              >
+                                <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                              {user?.isOwner && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); downloadBrandedImage(imgSrc); }}
+                                  className="absolute bottom-1 right-1 p-1 rounded bg-black/70 hover:bg-cyan-600 text-white opacity-0 group-hover:opacity-100 transition-all"
+                                  title="Download branded"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}

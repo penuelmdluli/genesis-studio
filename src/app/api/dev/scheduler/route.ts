@@ -1022,9 +1022,22 @@ async function handlePost(): Promise<{
 
     const topicTitle = item.input_data?.topic_title || "Trending Now";
 
-    // Build caption with page hashtags
+    // Build engaging caption with hook + topic + CTA + branding + hashtags
+    const captionHooks = [
+      "This changes everything",
+      "WATCH: The story no one is talking about",
+      "You need to see this",
+      "This is bigger than you think",
+      "The world just changed",
+      "Stop scrolling — this matters",
+      "Everyone is talking about this",
+      "This just happened",
+      "The full story in 30 seconds",
+      "Here's what you need to know",
+    ];
+    const captionHook = captionHooks[Math.floor(Math.random() * captionHooks.length)];
     const hashtagStr = (page.hashtags || []).join(" ");
-    const caption = `${topicTitle}\n\n${hashtagStr}\n\n#Trending #Viral #ForYou`;
+    const caption = `${captionHook}\n\n${topicTitle}\n\nPowered by AI — made with ivideostudio.ai\n\n${hashtagStr}`;
 
     // Queue Facebook post
     if (page.facebook_page_key) {
@@ -1044,7 +1057,7 @@ async function handlePost(): Promise<{
         videoId,
         userId: DEV_USER_ID,
         title: topicTitle.slice(0, 90),
-        description: `${caption}\n\n#Shorts`,
+        description: `${captionHook}\n\n${topicTitle}\n\nPowered by AI — made with ivideostudio.ai\n\n${hashtagStr}\n\n#Shorts`,
         tags: page.hashtags?.map((h: string) => h.replace("#", "")) || [],
         queueId: item.id,
       });

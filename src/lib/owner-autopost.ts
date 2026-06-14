@@ -12,6 +12,7 @@
 
 import { isOwnerClerkId } from "@/lib/credits";
 import { r2PublicUrl } from "@/lib/storage";
+import { autoCommentOnPost } from "@/lib/owner-marketing";
 
 // ── Page Configuration ──
 interface FacebookPage {
@@ -35,6 +36,11 @@ const PAGES: Record<string, FacebookPage> = {
     name: "Africa 2050",
     pageId: process.env.FB_AFRICA_2050_PAGE_ID || "104120995511039",
     tokenEnvKey: "FB_PAGE_TOKEN_limitless_you",
+  },
+  penuel: {
+    name: "Penuel Mdluli",
+    pageId: process.env.FB_PENUEL_PAGE_ID || "105512739117796",
+    tokenEnvKey: "FB_PAGE_TOKEN_penuel",
   },
 };
 
@@ -115,6 +121,133 @@ ${cta}
 #GenesisStudio #AIVideo #MadeWithAI #TextToVideo #AIGenerated #CreatorTools #AfricanCreators #ContentCreation #FYP #Viral`;
 }
 
+// ── Feature Announcement Templates ──
+// Used when posting new feature launches & product marketing to the Penuel Mdluli page
+
+interface FeatureInfo {
+  name: string;
+  description: string;
+  videoUrl?: string;
+  videoR2Key?: string;
+}
+
+const PRODUCT_HOOKS = [
+  "New feature just dropped 🔥",
+  "This changes EVERYTHING for content creators",
+  "AI just levelled up — watch this",
+  "We've been cooking... and it's finally ready",
+  "This is what AI video looks like in 2026",
+  "Every creator in Africa needs to see this",
+  "Built different. Made in South Africa. For the world.",
+  "AI video just got a MASSIVE upgrade",
+  "Watch what this does in 60 seconds",
+  "They said AI video was years away. It's HERE.",
+];
+
+const PRODUCT_CTAS = [
+  "Try it yourself — 50 FREE credits, no card needed → ivideostudio.ai",
+  "This is free to try. What are you waiting for? → ivideostudio.ai",
+  "Share this with a creator who needs to see it 🔥",
+  "Create YOUR own AI videos FREE → ivideostudio.ai",
+  "New features dropping every week. Follow for more.",
+  "Stop paying for stock footage. Start creating with AI → ivideostudio.ai",
+];
+
+const FEATURE_TEMPLATES: Record<string, (feature: FeatureInfo) => string> = {
+  "motion-control": (f) => `${pickRandom(PRODUCT_HOOKS)}
+
+🎭 NEW: Motion Control
+
+Upload ANY photo + ANY dance/motion video → AI makes your character perform that exact motion.
+
+TikTok dancer? Paste the URL. Instagram reel? Paste it. Your own video? Upload it.
+
+The character moves exactly like the reference. Every step. Every gesture. Every vibe.
+
+${pickRandom(PRODUCT_CTAS)}
+
+🔗 https://ivideostudio.ai
+
+#MotionControl #AIVideo #GenesisStudio #MadeWithAI #AfricanTech #ContentCreator #MadeInSA #Innovation #FYP #Viral #AIGenerated #MzansiBabyStars`,
+
+  "react-studio": (f) => `${pickRandom(PRODUCT_HOOKS)}
+
+🎬 NEW: React Studio
+
+Insert yourself into ANY video scene. React with celebrities. Join the World Cup. Enter movie scenes.
+
+Just upload your photo and describe where you want to be. AI does the rest.
+
+${pickRandom(PRODUCT_CTAS)}
+
+🔗 https://ivideostudio.ai
+
+#ReactStudio #AIVideo #GenesisStudio #MadeWithAI #AfricanTech #ContentCreator #MadeInSA #Innovation #FYP #Viral #AIGenerated #MzansiBabyStars`,
+
+  "ai-character": (f) => `${pickRandom(PRODUCT_HOOKS)}
+
+🧑‍🎨 NEW: AI Character Generator
+
+Don't have a photo? No problem. Describe ANY character — anime warrior, business mogul, superhero — and get 4 AI portraits to use in Motion Control.
+
+No uploads. No photoshoots. Pure imagination → video.
+
+${pickRandom(PRODUCT_CTAS)}
+
+🔗 https://ivideostudio.ai
+
+#AICharacter #AIVideo #GenesisStudio #MadeWithAI #AfricanTech #ContentCreator #MadeInSA #Innovation #FYP #Viral #AIGenerated #MzansiBabyStars`,
+
+  "ai-singer": (f) => `${pickRandom(PRODUCT_HOOKS)}
+
+🎤 NEW: AI Singer
+
+Write lyrics → pick a music style → get a full music video with perfect lip-sync.
+
+AI writes the melody. AI sings it. AI animates the face. You just bring the words.
+
+${pickRandom(PRODUCT_CTAS)}
+
+🔗 https://ivideostudio.ai
+
+#AISinger #AIMusic #GenesisStudio #MadeWithAI #AfricanTech #MusicVideo #MadeInSA #Innovation #FYP #Viral #AIGenerated #MzansiBabyStars`,
+
+  generic: (f) => `${pickRandom(PRODUCT_HOOKS)}
+
+${f.name}: ${f.description.slice(0, 300)}
+
+Built with love in South Africa. Used by creators worldwide.
+
+${pickRandom(PRODUCT_CTAS)}
+
+🔗 https://ivideostudio.ai
+
+#GenesisStudio #AIVideo #MadeWithAI #AfricanTech #ContentCreator #MadeInSA #Innovation #FYP #Viral #AIGenerated #MzansiBabyStars`,
+};
+
+function getFeatureAnnouncementDescription(
+  featureKey: string,
+  feature: FeatureInfo
+): string {
+  const template = FEATURE_TEMPLATES[featureKey] || FEATURE_TEMPLATES.generic;
+  return template(feature);
+}
+
+function getPersonalBrandDescription(prompt: string): string {
+  const hook = pickRandom(PRODUCT_HOOKS);
+  const cta = pickRandom(PRODUCT_CTAS);
+
+  return `${hook}
+
+${prompt.slice(0, 300)}
+
+${cta}
+
+🔗 https://ivideostudio.ai
+
+#GenesisStudio #AIVideo #MadeWithAI #AfricanTech #MadeInSA #ContentCreator #MzansiBabyStars #AIGenerated #FYP #Viral`;
+}
+
 // ── Post to Facebook Page ──
 
 const VIDEO_TITLES = [
@@ -182,6 +315,14 @@ async function postToPage(
     const postId = data.post_id || data.id;
 
     console.log(`[OWNER-AUTOPOST] 📅 ${page.name}: scheduled as ${postId}, publishes ${slot.scheduledFor.toISOString()}`);
+
+    // Auto-comment with marketing + engagement after publish time (fire-and-forget)
+    const msUntilPublish = slot.scheduledFor.getTime() - Date.now() + 60_000; // +1min buffer
+    if (msUntilPublish > 0 && msUntilPublish < 86_400_000) { // only if within 24h
+      setTimeout(() => {
+        autoCommentOnPost(postId, token).catch(() => {});
+      }, msUntilPublish);
+    }
 
     return {
       success: true,
@@ -313,6 +454,55 @@ export async function autoPostSingleVideo(
 
   // Facebook (smart scheduled)
   await postToPage(PAGES.tech_pulse, videoUrl, description);
+
+  // YouTube + TikTok (immediate, fire-and-forget)
+  crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});
+}
+
+/**
+ * Post a feature announcement / product marketing video.
+ * Posts to Penuel Mdluli page (personal brand) + Tech Pulse Africa.
+ * Use for new feature launches, demos, and product marketing.
+ *
+ * featureKey: "motion-control" | "react-studio" | "ai-character" | "ai-singer" | "generic"
+ */
+export async function autoPostFeatureAnnouncement(
+  clerkId: string,
+  videoR2Key: string,
+  featureKey: string,
+  featureInfo: { name: string; description: string }
+): Promise<void> {
+  if (!isOwnerClerkId(clerkId)) return;
+
+  const videoUrl = r2PublicUrl(videoR2Key);
+  const description = getFeatureAnnouncementDescription(featureKey, featureInfo);
+
+  // Post to Penuel Mdluli page (personal brand) + Tech Pulse Africa
+  await Promise.allSettled([
+    postToPage(PAGES.penuel, videoUrl, description),
+    postToPage(PAGES.tech_pulse, videoUrl, description),
+  ]);
+
+  // YouTube + TikTok (immediate, fire-and-forget)
+  crossPostToAllPlatforms(videoUrl, featureInfo.description).catch(() => {});
+}
+
+/**
+ * Auto-post any video to the Penuel Mdluli page with founder branding.
+ * For personal brand content, behind-the-scenes, demos, etc.
+ */
+export async function autoPostToPersonalPage(
+  clerkId: string,
+  videoR2Key: string,
+  prompt: string
+): Promise<void> {
+  if (!isOwnerClerkId(clerkId)) return;
+
+  const videoUrl = r2PublicUrl(videoR2Key);
+  const description = getPersonalBrandDescription(prompt);
+
+  // Facebook (smart scheduled)
+  await postToPage(PAGES.penuel, videoUrl, description);
 
   // YouTube + TikTok (immediate, fire-and-forget)
   crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});

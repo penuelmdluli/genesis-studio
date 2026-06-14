@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSignedDownloadUrl, videoStorageKey } from "@/lib/storage";
 import { recordPostForLearning } from "@/lib/intelligence/fb-insights-fetcher";
+import { autoCommentOnPost } from "@/lib/owner-marketing";
 import { blockInProduction } from "@/lib/dev-only";
 
 export const maxDuration = 120;
@@ -241,6 +242,11 @@ export async function POST(req: NextRequest) {
           headline: post.caption?.slice(0, 200),
           hookText: post.caption?.split("\n")[0]?.slice(0, 100),
         }).catch((err) => console.warn("[FB POST] Failed to record for learning:", err));
+
+        // Auto-comment with marketing + engagement (fire-and-forget)
+        autoCommentOnPost(result.postId, token.replace(/'/g, "")).catch((err) =>
+          console.warn("[FB POST] Auto-comment failed:", err)
+        );
       }
 
       // 3s delay between posts to avoid rate limits

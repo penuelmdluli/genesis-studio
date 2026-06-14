@@ -20,7 +20,6 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Clock,
   Move,
   Zap,
   Volume2,
@@ -33,12 +32,11 @@ import {
   type FunEffect,
 } from "@/lib/motion-control";
 import { uploadFile } from "@/lib/upload-client";
-import { Switch } from "@/components/ui/switch";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { HelpTip } from "@/components/ui/tooltip";
 import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 
-type MotionTab = "upload" | "effects" | "url" | "history";
+type MotionTab = "effects" | "upload" | "url";
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
@@ -114,6 +112,7 @@ export default function MotionControlPage() {
       setDuration(videoDur <= 7 ? 5 : videoDur <= 12 ? 10 : videoDur <= 17 ? 15 : 20);
       setMotionVideo(file);
       setSelectedEffect(null);
+      setReferenceUrl("");
       setMotionVideoPreview(url);
       setError(null);
     };
@@ -145,12 +144,14 @@ export default function MotionControlPage() {
     setSelectedEffect(effect.id);
     setMotionVideo(null);
     setMotionVideoPreview(null);
+    setReferenceUrl("");
   };
 
   const clearMotionVideo = () => {
     setMotionVideo(null);
     setMotionVideoPreview(null);
     setSelectedEffect(null);
+    setReferenceUrl("");
     if (motionVideoRef.current) motionVideoRef.current.value = "";
   };
 
@@ -294,7 +295,7 @@ export default function MotionControlPage() {
         {/* Step indicator */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
           {[
-            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect) },
+            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect || referenceUrl.trim()) },
             { num: 2, label: "Character", done: !!characterImage },
             { num: 3, label: "Generate", done: false },
           ].map((step, i) => (
@@ -327,7 +328,7 @@ export default function MotionControlPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Video className="w-4 h-4 text-violet-400" />
-                Motion Source <HelpTip text="Choose a fun effect or upload your own motion reference video to control camera movement." side="right" />
+                Motion Source <HelpTip text="Choose a fun effect, upload your own video, or paste a TikTok/Instagram URL as motion reference." side="right" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -337,7 +338,6 @@ export default function MotionControlPage() {
                   { key: "effects" as const, label: "Effects", icon: Sparkles },
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
-                  { key: "history" as const, label: "History", icon: Clock },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
@@ -513,16 +513,6 @@ export default function MotionControlPage() {
                 </div>
               )}
 
-              {/* History Tab */}
-              {motionTab === "history" && (
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <Clock className="w-8 h-8 text-zinc-400 mb-2" />
-                  <p className="text-sm text-zinc-400">No motion history yet</p>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Your previous motion generations will appear here
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -666,49 +656,58 @@ export default function MotionControlPage() {
                 </div>
               </div>
 
-              {/* Audio Toggle */}
-              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.10]">
-                <div className="flex items-center gap-2 mb-1">
-                  {enableAudio ? (
-                    <Volume2 className="w-4 h-4 text-violet-400" />
-                  ) : (
-                    <VolumeX className="w-4 h-4 text-zinc-400" />
-                  )}
+              {/* Audio */}
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1.5">Audio</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "none", label: "No Audio", icon: VolumeX, desc: "Silent video" },
+                    { value: "generate", label: "AI Audio", icon: Volume2, desc: "Generate sounds" },
+                    { value: "keep", label: "Keep Original", icon: Volume2, desc: "From reference" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setEnableAudio(opt.value === "generate");
+                        setKeepOriginalSound(opt.value === "keep");
+                      }}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
+                        (opt.value === "generate" && enableAudio) ||
+                        (opt.value === "keep" && keepOriginalSound)
+                          ? "border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20"
+                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.12]"
+                      }`}
+                    >
+                      <opt.icon className={`w-4 h-4 mx-auto mb-1 ${
+                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
+                        (opt.value === "generate" && enableAudio) ||
+                        (opt.value === "keep" && keepOriginalSound)
+                          ? "text-violet-400" : "text-zinc-400"
+                      }`} />
+                      <div className={`text-[11px] font-medium ${
+                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
+                        (opt.value === "generate" && enableAudio) ||
+                        (opt.value === "keep" && keepOriginalSound)
+                          ? "text-violet-300" : "text-zinc-400"
+                      }`}>{opt.label}</div>
+                    </button>
+                  ))}
                 </div>
-                <Switch
-                  checked={enableAudio}
-                  onCheckedChange={setEnableAudio}
-                  label={enableAudio ? "Audio Enabled" : "No Audio"}
-                  description="Generate native audio with the video"
-                  size="sm"
-                />
               </div>
 
               {/* Advanced Settings */}
               {showAdvanced && (
                 <div className="space-y-3 pt-3 border-t border-white/[0.10]">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-zinc-400 mb-1.5">Seed</label>
-                      <input
-                        type="number"
-                        value={seed ?? ""}
-                        onChange={(e) => setSeed(e.target.value ? Number(e.target.value) : undefined)}
-                        placeholder="Random"
-                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-violet-500/50 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-zinc-400 mb-1.5">Keep Original Sound</label>
-                      <select
-                        value={keepOriginalSound ? "yes" : "no"}
-                        onChange={(e) => setKeepOriginalSound(e.target.value === "yes")}
-                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
-                      >
-                        <option value="no">No</option>
-                        <option value="yes">Yes</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1.5">Seed (leave empty for random)</label>
+                    <input
+                      type="number"
+                      value={seed ?? ""}
+                      onChange={(e) => setSeed(e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="Random"
+                      className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-violet-500/50 focus:outline-none"
+                    />
                   </div>
                 </div>
               )}
@@ -738,6 +737,11 @@ export default function MotionControlPage() {
                       <div className="text-center p-2">
                         <Sparkles className="w-8 h-8 text-violet-400 mx-auto mb-1" />
                         <p className="text-[10px] text-violet-300 font-medium">{selectedEffectObj?.name}</p>
+                      </div>
+                    ) : referenceUrl.trim() ? (
+                      <div className="text-center p-2">
+                        <LinkIcon className="w-8 h-8 text-violet-400 mx-auto mb-1" />
+                        <p className="text-[10px] text-violet-300 font-medium truncate px-1">URL Video</p>
                       </div>
                     ) : (
                       <div className="text-center p-2">
@@ -773,7 +777,7 @@ export default function MotionControlPage() {
                   </div>
                 </div>
                 {/* Ready badge */}
-                {(motionVideo || selectedEffect) && characterImagePreview && (
+                {(motionVideo || selectedEffect || referenceUrl.trim()) && characterImagePreview && (
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10">
                     <Badge className="bg-violet-500/90 text-white text-[10px] shadow-lg">
                       Ready to Generate
@@ -811,6 +815,8 @@ export default function MotionControlPage() {
                         ? selectedEffectObj?.name
                         : motionVideo
                         ? motionVideo.name
+                        : referenceUrl.trim()
+                        ? "URL Import"
                         : "—"}
                     </span>
                   </div>
@@ -826,8 +832,8 @@ export default function MotionControlPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-200">Audio</span>
-                    <span className={enableAudio ? "text-violet-300" : "text-zinc-400"}>
-                      {enableAudio ? "Enabled" : "Off"}
+                    <span className={enableAudio || keepOriginalSound ? "text-violet-300" : "text-zinc-400"}>
+                      {enableAudio ? "AI Generated" : keepOriginalSound ? "Original" : "Off"}
                     </span>
                   </div>
                 </div>

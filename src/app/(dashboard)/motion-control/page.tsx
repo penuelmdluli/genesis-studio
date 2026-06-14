@@ -68,7 +68,7 @@ export default function MotionControlPage() {
   const [quality, setQuality] = useState<MotionQuality>("standard");
   const [duration, setDuration] = useState(10);
   const [enableAudio, setEnableAudio] = useState(false);
-  const [keepOriginalSound, setKeepOriginalSound] = useState(false);
+  const [keepOriginalSound, setKeepOriginalSound] = useState(true);
   const [seed, setSeed] = useState<number | undefined>(undefined);
   const [orientation, setOrientation] = useState<"video" | "image">("video");
 

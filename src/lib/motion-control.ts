@@ -91,6 +91,11 @@ async function tryWavespeedMotion(params: {
   // Must have a reference video for WaveSpeed motion control
   if (!params.referenceVideoUrl) return null;
 
+  // WaveSpeed is only cheaper for Pro quality motion control
+  // Standard: FAL $0.07/s vs WaveSpeed $0.112/s — FAL wins
+  // Pro: FAL $0.14/s vs WaveSpeed $0.112/s — WaveSpeed wins
+  if (params.quality === "standard") return null;
+
   const wsEndpoint = WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
     || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"];
 
@@ -153,7 +158,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     orientation = "video",
     duration = 10,
     enableAudio = false,
-    keepOriginalSound = false,
+    keepOriginalSound = true,
     seed,
     cfgScale = 0.5,
   } = params;

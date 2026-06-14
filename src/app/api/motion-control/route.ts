@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       orientation = "video",
       duration = 10,
       enableAudio = false,
-      keepOriginalSound = false,
+      keepOriginalSound = true,
       seed,
     } = body as {
       characterImageUrl: string;

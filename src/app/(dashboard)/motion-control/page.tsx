@@ -36,6 +36,13 @@ import { uploadFile } from "@/lib/upload-client";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { HelpTip } from "@/components/ui/tooltip";
 import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
+import {
+  SA_CHARACTER_PRESETS,
+  SCENARIO_PRESETS,
+  buildOwnerImagePrompt,
+  type CharacterPreset,
+  type ScenarioPreset,
+} from "@/lib/owner-marketing";
 
 type MotionTab = "effects" | "upload" | "url";
 type MotionQuality = "standard" | "pro";
@@ -66,6 +73,11 @@ export default function MotionControlPage() {
   const [characterPrompt, setCharacterPrompt] = useState("");
   const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
   const [generatedCharacters, setGeneratedCharacters] = useState<string[]>([]);
+  const [characterTab, setCharacterTab] = useState<"upload" | "generate" | "history">("generate");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [characterHistory, setCharacterHistory] = useState<Array<{ imageUrl: string; prompt: string; createdAt: string }>>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Model & quality
   const [model, setModel] = useState<MotionModel>("kling-v3");
@@ -176,7 +188,7 @@ export default function MotionControlPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Portrait photo of ${characterPrompt.trim()}, upper body visible, clear face, high quality, studio lighting, neutral background`,
+          prompt: `Full body photo of ${characterPrompt.trim()}, standing pose, entire body from head to feet visible, clear face, high quality, studio lighting, clean background, full length shot`,
           aspectRatio: "portrait",
           numImages: 4,
         }),
@@ -585,53 +597,229 @@ export default function MotionControlPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <label className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.04] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
-                    <input
-                      ref={characterImageRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={handleCharacterImageUpload}
-                      className="hidden"
-                    />
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-2 group-hover:bg-cyan-500/20 transition-colors">
-                      <Upload className="w-5 h-5 text-cyan-400" />
-                    </div>
-                    <span className="text-xs font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">Upload your photo</span>
-                    <span className="text-[10px] text-zinc-500 mt-0.5">PNG, JPG or WebP up to 10MB</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.08]" /></div>
-                    <div className="relative flex justify-center"><span className="bg-[#0f0f17] px-3 text-[10px] text-zinc-500">or generate with AI</span></div>
+                  {/* Tabs: AI Generate / Upload / History */}
+                  <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
+                    {([
+                      { key: "generate" as const, label: "AI Generate", icon: Wand2 },
+                      { key: "upload" as const, label: "Upload", icon: Upload },
+                      { key: "history" as const, label: "History", icon: Clock },
+                    ]).map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => {
+                          setCharacterTab(tab.key);
+                          if (tab.key === "history" && !historyLoaded) {
+                            fetch("/api/admin/marketing-image")
+                              .then(r => r.ok ? r.json() : null)
+                              .then(data => {
+                                if (data?.history) setCharacterHistory(data.history);
+                                setHistoryLoaded(true);
+                              })
+                              .catch(() => {});
+                          }
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
+                          characterTab === tab.key
+                            ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                            : "text-zinc-400 hover:text-zinc-300 hover:bg-white/[0.04] border border-transparent"
+                        }`}
+                      >
+                        <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{tab.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={characterPrompt}
-                      onChange={(e) => setCharacterPrompt(e.target.value)}
-                      placeholder="e.g. Professional dancer in red dress, studio lighting"
-                      className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
-                    />
-                    <Button
-                      onClick={handleGenerateCharacter}
-                      disabled={!characterPrompt.trim() || isGeneratingCharacter}
-                      loading={isGeneratingCharacter}
-                      className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white px-4"
-                      size="sm"
-                    >
-                      <Wand2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                  {generatedCharacters.length > 0 && (
-                    <div className="grid grid-cols-4 gap-2">
-                      {generatedCharacters.map((imgSrc, i) => (
-                        <button
-                          key={i}
-                          onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
-                          className="aspect-square rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
+
+                  {/* AI Generate Tab */}
+                  {characterTab === "generate" && (
+                    <div className="space-y-3">
+                      {/* Smart Presets (owner only) */}
+                      {user?.isOwner && (
+                        <>
+                          <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Quick Presets</label>
+                          <div className="grid grid-cols-5 gap-1.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                            {SA_CHARACTER_PRESETS.map((preset) => (
+                              <button
+                                key={preset.id}
+                                onClick={() => {
+                                  setSelectedPreset(preset.id);
+                                  setCharacterPrompt(preset.name);
+                                }}
+                                className={`p-2 rounded-lg border text-center transition-all ${
+                                  selectedPreset === preset.id
+                                    ? "border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-500/20"
+                                    : "border-white/[0.08] bg-white/[0.03] hover:border-cyan-500/30"
+                                }`}
+                              >
+                                <div className={`text-[10px] font-medium truncate ${selectedPreset === preset.id ? "text-cyan-300" : "text-zinc-400"}`}>
+                                  {preset.name}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Scenario selector */}
+                          {selectedPreset && (
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Scene / Vibe</label>
+                              <div className="flex gap-1.5 flex-wrap">
+                                <button
+                                  onClick={() => setSelectedScenario(null)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                                    !selectedScenario
+                                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                      : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-cyan-500/20"
+                                  }`}
+                                >
+                                  Standing (Default)
+                                </button>
+                                {SCENARIO_PRESETS.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => setSelectedScenario(s.id)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                                      selectedScenario === s.id
+                                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                        : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-cyan-500/20"
+                                    }`}
+                                  >
+                                    {s.emoji} {s.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.08]" /></div>
+                            <div className="relative flex justify-center"><span className="bg-[#0f0f17] px-3 text-[10px] text-zinc-500">or type your own</span></div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Custom prompt input */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={characterPrompt}
+                          onChange={(e) => { setCharacterPrompt(e.target.value); setSelectedPreset(null); setSelectedScenario(null); }}
+                          placeholder="e.g. Cute baby in a red dress ready to dance"
+                          className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
+                        />
+                        <Button
+                          onClick={() => {
+                            if (selectedPreset) {
+                              const preset = SA_CHARACTER_PRESETS.find(p => p.id === selectedPreset);
+                              const scenario = selectedScenario ? SCENARIO_PRESETS.find(s => s.id === selectedScenario) : null;
+                              if (preset) {
+                                const fullPrompt = scenario
+                                  ? buildOwnerImagePrompt(preset, scenario)
+                                  : preset.prompt;
+                                setCharacterPrompt(preset.name);
+                                setIsGeneratingCharacter(true);
+                                setError(null);
+                                fetch("/api/generate-image", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ prompt: fullPrompt, aspectRatio: "portrait", numImages: 4 }),
+                                })
+                                  .then(r => r.json())
+                                  .then(data => {
+                                    if (data.images?.length > 0) {
+                                      setGeneratedCharacters(data.images);
+                                      toast("Character images generated! Pick one.", "success");
+                                    } else {
+                                      setError(data.error || "Failed to generate");
+                                      toast(data.error || "Generation failed", "error");
+                                    }
+                                  })
+                                  .catch(() => { setError("Network error"); toast("Network error", "error"); })
+                                  .finally(() => setIsGeneratingCharacter(false));
+                                return;
+                              }
+                            }
+                            handleGenerateCharacter();
+                          }}
+                          disabled={(!characterPrompt.trim() && !selectedPreset) || isGeneratingCharacter}
+                          loading={isGeneratingCharacter}
+                          className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white px-4"
+                          size="sm"
                         >
-                          <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
+                          <Wand2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+
+                      {/* Generated options */}
+                      {generatedCharacters.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2">
+                          {generatedCharacters.map((imgSrc, i) => (
+                            <button
+                              key={i}
+                              onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
+                              className="aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
+                            >
+                              <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Upload Tab */}
+                  {characterTab === "upload" && (
+                    <label className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.04] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
+                      <input
+                        ref={characterImageRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleCharacterImageUpload}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-2 group-hover:bg-cyan-500/20 transition-colors">
+                        <Upload className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <span className="text-xs font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">Upload your photo</span>
+                      <span className="text-[10px] text-zinc-500 mt-0.5">Full body photo — PNG, JPG or WebP up to 10MB</span>
+                    </label>
+                  )}
+
+                  {/* History Tab */}
+                  {characterTab === "history" && (
+                    <div>
+                      {characterHistory.length > 0 ? (
+                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+                          {characterHistory.map((item, i) => (
+                            <button
+                              key={i}
+                              onClick={async () => {
+                                try {
+                                  const imgRes = await fetch(item.imageUrl);
+                                  if (!imgRes.ok) { toast("Image no longer available", "error"); return; }
+                                  const buffer = await imgRes.arrayBuffer();
+                                  const blob = new Blob([buffer], { type: "image/jpeg" });
+                                  const dataUrl = URL.createObjectURL(blob);
+                                  setCharacterImagePreview(dataUrl);
+                                  setCharacterImage(new File([blob], "history.jpg", { type: "image/jpeg" }));
+                                  toast("Image selected from history", "success");
+                                } catch {
+                                  toast("Failed to load image", "error");
+                                }
+                              }}
+                              className="aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all group"
+                              title={new Date(item.createdAt).toLocaleDateString()}
+                            >
+                              <img src={item.imageUrl} alt="History" className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-36 text-center">
+                          <Clock className="w-8 h-8 text-zinc-600 mb-2" />
+                          <span className="text-xs text-zinc-500">No images yet</span>
+                          <span className="text-[10px] text-zinc-600 mt-1">Generate images and they'll appear here</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -27,8 +27,8 @@ const FAL_API_KEY = process.env.FAL_KEY || "";
 const QUALITY_SUFFIX =
   "masterpiece, award-winning photography, ultra sharp focus, professional studio lighting, " +
   "8K UHD, hyperrealistic, photorealistic skin texture, natural subsurface scattering, " +
-  "ray tracing, volumetric lighting, cinematic color grading, shallow depth of field, " +
-  "shot on Sony A7R V with 85mm f/1.4 GM lens";
+  "full body visible from head to feet, full length shot, entire body in frame, " +
+  "clean background, ray tracing, volumetric lighting, cinematic color grading";
 
 const NEGATIVE_PROMPT =
   "cartoon, anime, illustration, painting, drawing, sketch, blurry, low quality, " +

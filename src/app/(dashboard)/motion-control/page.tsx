@@ -25,6 +25,7 @@ import {
   Zap,
   Volume2,
   VolumeX,
+  Link as LinkIcon,
 } from "lucide-react";
 import {
   FUN_EFFECTS,
@@ -37,7 +38,7 @@ import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { HelpTip } from "@/components/ui/tooltip";
 import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 
-type MotionTab = "upload" | "effects" | "history";
+type MotionTab = "upload" | "effects" | "url" | "history";
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
@@ -58,6 +59,7 @@ export default function MotionControlPage() {
   const [motionTab, setMotionTab] = useState<MotionTab>("effects");
   const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
   const [effectCategoryFilter, setEffectCategoryFilter] = useState("All");
+  const [referenceUrl, setReferenceUrl] = useState("");
   const [prompt, setPrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -159,7 +161,7 @@ export default function MotionControlPage() {
   };
 
   const canGenerate =
-    (motionVideo || selectedEffect) &&
+    (motionVideo || selectedEffect || referenceUrl.trim()) &&
     characterImage &&
     hasEnoughCredits &&
     !isLoading;
@@ -174,8 +176,8 @@ export default function MotionControlPage() {
     generateLockRef.current = true;
     setError(null);
 
-    if (!motionVideo && !selectedEffect) {
-      setError("Upload a reference video or pick a fun effect.");
+    if (!motionVideo && !selectedEffect && !referenceUrl.trim()) {
+      setError("Upload a reference video, paste a URL, or pick a fun effect.");
       return;
     }
     if (!characterImage) {
@@ -188,7 +190,7 @@ export default function MotionControlPage() {
     }
 
     setIsGenerating(true);
-    progress.start(["Uploading files", "Applying motion reference", "Generating video", "Saving to gallery"]);
+    progress.start(["Uploading files", referenceUrl ? "Downloading video" : "Applying motion reference", "Generating video", "Saving to gallery"]);
     try {
       progress.setProgress(10, "Uploading character image...");
 
@@ -213,6 +215,7 @@ export default function MotionControlPage() {
         body: JSON.stringify({
           characterImageUrl,
           referenceVideoUrl,
+          referenceUrl: referenceUrl.trim() || undefined,
           effect: selectedEffect || undefined,
           prompt: prompt.trim() || undefined,
           quality,
@@ -333,6 +336,7 @@ export default function MotionControlPage() {
                 {([
                   { key: "effects" as const, label: "Effects", icon: Sparkles },
                   { key: "upload" as const, label: "Upload", icon: Upload },
+                  { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                   { key: "history" as const, label: "History", icon: Clock },
                 ]).map((tab) => (
                   <button
@@ -471,6 +475,40 @@ export default function MotionControlPage() {
                         MP4, WebM or MOV — up to 30 seconds, max 50MB
                       </span>
                     </label>
+                  )}
+                </div>
+              )}
+
+              {/* URL Tab */}
+              {motionTab === "url" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-400">
+                      Paste a TikTok, Instagram, or video URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={referenceUrl}
+                        onChange={(e) => { setReferenceUrl(e.target.value); setMotionVideo(null); setMotionVideoPreview(null); setSelectedEffect(null); }}
+                        placeholder="https://www.tiktok.com/@user/video/..."
+                        className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                      />
+                      {referenceUrl && (
+                        <button onClick={() => setReferenceUrl("")} className="p-2 rounded-lg bg-white/[0.06] hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-500">
+                      Supports TikTok, Instagram Reels, Twitter/X, Facebook, and direct video URLs
+                    </p>
+                  </div>
+                  {referenceUrl && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                      <LinkIcon className="w-4 h-4 text-violet-400 shrink-0" />
+                      <span className="text-xs text-violet-300 truncate">{referenceUrl}</span>
+                    </div>
                   )}
                 </div>
               )}

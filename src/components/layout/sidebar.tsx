@@ -62,7 +62,7 @@ const baseNavItems: NavItem[] = [
   { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create", badge: "NEW" },
   { href: "/music-video", label: "Music Video", icon: Radio, section: "Create", badge: "NEW" },
   { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "HOT" },
-  { href: "/mimic", label: "Mimic Studio", icon: Zap, section: "Create" },
+  // Mimic Studio merged into Motion Control — removed from sidebar
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
   // --- AUDIO ---

@@ -10,6 +10,7 @@ import {
   type MotionOrientation,
 } from "@/lib/motion-control";
 import { checkRateLimit } from "@/lib/fraud";
+import { downloadVideoFromUrl } from "@/lib/video-downloader";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,7 +34,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       characterImageUrl,
-      referenceVideoUrl,
+      referenceVideoUrl: rawReferenceVideoUrl,
+      referenceUrl,
       effect,
       prompt,
       quality = "standard",
@@ -46,6 +48,7 @@ export async function POST(req: NextRequest) {
     } = body as {
       characterImageUrl: string;
       referenceVideoUrl?: string;
+      referenceUrl?: string;
       effect?: string;
       prompt?: string;
       quality?: MotionQuality;
@@ -57,13 +60,24 @@ export async function POST(req: NextRequest) {
       seed?: number;
     };
 
+    let referenceVideoUrl = rawReferenceVideoUrl;
+
     // Validate inputs
     if (!characterImageUrl) {
       return NextResponse.json({ error: "Character image is required" }, { status: 400 });
     }
-    if (!referenceVideoUrl && !effect) {
+
+    // Reject YouTube URLs
+    if (referenceUrl && /(?:youtube\.com|youtu\.be)\//i.test(referenceUrl)) {
       return NextResponse.json(
-        { error: "Either a reference video or a fun effect is required" },
+        { error: "YouTube URLs are not supported. Please use TikTok, Instagram, or upload a video directly." },
+        { status: 400 }
+      );
+    }
+
+    if (!referenceVideoUrl && !referenceUrl && !effect) {
+      return NextResponse.json(
+        { error: "Either a reference video, a social media URL, or a fun effect is required" },
         { status: 400 }
       );
     }
@@ -103,6 +117,30 @@ export async function POST(req: NextRequest) {
       creditsCost: creditCost,
       aspectRatio: "landscape",
     });
+
+    // Download social media video if referenceUrl provided but no direct upload
+    if (referenceUrl && !referenceVideoUrl) {
+      try {
+        const downloaded = await downloadVideoFromUrl(referenceUrl, user.id, job.id);
+        referenceVideoUrl = downloaded.publicUrl;
+      } catch (primaryErr) {
+        console.warn("[Motion] Primary video download failed, trying scraper fallback:", primaryErr);
+        try {
+          const { downloadAndPersist } = await import("@/lib/mbs/scraper");
+          const { r2Key } = await downloadAndPersist(referenceUrl);
+          referenceVideoUrl = `${process.env.R2_PUBLIC_URL || "https://cdn.ivideostudio.ai"}/${r2Key}`;
+        } catch {
+          if (!ownerAccount) {
+            await refundCredits(user.id, creditCost, job.id, "Failed to download reference video — automatic refund");
+          }
+          await updateJobStatus(job.id, { status: "failed", errorMessage: "Could not download video from the provided URL" });
+          return NextResponse.json(
+            { error: "Could not download video from the provided URL. Please upload the video directly or try a different link." },
+            { status: 422 }
+          );
+        }
+      }
+    }
 
     try {
       const result = await submitMotionControlJob({

@@ -4,6 +4,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, getJob, updateJobStatus, createVideo } from "@/lib/db";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
 import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { refundCredits } from "@/lib/credits";
 import { sendVideoReadyEmail } from "@/lib/email";
@@ -36,10 +37,13 @@ export async function GET(
     }
 
     // If job is still queued/processing and has a job ID, poll for updates
-    if ((job.status === "queued" || job.status === "processing") && job.runpod_job_id) {
+    // AI Singer jobs are polled by /api/cron/check-singer — just return current state
+    if ((job.status === "queued" || job.status === "processing") && job.runpod_job_id && job.model_id !== "ai-singer") {
       // Determine provider for this model
       const modelConfig = AI_MODELS[job.model_id as ModelId];
       const isFal = modelConfig?.provider === "fal";
+      // WaveSpeed jobs are prefixed with "ws:" by the provider router
+      const isWavespeed = job.runpod_job_id.startsWith("ws:");
       // Motion control jobs store "fal:endpoint:requestId" in runpod_job_id
       const isFalMotion = job.runpod_job_id.startsWith("fal:");
 
@@ -119,8 +123,112 @@ export async function GET(
           }
         }
 
+        // --- WaveSpeed Provider (t2v/i2v) ---
+        if (isWavespeed) {
+          const wsRequestId = job.runpod_job_id.slice(3); // Strip "ws:" prefix
+          const wsStatus = await getWavespeedJobStatus(wsRequestId);
+
+          if (wsStatus.status === "COMPLETED") {
+            const wsResult = await getWavespeedJobResult(wsRequestId);
+
+            // Download and upload to R2
+            const vKey = videoStorageKey(job.user_id, job.id);
+            const videoRes = await fetch(wsResult.videoUrl);
+            if (!videoRes.ok) throw new Error(`Failed to download WaveSpeed video: ${videoRes.status}`);
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            await uploadVideo(vKey, videoBuffer);
+            await verifyR2Upload(vKey);
+
+            const videoId = randomUUID();
+            const videoApiUrl = `/api/videos/${videoId}`;
+            const thumbnailUrl = await extractAndUploadThumbnail(vKey, job.user_id, videoId);
+
+            await createVideo({
+              id: videoId,
+              userId: job.user_id,
+              jobId: job.id,
+              title: job.prompt.slice(0, 100),
+              url: videoApiUrl,
+              thumbnailUrl,
+              modelId: job.model_id,
+              prompt: job.prompt,
+              resolution: job.resolution,
+              duration: job.duration,
+              fps: job.fps,
+              fileSize: videoBuffer.length,
+              aspectRatio: job.aspect_ratio,
+              audioUrl: job.audio_url,
+              audioTrackId: job.audio_track_id,
+            });
+
+            await updateJobStatus(job.id, {
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              completedAt: new Date().toISOString(),
+            });
+
+            if (user?.email) {
+              sendVideoReadyEmail(user.email, user.name || "Creator", videoId).catch((err) =>
+                console.error("[JOB STATUS] Video-ready email failed:", err)
+              );
+            }
+
+            import("@/lib/owner-autopost").then(({ autoPostSingleVideo }) =>
+              autoPostSingleVideo(clerkId, videoStorageKey(job.user_id, job.id), job.prompt)
+            ).catch(() => {});
+
+            autoPublishToExplore({
+              jobId: job.id,
+              userId: job.user_id,
+              prompt: job.prompt,
+              modelId: job.model_id,
+              videoUrl: videoApiUrl,
+              thumbnailUrl,
+              duration: job.duration,
+              resolution: job.resolution,
+              hasAudio: !!job.audio_url || !!job.audio_track_id,
+              type: "standard",
+              userPlan: user?.plan,
+              creatorName: user?.name || "Genesis Creator",
+              creatorAvatarUrl: user?.avatar_url,
+            }).catch((err) => console.error("[JOB STATUS] Auto-publish failed:", err));
+
+            return NextResponse.json({
+              id: job.id,
+              status: "completed",
+              progress: 100,
+              outputVideoUrl: videoApiUrl,
+              modelId: job.model_id,
+              prompt: job.prompt,
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+              completedAt: new Date().toISOString(),
+            });
+          } else if (wsStatus.status === "FAILED") {
+            await updateJobStatus(job.id, {
+              status: "failed",
+              errorMessage: wsStatus.error || "WaveSpeed generation failed",
+              completedAt: new Date().toISOString(),
+            });
+            await refundCredits(job.user_id, job.credits_cost, job.id, "WaveSpeed generation failed — automatic refund");
+            return NextResponse.json({
+              id: job.id,
+              status: "failed",
+              errorMessage: wsStatus.error || "Generation failed",
+              creditsCost: job.credits_cost,
+              createdAt: job.created_at,
+            });
+          } else if (wsStatus.status === "IN_PROGRESS") {
+            await updateJobStatus(job.id, { status: "processing", progress: 50 });
+            job.status = "processing";
+            job.progress = 50;
+          }
+          // IN_QUEUE — keep as queued, fall through to return current status
+        }
+
         // --- FAL.AI Provider (t2v/i2v) ---
-        if (!isFalMotion && isFal) {
+        if (!isFalMotion && !isWavespeed && isFal) {
           const falStatus = await getFalJobStatus(
             job.model_id as ModelId,
             job.runpod_job_id,

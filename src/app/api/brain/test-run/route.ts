@@ -11,6 +11,7 @@ import {
   updateProductionScene,
 } from "@/lib/genesis-brain/orchestrator";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
 import { AI_MODELS } from "@/lib/constants";
 import { BrainInput, ModelId } from "@/types";
 
@@ -143,29 +144,56 @@ export async function GET(req: NextRequest) {
         const isFalScene = modelConfig?.provider === "fal";
 
         if (isFalScene) {
+          const isWsScene = scene.runpodJobId.startsWith("ws:");
           try {
-            const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
-            if (falStatus.status === "COMPLETED") {
-              const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
-              await updateProductionScene(scene.id, {
-                status: "completed",
-                output_video_url: result.videoUrl,
-                progress: 100,
-              });
-              scene.status = "completed" as typeof scene.status;
-              log(`Scene ${scene.sceneNumber}: COMPLETED (FAL)`);
-            } else if (falStatus.status === "FAILED") {
-              await updateProductionScene(scene.id, {
-                status: "failed",
-                error_message: falStatus.error || "FAL generation failed",
-              });
-              scene.status = "failed" as typeof scene.status;
-              log(`Scene ${scene.sceneNumber}: FAILED — ${falStatus.error}`);
+            if (isWsScene) {
+              // WaveSpeed job
+              const wsRequestId = scene.runpodJobId.slice(3);
+              const wsStatus = await getWavespeedJobStatus(wsRequestId);
+              if (wsStatus.status === "COMPLETED") {
+                const result = await getWavespeedJobResult(wsRequestId);
+                await updateProductionScene(scene.id, {
+                  status: "completed",
+                  output_video_url: result.videoUrl,
+                  progress: 100,
+                });
+                scene.status = "completed" as typeof scene.status;
+                log(`Scene ${scene.sceneNumber}: COMPLETED (WaveSpeed)`);
+              } else if (wsStatus.status === "FAILED") {
+                await updateProductionScene(scene.id, {
+                  status: "failed",
+                  error_message: wsStatus.error || "WaveSpeed generation failed",
+                });
+                scene.status = "failed" as typeof scene.status;
+                log(`Scene ${scene.sceneNumber}: FAILED — ${wsStatus.error}`);
+              } else {
+                log(`Scene ${scene.sceneNumber}: ${wsStatus.status} (WaveSpeed)`);
+              }
             } else {
-              log(`Scene ${scene.sceneNumber}: ${falStatus.status} (FAL)`);
+              // FAL job
+              const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
+              if (falStatus.status === "COMPLETED") {
+                const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
+                await updateProductionScene(scene.id, {
+                  status: "completed",
+                  output_video_url: result.videoUrl,
+                  progress: 100,
+                });
+                scene.status = "completed" as typeof scene.status;
+                log(`Scene ${scene.sceneNumber}: COMPLETED (FAL)`);
+              } else if (falStatus.status === "FAILED") {
+                await updateProductionScene(scene.id, {
+                  status: "failed",
+                  error_message: falStatus.error || "FAL generation failed",
+                });
+                scene.status = "failed" as typeof scene.status;
+                log(`Scene ${scene.sceneNumber}: FAILED — ${falStatus.error}`);
+              } else {
+                log(`Scene ${scene.sceneNumber}: ${falStatus.status} (FAL)`);
+              }
             }
           } catch (err) {
-            log(`Scene ${scene.sceneNumber}: FAL poll error — ${err instanceof Error ? err.message : err}`);
+            log(`Scene ${scene.sceneNumber}: ${isWsScene ? "WaveSpeed" : "FAL"} poll error — ${err instanceof Error ? err.message : err}`);
           }
         } else {
           try {

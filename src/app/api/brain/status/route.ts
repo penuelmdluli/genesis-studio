@@ -9,6 +9,7 @@ import {
   resubmitStuckScenes,
 } from "@/lib/genesis-brain/orchestrator";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
 import { getDb } from "@/lib/db-driver";
 import { ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
@@ -112,31 +113,59 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // FAL model — poll FAL API
+        // WaveSpeed or FAL model — poll the correct API
+        const isWsScene = scene.runpodJobId.startsWith("ws:");
         try {
-          const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
+          if (isWsScene) {
+            // WaveSpeed — strip prefix and poll WaveSpeed API
+            const wsRequestId = scene.runpodJobId.slice(3);
+            const wsStatus = await getWavespeedJobStatus(wsRequestId);
 
-          if (falStatus.status === "COMPLETED") {
-            const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
-            await updateProductionScene(scene.id, {
-              status: "completed",
-              output_video_url: result.videoUrl,
-              progress: 100,
-            });
-            scene.status = "completed" as typeof scene.status;
-            scene.outputVideoUrl = result.videoUrl;
-          } else if (falStatus.status === "FAILED") {
-            await updateProductionScene(scene.id, {
-              status: "failed",
-              error_message: falStatus.error || "FAL generation failed",
-            });
-            scene.status = "failed" as typeof scene.status;
-          } else if (falStatus.status === "IN_PROGRESS") {
-            await updateProductionScene(scene.id, { progress: 50 });
-            scene.progress = 50;
+            if (wsStatus.status === "COMPLETED") {
+              const result = await getWavespeedJobResult(wsRequestId);
+              await updateProductionScene(scene.id, {
+                status: "completed",
+                output_video_url: result.videoUrl,
+                progress: 100,
+              });
+              scene.status = "completed" as typeof scene.status;
+              scene.outputVideoUrl = result.videoUrl;
+            } else if (wsStatus.status === "FAILED") {
+              await updateProductionScene(scene.id, {
+                status: "failed",
+                error_message: wsStatus.error || "WaveSpeed generation failed",
+              });
+              scene.status = "failed" as typeof scene.status;
+            } else if (wsStatus.status === "IN_PROGRESS") {
+              await updateProductionScene(scene.id, { progress: 50 });
+              scene.progress = 50;
+            }
+          } else {
+            // FAL — poll FAL API
+            const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
+
+            if (falStatus.status === "COMPLETED") {
+              const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
+              await updateProductionScene(scene.id, {
+                status: "completed",
+                output_video_url: result.videoUrl,
+                progress: 100,
+              });
+              scene.status = "completed" as typeof scene.status;
+              scene.outputVideoUrl = result.videoUrl;
+            } else if (falStatus.status === "FAILED") {
+              await updateProductionScene(scene.id, {
+                status: "failed",
+                error_message: falStatus.error || "FAL generation failed",
+              });
+              scene.status = "failed" as typeof scene.status;
+            } else if (falStatus.status === "IN_PROGRESS") {
+              await updateProductionScene(scene.id, { progress: 50 });
+              scene.progress = 50;
+            }
           }
         } catch (err) {
-          console.warn(`[BRAIN STATUS] FAL poll error for scene ${scene.id}:`, err);
+          console.warn(`[BRAIN STATUS] ${isWsScene ? "WaveSpeed" : "FAL"} poll error for scene ${scene.id}:`, err);
         }
       }
 

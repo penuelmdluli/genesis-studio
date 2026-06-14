@@ -13,9 +13,14 @@
 
 import crypto from "crypto";
 import { shouldUseRunPodComfyUI } from "./runpod-comfyui";
-import { VendorProvider } from "./vendor-failover";
+import { VendorProvider, isProviderAvailable, recordProviderSuccess, recordProviderFailure } from "./vendor-failover";
 import { isOverDailyProviderCap } from "./spend-tracker";
 import { envNumber } from "./env";
+import { envString } from "./env";
+import { submitFalJob } from "./fal";
+import { submitWavespeedJob } from "./wavespeed";
+import { AI_MODELS } from "./constants";
+import { ModelId } from "@/types";
 
 export type ProviderChain = VendorProvider[];
 
@@ -86,4 +91,79 @@ export function selectProviderChainSync(userPlan: string): ProviderChain {
     return ["runpod-comfyui", "runpod", "fal"];
   }
   return ["fal", "runpod", "replicate"];
+}
+
+// ============================================
+// Multi-Provider Video Submission
+// ============================================
+// Routes video gen to cheapest provider (WaveSpeed) with FAL fallback.
+// WaveSpeed jobs are prefixed with "ws:" in the request_id so the
+// status poller knows which API to call.
+
+export type VideoSubmitResult = {
+  request_id: string;
+  status: string;
+  provider: "wavespeed" | "fal";
+};
+
+/**
+ * Check if WaveSpeed is configured and available for a model + type.
+ */
+function canUseWavespeed(modelId: ModelId, type: "t2v" | "i2v"): boolean {
+  if (!envString("WAVESPEED_API_KEY")) return false;
+  if (!isProviderAvailable("wavespeed")) return false;
+
+  const model = AI_MODELS[modelId];
+  if (!model) return false;
+
+  if (type === "i2v") return !!model.wavespeedModelIdI2V;
+  return !!model.wavespeedModelId;
+}
+
+/**
+ * Submit a video generation job to the cheapest available provider.
+ * Tries WaveSpeed first (30-50% cheaper), falls back to FAL.AI.
+ *
+ * Returns a VideoSubmitResult with a prefixed request_id:
+ *  - "ws:{id}" for WaveSpeed jobs
+ *  - raw FAL request_id for FAL jobs
+ */
+export async function submitVideoJob(params: {
+  modelId: ModelId;
+  type: "t2v" | "i2v";
+  prompt: string;
+  negativePrompt?: string;
+  imageUrl?: string;
+  duration?: number;
+  aspectRatio?: string;
+  enableAudio?: boolean;
+  seed?: number;
+}): Promise<VideoSubmitResult> {
+  // Try WaveSpeed first (cheaper for video gen)
+  if (canUseWavespeed(params.modelId, params.type)) {
+    try {
+      const result = await submitWavespeedJob(params);
+      recordProviderSuccess("wavespeed");
+      console.log(`[ROUTER] ${params.modelId} routed to WaveSpeed (cheaper)`);
+      return {
+        request_id: `ws:${result.request_id}`,
+        status: result.status,
+        provider: "wavespeed",
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ROUTER] WaveSpeed failed for ${params.modelId}: ${msg}, falling back to FAL`);
+      recordProviderFailure("wavespeed", msg);
+    }
+  }
+
+  // Fallback to FAL.AI (always available, full feature set)
+  const falResult = await submitFalJob(params);
+  recordProviderSuccess("fal");
+  console.log(`[ROUTER] ${params.modelId} routed to FAL.AI`);
+  return {
+    request_id: falResult.request_id,
+    status: falResult.status,
+    provider: "fal",
+  };
 }

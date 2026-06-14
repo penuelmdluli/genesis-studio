@@ -107,6 +107,8 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     hasAudio: true,
     falModelId: "fal-ai/kling-video/v2.6/pro/text-to-video",
     falModelIdI2V: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    wavespeedModelId: "kwaivgi/kling-v2.6-pro/text-to-video",
+    wavespeedModelIdI2V: "kwaivgi/kling-v2.6-pro/image-to-video",
     maxDuration: 10,
   },
   "kling-3.0": {
@@ -126,6 +128,8 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     hasAudio: true,
     falModelId: "fal-ai/kling-video/v3/pro/text-to-video",
     falModelIdI2V: "fal-ai/kling-video/v3/pro/image-to-video",
+    wavespeedModelId: "kwaivgi/kling-v3.0-pro/text-to-video",
+    wavespeedModelIdI2V: "kwaivgi/kling-v3.0-pro/image-to-video",
     maxDuration: 10,
   },
   "veo-3.1": {
@@ -143,6 +147,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     provider: "fal",
     hasAudio: true,
     falModelId: "fal-ai/veo3",
+    wavespeedModelId: "google/veo3.1/text-to-video",
     maxDuration: 8,
   },
   "seedance-1.5": {
@@ -161,6 +166,8 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     hasAudio: false,
     falModelId: "fal-ai/bytedance/seedance/v1/pro/text-to-video",
     falModelIdI2V: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+    wavespeedModelId: "bytedance/seedance-v1.5-pro/text-to-video",
+    wavespeedModelIdI2V: "bytedance/seedance-v1.5-pro/image-to-video",
     maxDuration: 10,
   },
   "ai-singer": {

@@ -14,6 +14,7 @@ import {
   resubmitStuckScenes,
 } from "@/lib/genesis-brain/orchestrator";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
 import { getDb } from "@/lib/db-driver";
 import { ModelId, BrainInput } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
@@ -196,15 +197,31 @@ export async function POST(req: NextRequest) {
           }
 
           try {
-            const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
-            if (falStatus.status === "COMPLETED") {
-              const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
-              await updateProductionScene(scene.id, { status: "completed", output_video_url: result.videoUrl, progress: 100 });
-              scene.status = "completed" as typeof scene.status;
-              scene.outputVideoUrl = result.videoUrl;
-            } else if (falStatus.status === "FAILED") {
-              await updateProductionScene(scene.id, { status: "failed", error_message: falStatus.error || "Failed" });
-              scene.status = "failed" as typeof scene.status;
+            if (scene.runpodJobId.startsWith("ws:")) {
+              // WaveSpeed job
+              const wsRequestId = scene.runpodJobId.slice(3);
+              const wsStatus = await getWavespeedJobStatus(wsRequestId);
+              if (wsStatus.status === "COMPLETED") {
+                const result = await getWavespeedJobResult(wsRequestId);
+                await updateProductionScene(scene.id, { status: "completed", output_video_url: result.videoUrl, progress: 100 });
+                scene.status = "completed" as typeof scene.status;
+                scene.outputVideoUrl = result.videoUrl;
+              } else if (wsStatus.status === "FAILED") {
+                await updateProductionScene(scene.id, { status: "failed", error_message: wsStatus.error || "Failed" });
+                scene.status = "failed" as typeof scene.status;
+              }
+            } else {
+              // FAL job
+              const falStatus = await getFalJobStatus(sceneModelId, scene.runpodJobId);
+              if (falStatus.status === "COMPLETED") {
+                const result = await getFalJobResult(sceneModelId, scene.runpodJobId);
+                await updateProductionScene(scene.id, { status: "completed", output_video_url: result.videoUrl, progress: 100 });
+                scene.status = "completed" as typeof scene.status;
+                scene.outputVideoUrl = result.videoUrl;
+              } else if (falStatus.status === "FAILED") {
+                await updateProductionScene(scene.id, { status: "failed", error_message: falStatus.error || "Failed" });
+                scene.status = "failed" as typeof scene.status;
+              }
             }
           } catch {}
         }

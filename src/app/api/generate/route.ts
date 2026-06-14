@@ -4,6 +4,7 @@ import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { submitFalJob } from "@/lib/fal";
+import { submitVideoJob } from "@/lib/provider-router";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { isProfitable } from "@/lib/profitability";
@@ -150,9 +151,9 @@ export async function POST(req: NextRequest) {
     let actualModelId: string = body.modelId;
     try {
       if (model.provider === "fal") {
-        // FAL.AI — premium models with native audio
+        // Premium models — route through provider router (WaveSpeed → FAL fallback)
         try {
-          const falResult = await submitFalJob({
+          const routerResult = await submitVideoJob({
             modelId: body.modelId,
             type: effectiveType as "t2v" | "i2v",
             prompt: body.prompt,
@@ -165,12 +166,12 @@ export async function POST(req: NextRequest) {
           });
 
           await updateJobStatus(job.id, {
-            runpodJobId: falResult.request_id,
+            runpodJobId: routerResult.request_id,
             status: "queued",
           });
         } catch (falError) {
           const falMsg = falError instanceof Error ? falError.message : String(falError);
-          // Auto-fallback to RunPod Wan 2.2 on FAL billing/auth errors
+          // Auto-fallback to RunPod Wan 2.2 on billing/auth errors
           if (falMsg.includes("Forbidden") || falMsg.includes("locked") || falMsg.includes("balance") || falMsg.includes("403")) {
             console.warn(`[FAL_FALLBACK] ${body.modelId} failed (${falMsg}), falling back to wan-2.2`);
             usedFallback = true;
@@ -217,8 +218,10 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Track provider success
-      recordProviderSuccess(model.provider === "fal" ? "fal" : "runpod");
+      // Track provider success (router already tracks wavespeed/fal internally)
+      if (model.provider !== "fal") {
+        recordProviderSuccess("runpod");
+      }
 
       sendSlackAlert({
         level: "info",

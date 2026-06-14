@@ -20,6 +20,7 @@ import { startAssembly, pollAssembly } from "@/lib/genesis-brain/assembly";
 import { resubmitStuckScenes } from "@/lib/genesis-brain/orchestrator";
 import { getRunPodJobStatus } from "@/lib/runpod";
 import { getFalJobStatus, getFalJobResult } from "@/lib/fal";
+import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
 import { AI_MODELS } from "@/lib/constants";
 import { uploadVideo, getSignedDownloadUrl } from "@/lib/storage";
 import { ModelId } from "@/types";
@@ -175,31 +176,61 @@ export async function POST(req: NextRequest) {
 
             try {
               if (isFalScene) {
-                // ── FAL scene polling ──
-                const falStatus = await getFalJobStatus(scene.modelId as ModelId, scene.runpodJobId);
-                if (falStatus.status === "COMPLETED") {
-                  const falResult = await getFalJobResult(scene.modelId as ModelId, scene.runpodJobId);
-                  if (falResult.videoUrl) {
-                    await supabase.from("production_scenes").update({
-                      status: "completed",
-                      output_video_url: falResult.videoUrl,
-                      progress: 100,
-                    }).eq("id", scene.id);
-                    scene.status = "completed" as typeof scene.status;
-                    console.log(`[DEV POLL] FAL scene ${scene.id} COMPLETED: ${falResult.videoUrl.slice(0, 60)}...`);
-                  } else {
+                // ── FAL / WaveSpeed scene polling ──
+                const isWsScene = scene.runpodJobId.startsWith("ws:");
+                if (isWsScene) {
+                  const wsRequestId = scene.runpodJobId.slice(3);
+                  const wsStatus = await getWavespeedJobStatus(wsRequestId);
+                  if (wsStatus.status === "COMPLETED") {
+                    const wsResult = await getWavespeedJobResult(wsRequestId);
+                    if (wsResult.videoUrl) {
+                      await supabase.from("production_scenes").update({
+                        status: "completed",
+                        output_video_url: wsResult.videoUrl,
+                        progress: 100,
+                      }).eq("id", scene.id);
+                      scene.status = "completed" as typeof scene.status;
+                      console.log(`[DEV POLL] WaveSpeed scene ${scene.id} COMPLETED: ${wsResult.videoUrl.slice(0, 60)}...`);
+                    } else {
+                      await supabase.from("production_scenes").update({
+                        status: "failed",
+                        error_message: "WaveSpeed completed but no video URL in result",
+                      }).eq("id", scene.id);
+                      scene.status = "failed" as typeof scene.status;
+                    }
+                  } else if (wsStatus.status === "FAILED") {
                     await supabase.from("production_scenes").update({
                       status: "failed",
-                      error_message: "FAL completed but no video URL in result",
+                      error_message: wsStatus.error || "WaveSpeed generation failed",
                     }).eq("id", scene.id);
                     scene.status = "failed" as typeof scene.status;
                   }
-                } else if (falStatus.status === "FAILED") {
-                  await supabase.from("production_scenes").update({
-                    status: "failed",
-                    error_message: falStatus.error || "FAL generation failed",
-                  }).eq("id", scene.id);
-                  scene.status = "failed" as typeof scene.status;
+                } else {
+                  const falStatus = await getFalJobStatus(scene.modelId as ModelId, scene.runpodJobId);
+                  if (falStatus.status === "COMPLETED") {
+                    const falResult = await getFalJobResult(scene.modelId as ModelId, scene.runpodJobId);
+                    if (falResult.videoUrl) {
+                      await supabase.from("production_scenes").update({
+                        status: "completed",
+                        output_video_url: falResult.videoUrl,
+                        progress: 100,
+                      }).eq("id", scene.id);
+                      scene.status = "completed" as typeof scene.status;
+                      console.log(`[DEV POLL] FAL scene ${scene.id} COMPLETED: ${falResult.videoUrl.slice(0, 60)}...`);
+                    } else {
+                      await supabase.from("production_scenes").update({
+                        status: "failed",
+                        error_message: "FAL completed but no video URL in result",
+                      }).eq("id", scene.id);
+                      scene.status = "failed" as typeof scene.status;
+                    }
+                  } else if (falStatus.status === "FAILED") {
+                    await supabase.from("production_scenes").update({
+                      status: "failed",
+                      error_message: falStatus.error || "FAL generation failed",
+                    }).eq("id", scene.id);
+                    scene.status = "failed" as typeof scene.status;
+                  }
                 }
               } else {
                 // ── RunPod scene polling ──
@@ -232,7 +263,8 @@ export async function POST(req: NextRequest) {
                 }
               }
             } catch (e) {
-              console.warn(`[DEV POLL] ${isFalScene ? "FAL" : "RunPod"} poll error for scene ${scene.id}:`, e);
+              const providerLabel = isFalScene ? (scene.runpodJobId.startsWith("ws:") ? "WaveSpeed" : "FAL") : "RunPod";
+              console.warn(`[DEV POLL] ${providerLabel} poll error for scene ${scene.id}:`, e);
             }
           }
 

@@ -26,7 +26,7 @@ export type ModelTier =
   | "motion"
   | "hollywood";
 
-export type VideoProvider = "runpod-hub" | "runpod-custom" | "fal" | "runpod-comfyui";
+export type VideoProvider = "runpod-hub" | "runpod-custom" | "fal" | "wavespeed" | "runpod-comfyui";
 
 export type GenerationType = "t2v" | "i2v" | "v2v" | "motion";
 
@@ -103,6 +103,8 @@ export interface AIModel {
   hasAudio?: boolean;
   falModelId?: string;      // FAL.AI model ID for t2v
   falModelIdI2V?: string;   // FAL.AI model ID for i2v
+  wavespeedModelId?: string;    // WaveSpeed model ID for t2v
+  wavespeedModelIdI2V?: string; // WaveSpeed model ID for i2v
   maxDuration?: number;     // max duration in seconds
   launchAvailable?: boolean; // visible in model selector at launch
 }

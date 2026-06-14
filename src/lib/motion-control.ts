@@ -6,6 +6,12 @@
 // Fallback: Replicate MimicMotion for basic motion transfer.
 
 import { fal } from "@fal-ai/client";
+import { envString } from "@/lib/env";
+import {
+  isProviderAvailable,
+  recordProviderSuccess,
+  recordProviderFailure,
+} from "@/lib/vendor-failover";
 
 fal.config({ credentials: process.env.FAL_KEY || "" });
 
@@ -46,7 +52,93 @@ const MOTION_ENDPOINTS: Record<string, Record<string, string>> = {
   },
 };
 
+// WaveSpeed motion control endpoints (cheaper alternative)
+const WAVESPEED_MOTION_ENDPOINTS: Record<string, Record<string, string>> = {
+  "kling-v3": {
+    standard: "kwaivgi/kling-v3.0-std/motion-control",
+    pro: "kwaivgi/kling-v3.0-pro/motion-control",
+  },
+  "kling-v2.6": {
+    standard: "kwaivgi/kling-v2.6-std/motion-control",
+    pro: "kwaivgi/kling-v2.6-pro/motion-control",
+  },
+};
+
+const WAVESPEED_API_BASE = "https://api.wavespeed.ai/api/v3";
+
+/**
+ * Submit motion control to WaveSpeed (cheaper).
+ * Returns null if WaveSpeed is unavailable or fails.
+ */
+async function tryWavespeedMotion(params: {
+  characterImageUrl: string;
+  referenceVideoUrl?: string;
+  effect?: string;
+  prompt?: string;
+  quality: string;
+  model: string;
+  orientation: string;
+  keepOriginalSound: boolean;
+  negativePrompt?: string;
+}): Promise<{ requestId: string; endpoint: string } | null> {
+  const wsKey = envString("WAVESPEED_API_KEY");
+  if (!wsKey) return null;
+  if (!isProviderAvailable("wavespeed")) return null;
+
+  // Effects are only supported on FAL (Kling-specific feature)
+  if (params.effect) return null;
+
+  // Must have a reference video for WaveSpeed motion control
+  if (!params.referenceVideoUrl) return null;
+
+  const wsEndpoint = WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
+    || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"];
+
+  const body: Record<string, unknown> = {
+    image: params.characterImageUrl,
+    video: params.referenceVideoUrl,
+    character_orientation: params.orientation,
+    keep_original_sound: params.keepOriginalSound,
+  };
+  if (params.prompt) body.prompt = params.prompt;
+  if (params.negativePrompt) body.negative_prompt = params.negativePrompt;
+
+  try {
+    console.log(`[Motion] Trying WaveSpeed: ${wsEndpoint}`);
+    const res = await fetch(`${WAVESPEED_API_BASE}/${wsEndpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${wsKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`WaveSpeed motion failed (${res.status}): ${errText}`);
+    }
+
+    const json = (await res.json()) as { data: { id: string; status: string } };
+    const data = json.data;
+    recordProviderSuccess("wavespeed");
+    console.log(`[Motion] WaveSpeed motion submitted: ${data.id}`);
+
+    return {
+      requestId: data.id,
+      // Use "ws:" prefix on endpoint so the poller routes to WaveSpeed API
+      endpoint: `ws:${wsEndpoint}`,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[Motion] WaveSpeed motion failed: ${msg}, falling back to FAL`);
+    recordProviderFailure("wavespeed", msg);
+    return null;
+  }
+}
+
 // Submit motion control job (async queue to avoid Vercel timeout)
+// Tries WaveSpeed first (cheaper), falls back to FAL.AI
 export async function submitMotionControlJob(params: MotionControlParams): Promise<{
   requestId: string;
   endpoint: string;
@@ -70,6 +162,23 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     throw new Error("Either a reference video or a fun effect is required");
   }
 
+  // Try WaveSpeed first for custom reference video motion (not effects)
+  const wsResult = await tryWavespeedMotion({
+    characterImageUrl,
+    referenceVideoUrl,
+    effect,
+    prompt,
+    quality,
+    model,
+    orientation,
+    keepOriginalSound,
+  });
+
+  if (wsResult) {
+    return wsResult;
+  }
+
+  // Fallback to FAL.AI (always available, supports effects)
   const endpoint = MOTION_ENDPOINTS[model]?.[quality] || MOTION_ENDPOINTS["kling-v3"]["standard"];
 
   const input: Record<string, unknown> = {
@@ -86,7 +195,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
   if (keepOriginalSound) input.keep_original_sound = true;
   if (seed !== undefined && seed >= 0) input.seed = seed;
 
-  console.log(`[Motion] Submitting to ${endpoint}: effect=${effect || "custom"}, duration=${duration}s`);
+  console.log(`[Motion] Submitting to FAL: ${endpoint}: effect=${effect || "custom"}, duration=${duration}s`);
 
   const result = await fal.queue.submit(endpoint, { input });
 
@@ -97,6 +206,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
 }
 
 // Poll motion control job status
+// Handles both FAL endpoints and WaveSpeed endpoints (prefixed with "ws:")
 export async function getMotionJobStatus(
   endpoint: string,
   requestId: string
@@ -104,6 +214,35 @@ export async function getMotionJobStatus(
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   error?: string;
 }> {
+  // WaveSpeed motion — endpoint starts with "ws:"
+  if (endpoint.startsWith("ws:")) {
+    try {
+      const wsKey = envString("WAVESPEED_API_KEY");
+      if (!wsKey) return { status: "FAILED", error: "WAVESPEED_API_KEY not configured" };
+
+      const res = await fetch(`${WAVESPEED_API_BASE}/predictions/${requestId}/result`, {
+        headers: { Authorization: `Bearer ${wsKey}` },
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) return { status: "IN_QUEUE" };
+        return { status: "FAILED", error: `WaveSpeed status check failed: ${res.status}` };
+      }
+
+      const json = (await res.json()) as { data: { status: string; error?: string } };
+      const data = json.data;
+      switch (data.status) {
+        case "completed": return { status: "COMPLETED" };
+        case "failed": return { status: "FAILED", error: data.error || "WaveSpeed motion failed" };
+        case "processing": return { status: "IN_PROGRESS" };
+        default: return { status: "IN_QUEUE" };
+      }
+    } catch (err) {
+      return { status: "FAILED", error: String(err) };
+    }
+  }
+
+  // FAL motion
   try {
     const status = await fal.queue.status(endpoint, {
       requestId,
@@ -116,10 +255,32 @@ export async function getMotionJobStatus(
 }
 
 // Get completed motion control result
+// Handles both FAL and WaveSpeed endpoints
 export async function getMotionJobResult(
   endpoint: string,
   requestId: string
 ): Promise<{ videoUrl: string }> {
+  // WaveSpeed motion
+  if (endpoint.startsWith("ws:")) {
+    const wsKey = envString("WAVESPEED_API_KEY");
+    if (!wsKey) throw new Error("WAVESPEED_API_KEY not configured");
+
+    const res = await fetch(`${WAVESPEED_API_BASE}/predictions/${requestId}/result`, {
+      headers: { Authorization: `Bearer ${wsKey}` },
+    });
+
+    if (!res.ok) throw new Error(`WaveSpeed motion result fetch failed: ${res.status}`);
+
+    const json = (await res.json()) as { data: { outputs?: string[]; status: string } };
+    const data = json.data;
+    if (data.status !== "completed" || !data.outputs?.length) {
+      throw new Error("WaveSpeed motion result not ready or missing outputs");
+    }
+
+    return { videoUrl: data.outputs[0] };
+  }
+
+  // FAL motion
   const result = await fal.queue.result(endpoint, { requestId });
   const data = result.data as { video?: { url: string } };
 

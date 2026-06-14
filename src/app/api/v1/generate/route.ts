@@ -8,7 +8,7 @@ import { validateApiKey } from "@/lib/db";
 import { createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
-import { submitFalJob } from "@/lib/fal";
+import { submitVideoJob } from "@/lib/provider-router";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
     // Route to the correct provider (FAL.AI or RunPod)
     try {
       if (model.provider === "fal") {
-        // FAL.AI — premium models with native audio
-        const falResult = await submitFalJob({
+        // Premium models — route through provider router (WaveSpeed → FAL fallback)
+        const routerResult = await submitVideoJob({
           modelId: modelId as ModelId,
           type: type as "t2v" | "i2v",
           prompt: body.prompt,
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         });
 
         await updateJobStatus(job.id, {
-          runpodJobId: falResult.request_id,
+          runpodJobId: routerResult.request_id,
           status: "queued",
         });
       } else {

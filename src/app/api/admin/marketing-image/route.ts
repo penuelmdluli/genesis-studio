@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireStudioOwner } from "@/lib/studio/auth";
+import { envString } from "@/lib/env";
 import {
   SA_CHARACTER_PRESETS,
   SCENARIO_PRESETS,
@@ -23,17 +24,68 @@ import {
 
 const FAL_API_KEY = process.env.FAL_KEY || "";
 
+/**
+ * Apply branding overlay to a generated image.
+ * Sends to the scraper service which uses ffmpeg to stamp:
+ * - "ivideostudio.ai" website URL (bottom right)
+ * - "GENESIS STUDIO" logo text (top left, subtle)
+ * - "Create AI Videos FREE" tagline (bottom center)
+ * - Semi-transparent dark gradient bar at bottom for readability
+ */
+async function applyImageBranding(imageBuffer: Buffer): Promise<Buffer> {
+  const scraperUrl = envString("SCRAPER_SERVICE_URL");
+  const scraperSecret = envString("SCRAPER_SERVICE_SECRET");
+
+  if (!scraperUrl || !scraperSecret) {
+    // No scraper configured — return unbrandd
+    return imageBuffer;
+  }
+
+  try {
+    const res = await fetch(`${scraperUrl}/brand-image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-scraper-secret": scraperSecret,
+      },
+      body: JSON.stringify({
+        imageBase64: imageBuffer.toString("base64"),
+        website: "ivideostudio.ai",
+        logoText: "GENESIS STUDIO",
+        tagline: "Create AI Videos FREE",
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn("[MARKETING-IMG] Branding overlay failed, returning unbranded");
+      return imageBuffer;
+    }
+
+    const data = await res.json();
+    if (data.imageBase64) {
+      return Buffer.from(data.imageBase64, "base64");
+    }
+    return imageBuffer;
+  } catch (err) {
+    console.warn("[MARKETING-IMG] Branding error:", err);
+    return imageBuffer;
+  }
+}
+
 // ── Quality boosters appended to every prompt ──
 const QUALITY_SUFFIX =
-  "masterpiece, award-winning photography, ultra sharp focus, professional studio lighting, " +
-  "8K UHD, hyperrealistic, photorealistic skin texture, natural subsurface scattering, " +
+  "masterpiece, award-winning photography, ultra sharp focus, " +
+  "8K UHD, hyperrealistic, photorealistic skin texture, " +
   "full body visible from head to feet, full length shot, entire body in frame, " +
-  "clean background, ray tracing, volumetric lighting, cinematic color grading";
+  "main character in sharp focus center frame, blurred crowd of people celebrating in background, " +
+  "vibrant atmosphere, bokeh background figures, ray tracing, volumetric lighting, cinematic color grading";
 
-const NEGATIVE_PROMPT =
-  "cartoon, anime, illustration, painting, drawing, sketch, blurry, low quality, " +
-  "deformed, ugly, bad anatomy, bad hands, extra fingers, mutated, disfigured, " +
-  "watermark, text overlay, logo overlay, stock photo watermark";
+// Branding overlay config — applied AFTER AI generation via canvas
+const BRANDING = {
+  website: "ivideostudio.ai",
+  tagline: "Create AI Videos FREE",
+  logoText: "GENESIS STUDIO",
+};
 
 export async function GET(req: NextRequest) {
   const authResult = await requireStudioOwner();
@@ -111,17 +163,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No images generated" }, { status: 503 });
     }
 
-    // Convert to base64 to avoid CORS issues
+    // Convert to base64 and apply branding overlay via SVG
     const base64Images = await Promise.all(
       imageUrls.map(async (url: string) => {
         try {
           const imgRes = await fetch(url);
           if (!imgRes.ok) return url;
           const buffer = Buffer.from(await imgRes.arrayBuffer());
-          const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-          return `data:${contentType};base64,${buffer.toString("base64")}`;
+
+          // Apply branding overlay using the scraper service (ffmpeg)
+          const brandedBuffer = await applyImageBranding(buffer);
+
+          const contentType = "image/jpeg";
+          return `data:${contentType};base64,${brandedBuffer.toString("base64")}`;
         } catch {
-          return url;
+          // Fallback: return without branding
+          try {
+            const imgRes = await fetch(url);
+            if (!imgRes.ok) return url;
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+          } catch {
+            return url;
+          }
         }
       })
     );

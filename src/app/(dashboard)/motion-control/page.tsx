@@ -188,7 +188,7 @@ export default function MotionControlPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Full body photo of ${characterPrompt.trim()}, standing pose, entire body from head to feet visible, clear face, high quality, studio lighting, clean background, full length shot`,
+          prompt: `Full body photo of ${characterPrompt.trim()}, standing in a dance-ready pose, entire body from head to feet visible, sharp focus on main character, blurred crowd and people dancing in the background, vibrant party atmosphere, bokeh background figures, main subject centered and in focus, full length shot, 8K hyperrealistic`,
           aspectRatio: "portrait",
           numImages: 4,
         }),
@@ -328,7 +328,7 @@ export default function MotionControlPage() {
   const selectedEffectObj = FUN_EFFECTS.find((e) => e.id === selectedEffect);
 
   return (
-    <PageTransition className="space-y-6">
+    <PageTransition className="space-y-6 overflow-x-hidden">
       {/* Header */}
       <div>
         <div className="flex items-start gap-3 mb-4">
@@ -637,7 +637,7 @@ export default function MotionControlPage() {
                       {user?.isOwner && (
                         <>
                           <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Quick Presets</label>
-                          <div className="grid grid-cols-5 gap-1.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
                             {SA_CHARACTER_PRESETS.map((preset) => (
                               <button
                                 key={preset.id}
@@ -662,7 +662,7 @@ export default function MotionControlPage() {
                           {selectedPreset && (
                             <div className="space-y-1.5">
                               <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Scene / Vibe</label>
-                              <div className="flex gap-1.5 flex-wrap">
+                              <div className="flex gap-1.5 flex-wrap max-h-[120px] overflow-y-auto custom-scrollbar">
                                 <button
                                   onClick={() => setSelectedScenario(null)}
                                   className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
@@ -751,7 +751,7 @@ export default function MotionControlPage() {
 
                       {/* Generated options */}
                       {generatedCharacters.length > 0 && (
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {generatedCharacters.map((imgSrc, i) => (
                             <button
                               key={i}
@@ -788,7 +788,7 @@ export default function MotionControlPage() {
                   {characterTab === "history" && (
                     <div>
                       {characterHistory.length > 0 ? (
-                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
                           {characterHistory.map((item, i) => (
                             <button
                               key={i}

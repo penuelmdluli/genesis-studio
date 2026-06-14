@@ -25,6 +25,7 @@ import {
   Volume2,
   VolumeX,
   Link as LinkIcon,
+  Clock,
 } from "lucide-react";
 import {
   FUN_EFFECTS,
@@ -44,7 +45,7 @@ type MotionModel = "kling-v3" | "kling-v2.6";
 const MOTION_DURATIONS = [5, 10, 15, 20];
 
 export default function MotionControlPage() {
-  const { user, addJob, updateCreditBalance, isInitialized } = useStore();
+  const { user, addJob, updateCreditBalance, isInitialized, videos } = useStore();
   const { toast } = useToast();
 
   const isLoading = !isInitialized;
@@ -62,6 +63,9 @@ export default function MotionControlPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [characterPrompt, setCharacterPrompt] = useState("");
+  const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
+  const [generatedCharacters, setGeneratedCharacters] = useState<string[]>([]);
 
   // Model & quality
   const [model, setModel] = useState<MotionModel>("kling-v3");
@@ -158,12 +162,44 @@ export default function MotionControlPage() {
   const clearCharacterImage = () => {
     setCharacterImage(null);
     setCharacterImagePreview(null);
+    setGeneratedCharacters([]);
+    setCharacterPrompt("");
     if (characterImageRef.current) characterImageRef.current.value = "";
+  };
+
+  const handleGenerateCharacter = async () => {
+    if (!characterPrompt.trim() || isGeneratingCharacter) return;
+    setIsGeneratingCharacter(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Portrait photo of ${characterPrompt.trim()}, upper body visible, clear face, high quality, studio lighting, neutral background`,
+          aspectRatio: "portrait",
+          numImages: 4,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.images?.length > 0) {
+        setGeneratedCharacters(data.images);
+        toast("Character images generated! Pick one.", "success");
+      } else {
+        setError(data.error || "Failed to generate character");
+        toast(data.error || "Generation failed", "error");
+      }
+    } catch {
+      setError("Failed to generate character image");
+      toast("Network error", "error");
+    } finally {
+      setIsGeneratingCharacter(false);
+    }
   };
 
   const canGenerate =
     (motionVideo || selectedEffect || referenceUrl.trim()) &&
-    characterImage &&
+    (characterImage || characterImagePreview) &&
     hasEnoughCredits &&
     !isLoading;
 
@@ -181,8 +217,8 @@ export default function MotionControlPage() {
       setError("Upload a reference video, paste a URL, or pick a fun effect.");
       return;
     }
-    if (!characterImage) {
-      setError("Please upload a character image.");
+    if (!characterImage && !characterImagePreview) {
+      setError("Please upload or generate a character image.");
       return;
     }
     if (!hasEnoughCredits) {
@@ -196,7 +232,15 @@ export default function MotionControlPage() {
       progress.setProgress(10, "Uploading character image...");
 
       // Upload character image
-      const characterImageUrl = await uploadFileToR2(characterImage, "image");
+      let characterImageUrl: string;
+      if (characterImage && characterImage.size > 0) {
+        characterImageUrl = await uploadFileToR2(characterImage, "image");
+      } else if (characterImagePreview) {
+        // AI-generated image is already a URL or base64
+        characterImageUrl = characterImagePreview;
+      } else {
+        throw new Error("No character image");
+      }
 
       progress.setProgress(25, "Uploading motion reference...");
       progress.advanceStep("Applying motion reference...");
@@ -540,24 +584,57 @@ export default function MotionControlPage() {
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.04] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
-                  <input
-                    ref={characterImageRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={handleCharacterImageUpload}
-                    className="hidden"
-                  />
-                  <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500/20 transition-colors">
-                    <ImageIcon className="w-7 h-7 text-cyan-400" />
+                <div className="space-y-3">
+                  <label className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-500/40 bg-white/[0.04] hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group">
+                    <input
+                      ref={characterImageRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleCharacterImageUpload}
+                      className="hidden"
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-2 group-hover:bg-cyan-500/20 transition-colors">
+                      <Upload className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <span className="text-xs font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">Upload your photo</span>
+                    <span className="text-[10px] text-zinc-500 mt-0.5">PNG, JPG or WebP up to 10MB</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.08]" /></div>
+                    <div className="relative flex justify-center"><span className="bg-[#0f0f17] px-3 text-[10px] text-zinc-500">or generate with AI</span></div>
                   </div>
-                  <span className="text-sm font-medium text-zinc-400 group-hover:text-cyan-300 transition-colors">
-                    Add character image
-                  </span>
-                  <span className="text-xs text-zinc-400 mt-1">
-                    PNG, JPG or WebP up to 10MB
-                  </span>
-                </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={characterPrompt}
+                      onChange={(e) => setCharacterPrompt(e.target.value)}
+                      placeholder="e.g. Professional dancer in red dress, studio lighting"
+                      className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
+                    />
+                    <Button
+                      onClick={handleGenerateCharacter}
+                      disabled={!characterPrompt.trim() || isGeneratingCharacter}
+                      loading={isGeneratingCharacter}
+                      className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white px-4"
+                      size="sm"
+                    >
+                      <Wand2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  {generatedCharacters.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2">
+                      {generatedCharacters.map((imgSrc, i) => (
+                        <button
+                          key={i}
+                          onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
+                          className="aspect-square rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
+                        >
+                          <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -823,7 +900,7 @@ export default function MotionControlPage() {
                   <div className="flex justify-between">
                     <span className="text-zinc-200">Character</span>
                     <span className="text-zinc-300">
-                      {characterImage ? "Uploaded" : "—"}
+                      {characterImage && characterImage.size > 0 ? "Uploaded" : characterImagePreview ? "AI Generated" : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -900,6 +977,50 @@ export default function MotionControlPage() {
           </div>
         </div>
       </div>
+
+      {/* Recent Creations */}
+      {videos.filter(v => v.modelId === "mimic-motion").length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-zinc-400" />
+              Recent Creations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+              {videos.filter(v => v.modelId === "mimic-motion").slice(0, 8).map((vid) => (
+                <div key={vid.id} className="shrink-0 w-40 rounded-xl border border-white/[0.10] bg-white/[0.04] overflow-hidden group">
+                  <div className="aspect-video bg-black/40 relative">
+                    {vid.thumbnailUrl ? (
+                      <img src={vid.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-6 h-6 text-zinc-500" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-1 right-1">
+                      <span className="px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-zinc-300">{vid.duration}s</span>
+                    </div>
+                  </div>
+                  <div className="p-2 space-y-1.5">
+                    <p className="text-[11px] text-zinc-300 line-clamp-2 leading-tight">{vid.prompt?.slice(0, 60) || "Motion video"}</p>
+                    <p className="text-[9px] text-zinc-500">{new Date(vid.createdAt).toLocaleDateString()}</p>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => { setPrompt(vid.prompt || ""); toast("Prompt loaded from history", "success"); }}
+                        className="flex-1 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-[10px] text-violet-300 font-medium transition-colors"
+                      >
+                        Recreate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Mobile progress tracker */}
       {(progress.isActive || progress.percent > 0) && (

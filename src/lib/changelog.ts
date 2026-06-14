@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-06-14-react-studio",
+    date: "2026-06-14",
+    title: "React Studio",
+    description: "Insert yourself into any video scene — react with celebrities, join the World Cup, enter movie scenes. Upload your photo and describe the scene.",
+    type: "feature",
+    badge: "Hot",
+  },
+  {
     id: "2026-06-14-ai-character-generator",
     date: "2026-06-14",
     title: "AI Character Generator",

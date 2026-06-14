@@ -62,6 +62,7 @@ const baseNavItems: NavItem[] = [
   { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create" },
   { href: "/music-video", label: "Music Video", icon: Radio, section: "Create" },
   { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "HOT" },
+  { href: "/react-studio", label: "React Studio", icon: Users, section: "Create", badge: "HOT" },
   // --- ENHANCE ---
   { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance" },
   // --- AUDIO ---

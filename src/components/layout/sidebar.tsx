@@ -54,25 +54,24 @@ const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/explore", label: "Explore", icon: Globe, section: "Discover" },
   // --- CREATE ---
-  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create", badge: "NEW" },
+  { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "HOT" },
   { href: "/brain/templates", label: "Templates", icon: Film, section: "Create" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
-  { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create", badge: "NEW" },
-  { href: "/music-video", label: "Music Video", icon: Radio, section: "Create", badge: "NEW" },
+  { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create" },
+  { href: "/music-video", label: "Music Video", icon: Radio, section: "Create" },
   { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "HOT" },
-  // Mimic Studio merged into Motion Control — removed from sidebar
   // --- ENHANCE ---
-  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance", badge: "NEW" },
+  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance" },
   // --- AUDIO ---
-  { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio", badge: "NEW" },
-  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio", badge: "NEW" },
+  { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio" },
+  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio" },
   // --- IMAGE ---
-  { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image", badge: "NEW" },
+  { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image" },
   { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "HOT" },
   // --- EDIT ---
-  { href: "/edit", label: "Video Editor", icon: Scissors, section: "Edit", badge: "NEW" },
+  { href: "/edit", label: "Video Editor", icon: Scissors, section: "Edit" },
   // --- MANAGE ---
   { href: "/gallery", label: "Gallery", icon: Film, section: "Manage" },
   { href: "/collections", label: "Collections", icon: FolderOpen, section: "Manage" },

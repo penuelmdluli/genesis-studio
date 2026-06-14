@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Megaphone } from "lucide-react";
+import { Newspaper } from "lucide-react";
 import { CHANGELOG, type ChangelogEntry } from "@/lib/changelog";
 
 export function WhatsNewBell() {
@@ -51,7 +51,7 @@ export function WhatsNewBell() {
         aria-label="What's New"
         title="What's New"
       >
-        <Megaphone className="w-5 h-5 text-zinc-400" />
+        <Newspaper className="w-5 h-5 text-zinc-400" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-violet-500 text-[10px] font-bold text-white rounded-full flex items-center justify-center min-w-[18px] h-[18px]">
             {unreadCount > 9 ? "9+" : unreadCount}

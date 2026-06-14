@@ -1,6 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour — must match backend
+const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000; // check every 60s
 
 interface User {
   id: string;
@@ -32,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const lastActivityRef = useRef<number>(Date.now());
 
   const fetchUser = useCallback(async () => {
     try {
@@ -39,6 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+      } else if (res.status === 401) {
+        // Session expired — redirect to sign-in
+        setUser(null);
+        if (window.location.pathname.startsWith("/dashboard") ||
+            window.location.pathname.startsWith("/generate") ||
+            window.location.pathname.startsWith("/brain") ||
+            window.location.pathname.startsWith("/motion-control") ||
+            window.location.pathname.startsWith("/react-studio") ||
+            window.location.pathname.startsWith("/gallery") ||
+            window.location.pathname.startsWith("/settings")) {
+          window.location.href = "/sign-in?expired=1";
+        }
       } else {
         setUser(null);
       }
@@ -53,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
@@ -61,7 +77,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     window.location.href = "/sign-in";
-  };
+  }, []);
+
+  // ── Inactivity detection ──────────────────────────────────────
+  useEffect(() => {
+    // Track user activity
+    const onActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"] as const;
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+
+    // Periodically check if the user has been idle too long
+    const interval = setInterval(() => {
+      if (!user) return;
+      const idle = Date.now() - lastActivityRef.current;
+      if (idle >= INACTIVITY_TIMEOUT_MS) {
+        // Session timed out due to inactivity — sign out with expired flag
+        fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        setUser(null);
+        window.location.href = "/sign-in?expired=1";
+        return;
+      }
+    }, ACTIVITY_CHECK_INTERVAL_MS);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(interval);
+    };
+  }, [user, signOut]);
 
   return (
     <AuthContext.Provider

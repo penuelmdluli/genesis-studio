@@ -3,7 +3,9 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { AuthBackgroundVideo } from "@/components/auth-background-video";
 
-export default function SignInPage() {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ expired?: string }> }) {
+  const params = await searchParams;
+  const sessionExpired = params.expired === "1";
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex relative overflow-hidden">
       {/* Live background — looping AI generations from explore picks */}
@@ -76,6 +78,13 @@ export default function SignInPage() {
             </div>
             <p className="text-sm text-zinc-400">Sign in to continue creating</p>
           </div>
+
+          {sessionExpired && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+              <p className="text-sm font-medium text-amber-300">Session expired</p>
+              <p className="text-xs text-amber-400/70 mt-0.5">Please sign in again to continue</p>
+            </div>
+          )}
 
           <SignInForm />
 

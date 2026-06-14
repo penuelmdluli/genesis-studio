@@ -169,6 +169,13 @@ export default function DashboardLayout({
           fetch("/api/jobs?status=queued&limit=50"),
           fetch("/api/jobs?status=processing&limit=50"),
         ]);
+
+        // Session expired — redirect to sign-in immediately
+        if (userRes.status === 401) {
+          window.location.href = "/sign-in?expired=1";
+          return;
+        }
+
         if (userRes.ok) {
           const userData = await userRes.json();
           setUser(userData);

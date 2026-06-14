@@ -57,7 +57,7 @@ export default function SignUpPage() {
             {[
               { text: "Text to video, image to video, motion transfer", highlight: false },
               { text: "Brain Studio: one prompt, full short film with audio", highlight: true },
-              { text: "Mimic Studio: make any character dance to any video", highlight: true },
+              { text: "Motion Control: make any character dance to any video", highlight: true },
               { text: "Download, share to TikTok, Instagram, WhatsApp", highlight: false },
             ].map((item) => (
               <div key={item.text} className="flex items-center gap-2.5 text-sm">

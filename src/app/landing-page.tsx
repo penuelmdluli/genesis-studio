@@ -86,10 +86,10 @@ const howItWorksSteps = [
 const capabilities = [
   {
     icon: Zap,
-    title: "Mimic Studio",
-    description: "Upload any character photo + a dance video. AI makes your character perform the moves. Viral content in minutes.",
+    title: "Motion Control",
+    description: "Upload a character photo + dance video, paste a TikTok URL, or pick from 40+ fun effects. AI makes your character perform the moves.",
     models: [],
-    badge: "NEW",
+    badge: "HOT",
   },
   {
     icon: Brain,
@@ -545,10 +545,10 @@ export default function LandingPage() {
                     Get 100 Free Credits
                   </Button>
                 </Link>
-                <Link href="/mimic">
+                <Link href="/motion-control">
                   <Button variant="outline" size="lg" className="text-base px-8 py-4">
                     <Zap className="w-5 h-5" />
-                    Try Mimic Studio
+                    Try Motion Control
                   </Button>
                 </Link>
               </div>
@@ -580,7 +580,7 @@ export default function LandingPage() {
                 {[
                   { href: "/generate", label: "Generate" },
                   { href: "/brain", label: "Brain Studio" },
-                  { href: "/mimic", label: "Mimic Studio" },
+                  { href: "/motion-control", label: "Motion Control" },
                   { href: "/explore", label: "Explore" },
                   { href: "/pricing", label: "Pricing" },
                 ].map((link) => (

@@ -52,7 +52,7 @@ export default function SignInPage() {
             {[
               "10+ AI video models in one place",
               "Brain Studio: script to full film",
-              "Mimic Studio: any character, any dance",
+              "Motion Control: any character, any dance",
             ].map((item) => (
               <div key={item} className="flex items-center gap-2.5 text-sm text-zinc-400">
                 <div className="w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">

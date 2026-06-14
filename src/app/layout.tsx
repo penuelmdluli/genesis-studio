@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "image to video",
     "AI dance video",
     "Genesis Studio",
-    "Mimic Studio",
+    "Motion Control",
     "Brain Studio",
     "AI video South Africa",
     "create AI videos free",

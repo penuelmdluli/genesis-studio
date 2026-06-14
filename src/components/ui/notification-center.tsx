@@ -147,7 +147,7 @@ export function NotificationCenter() {
             {notifications.length > 0 && (
               <button
                 onClick={clearNotifications}
-                className="text-zinc-400 hover:text-zinc-400 transition-colors p-1"
+                className="text-zinc-400 hover:text-red-400 transition-colors p-1"
                 title="Clear all"
               >
                 <Trash2 className="w-3.5 h-3.5" />

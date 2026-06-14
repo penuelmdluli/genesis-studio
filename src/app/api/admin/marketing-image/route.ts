@@ -22,7 +22,8 @@ import {
   getMarketingImageHistory,
 } from "@/lib/owner-marketing";
 
-const FAL_API_KEY = process.env.FAL_KEY || "";
+const WS_API_BASE = "https://api.wavespeed.ai/api/v3";
+const WS_IMAGE_MODEL = "wavespeed-ai/flux-schnell";
 
 /**
  * Apply branding overlay to a generated image.
@@ -131,33 +132,50 @@ export async function POST(req: NextRequest) {
 
     console.log(`[MARKETING-IMG] Generating: ${prompt.slice(0, 120)}...`);
 
-    // Generate with FLUX Pro — portrait format, 4 options
-    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${FAL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        image_size: { width: 768, height: 1360 },
-        num_images: 4,
-        enable_safety_checker: true,
-        output_format: "jpeg",
-        num_inference_steps: 28,
-        guidance_scale: 3.5,
-      }),
-    });
-
-    if (!falRes.ok) {
-      const errText = await falRes.text();
-      console.error("[MARKETING-IMG] FAL error:", errText.slice(0, 300));
-      return NextResponse.json({ error: "Image generation failed" }, { status: 503 });
+    // Generate with WaveSpeed — 4 parallel requests (1 image each)
+    const wsKey = envString("WAVESPEED_API_KEY");
+    if (!wsKey) {
+      return NextResponse.json({ error: "WAVESPEED_API_KEY not configured" }, { status: 503 });
     }
 
-    const result = await falRes.json();
-    const imageUrls: string[] =
-      result.images?.map((img: { url: string }) => img.url) || [];
+    console.log(`[MARKETING-IMG] Generating 4 images via WaveSpeed...`);
+
+    const submitPromises = Array.from({ length: 4 }, () =>
+      fetch(`${WS_API_BASE}/${WS_IMAGE_MODEL}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${wsKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, image_size: { width: 768, height: 1360 }, num_images: 1 }),
+      })
+    );
+    const submitResults = await Promise.all(submitPromises);
+    const jobs: string[] = [];
+    for (const r of submitResults) {
+      if (!r.ok) continue;
+      const d = await r.json();
+      const pollUrl = d.data?.urls?.get || `${WS_API_BASE}/predictions/${d.data?.id}/result`;
+      if (d.data?.id) jobs.push(pollUrl);
+    }
+
+    // Poll until all complete (max 60s)
+    const imageUrls: string[] = [];
+    const start = Date.now();
+    while (imageUrls.length < jobs.length && Date.now() - start < 60_000) {
+      await new Promise((r) => setTimeout(r, 2000));
+      for (const pollUrl of jobs) {
+        if (imageUrls.length >= 4) break;
+        try {
+          const pr = await fetch(pollUrl, { headers: { Authorization: `Bearer ${wsKey}` } });
+          if (!pr.ok) continue;
+          const pd = await pr.json();
+          const pred = pd.data || pd;
+          if (pred.status === "completed" && pred.outputs?.length > 0) {
+            for (const o of pred.outputs) {
+              if (!imageUrls.includes(o)) imageUrls.push(o);
+            }
+          }
+        } catch {}
+      }
+    }
 
     if (imageUrls.length === 0) {
       return NextResponse.json({ error: "No images generated" }, { status: 503 });

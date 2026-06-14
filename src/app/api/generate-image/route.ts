@@ -3,9 +3,99 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
+import { envString } from "@/lib/env";
 
 const CREDIT_COST = 10; // 10 credits per 4 images
-const FAL_API_KEY = process.env.FAL_KEY || "";
+const WS_API_BASE = "https://api.wavespeed.ai/api/v3";
+// flux-schnell is fast (~8s) and cheap. Fallback to flux-dev for higher quality.
+const WS_IMAGE_MODEL = "wavespeed-ai/flux-schnell";
+
+function getWavespeedKey(): string {
+  return envString("WAVESPEED_API_KEY") || "";
+}
+
+/**
+ * Submit image generation to WaveSpeed, poll until done, return output URLs.
+ */
+async function generateWithWavespeed(
+  prompt: string,
+  size: { width: number; height: number },
+  numImages: number
+): Promise<string[]> {
+  const apiKey = getWavespeedKey();
+  if (!apiKey) throw new Error("WAVESPEED_API_KEY not configured");
+
+  const allOutputs: string[] = [];
+
+  // WaveSpeed flux-schnell generates 1 image per request, so we run N in parallel
+  const requests = Array.from({ length: Math.min(numImages, 4) }, () =>
+    fetch(`${WS_API_BASE}/${WS_IMAGE_MODEL}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        image_size: size,
+        num_images: 1,
+      }),
+    })
+  );
+
+  const submitResults = await Promise.all(requests);
+  const jobs: Array<{ id: string; pollUrl: string }> = [];
+
+  for (const res of submitResults) {
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[IMAGE-GEN] WaveSpeed submit error:", err.slice(0, 200));
+      continue;
+    }
+    const data = await res.json();
+    const pred = data.data || data;
+    if (pred.id) {
+      jobs.push({
+        id: pred.id,
+        pollUrl: pred.urls?.get || `${WS_API_BASE}/predictions/${pred.id}/result`,
+      });
+    }
+  }
+
+  if (jobs.length === 0) throw new Error("All image generation requests failed");
+
+  // Poll all jobs until complete (max 60s)
+  const maxWait = 60_000;
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    const pending = jobs.filter((j) => !allOutputs.some((o) => o.includes(j.id)));
+    if (pending.length === 0 || allOutputs.length >= numImages) break;
+
+    await new Promise((r) => setTimeout(r, 2000));
+
+    for (const job of pending) {
+      try {
+        const pollRes = await fetch(job.pollUrl, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        const pred = pollData.data || pollData;
+
+        if (pred.status === "completed" && pred.outputs?.length > 0) {
+          allOutputs.push(...pred.outputs);
+        } else if (pred.status === "failed") {
+          console.error(`[IMAGE-GEN] Job ${job.id} failed: ${pred.error}`);
+        }
+      } catch {
+        // retry on next poll
+      }
+    }
+  }
+
+  return allOutputs;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,7 +129,7 @@ export async function POST(req: NextRequest) {
         user.id,
         CREDIT_COST,
         "",
-        `Image generation: FLUX Pro ${numImages} images`
+        `Image generation: ${numImages} images`
       );
       if (!success) {
         return NextResponse.json(
@@ -49,7 +139,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Map aspect ratio to FLUX Pro format
+    // Map aspect ratio
     const sizeMap: Record<string, { width: number; height: number }> = {
       landscape: { width: 1360, height: 768 },
       portrait: { width: 768, height: 1360 },
@@ -57,62 +147,34 @@ export async function POST(req: NextRequest) {
     };
     const size = sizeMap[aspectRatio] || sizeMap.landscape;
 
-    // Submit to FAL.AI FLUX Pro (synchronous endpoint, not queue)
-    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${FAL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt: prompt.trim(),
-        image_size: size,
-        num_images: Math.min(numImages, 4),
-        enable_safety_checker: true,
-        output_format: "jpeg",
-        num_inference_steps: 28,
-        guidance_scale: 3.5,
-      }),
-    });
+    // Generate with WaveSpeed
+    console.log(`[IMAGE-GEN] Generating ${numImages} images via WaveSpeed (${WS_IMAGE_MODEL})`);
+    const imageUrls = await generateWithWavespeed(prompt.trim(), size, Math.min(numImages, 4));
 
-    if (!falRes.ok) {
-      const errText = await falRes.text();
-      console.error("[IMAGE-GEN] FAL error:", errText);
-
-      // Refund on failure
-      if (!ownerAccount) {
-        const { refundCredits } = await import("@/lib/credits");
-        await refundCredits(user.id, CREDIT_COST, "", "Image generation failed — automatic refund");
-      }
-
-      return NextResponse.json({ error: "Image generation failed. Credits refunded." }, { status: 503 });
-    }
-
-    const result = await falRes.json();
-
-    const imageUrls = result.images?.map((img: { url: string }) => img.url) || [];
     if (imageUrls.length === 0) {
-      console.error("[IMAGE-GEN] No images in response:", JSON.stringify(result).slice(0, 500));
+      console.error("[IMAGE-GEN] No images generated");
       if (!ownerAccount) {
         await refundCredits(user.id, CREDIT_COST, "", "Image generation returned no images — automatic refund");
       }
       return NextResponse.json({ error: "No images generated. Credits refunded." }, { status: 503 });
     }
 
-    // Convert FAL URLs to base64 data URIs server-side to avoid CDN/CORS issues
+    // Convert URLs to base64 data URIs to avoid CORS issues
     const base64Images = await Promise.all(
       imageUrls.map(async (url: string) => {
         try {
           const imgRes = await fetch(url);
-          if (!imgRes.ok) return url; // fallback to URL if fetch fails
+          if (!imgRes.ok) return url;
           const buffer = Buffer.from(await imgRes.arrayBuffer());
           const contentType = imgRes.headers.get("content-type") || "image/jpeg";
           return `data:${contentType};base64,${buffer.toString("base64")}`;
         } catch {
-          return url; // fallback to URL
+          return url;
         }
       })
     );
+
+    console.log(`[IMAGE-GEN] Generated ${base64Images.length} images successfully`);
 
     return NextResponse.json({
       images: base64Images,

@@ -40,9 +40,7 @@ import {
   SA_CHARACTER_PRESETS,
   SCENARIO_PRESETS,
   buildOwnerImagePrompt,
-  type CharacterPreset,
-  type ScenarioPreset,
-} from "@/lib/owner-marketing";
+} from "@/lib/marketing-presets";
 
 type MotionTab = "effects" | "upload" | "url";
 type MotionQuality = "standard" | "pro";

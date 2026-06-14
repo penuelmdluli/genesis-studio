@@ -12,22 +12,19 @@
  */
 
 import { envString } from "@/lib/env";
+import type { ScenarioPreset } from "@/lib/marketing-presets";
+export type { CharacterPreset, ScenarioPreset } from "@/lib/marketing-presets";
+export { buildOwnerImagePrompt, SA_CHARACTER_PRESETS, SCENARIO_PRESETS } from "@/lib/marketing-presets";
 
-// ── SA Culture Character Presets ──
-// Each preset generates a unique South African baby character
-// designed for maximum engagement + brand consistency
+// Presets data (SA_CHARACTER_PRESETS, SCENARIO_PRESETS) lives in marketing-presets.ts (client-safe).
+// Below are server-only functions (auto-comment, DB, fetch).
+// DO NOT import this file from "use client" components — use marketing-presets.ts instead.
 
-export interface CharacterPreset {
-  id: string;
-  name: string;
-  prompt: string;
-  tags: string[];
-}
-
-export const SA_CHARACTER_PRESETS: CharacterPreset[] = [
+/* Presets data removed — now in marketing-presets.ts */
+const _REMOVED = [
   {
-    id: "zulu-princess",
-    name: "Zulu Princess",
+    id: "_removed",
+    name: "_removed",
     prompt: "Photorealistic full body photo of an adorable 3-year-old South African Zulu baby girl standing center frame in a confident dance-ready pose, entire body from head to tiny feet visible, sharp focus on her, radiant dark melanin-rich skin with natural glow, big bright sparkling brown eyes, wearing authentic colorful Zulu beaded headpiece and intricate beaded necklace in red gold and turquoise, vibrant red and gold traditional outfit with detailed beadwork, tiny beaded anklets, joyful beaming smile, blurred crowd of people dancing and celebrating in the background, festive atmosphere with bokeh lights, main character in perfect focus, full length shot, 8K hyperrealistic",
     tags: ["zulu", "traditional", "girl"],
   },
@@ -90,16 +87,9 @@ export const SA_CHARACTER_PRESETS: CharacterPreset[] = [
 // ── Scenario Presets ──
 // Different settings/moods for the characters — each generates unique content
 
-export interface ScenarioPreset {
-  id: string;
-  name: string;
-  emoji: string;
-  promptSuffix: string;
-  hashtags: string[];
-  captionHook: string;
-}
+// ScenarioPreset type re-exported from marketing-presets.ts above
 
-export const SCENARIO_PRESETS: ScenarioPreset[] = [
+const _SCENARIO_PRESETS_MOVED: ScenarioPreset[] = [
   {
     id: "amapiano-party",
     name: "Amapiano Party",
@@ -182,14 +172,7 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
   },
 ];
 
-// ── Build Full Image Prompt ──
-
-export function buildOwnerImagePrompt(
-  character: CharacterPreset,
-  scenario: ScenarioPreset
-): string {
-  return `${character.prompt}, ${scenario.promptSuffix}`;
-}
+// buildOwnerImagePrompt re-exported from marketing-presets.ts above
 
 // ── Build Caption for Owner Posts ──
 

@@ -265,7 +265,8 @@ async function postToPage(
   page: FacebookPage,
   videoUrl: string,
   description: string,
-  videoId?: string
+  videoId?: string,
+  prompt?: string
 ): Promise<{ success: boolean; postId?: string; scheduled?: boolean; scheduledFor?: string; error?: string }> {
   const token = process.env[page.tokenEnvKey];
   if (!token || !page.pageId) {
@@ -283,7 +284,7 @@ async function postToPage(
     const reservationId = `pending-${Date.now()}`;
     await recordOwnerPost(
       page.pageId, page.name, reservationId, videoId || "",
-      "scheduled", slot.scheduledFor
+      "scheduled", slot.scheduledFor, prompt
     ).catch(() => {});
 
     // Use Facebook's scheduled_publish_time — video uploads now, publishes at the scheduled time
@@ -405,8 +406,8 @@ export async function autoPostMimicToMBS(
 
   // Facebook — MBS page + Penuel Mdluli page
   await Promise.allSettled([
-    postToPage(PAGES.mbs, videoUrl, description),
-    postToPage(PAGES.penuel, videoUrl, description),
+    postToPage(PAGES.mbs, videoUrl, description, undefined, prompt),
+    postToPage(PAGES.penuel, videoUrl, description, undefined, prompt),
   ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
@@ -432,8 +433,8 @@ export async function autoPostBrainToPages(
 
   // Facebook pages (smart scheduled)
   await Promise.allSettled([
-    postToPage(PAGES.tech_pulse, videoUrl, description),
-    postToPage(PAGES.africa_2050, videoUrl, description),
+    postToPage(PAGES.tech_pulse, videoUrl, description, undefined, concept),
+    postToPage(PAGES.africa_2050, videoUrl, description, undefined, concept),
   ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
@@ -442,7 +443,7 @@ export async function autoPostBrainToPages(
 
 /**
  * Auto-post a single generation to all platforms.
- * Facebook (Tech Pulse) + YouTube Shorts + TikTok.
+ * Facebook (Tech Pulse + Penuel Mdluli) + YouTube Shorts + TikTok.
  * Only for owner accounts.
  */
 export async function autoPostSingleVideo(
@@ -457,8 +458,8 @@ export async function autoPostSingleVideo(
 
   // Facebook — post to both Tech Pulse and Penuel Mdluli page
   await Promise.allSettled([
-    postToPage(PAGES.tech_pulse, videoUrl, description),
-    postToPage(PAGES.penuel, videoUrl, description),
+    postToPage(PAGES.tech_pulse, videoUrl, description, undefined, prompt),
+    postToPage(PAGES.penuel, videoUrl, description, undefined, prompt),
   ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
@@ -485,8 +486,8 @@ export async function autoPostFeatureAnnouncement(
 
   // Post to Penuel Mdluli page (personal brand) + Tech Pulse Africa
   await Promise.allSettled([
-    postToPage(PAGES.penuel, videoUrl, description),
-    postToPage(PAGES.tech_pulse, videoUrl, description),
+    postToPage(PAGES.penuel, videoUrl, description, undefined, featureInfo.description),
+    postToPage(PAGES.tech_pulse, videoUrl, description, undefined, featureInfo.description),
   ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
@@ -508,7 +509,7 @@ export async function autoPostToPersonalPage(
   const description = getPersonalBrandDescription(prompt);
 
   // Facebook (smart scheduled)
-  await postToPage(PAGES.penuel, videoUrl, description);
+  await postToPage(PAGES.penuel, videoUrl, description, undefined, prompt);
 
   // YouTube + TikTok (immediate, fire-and-forget)
   crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});

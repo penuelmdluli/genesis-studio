@@ -403,8 +403,11 @@ export async function autoPostMimicToMBS(
   const videoUrl = r2PublicUrl(videoR2Key);
   const description = getMBSDescription(prompt);
 
-  // Facebook (smart scheduled)
-  await postToPage(PAGES.mbs, videoUrl, description);
+  // Facebook — MBS page + Penuel Mdluli page
+  await Promise.allSettled([
+    postToPage(PAGES.mbs, videoUrl, description),
+    postToPage(PAGES.penuel, videoUrl, description),
+  ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
   crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});
@@ -452,8 +455,11 @@ export async function autoPostSingleVideo(
   const videoUrl = r2PublicUrl(videoR2Key);
   const description = getSingleVideoDescription(prompt);
 
-  // Facebook (smart scheduled)
-  await postToPage(PAGES.tech_pulse, videoUrl, description);
+  // Facebook — post to both Tech Pulse and Penuel Mdluli page
+  await Promise.allSettled([
+    postToPage(PAGES.tech_pulse, videoUrl, description),
+    postToPage(PAGES.penuel, videoUrl, description),
+  ]);
 
   // YouTube + TikTok (immediate, fire-and-forget)
   crossPostToAllPlatforms(videoUrl, prompt).catch(() => {});

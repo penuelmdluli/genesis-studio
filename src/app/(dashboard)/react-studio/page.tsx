@@ -216,7 +216,7 @@ export default function ReactStudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          photoUrls,
+          userPhotos: photoUrls,
           sceneVideoUrl,
           sceneUrl: sceneUrl.trim() || undefined,
           scenePrompt: scenePrompt.trim() || undefined,

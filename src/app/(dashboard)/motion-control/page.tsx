@@ -312,12 +312,18 @@ export default function MotionControlPage() {
     try {
       progress.setProgress(10, "Uploading character image...");
 
-      // Upload character image
+      // Upload character image (works for both uploaded files and AI-generated images)
       let characterImageUrl: string;
       if (characterImage && characterImage.size > 0) {
         characterImageUrl = await uploadFileToR2(characterImage, "image");
+      } else if (characterImagePreview?.startsWith("data:")) {
+        // AI-generated base64 image — convert to File and upload to R2
+        const res = await fetch(characterImagePreview);
+        const blob = await res.blob();
+        const file = new File([blob], "ai-character.jpg", { type: "image/jpeg" });
+        characterImageUrl = await uploadFileToR2(file, "image");
       } else if (characterImagePreview) {
-        // AI-generated image is already a URL or base64
+        // Already a URL
         characterImageUrl = characterImagePreview;
       } else {
         throw new Error("No character image");
@@ -836,7 +842,19 @@ export default function MotionControlPage() {
                           {generatedCharacters.map((imgSrc, i) => (
                             <div key={i} className="relative group">
                               <button
-                                onClick={() => { setCharacterImagePreview(imgSrc); setCharacterImage(new File([], "ai-generated.jpg")); }}
+                                onClick={async () => {
+                              setCharacterImagePreview(imgSrc);
+                              // Convert base64/URL to a real File and upload to R2
+                              try {
+                                const res = await fetch(imgSrc);
+                                const blob = await res.blob();
+                                const file = new File([blob], `ai-character-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
+                                setCharacterImage(file);
+                              } catch {
+                                // Fallback: create empty file marker, generate handler will use preview URL
+                                setCharacterImage(new File([], "ai-generated.jpg"));
+                              }
+                            }}
                                 className="w-full aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
                               >
                                 <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />

@@ -265,6 +265,18 @@ export default function MotionControlPage() {
       const data = await res.json();
       if (res.ok && data.images?.length > 0) {
         setGeneratedCharacters(data.images);
+        // Save to localStorage history
+        try {
+          const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+          const newEntries = data.images.map((url: string) => ({
+            imageUrl: url,
+            prompt: characterPrompt.trim(),
+            createdAt: new Date().toISOString(),
+          }));
+          const updated = [...newEntries, ...existing].slice(0, 40); // Keep last 40
+          localStorage.setItem("gs-character-history", JSON.stringify(updated));
+          setCharacterHistory(updated);
+        } catch {}
         toast("Character images generated! Pick one.", "success");
       } else {
         setError(data.error || "Failed to generate character");
@@ -696,13 +708,11 @@ export default function MotionControlPage() {
                         onClick={() => {
                           setCharacterTab(tab.key);
                           if (tab.key === "history" && !historyLoaded) {
-                            fetch("/api/admin/marketing-image")
-                              .then(r => r.ok ? r.json() : null)
-                              .then(data => {
-                                if (data?.history) setCharacterHistory(data.history);
-                                setHistoryLoaded(true);
-                              })
-                              .catch(() => {});
+                            try {
+                              const stored = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+                              setCharacterHistory(stored);
+                            } catch {}
+                            setHistoryLoaded(true);
                           }
                         }}
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${

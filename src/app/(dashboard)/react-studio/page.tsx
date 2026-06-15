@@ -248,8 +248,9 @@ export default function ReactStudioPage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        progress.complete("Your react video is ready!");
-        toast("React video started! Check your gallery.", "success");
+        progress.setProgress(60, "Generating on AI servers...");
+        const estMin = Math.ceil((data.estimatedTime || 180) / 60);
+        toast(`React video submitted! Est. ~${estMin} min. We'll notify you when it's ready.`, "success");
         setError(null);
       } else {
         progress.fail(data.error || "Generation failed.");

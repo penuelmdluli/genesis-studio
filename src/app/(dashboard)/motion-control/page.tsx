@@ -374,9 +374,6 @@ export default function MotionControlPage() {
 
       const data = await res.json();
       if (res.ok) {
-        progress.setProgress(85, "Saving to gallery...");
-        progress.advanceStep("Saving to gallery...");
-
         addJob({
           id: data.jobId,
           userId: user?.id || "",
@@ -393,8 +390,10 @@ export default function MotionControlPage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        progress.complete("Your motion video is ready!");
-        toast("Motion control started! Check your gallery.", "success");
+        // Don't show "complete" — the video is still generating on the server.
+        // The dashboard layout poller will update progress and notify when truly done.
+        progress.setProgress(60, "Generating on AI servers...");
+        toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min. We'll notify you when it's ready.`, "success");
         setError(null);
       } else {
         progress.fail(data.error || "Generation failed.");

@@ -389,11 +389,10 @@ export default function GeneratePage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        toast("Generation started! Check your gallery for progress.", "success");
         setError(null);
-        progress.advanceStep("Saving to gallery...");
-        progress.setProgress(90);
-        progress.complete("Your video is ready!");
+        progress.setProgress(60, "Generating on AI servers...");
+        const estMin = Math.ceil((data.estimatedTime || 120) / 60);
+        toast(`Video submitted! Est. ~${estMin} min. We'll notify you when it's ready.`, "success");
       } else {
         setError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");

@@ -85,8 +85,7 @@ async function tryWavespeedMotion(params: {
   if (!wsKey) return null;
   if (!isProviderAvailable("wavespeed")) return null;
 
-  // WaveSpeed supports both effects and custom reference videos
-  // It's now the PRIMARY provider (FAL balance is exhausted)
+  // Must have either a reference video or an effect
   if (!params.referenceVideoUrl && !params.effect) return null;
 
   const wsEndpoint = WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
@@ -97,7 +96,15 @@ async function tryWavespeedMotion(params: {
     character_orientation: params.orientation,
     keep_original_sound: params.keepOriginalSound,
   };
-  if (params.referenceVideoUrl) body.video = params.referenceVideoUrl;
+  // WaveSpeed requires 'video' field even for effects
+  // For effects without a reference video, use a stock reference from WaveSpeed CDN
+  if (params.referenceVideoUrl) {
+    body.video = params.referenceVideoUrl;
+  } else if (params.effect) {
+    // Use a minimal stock dance video as base reference for effects
+    // WaveSpeed will override motion with the effect but needs a valid video input
+    body.video = "https://d1q70pf5vjeyhc.cloudfront.net/predictions/5c972e863dd24bf9bd2821a3e1e601b3/1.mp4";
+  }
   if (params.effect) body.effect = params.effect;
   if (params.prompt) body.prompt = params.prompt;
   if (params.negativePrompt) body.negative_prompt = params.negativePrompt;

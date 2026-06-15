@@ -181,9 +181,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const errMsg = submitErr instanceof Error ? submitErr.message : "Submission failed";
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: submitErr instanceof Error ? submitErr.message : "Submission failed",
+        errorMessage: `${errMsg}. Credits have been refunded.`,
       });
 
       return NextResponse.json(

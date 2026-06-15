@@ -98,6 +98,28 @@ export async function GET(
               );
             }
 
+            // Owner auto-post to pages (fire and forget)
+            import("@/lib/owner-autopost").then(({ autoPostSingleVideo }) =>
+              autoPostSingleVideo(clerkId, videoStorageKey(job.user_id, job.id), job.prompt)
+            ).catch(() => {});
+
+            // Auto-publish to Explore feed (fire and forget)
+            autoPublishToExplore({
+              jobId: job.id,
+              userId: job.user_id,
+              prompt: job.prompt,
+              modelId: job.model_id,
+              videoUrl: videoApiUrl,
+              thumbnailUrl,
+              duration: job.duration,
+              resolution: job.resolution,
+              hasAudio: !!job.audio_url || !!job.audio_track_id,
+              type: "motion",
+              userPlan: user?.plan,
+              creatorName: user?.name || "Genesis Creator",
+              creatorAvatarUrl: user?.avatar_url,
+            }).catch((err) => console.error("[JOB STATUS] Auto-publish failed:", err));
+
             return NextResponse.json({
               id: job.id, status: "completed", progress: 100,
               outputVideoUrl: videoApiUrl, modelId: job.model_id,

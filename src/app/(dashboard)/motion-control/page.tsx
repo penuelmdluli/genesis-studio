@@ -368,21 +368,26 @@ export default function MotionControlPage() {
     try {
       progress.setProgress(10, "Uploading character image...");
 
-      // Upload character image (works for both uploaded files and AI-generated images)
+      // Upload character image to get a proper HTTPS URL for the AI API
       let characterImageUrl: string;
       if (characterImage && characterImage.size > 0) {
+        // Real file (uploaded photo or converted from AI generation)
         characterImageUrl = await uploadFileToR2(characterImage, "image");
-      } else if (characterImagePreview?.startsWith("data:")) {
-        // AI-generated base64 image — convert to File and upload to R2
-        const res = await fetch(characterImagePreview);
-        const blob = await res.blob();
-        const file = new File([blob], "ai-character.jpg", { type: "image/jpeg" });
-        characterImageUrl = await uploadFileToR2(file, "image");
-      } else if (characterImagePreview) {
-        // Already a URL
+      } else if (characterImagePreview?.startsWith("http")) {
+        // CDN URL from history — already accessible, pass directly
         characterImageUrl = characterImagePreview;
+      } else if (characterImagePreview) {
+        // base64 or blob URL — convert to file and upload to R2
+        try {
+          const imgResp = await fetch(characterImagePreview);
+          const blob = await imgResp.blob();
+          const file = new File([blob], "character.jpg", { type: "image/jpeg" });
+          characterImageUrl = await uploadFileToR2(file, "image");
+        } catch {
+          throw new Error("Failed to process character image. Please re-upload or generate a new one.");
+        }
       } else {
-        throw new Error("No character image");
+        throw new Error("No character image selected");
       }
 
       progress.setProgress(25, "Uploading motion reference...");
@@ -954,19 +959,11 @@ export default function MotionControlPage() {
                           {characterHistory.map((item, i) => (
                             <button
                               key={i}
-                              onClick={async () => {
-                                try {
-                                  const imgRes = await fetch(item.imageUrl);
-                                  if (!imgRes.ok) { toast("Image no longer available", "error"); return; }
-                                  const buffer = await imgRes.arrayBuffer();
-                                  const blob = new Blob([buffer], { type: "image/jpeg" });
-                                  const dataUrl = URL.createObjectURL(blob);
-                                  setCharacterImagePreview(dataUrl);
-                                  setCharacterImage(new File([blob], "history.jpg", { type: "image/jpeg" }));
-                                  toast("Image selected from history", "success");
-                                } catch {
-                                  toast("Failed to load image", "error");
-                                }
+                              onClick={() => {
+                                // Set the CDN URL directly — the generate handler will upload to R2
+                                setCharacterImagePreview(item.imageUrl);
+                                setCharacterImage(new File([], "history.jpg")); // placeholder
+                                toast("Image selected from history", "success");
                               }}
                               className="aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all group"
                               title={new Date(item.createdAt).toLocaleDateString()}

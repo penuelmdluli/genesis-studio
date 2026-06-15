@@ -179,6 +179,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       images: base64Images,
+      urls: imageUrls, // CDN URLs for persistent storage (base64 too large for localStorage)
       prompt: prompt.trim(),
       creditsCost: CREDIT_COST,
     });

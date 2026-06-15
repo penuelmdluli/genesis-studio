@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +91,17 @@ export default function MotionControlPage() {
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   const progress = useGenerationProgress();
+
+  // Load character image history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+      if (stored.length > 0) {
+        setCharacterHistory(stored);
+        setHistoryLoaded(true);
+      }
+    } catch {}
+  }, []);
 
   // Download image with branding overlay (canvas-based, instant, no server needed)
   const downloadBrandedImage = useCallback(async (imageSrc: string) => {
@@ -265,17 +276,21 @@ export default function MotionControlPage() {
       const data = await res.json();
       if (res.ok && data.images?.length > 0) {
         setGeneratedCharacters(data.images);
-        // Save to localStorage history
+        // Save CDN URLs (not base64) to localStorage history — base64 is too large
         try {
-          const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
-          const newEntries = data.images.map((url: string) => ({
-            imageUrl: url,
-            prompt: characterPrompt.trim(),
-            createdAt: new Date().toISOString(),
-          }));
-          const updated = [...newEntries, ...existing].slice(0, 40); // Keep last 40
-          localStorage.setItem("gs-character-history", JSON.stringify(updated));
-          setCharacterHistory(updated);
+          const cdnUrls: string[] = data.urls || [];
+          if (cdnUrls.length > 0) {
+            const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+            const newEntries = cdnUrls.map((url: string) => ({
+              imageUrl: url,
+              prompt: characterPrompt.trim(),
+              createdAt: new Date().toISOString(),
+            }));
+            const updated = [...newEntries, ...existing].slice(0, 60);
+            localStorage.setItem("gs-character-history", JSON.stringify(updated));
+            setCharacterHistory(updated);
+            setHistoryLoaded(true);
+          }
         } catch {}
         toast("Character images generated! Pick one.", "success");
       } else {

@@ -106,12 +106,21 @@ export default function MotionControlPage() {
   // Download image with branding overlay (canvas-based, instant, no server needed)
   const downloadBrandedImage = useCallback(async (imageSrc: string) => {
     try {
+      // Fetch image as blob to bypass CORS (CDN URLs don't have CORS headers)
+      let blobUrl: string;
+      if (imageSrc.startsWith("data:")) {
+        blobUrl = imageSrc; // base64 is already local
+      } else {
+        const resp = await fetch(imageSrc);
+        const blob = await resp.blob();
+        blobUrl = URL.createObjectURL(blob);
+      }
+
       const img = new Image();
-      img.crossOrigin = "anonymous";
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error("Failed to load image"));
-        img.src = imageSrc;
+        img.src = blobUrl;
       });
 
       const canvas = document.createElement("canvas");
@@ -167,9 +176,26 @@ export default function MotionControlPage() {
       link.href = canvas.toDataURL("image/jpeg", 0.95);
       link.click();
 
+      // Clean up blob URL
+      if (blobUrl.startsWith("blob:")) URL.revokeObjectURL(blobUrl);
+
       toast("Branded image downloaded!", "success");
-    } catch {
-      toast("Failed to download image", "error");
+    } catch (err) {
+      console.error("Download error:", err);
+      // Fallback: download without branding
+      try {
+        const resp = await fetch(imageSrc);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `genesis-studio-${Date.now()}.jpg`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast("Image downloaded (without branding)", "success");
+      } catch {
+        toast("Failed to download image", "error");
+      }
     }
   }, [toast]);
 
@@ -323,14 +349,17 @@ export default function MotionControlPage() {
 
     if (!motionVideo && !selectedEffect && !referenceUrl.trim()) {
       setError("Upload a reference video, paste a URL, or pick a fun effect.");
+      generateLockRef.current = false;
       return;
     }
     if (!characterImage && !characterImagePreview) {
       setError("Please upload or generate a character image.");
+      generateLockRef.current = false;
       return;
     }
     if (!hasEnoughCredits) {
       setError(`Not enough credits. Need ${creditCost}, have ${user?.creditBalance ?? 0}.`);
+      generateLockRef.current = false;
       return;
     }
 
@@ -814,7 +843,7 @@ export default function MotionControlPage() {
                           type="text"
                           value={characterPrompt}
                           onChange={(e) => { setCharacterPrompt(e.target.value); setSelectedPreset(null); setSelectedScenario(null); }}
-                          placeholder="e.g. Cute baby in a red dress ready to dance"
+                          placeholder="e.g. Cute 5-year-old child in a red dress ready to dance"
                           className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
                         />
                         <Button

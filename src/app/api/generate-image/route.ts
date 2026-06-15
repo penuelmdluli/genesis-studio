@@ -7,8 +7,8 @@ import { envString } from "@/lib/env";
 
 const CREDIT_COST = 10; // 10 credits per 4 images
 const WS_API_BASE = "https://api.wavespeed.ai/api/v3";
-// flux-schnell is fast (~8s) and cheap. Fallback to flux-dev for higher quality.
-const WS_IMAGE_MODEL = "wavespeed-ai/flux-schnell";
+// flux-dev gives higher quality + respects custom sizes (portrait/landscape)
+const WS_IMAGE_MODEL = "wavespeed-ai/flux-dev";
 
 function getWavespeedKey(): string {
   return envString("WAVESPEED_API_KEY") || "";
@@ -37,7 +37,7 @@ async function generateWithWavespeed(
       },
       body: JSON.stringify({
         prompt,
-        image_size: size,
+        size: `${size.width}x${size.height}`,
         num_images: 1,
       }),
     })
@@ -139,10 +139,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Map aspect ratio
+    // Map aspect ratio — WaveSpeed uses "size" string param (WxH), not "image_size" object
     const sizeMap: Record<string, { width: number; height: number }> = {
-      landscape: { width: 1360, height: 768 },
-      portrait: { width: 768, height: 1360 },
+      landscape: { width: 1344, height: 768 },
+      portrait: { width: 768, height: 1344 },
       square: { width: 1024, height: 1024 },
     };
     const size = sizeMap[aspectRatio] || sizeMap.landscape;

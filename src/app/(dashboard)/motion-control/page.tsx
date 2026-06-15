@@ -72,6 +72,7 @@ export default function MotionControlPage() {
   const [characterPrompt, setCharacterPrompt] = useState("");
   const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
   const [generatedCharacters, setGeneratedCharacters] = useState<string[]>([]);
+  const [generatedCharacterUrls, setGeneratedCharacterUrls] = useState<string[]>([]);
   const [characterTab, setCharacterTab] = useState<"upload" | "generate" | "history">("generate");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
@@ -302,6 +303,7 @@ export default function MotionControlPage() {
       const data = await res.json();
       if (res.ok && data.images?.length > 0) {
         setGeneratedCharacters(data.images);
+        setGeneratedCharacterUrls(data.urls || []);
         // Save CDN URLs (not base64) to localStorage history — base64 is too large
         try {
           const cdnUrls: string[] = data.urls || [];
@@ -900,18 +902,12 @@ export default function MotionControlPage() {
                           {generatedCharacters.map((imgSrc, i) => (
                             <div key={i} className="relative group">
                               <button
-                                onClick={async () => {
-                              setCharacterImagePreview(imgSrc);
-                              // Convert base64/URL to a real File and upload to R2
-                              try {
-                                const res = await fetch(imgSrc);
-                                const blob = await res.blob();
-                                const file = new File([blob], `ai-character-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
-                                setCharacterImage(file);
-                              } catch {
-                                // Fallback: create empty file marker, generate handler will use preview URL
-                                setCharacterImage(new File([], "ai-generated.jpg"));
-                              }
+                                onClick={() => {
+                              // Use CDN URL if available (no upload needed), base64 for display
+                              const cdnUrl = generatedCharacterUrls[i];
+                              setCharacterImagePreview(cdnUrl || imgSrc);
+                              // Empty file marker — generate handler will use the CDN URL from preview
+                              setCharacterImage(new File([], "ai-generated.jpg"));
                             }}
                                 className="w-full aspect-[3/4] rounded-lg border border-white/[0.10] hover:border-cyan-500/40 overflow-hidden transition-all"
                               >

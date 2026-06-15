@@ -85,26 +85,20 @@ async function tryWavespeedMotion(params: {
   if (!wsKey) return null;
   if (!isProviderAvailable("wavespeed")) return null;
 
-  // Effects are only supported on FAL (Kling-specific feature)
-  if (params.effect) return null;
-
-  // Must have a reference video for WaveSpeed motion control
-  if (!params.referenceVideoUrl) return null;
-
-  // WaveSpeed is only cheaper for Pro quality motion control
-  // Standard: FAL $0.07/s vs WaveSpeed $0.112/s — FAL wins
-  // Pro: FAL $0.14/s vs WaveSpeed $0.112/s — WaveSpeed wins
-  if (params.quality === "standard") return null;
+  // WaveSpeed supports both effects and custom reference videos
+  // It's now the PRIMARY provider (FAL balance is exhausted)
+  if (!params.referenceVideoUrl && !params.effect) return null;
 
   const wsEndpoint = WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
     || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"];
 
   const body: Record<string, unknown> = {
     image: params.characterImageUrl,
-    video: params.referenceVideoUrl,
     character_orientation: params.orientation,
     keep_original_sound: params.keepOriginalSound,
   };
+  if (params.referenceVideoUrl) body.video = params.referenceVideoUrl;
+  if (params.effect) body.effect = params.effect;
   if (params.prompt) body.prompt = params.prompt;
   if (params.negativePrompt) body.negative_prompt = params.negativePrompt;
 

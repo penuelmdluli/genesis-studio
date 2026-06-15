@@ -398,7 +398,11 @@ export default function MotionControlPage() {
       // Upload motion video if provided
       let referenceVideoUrl: string | undefined;
       if (motionVideo) {
-        referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
+        try {
+          referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
+        } catch (uploadErr) {
+          throw new Error(`Video upload failed: ${uploadErr instanceof Error ? uploadErr.message : "Please try again"}`);
+        }
       }
 
       progress.setProgress(45, "Starting motion generation...");
@@ -423,7 +427,12 @@ export default function MotionControlPage() {
         }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status}). The app may need to redeploy. Please try again in a few minutes.`);
+      }
       if (res.ok) {
         addJob({
           id: data.jobId,
@@ -453,9 +462,10 @@ export default function MotionControlPage() {
       }
     } catch (err) {
       console.error("Motion control generation failed:", err);
-      progress.fail("Network error. Please try again.");
-      setError("Network error. Please try again.");
-      toast("Network error.", "error");
+      const errMsg = err instanceof Error ? err.message : "Network error";
+      progress.fail(errMsg);
+      setError(errMsg);
+      toast(errMsg, "error");
     } finally {
       setIsGenerating(false);
       generateLockRef.current = false;

@@ -139,13 +139,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Map aspect ratio — WaveSpeed uses "size" string param (WxH), not "image_size" object
+    // Map aspect ratio — WaveSpeed uses "size" string param (WxH)
+    // Portrait = 9:16 reels format (TikTok, Instagram Reels, YouTube Shorts)
     const sizeMap: Record<string, { width: number; height: number }> = {
-      landscape: { width: 1344, height: 768 },
-      portrait: { width: 768, height: 1344 },
-      square: { width: 1024, height: 1024 },
+      landscape: { width: 1024, height: 576 },   // 16:9
+      portrait: { width: 576, height: 1024 },     // 9:16 (reels)
+      square: { width: 1024, height: 1024 },      // 1:1
     };
-    const size = sizeMap[aspectRatio] || sizeMap.landscape;
+    const size = sizeMap[aspectRatio] || sizeMap.portrait;
 
     // Generate with WaveSpeed
     console.log(`[IMAGE-GEN] Generating ${numImages} images via WaveSpeed (${WS_IMAGE_MODEL})`);

@@ -92,6 +92,62 @@ export default function MotionControlPage() {
   const characterImageRef = useRef<HTMLInputElement>(null);
 
   const progress = useGenerationProgress();
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  // Poll job status and update progress in real-time
+  const startJobPolling = useCallback((jobId: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    let pollCount = 0;
+    pollRef.current = setInterval(async () => {
+      pollCount++;
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.status === "completed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          progress.advanceStep();
+          progress.complete("Your motion video is ready!");
+          toast("Video complete! Check your gallery.", "success");
+          return;
+        }
+
+        if (data.status === "failed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          progress.fail(data.errorMessage || "Generation failed");
+          setError(data.errorMessage || "Generation failed on AI servers");
+          toast(data.errorMessage || "Generation failed", "error");
+          return;
+        }
+
+        // Estimate progress based on poll count and status
+        if (data.status === "processing") {
+          const elapsed = pollCount * 5; // 5 sec per poll
+          const estTotal = duration * 12; // rough total seconds
+          const pct = Math.min(55 + Math.round((elapsed / estTotal) * 40), 95);
+          progress.setProgress(pct, "AI is generating your video...");
+          if (pollCount === 1) progress.advanceStep("Generating video...");
+        } else {
+          // queued
+          const pct = Math.min(55 + pollCount, 65);
+          progress.setProgress(pct, "Waiting in AI queue...");
+        }
+      } catch {
+        // Network hiccup — keep polling
+      }
+    }, 5000);
+  }, [progress, toast, duration]);
 
   // Load character image history from localStorage on mount
   useEffect(() => {
@@ -467,10 +523,11 @@ export default function MotionControlPage() {
           createdAt: new Date().toISOString(),
         });
         updateCreditBalance((user?.creditBalance ?? 0) - creditCost);
-        // Don't show "complete" — the video is still generating on the server.
-        // The dashboard layout poller will update progress and notify when truly done.
-        progress.setProgress(60, "Generating on AI servers...");
-        toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min. We'll notify you when it's ready.`, "success");
+        // Start live polling for real-time progress updates
+        progress.advanceStep("Generating video...");
+        progress.setProgress(55, "Submitted to AI — generating your video...");
+        startJobPolling(data.jobId);
+        toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min.`, "success");
         setError(null);
       } else {
         progress.fail(data.error || "Generation failed.");

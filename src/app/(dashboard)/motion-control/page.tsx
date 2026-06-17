@@ -51,7 +51,7 @@ type MotionModel = "kling-v3" | "kling-v2.6";
 const MOTION_DURATIONS = [5, 10, 15, 20];
 
 export default function MotionControlPage() {
-  const { user, addJob, updateCreditBalance, isInitialized, videos } = useStore();
+  const { user, addJob, updateCreditBalance, isInitialized, videos, activeJobs } = useStore();
   const { toast } = useToast();
 
   const isLoading = !isInitialized;
@@ -148,6 +148,23 @@ export default function MotionControlPage() {
       }
     }, 5000);
   }, [progress, toast, duration]);
+
+  // Resume tracking for any active motion control job on page load
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || !isInitialized) return;
+    const activeMotionJob = activeJobs.find(
+      (j) => j.modelId === "mimic-motion" && (j.status === "queued" || j.status === "processing")
+    );
+    if (activeMotionJob) {
+      resumedRef.current = true;
+      progress.start(["Uploading files", "Downloading video", "Generating video", "Saving to gallery"]);
+      progress.advanceStep(); // uploading done
+      progress.advanceStep(); // downloading done
+      progress.setProgress(55, "AI is generating your video...");
+      startJobPolling(activeMotionJob.id);
+    }
+  }, [isInitialized, activeJobs, progress, startJobPolling]);
 
   // Load character image history from localStorage on mount
   useEffect(() => {

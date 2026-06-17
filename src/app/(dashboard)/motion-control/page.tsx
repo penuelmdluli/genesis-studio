@@ -370,22 +370,56 @@ export default function MotionControlPage() {
     try {
       progress.setProgress(10, "Uploading character image...");
 
-      // Upload character image to get a proper HTTPS URL for the AI API
+      // Upload character image to get a permanent HTTPS URL for the AI API
       let characterImageUrl: string;
       if (characterImage && characterImage.size > 0) {
-        // Real file (uploaded photo or converted from AI generation)
+        // Real file from file-picker upload
         characterImageUrl = await uploadFileToR2(characterImage, "image");
       } else if (characterImagePreview?.startsWith("http")) {
-        // CDN URL from history — already accessible, pass directly
-        characterImageUrl = characterImagePreview;
-      } else if (characterImagePreview) {
-        // base64 or blob URL — convert to file and upload to R2
+        // CDN URL (WaveSpeed / history) — re-upload to our R2 via server-side proxy
+        // (can't fetch cross-origin CDN URLs from the browser due to CORS)
         try {
-          const imgResp = await fetch(characterImagePreview);
-          const blob = await imgResp.blob();
-          const file = new File([blob], "character.jpg", { type: "image/jpeg" });
-          characterImageUrl = await uploadFileToR2(file, "image");
+          const proxyRes = await fetch("/api/upload-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: characterImagePreview, purpose: "image" }),
+          });
+          if (!proxyRes.ok) {
+            // Fallback: pass CDN URL directly and hope it's still valid
+            characterImageUrl = characterImagePreview;
+          } else {
+            const proxyData = await proxyRes.json();
+            characterImageUrl = proxyData.publicUrl || characterImagePreview;
+          }
         } catch {
+          // Fallback: use CDN URL directly
+          characterImageUrl = characterImagePreview;
+        }
+      } else if (characterImagePreview) {
+        // Base64 data URI or blob URL — convert to file and upload to R2
+        try {
+          let blob: Blob;
+          if (characterImagePreview.startsWith("data:")) {
+            // Decode data URI directly — fetch() can fail on large data URIs
+            const commaIdx = characterImagePreview.indexOf(",");
+            const header = characterImagePreview.slice(0, commaIdx);
+            const b64 = characterImagePreview.slice(commaIdx + 1);
+            const mime = header.match(/data:(.*?);/)?.[1] || "image/jpeg";
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+            blob = new Blob([arr], { type: mime });
+          } else {
+            // Blob URL — fetch is OK (same-origin)
+            const imgResp = await fetch(characterImagePreview);
+            blob = await imgResp.blob();
+          }
+          if (blob.size === 0) throw new Error("Image blob is empty");
+          const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+          const file = new File([blob], `character.${ext}`, { type: blob.type || "image/jpeg" });
+          characterImageUrl = await uploadFileToR2(file, "image");
+        } catch (imgErr) {
+          console.error("[Motion] Character image processing failed:", imgErr);
           throw new Error("Failed to process character image. Please re-upload or generate a new one.");
         }
       } else {
@@ -884,6 +918,23 @@ export default function MotionControlPage() {
                                   .then(data => {
                                     if (data.images?.length > 0) {
                                       setGeneratedCharacters(data.images);
+                                      setGeneratedCharacterUrls(data.urls || []);
+                                      // Save CDN URLs to localStorage history
+                                      try {
+                                        const cdnUrls: string[] = data.urls || [];
+                                        if (cdnUrls.length > 0) {
+                                          const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+                                          const newEntries = cdnUrls.map((url: string) => ({
+                                            imageUrl: url,
+                                            prompt: characterPrompt.trim(),
+                                            createdAt: new Date().toISOString(),
+                                          }));
+                                          const updated = [...newEntries, ...existing].slice(0, 60);
+                                          localStorage.setItem("gs-character-history", JSON.stringify(updated));
+                                          setCharacterHistory(updated);
+                                          setHistoryLoaded(true);
+                                        }
+                                      } catch {}
                                       toast("Character images generated! Pick one.", "success");
                                     } else {
                                       setError(data.error || "Failed to generate");

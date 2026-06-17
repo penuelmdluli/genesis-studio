@@ -78,6 +78,7 @@ async function tryWavespeedMotion(params: {
   quality: string;
   model: string;
   orientation: string;
+  duration: number;
   keepOriginalSound: boolean;
   negativePrompt?: string;
 }): Promise<{ requestId: string; endpoint: string } | null> {
@@ -92,18 +93,19 @@ async function tryWavespeedMotion(params: {
     || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"];
 
   const body: Record<string, unknown> = {
-    image: params.characterImageUrl,
+    image_url: params.characterImageUrl,
     character_orientation: params.orientation,
+    duration: String(params.duration || 10),
     keep_original_sound: params.keepOriginalSound,
+    cfg_scale: 0.5,
   };
-  // WaveSpeed requires 'video' field even for effects
-  // For effects without a reference video, use a stock reference from WaveSpeed CDN
+  // WaveSpeed requires 'video_url' field even for effects
   if (params.referenceVideoUrl) {
-    body.video = params.referenceVideoUrl;
+    body.video_url = params.referenceVideoUrl;
   } else if (params.effect) {
     // Use a minimal stock dance video as base reference for effects
     // WaveSpeed will override motion with the effect but needs a valid video input
-    body.video = "https://d1q70pf5vjeyhc.cloudfront.net/predictions/5c972e863dd24bf9bd2821a3e1e601b3/1.mp4";
+    body.video_url = "https://d1q70pf5vjeyhc.cloudfront.net/predictions/5c972e863dd24bf9bd2821a3e1e601b3/1.mp4";
   }
   if (params.effect) body.effect = params.effect;
   if (params.prompt) body.prompt = params.prompt;
@@ -168,7 +170,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     throw new Error("Either a reference video or a fun effect is required");
   }
 
-  // Try WaveSpeed first for custom reference video motion (not effects)
+  // Try WaveSpeed first (cheaper)
   const wsResult = await tryWavespeedMotion({
     characterImageUrl,
     referenceVideoUrl,
@@ -177,6 +179,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     quality,
     model,
     orientation,
+    duration,
     keepOriginalSound,
   });
 

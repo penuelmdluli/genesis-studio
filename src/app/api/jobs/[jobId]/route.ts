@@ -59,11 +59,29 @@ export async function GET(
           if (motionStatus.status === "COMPLETED") {
             const motionResult = await getMotionJobResult(falEndpoint, falRequestId);
             const vKey = videoStorageKey(job.user_id, job.id);
-            const videoRes = await fetch(motionResult.videoUrl);
-            if (!videoRes.ok) throw new Error(`Failed to download motion video: ${videoRes.status}`);
-            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-            await uploadVideo(vKey, videoBuffer);
-            await verifyR2Upload(vKey);
+
+            // Download video from FAL and upload to R2
+            let videoBuffer: Buffer;
+            try {
+              const videoRes = await fetch(motionResult.videoUrl);
+              if (!videoRes.ok) throw new Error(`Failed to download motion video: ${videoRes.status}`);
+              videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+              await uploadVideo(vKey, videoBuffer);
+              await verifyR2Upload(vKey);
+            } catch (storageErr) {
+              console.error("[MOTION] Video storage failed:", storageErr);
+              await updateJobStatus(job.id, {
+                status: "failed",
+                errorMessage: `Video upload failed: ${storageErr instanceof Error ? storageErr.message : "Unknown error"}`,
+                completedAt: new Date().toISOString(),
+              });
+              await refundCredits(job.user_id, job.credits_cost, job.id, "Motion video upload failed — automatic refund");
+              return NextResponse.json({
+                id: job.id, status: "failed",
+                errorMessage: "Video upload failed. Credits have been refunded.",
+                creditsCost: job.credits_cost, createdAt: job.created_at,
+              });
+            }
 
             const videoId = randomUUID();
             const videoApiUrl = `/api/videos/${videoId}`;

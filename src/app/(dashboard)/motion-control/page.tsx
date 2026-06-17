@@ -376,25 +376,8 @@ export default function MotionControlPage() {
         // Real file from file-picker upload
         characterImageUrl = await uploadFileToR2(characterImage, "image");
       } else if (characterImagePreview?.startsWith("http")) {
-        // CDN URL (WaveSpeed / history) — re-upload to our R2 via server-side proxy
-        // (can't fetch cross-origin CDN URLs from the browser due to CORS)
-        try {
-          const proxyRes = await fetch("/api/upload-url", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: characterImagePreview, purpose: "image" }),
-          });
-          if (!proxyRes.ok) {
-            // Fallback: pass CDN URL directly and hope it's still valid
-            characterImageUrl = characterImagePreview;
-          } else {
-            const proxyData = await proxyRes.json();
-            characterImageUrl = proxyData.publicUrl || characterImagePreview;
-          }
-        } catch {
-          // Fallback: use CDN URL directly
-          characterImageUrl = characterImagePreview;
-        }
+        // CDN URL (WaveSpeed / history) — use directly
+        characterImageUrl = characterImagePreview;
       } else if (characterImagePreview) {
         // Base64 data URI or blob URL — convert to file and upload to R2
         try {

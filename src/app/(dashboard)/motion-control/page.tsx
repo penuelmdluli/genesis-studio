@@ -362,6 +362,10 @@ export default function MotionControlPage() {
 
   // isLoading already defined from isInitialized above
 
+  // Should branding be applied? Owner, free users, and expired subscriptions get branded output.
+  // Paid active subscribers (creator/pro/studio) get clean output.
+  const shouldBrand = user?.isOwner || !user?.plan || user.plan === "free";
+
   // Credit cost estimation (matches server-side estimateMotionCost)
   const ratePerSec = quality === "pro" ? 0.14 : 0.07;
   const creditCost = Math.ceil(ratePerSec * duration * 400);
@@ -529,8 +533,8 @@ export default function MotionControlPage() {
         setGeneratedCharacters(images);
         setGeneratedCharacterUrls(urls);
 
-        // Owner auto-branding: create branded versions for display + auto-download
-        if (user?.isOwner) {
+        // Auto-branding for owner, free users, and expired subscriptions
+        if (shouldBrand) {
           const branded: string[] = [];
           for (const imgSrc of images) {
             const b = await brandImage(imgSrc);
@@ -583,7 +587,7 @@ export default function MotionControlPage() {
     } finally {
       setFamilyImageGenerating(false);
     }
-  }, [toast, user?.isOwner, brandImage]);
+  }, [toast, shouldBrand, brandImage]);
 
   // SA Family: handle custom build — pick character, scene, dance individually
   const handleFamilyBuild = useCallback(async () => {
@@ -614,8 +618,8 @@ export default function MotionControlPage() {
         setGeneratedCharacters(images);
         setGeneratedCharacterUrls(urls);
 
-        // Owner auto-branding
-        if (user?.isOwner) {
+        // Auto-branding for owner, free users, and expired subscriptions
+        if (shouldBrand) {
           const branded: string[] = [];
           for (const imgSrc of images) {
             const b = await brandImage(imgSrc);
@@ -665,7 +669,7 @@ export default function MotionControlPage() {
     } finally {
       setFamilyImageGenerating(false);
     }
-  }, [familyCharacter, familyScene, familyDance, toast, user?.isOwner, brandImage]);
+  }, [familyCharacter, familyScene, familyDance, toast, shouldBrand, brandImage]);
 
   // Allow generation with motion source OR prompt-only mode (just character image + prompt)
   const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
@@ -710,8 +714,9 @@ export default function MotionControlPage() {
       // Upload character image to get a permanent HTTPS URL for the AI API
       let characterImageUrl: string;
 
-      // SA Family owner flow: use the BRANDED image so branding appears in the video
-      if (isFamilyFlow && user?.isOwner && brandedFamilyImages.length > 0 && characterImagePreview) {
+      // SA Family branding flow: use the BRANDED image so branding appears in the video
+      // Applies to owner, free users, and expired subscriptions
+      if (isFamilyFlow && shouldBrand && brandedFamilyImages.length > 0 && characterImagePreview) {
         // Find which branded image matches the selected original
         const selectedIdx = generatedCharacterUrls.findIndex(u => u === characterImagePreview);
         const brandedDataUrl = selectedIdx >= 0 ? brandedFamilyImages[selectedIdx] : brandedFamilyImages[0];
@@ -1321,7 +1326,7 @@ export default function MotionControlPage() {
                     </button>
                   </div>
                   {/* Download branded version for social media */}
-                  {user?.isOwner && (
+                  {shouldBrand && (
                     <button
                       onClick={() => downloadBrandedImage(characterImagePreview)}
                       className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 text-xs font-medium transition-all"
@@ -1517,7 +1522,7 @@ export default function MotionControlPage() {
                               >
                                 <img src={imgSrc} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
                               </button>
-                              {user?.isOwner && (
+                              {shouldBrand && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); downloadBrandedImage(imgSrc); }}
                                   className="absolute bottom-1 right-1 p-1 rounded bg-black/70 hover:bg-cyan-600 text-white opacity-0 group-hover:opacity-100 transition-all"

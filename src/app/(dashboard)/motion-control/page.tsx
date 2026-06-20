@@ -709,7 +709,29 @@ export default function MotionControlPage() {
 
       // Upload character image to get a permanent HTTPS URL for the AI API
       let characterImageUrl: string;
-      if (characterImage && characterImage.size > 0) {
+
+      // SA Family owner flow: use the BRANDED image so branding appears in the video
+      if (isFamilyFlow && user?.isOwner && brandedFamilyImages.length > 0 && characterImagePreview) {
+        // Find which branded image matches the selected original
+        const selectedIdx = generatedCharacterUrls.findIndex(u => u === characterImagePreview);
+        const brandedDataUrl = selectedIdx >= 0 ? brandedFamilyImages[selectedIdx] : brandedFamilyImages[0];
+        if (brandedDataUrl?.startsWith("data:")) {
+          // Convert branded data URL to file and upload to R2
+          const commaIdx = brandedDataUrl.indexOf(",");
+          const header = brandedDataUrl.slice(0, commaIdx);
+          const b64 = brandedDataUrl.slice(commaIdx + 1);
+          const mime = header.match(/data:(.*?);/)?.[1] || "image/jpeg";
+          const bin = atob(b64);
+          const arr = new Uint8Array(bin.length);
+          for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+          const blob = new Blob([arr], { type: mime });
+          const file = new File([blob], "branded-character.jpg", { type: mime });
+          characterImageUrl = await uploadFileToR2(file, "image");
+          progress.setProgress(20, "Branded image uploaded...");
+        } else {
+          characterImageUrl = characterImagePreview;
+        }
+      } else if (characterImage && characterImage.size > 0) {
         // Real file from file-picker upload
         characterImageUrl = await uploadFileToR2(characterImage, "image");
       } else if (characterImagePreview?.startsWith("http")) {

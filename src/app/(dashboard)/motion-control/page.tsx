@@ -97,6 +97,7 @@ export default function MotionControlPage() {
   const [isFamilyFlow, setIsFamilyFlow] = useState(false);
   const [familyImageGenerating, setFamilyImageGenerating] = useState(false);
   const [showFamilyBuilder, setShowFamilyBuilder] = useState(false);
+  const [brandedFamilyImages, setBrandedFamilyImages] = useState<string[]>([]); // branded data URLs for display
 
   // Model & quality
   const [model, setModel] = useState<MotionModel>("kling-v3");
@@ -194,6 +195,73 @@ export default function MotionControlPage() {
         setHistoryLoaded(true);
       }
     } catch {}
+  }, []);
+
+  // Apply branding overlay to an image and return data URL (no download)
+  const brandImage = useCallback(async (imageSrc: string): Promise<string | null> => {
+    try {
+      let blobUrl: string;
+      if (imageSrc.startsWith("data:")) {
+        blobUrl = imageSrc;
+      } else {
+        const resp = await fetch(imageSrc);
+        const blob = await resp.blob();
+        blobUrl = URL.createObjectURL(blob);
+      }
+
+      const img = new window.Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = blobUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+
+      ctx.drawImage(img, 0, 0);
+      const w = canvas.width;
+      const h = canvas.height;
+      const barH = Math.round(h * 0.14);
+
+      const gradient = ctx.createLinearGradient(0, h - barH * 1.5, 0, h);
+      gradient.addColorStop(0, "rgba(0,0,0,0)");
+      gradient.addColorStop(0.4, "rgba(0,0,0,0.6)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.85)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, h - barH * 1.5, w, barH * 1.5);
+
+      ctx.font = `bold ${Math.round(w * 0.035)}px 'Arial Black', Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillText("GENESIS STUDIO", 20, Math.round(w * 0.05));
+
+      const urlSize = Math.round(w * 0.055);
+      ctx.font = `bold ${urlSize}px 'Arial Black', Arial, sans-serif`;
+      ctx.fillStyle = "#00BFFF";
+      const urlText = "ivideostudio.ai";
+      const urlWidth = ctx.measureText(urlText).width;
+      ctx.fillText(urlText, w - urlWidth - 25, h - Math.round(barH * 0.25));
+
+      const tagSize = Math.round(w * 0.038);
+      ctx.font = `${tagSize}px Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      const tagText = "Create AI Videos FREE";
+      const tagWidth = ctx.measureText(tagText).width;
+      ctx.fillText(tagText, (w - tagWidth) / 2, h - Math.round(barH * 0.65));
+
+      ctx.font = `${Math.round(w * 0.025)}px Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillText("Made with AI", 20, h - Math.round(barH * 0.25));
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      if (blobUrl.startsWith("blob:")) URL.revokeObjectURL(blobUrl);
+      return dataUrl;
+    } catch {
+      return null;
+    }
   }, []);
 
   // Download image with branding overlay (canvas-based, instant, no server needed)
@@ -456,20 +524,45 @@ export default function MotionControlPage() {
       });
       const data = await res.json();
       if (res.ok && data.images?.length > 0) {
-        setGeneratedCharacters(data.images);
-        setGeneratedCharacterUrls(data.urls || []);
-        // Auto-select the first image
-        const cdnUrl = data.urls?.[0];
+        const images: string[] = data.images;
+        const urls: string[] = data.urls || [];
+        setGeneratedCharacters(images);
+        setGeneratedCharacterUrls(urls);
+
+        // Owner auto-branding: create branded versions for display + auto-download
+        if (user?.isOwner) {
+          const branded: string[] = [];
+          for (const imgSrc of images) {
+            const b = await brandImage(imgSrc);
+            branded.push(b || imgSrc);
+          }
+          setBrandedFamilyImages(branded);
+          // Auto-download all branded images
+          for (const b of branded) {
+            try {
+              const link = document.createElement("a");
+              link.download = `genesis-studio-${character.name.toLowerCase()}-${Date.now()}-${branded.indexOf(b)}.jpg`;
+              link.href = b;
+              link.click();
+            } catch {}
+          }
+          toast(`${character.name} branded images downloaded! Pick your favorite.`, "success");
+        } else {
+          setBrandedFamilyImages([]);
+          toast(`${character.name} is ready! Pick your favorite pose, then hit Generate.`, "success");
+        }
+
+        // Auto-select the first image (use original URL for animation, not branded)
+        const cdnUrl = urls[0];
         if (cdnUrl) {
           setCharacterImagePreview(cdnUrl);
           setCharacterImage(new File([], "sa-family.jpg"));
         }
         // Save to history
         try {
-          const cdnUrls: string[] = data.urls || [];
-          if (cdnUrls.length > 0) {
+          if (urls.length > 0) {
             const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
-            const newEntries = cdnUrls.map((url: string) => ({
+            const newEntries = urls.map((url: string) => ({
               imageUrl: url,
               prompt: `SA Family: ${character.name} - ${dance.name}`,
               createdAt: new Date().toISOString(),
@@ -480,7 +573,6 @@ export default function MotionControlPage() {
             setHistoryLoaded(true);
           }
         } catch {}
-        toast(`${character.name} is ready! Pick your favorite pose, then hit Generate.`, "success");
       } else {
         setError(data.error || "Failed to generate character");
         toast(data.error || "Generation failed", "error");
@@ -491,7 +583,7 @@ export default function MotionControlPage() {
     } finally {
       setFamilyImageGenerating(false);
     }
-  }, [toast]);
+  }, [toast, user?.isOwner, brandImage]);
 
   // SA Family: handle custom build — pick character, scene, dance individually
   const handleFamilyBuild = useCallback(async () => {
@@ -517,18 +609,42 @@ export default function MotionControlPage() {
       });
       const data = await res.json();
       if (res.ok && data.images?.length > 0) {
-        setGeneratedCharacters(data.images);
-        setGeneratedCharacterUrls(data.urls || []);
-        const cdnUrl = data.urls?.[0];
+        const images: string[] = data.images;
+        const urls: string[] = data.urls || [];
+        setGeneratedCharacters(images);
+        setGeneratedCharacterUrls(urls);
+
+        // Owner auto-branding
+        if (user?.isOwner) {
+          const branded: string[] = [];
+          for (const imgSrc of images) {
+            const b = await brandImage(imgSrc);
+            branded.push(b || imgSrc);
+          }
+          setBrandedFamilyImages(branded);
+          for (const b of branded) {
+            try {
+              const link = document.createElement("a");
+              link.download = `genesis-studio-${character.name.toLowerCase()}-${Date.now()}-${branded.indexOf(b)}.jpg`;
+              link.href = b;
+              link.click();
+            } catch {}
+          }
+          toast(`${character.name} branded images downloaded! Pick your favorite.`, "success");
+        } else {
+          setBrandedFamilyImages([]);
+          toast(`${character.name} is ready! Pick your favorite, then Generate.`, "success");
+        }
+
+        const cdnUrl = urls[0];
         if (cdnUrl) {
           setCharacterImagePreview(cdnUrl);
           setCharacterImage(new File([], "sa-family.jpg"));
         }
         try {
-          const cdnUrls: string[] = data.urls || [];
-          if (cdnUrls.length > 0) {
+          if (urls.length > 0) {
             const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
-            const newEntries = cdnUrls.map((url: string) => ({
+            const newEntries = urls.map((url: string) => ({
               imageUrl: url,
               prompt: `SA Family: ${character.name} - ${dance.name}`,
               createdAt: new Date().toISOString(),
@@ -539,7 +655,6 @@ export default function MotionControlPage() {
             setHistoryLoaded(true);
           }
         } catch {}
-        toast(`${character.name} is ready! Pick your favorite, then Generate.`, "success");
       } else {
         setError(data.error || "Failed to generate character");
         toast(data.error || "Generation failed", "error");
@@ -550,7 +665,7 @@ export default function MotionControlPage() {
     } finally {
       setFamilyImageGenerating(false);
     }
-  }, [familyCharacter, familyScene, familyDance, toast]);
+  }, [familyCharacter, familyScene, familyDance, toast, user?.isOwner, brandImage]);
 
   // Allow generation with motion source OR prompt-only mode (just character image + prompt)
   const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
@@ -893,39 +1008,70 @@ export default function MotionControlPage() {
           {/* Show generated options for SA Family (pick a pose) */}
           {isFamilyFlow && generatedCharacters.length > 0 && (
             <div className="space-y-2">
-              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Pick your favourite pose</label>
+              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+                Pick your favourite pose {brandedFamilyImages.length > 0 && <span className="text-amber-400">(branded + auto-downloaded)</span>}
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {generatedCharacters.map((imgSrc, i) => {
                   const cdnUrl = generatedCharacterUrls[i];
+                  const brandedSrc = brandedFamilyImages[i];
+                  const displaySrc = brandedSrc || imgSrc; // Show branded version if available
                   const isSelected = characterImagePreview === (cdnUrl || imgSrc);
                   return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setCharacterImagePreview(cdnUrl || imgSrc);
-                        setCharacterImage(new File([], "sa-family.jpg"));
-                      }}
-                      className={`relative aspect-[3/4] rounded-lg border overflow-hidden transition-all ${
-                        isSelected
-                          ? "border-amber-500/50 ring-2 ring-amber-500/30"
-                          : "border-white/[0.10] hover:border-amber-500/40"
-                      }`}
-                    >
-                      <img src={imgSrc} alt={`Pose ${i + 1}`} className="w-full h-full object-cover" />
-                      {isSelected && (
-                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </div>
+                    <div key={i} className="relative group">
+                      <button
+                        onClick={() => {
+                          // Always use ORIGINAL unbranded URL for animation (AI needs clean image)
+                          setCharacterImagePreview(cdnUrl || imgSrc);
+                          setCharacterImage(new File([], "sa-family.jpg"));
+                        }}
+                        className={`relative w-full aspect-[3/4] rounded-lg border overflow-hidden transition-all ${
+                          isSelected
+                            ? "border-amber-500/50 ring-2 ring-amber-500/30"
+                            : "border-white/[0.10] hover:border-amber-500/40"
+                        }`}
+                      >
+                        <img src={displaySrc} alt={`Pose ${i + 1}`} className="w-full h-full object-cover" />
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                        {brandedSrc && (
+                          <div className="absolute bottom-1 left-1">
+                            <span className="px-1.5 py-0.5 rounded bg-black/70 text-[8px] text-amber-300 font-medium">BRANDED</span>
+                          </div>
+                        )}
+                      </button>
+                      {/* Re-download branded version */}
+                      {brandedSrc && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const link = document.createElement("a");
+                            link.download = `genesis-studio-family-${Date.now()}.jpg`;
+                            link.href = brandedSrc;
+                            link.click();
+                            toast("Branded image downloaded!", "success");
+                          }}
+                          className="absolute top-1 left-1 p-1 rounded bg-black/70 hover:bg-amber-600 text-white opacity-0 group-hover:opacity-100 transition-all"
+                          title="Download branded"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
               <p className="text-[10px] text-zinc-500 text-center">
-                Selected image will be animated with {SA_DANCE_STYLES.find(d => d.id === familyDance)?.name || "your chosen dance"}.
-                Hit <strong>Generate Motion</strong> below to bring them to life.
+                {brandedFamilyImages.length > 0
+                  ? <>Branded images auto-downloaded. Animation uses the clean original for best quality.</>
+                  : <>Selected image will be animated with {SA_DANCE_STYLES.find(d => d.id === familyDance)?.name || "your chosen dance"}.</>
+                }
+                {" "}Hit <strong>Generate Motion</strong> below to bring them to life.
               </p>
             </div>
           )}

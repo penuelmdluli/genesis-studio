@@ -406,8 +406,11 @@ export default function MotionControlPage() {
     }
   };
 
+  // Allow generation with motion source OR prompt-only mode (just character image + prompt)
+  const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
+  const hasPromptOnly = !hasMotionSource && prompt.trim().length > 0;
   const canGenerate =
-    (motionVideo || selectedEffect || referenceUrl.trim()) &&
+    (hasMotionSource || hasPromptOnly) &&
     (characterImage || characterImagePreview) &&
     hasEnoughCredits &&
     !isLoading;
@@ -422,8 +425,8 @@ export default function MotionControlPage() {
     generateLockRef.current = true;
     setError(null);
 
-    if (!motionVideo && !selectedEffect && !referenceUrl.trim()) {
-      setError("Upload a reference video, paste a URL, or pick a fun effect.");
+    if (!motionVideo && !selectedEffect && !referenceUrl.trim() && !prompt.trim()) {
+      setError("Upload a reference video, paste a URL, pick an effect, or describe the motion.");
       generateLockRef.current = false;
       return;
     }
@@ -589,7 +592,7 @@ export default function MotionControlPage() {
         {/* Step indicator */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
           {[
-            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect || referenceUrl.trim()) },
+            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect || referenceUrl.trim() || prompt.trim()) },
             { num: 2, label: "Character", done: !!characterImage },
             { num: 3, label: "Generate", done: false },
           ].map((step, i) => (

@@ -64,20 +64,26 @@ export async function POST(req: NextRequest) {
 
     // Validate inputs
     if (!characterImageUrl) {
-      return NextResponse.json({ error: "Character image is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Character image is required", code: "INVALID_INPUT" },
+        { status: 400 }
+      );
     }
 
     // Reject YouTube URLs
     if (referenceUrl && /(?:youtube\.com|youtu\.be)\//i.test(referenceUrl)) {
       return NextResponse.json(
-        { error: "YouTube URLs are not supported. Please use TikTok, Instagram, or upload a video directly." },
+        { success: false, error: "YouTube URLs are not supported. Please use TikTok, Instagram, or upload a video directly.", code: "INVALID_INPUT" },
         { status: 400 }
       );
     }
 
-    if (!referenceVideoUrl && !referenceUrl && !effect) {
+    // Prompt-only mode: if no reference video/URL/effect but prompt is provided,
+    // we'll use a standard i2v model (image + prompt → video) instead of motion transfer
+    const isPromptOnlyMode = !referenceVideoUrl && !referenceUrl && !effect;
+    if (isPromptOnlyMode && !prompt) {
       return NextResponse.json(
-        { error: "Either a reference video, a social media URL, or a fun effect is required" },
+        { success: false, error: "Please provide a reference video, an effect, or describe the motion you want.", code: "INVALID_INPUT" },
         { status: 400 }
       );
     }
@@ -95,7 +101,7 @@ export async function POST(req: NextRequest) {
       );
       if (!success) {
         return NextResponse.json(
-          { error: "Insufficient credits", required: creditCost },
+          { success: false, error: "Insufficient credits", code: "INSUFFICIENT_CREDITS", required: creditCost },
           { status: 402 }
         );
       }
@@ -135,7 +141,7 @@ export async function POST(req: NextRequest) {
           }
           await updateJobStatus(job.id, { status: "failed", errorMessage: "Could not download video from the provided URL" });
           return NextResponse.json(
-            { error: "Could not download video from the provided URL. Please upload the video directly or try a different link." },
+            { success: false, error: "Could not download video from the provided URL. Please upload the video directly or try a different link.", code: "GENERATION_FAILED" },
             { status: 422 }
           );
         }
@@ -143,19 +149,42 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const result = await submitMotionControlJob({
-        characterImageUrl,
-        referenceVideoUrl,
-        effect,
-        prompt,
-        quality,
-        model,
-        orientation,
-        duration,
-        enableAudio,
-        keepOriginalSound,
-        seed,
-      });
+      let result: { requestId: string; endpoint: string };
+
+      if (isPromptOnlyMode) {
+        // Prompt-only mode: use standard i2v (image + prompt → video)
+        const { fal } = await import("@fal-ai/client");
+        fal.config({ credentials: process.env.FAL_KEY || "" });
+        const i2vEndpoint = quality === "pro"
+          ? "fal-ai/kling-video/v3/pro/image-to-video"
+          : "fal-ai/kling-video/v3/standard/image-to-video";
+        const falResult = await fal.queue.submit(i2vEndpoint, {
+          input: {
+            image_url: characterImageUrl,
+            prompt: prompt || "gentle natural movement",
+            duration: String(duration),
+            aspect_ratio: orientation === "image" ? "9:16" : "16:9",
+            ...(seed !== undefined && seed >= 0 ? { seed } : {}),
+            ...(enableAudio ? { native_audio: true } : {}),
+          },
+        });
+        result = { requestId: falResult.request_id, endpoint: i2vEndpoint };
+      } else {
+        // Motion control mode: transfer motion from reference video/effect
+        result = await submitMotionControlJob({
+          characterImageUrl,
+          referenceVideoUrl,
+          effect,
+          prompt,
+          quality,
+          model,
+          orientation,
+          duration,
+          enableAudio,
+          keepOriginalSound,
+          seed,
+        });
+      }
 
       // Store FAL request ID and endpoint for polling
       await updateJobStatus(job.id, {
@@ -164,6 +193,7 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({
+        success: true,
         jobId: job.id,
         status: "queued",
         estimatedTime: duration * 12, // rough estimate
@@ -188,12 +218,12 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json(
-        { error: "Motion control submission failed. Credits refunded." },
+        { success: false, error: "Motion control submission failed. Credits refunded.", code: "GENERATION_FAILED" },
         { status: 503 }
       );
     }
   } catch (error) {
     console.error("Motion control error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Internal server error", code: "GENERATION_FAILED" }, { status: 500 });
   }
 }

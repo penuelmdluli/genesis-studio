@@ -42,6 +42,17 @@ import {
   SCENARIO_PRESETS,
   buildOwnerImagePrompt,
 } from "@/lib/marketing-presets";
+import {
+  SA_FAMILY_CHARACTERS,
+  SA_FAMILY_SCENES,
+  SA_DANCE_STYLES,
+  SA_FAMILY_PRESETS,
+  buildFamilyImagePrompt,
+  SA_FAMILY_COSTS,
+  type FamilyCharacter,
+  type FamilyScene,
+  type DanceStyle,
+} from "@/lib/sa-family";
 
 type MotionTab = "effects" | "upload" | "url";
 type MotionQuality = "standard" | "pro";
@@ -78,6 +89,14 @@ export default function MotionControlPage() {
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [characterHistory, setCharacterHistory] = useState<Array<{ imageUrl: string; prompt: string; createdAt: string }>>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  // SA Family state
+  const [familyCharacter, setFamilyCharacter] = useState<string | null>(null);
+  const [familyScene, setFamilyScene] = useState<string | null>(null);
+  const [familyDance, setFamilyDance] = useState<string | null>(null);
+  const [isFamilyFlow, setIsFamilyFlow] = useState(false);
+  const [familyImageGenerating, setFamilyImageGenerating] = useState(false);
+  const [showFamilyBuilder, setShowFamilyBuilder] = useState(false);
 
   // Model & quality
   const [model, setModel] = useState<MotionModel>("kling-v3");
@@ -406,6 +425,133 @@ export default function MotionControlPage() {
     }
   };
 
+  // SA Family: handle preset click — generates image then sets up for animation
+  const handleFamilyPreset = useCallback(async (presetId: string) => {
+    const preset = SA_FAMILY_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+
+    const character = SA_FAMILY_CHARACTERS.find(c => c.id === preset.characterId);
+    const scene = SA_FAMILY_SCENES.find(s => s.id === preset.sceneId);
+    const dance = SA_DANCE_STYLES.find(d => d.id === preset.danceId);
+    if (!character || !scene || !dance) return;
+
+    setFamilyCharacter(preset.characterId);
+    setFamilyScene(preset.sceneId);
+    setFamilyDance(preset.danceId);
+    setIsFamilyFlow(true);
+    setError(null);
+
+    // Set the animation prompt from the dance style
+    setPrompt(dance.animationPrompt);
+
+    // Generate the character image
+    setFamilyImageGenerating(true);
+    const { prompt: imagePrompt } = buildFamilyImagePrompt({ character, scene, dance });
+
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: imagePrompt, aspectRatio: "portrait", numImages: 4 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.images?.length > 0) {
+        setGeneratedCharacters(data.images);
+        setGeneratedCharacterUrls(data.urls || []);
+        // Auto-select the first image
+        const cdnUrl = data.urls?.[0];
+        if (cdnUrl) {
+          setCharacterImagePreview(cdnUrl);
+          setCharacterImage(new File([], "sa-family.jpg"));
+        }
+        // Save to history
+        try {
+          const cdnUrls: string[] = data.urls || [];
+          if (cdnUrls.length > 0) {
+            const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+            const newEntries = cdnUrls.map((url: string) => ({
+              imageUrl: url,
+              prompt: `SA Family: ${character.name} - ${dance.name}`,
+              createdAt: new Date().toISOString(),
+            }));
+            const updated = [...newEntries, ...existing].slice(0, 60);
+            localStorage.setItem("gs-character-history", JSON.stringify(updated));
+            setCharacterHistory(updated);
+            setHistoryLoaded(true);
+          }
+        } catch {}
+        toast(`${character.name} is ready! Pick your favorite pose, then hit Generate.`, "success");
+      } else {
+        setError(data.error || "Failed to generate character");
+        toast(data.error || "Generation failed", "error");
+      }
+    } catch {
+      setError("Failed to generate character image");
+      toast("Network error", "error");
+    } finally {
+      setFamilyImageGenerating(false);
+    }
+  }, [toast]);
+
+  // SA Family: handle custom build — pick character, scene, dance individually
+  const handleFamilyBuild = useCallback(async () => {
+    if (!familyCharacter || !familyScene || !familyDance) return;
+
+    const character = SA_FAMILY_CHARACTERS.find(c => c.id === familyCharacter);
+    const scene = SA_FAMILY_SCENES.find(s => s.id === familyScene);
+    const dance = SA_DANCE_STYLES.find(d => d.id === familyDance);
+    if (!character || !scene || !dance) return;
+
+    setIsFamilyFlow(true);
+    setPrompt(dance.animationPrompt);
+    setFamilyImageGenerating(true);
+    setError(null);
+
+    const { prompt: imagePrompt } = buildFamilyImagePrompt({ character, scene, dance });
+
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: imagePrompt, aspectRatio: "portrait", numImages: 4 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.images?.length > 0) {
+        setGeneratedCharacters(data.images);
+        setGeneratedCharacterUrls(data.urls || []);
+        const cdnUrl = data.urls?.[0];
+        if (cdnUrl) {
+          setCharacterImagePreview(cdnUrl);
+          setCharacterImage(new File([], "sa-family.jpg"));
+        }
+        try {
+          const cdnUrls: string[] = data.urls || [];
+          if (cdnUrls.length > 0) {
+            const existing = JSON.parse(localStorage.getItem("gs-character-history") || "[]");
+            const newEntries = cdnUrls.map((url: string) => ({
+              imageUrl: url,
+              prompt: `SA Family: ${character.name} - ${dance.name}`,
+              createdAt: new Date().toISOString(),
+            }));
+            const updated = [...newEntries, ...existing].slice(0, 60);
+            localStorage.setItem("gs-character-history", JSON.stringify(updated));
+            setCharacterHistory(updated);
+            setHistoryLoaded(true);
+          }
+        } catch {}
+        toast(`${character.name} is ready! Pick your favorite, then Generate.`, "success");
+      } else {
+        setError(data.error || "Failed to generate character");
+        toast(data.error || "Generation failed", "error");
+      }
+    } catch {
+      setError("Failed to generate character image");
+      toast("Network error", "error");
+    } finally {
+      setFamilyImageGenerating(false);
+    }
+  }, [familyCharacter, familyScene, familyDance, toast]);
+
   // Allow generation with motion source OR prompt-only mode (just character image + prompt)
   const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
   const hasPromptOnly = !hasMotionSource && prompt.trim().length > 0;
@@ -616,6 +762,175 @@ export default function MotionControlPage() {
           ))}
         </div>
       </div>
+
+      {/* ── SA Family Quick Start ── */}
+      <Card className="border-amber-500/20 bg-gradient-to-r from-amber-950/20 via-zinc-900/50 to-orange-950/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="text-lg">🇿🇦</span>
+            SA Family Studio
+            <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px]">
+              NEW
+            </Badge>
+            <button
+              onClick={() => setShowFamilyBuilder(!showFamilyBuilder)}
+              className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
+            >
+              {showFamilyBuilder ? "Hide" : "Build Your Own"}
+              {showFamilyBuilder ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </CardTitle>
+          <p className="text-[11px] text-zinc-500">Pick a family character + dance. We generate the image and animate them — one click.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Quick Presets */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
+            {SA_FAMILY_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => handleFamilyPreset(preset.id)}
+                disabled={familyImageGenerating || isGenerating}
+                className={`p-2.5 rounded-xl border text-left transition-all group ${
+                  isFamilyFlow && familyCharacter === SA_FAMILY_PRESETS.find(p => p.id === preset.id)?.characterId
+                    ? "border-amber-500/40 bg-amber-500/10 ring-1 ring-amber-500/20"
+                    : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30 hover:bg-amber-500/5"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="text-lg mb-0.5">{preset.emoji}</div>
+                <div className="text-[11px] font-medium text-zinc-300 group-hover:text-amber-300 truncate">{preset.name}</div>
+                <div className="text-[9px] text-zinc-500 truncate">{preset.description}</div>
+              </button>
+            ))}
+          </div>
+
+          {familyImageGenerating && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 animate-pulse">
+              <Wand2 className="w-4 h-4 text-amber-400 animate-spin" />
+              <span className="text-xs text-amber-300">Creating your character... pick your favorite pose when ready</span>
+            </div>
+          )}
+
+          {/* Build Your Own */}
+          {showFamilyBuilder && (
+            <div className="space-y-3 pt-2 border-t border-white/[0.08]">
+              {/* Character picker */}
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Character</label>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                  {SA_FAMILY_CHARACTERS.map((char) => (
+                    <button
+                      key={char.id}
+                      onClick={() => setFamilyCharacter(char.id)}
+                      className={`p-2 rounded-lg border text-center transition-all ${
+                        familyCharacter === char.id
+                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/20"
+                          : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30"
+                      }`}
+                    >
+                      <div className="text-lg">{char.emoji}</div>
+                      <div className={`text-[10px] font-medium truncate ${familyCharacter === char.id ? "text-amber-300" : "text-zinc-400"}`}>
+                        {char.name}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scene picker */}
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Scene</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {SA_FAMILY_SCENES.map((scene) => (
+                    <button
+                      key={scene.id}
+                      onClick={() => setFamilyScene(scene.id)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                        familyScene === scene.id
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
+                      }`}
+                    >
+                      {scene.emoji} {scene.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dance picker */}
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Dance Style</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {SA_DANCE_STYLES.map((dance) => (
+                    <button
+                      key={dance.id}
+                      onClick={() => setFamilyDance(dance.id)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                        familyDance === dance.id
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
+                      }`}
+                    >
+                      {dance.emoji} {dance.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Build button */}
+              <Button
+                onClick={handleFamilyBuild}
+                disabled={!familyCharacter || !familyScene || !familyDance || familyImageGenerating}
+                loading={familyImageGenerating}
+                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium"
+                size="sm"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                Generate Character Image
+              </Button>
+            </div>
+          )}
+
+          {/* Show generated options for SA Family (pick a pose) */}
+          {isFamilyFlow && generatedCharacters.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Pick your favourite pose</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {generatedCharacters.map((imgSrc, i) => {
+                  const cdnUrl = generatedCharacterUrls[i];
+                  const isSelected = characterImagePreview === (cdnUrl || imgSrc);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setCharacterImagePreview(cdnUrl || imgSrc);
+                        setCharacterImage(new File([], "sa-family.jpg"));
+                      }}
+                      className={`relative aspect-[3/4] rounded-lg border overflow-hidden transition-all ${
+                        isSelected
+                          ? "border-amber-500/50 ring-2 ring-amber-500/30"
+                          : "border-white/[0.10] hover:border-amber-500/40"
+                      }`}
+                    >
+                      <img src={imgSrc} alt={`Pose ${i + 1}`} className="w-full h-full object-cover" />
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-500 text-center">
+                Selected image will be animated with {SA_DANCE_STYLES.find(d => d.id === familyDance)?.name || "your chosen dance"}.
+                Hit <strong>Generate Motion</strong> below to bring them to life.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Inputs */}
@@ -1480,6 +1795,40 @@ export default function MotionControlPage() {
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Try Different Dance — appears when SA Family character is loaded */}
+      {isFamilyFlow && characterImagePreview && !isGenerating && (
+        <Card className="border-amber-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <span className="text-base">🔄</span>
+              Try a Different Dance
+              <span className="text-[10px] font-normal text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded">Same character, new moves</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-1.5 flex-wrap">
+              {SA_DANCE_STYLES.map((dance) => (
+                <button
+                  key={dance.id}
+                  onClick={() => {
+                    setFamilyDance(dance.id);
+                    setPrompt(dance.animationPrompt);
+                    toast(`Dance changed to ${dance.name} — hit Generate!`, "success");
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    familyDance === dance.id
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "bg-white/[0.05] text-zinc-400 border border-white/[0.10] hover:border-amber-500/20 hover:text-zinc-300"
+                  }`}
+                >
+                  {dance.emoji} {dance.name}
+                </button>
               ))}
             </div>
           </CardContent>

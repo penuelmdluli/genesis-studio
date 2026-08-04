@@ -4,9 +4,9 @@
  * STRICT RULES:
  * - NEVER post immediately. ALL posts are scheduled to optimal time slots.
  * - Max 3 posts per page per day
- * - Slots: 7am, 1pm, 7pm SA time (UTC+2)
+ * - Slots: 7am, 1pm, 6pm SA time (UTC+2)
  * - Each slot can only hold 1 post
- * - If you create 3 videos at once, they go to 7am, 1pm, 7pm
+ * - If you create 3 videos at once, they go to 7am, 1pm, 6pm
  * - If today's slots are full, overflow to tomorrow
  * - Anti-pattern jitter: ±10 minutes so posts look natural
  * - Slack + in-app notification on every schedule and post
@@ -21,7 +21,7 @@ const MAX_POSTS_PER_DAY = 3;
 const SLOTS = [
   { hour: 7, label: "7 AM", jitter: 10 },    // Morning commute
   { hour: 13, label: "1 PM", jitter: 10 },   // Lunch break
-  { hour: 19, label: "7 PM", jitter: 10 },   // Evening prime time
+  { hour: 18, label: "6 PM", jitter: 10 },   // Evening prime time (last post of the day)
 ];
 
 interface ScheduleResult {

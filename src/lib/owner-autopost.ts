@@ -275,31 +275,18 @@ async function postToPage(
   }
 
   try {
-    // ALL posts are scheduled — never immediate. Find the next available slot.
-    const { getPostingSlot, recordOwnerPost } = await import("@/lib/owner-scheduler");
-    const slot = await getPostingSlot(page.pageId, page.name);
-    console.log(`[OWNER-AUTOPOST] ${slot.reason}`);
+    const { recordOwnerPost } = await import("@/lib/owner-scheduler");
 
-    // RESERVE the slot immediately so parallel posts don't double-book
-    const reservationId = `pending-${Date.now()}`;
-    await recordOwnerPost(
-      page.pageId, page.name, reservationId, videoId || "",
-      "scheduled", slot.scheduledFor, prompt
-    ).catch(() => {});
-
-    // Use Facebook's scheduled_publish_time — video uploads now, publishes at the scheduled time
-    const unixTimestamp = Math.floor(slot.scheduledFor.getTime() / 1000);
-
+    // Publish IMMEDIATELY — post the video the moment it's created (no slots).
     const params = new URLSearchParams({
       file_url: videoUrl,
       title: pickRandom(VIDEO_TITLES),
       description,
       access_token: token,
-      scheduled_publish_time: String(unixTimestamp),
-      published: "false",
+      published: "true",
     });
 
-    console.log(`[OWNER-AUTOPOST] 📅 ${page.name}: uploading now, publishes at ${slot.scheduledFor.toISOString()}`);
+    console.log(`[OWNER-AUTOPOST] 🚀 ${page.name}: publishing immediately`);
 
     const res = await fetch(
       `https://graph.facebook.com/v25.0/${page.pageId}/videos`,
@@ -315,22 +302,18 @@ async function postToPage(
     const data = (await res.json()) as { id: string; post_id?: string };
     const postId = data.post_id || data.id;
 
-    console.log(`[OWNER-AUTOPOST] 📅 ${page.name}: scheduled as ${postId}, publishes ${slot.scheduledFor.toISOString()}`);
+    console.log(`[OWNER-AUTOPOST] ✅ ${page.name}: posted ${postId}`);
 
-    // Auto-comment with marketing + engagement after publish time (fire-and-forget)
-    const msUntilPublish = slot.scheduledFor.getTime() - Date.now() + 60_000; // +1min buffer
-    if (msUntilPublish > 0 && msUntilPublish < 86_400_000) { // only if within 24h
-      setTimeout(() => {
-        autoCommentOnPost(postId, token).catch(() => {});
-      }, msUntilPublish);
-    }
+    // Record as posted (also fires the Slack "✅ Video posted" alert)
+    await recordOwnerPost(
+      page.pageId, page.name, postId, videoId || "",
+      "posted", new Date(), prompt
+    ).catch(() => {});
 
-    return {
-      success: true,
-      postId,
-      scheduled: true,
-      scheduledFor: slot.scheduledFor.toISOString(),
-    };
+    // Auto-comment with marketing + engagement right away (fire-and-forget)
+    autoCommentOnPost(postId, token).catch(() => {});
+
+    return { success: true, postId, scheduled: false };
   } catch (err) {
     console.error(`[OWNER-AUTOPOST] ${page.name} error:`, err);
     return { success: false, error: String(err) };

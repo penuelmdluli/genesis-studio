@@ -4,6 +4,8 @@ import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, isOwnerClerkId, refundCredits } from "@/lib/credits";
 import {
   submitMotionControlJob,
+  hostedMotionAvailable,
+  hostedMotionUnavailable,
   estimateMotionCost,
   type MotionQuality,
   type MotionModel,
@@ -11,6 +13,11 @@ import {
 } from "@/lib/motion-control";
 import { checkRateLimit } from "@/lib/fraud";
 import { downloadVideoFromUrl } from "@/lib/video-downloader";
+
+// Matches the client-side cap on direct uploads and Kling's own hard limit.
+// 0 means the duration could not be read, which we let through rather than
+// blocking a valid video on a parsing gap.
+const MAX_REFERENCE_SECONDS = 30;
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,6 +95,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Fun effects and prompt-only motion are Kling-only — Wan-Animate needs a
+    // driving video. If neither hosted provider has funds, say so before taking
+    // the user's credits rather than refunding them after an opaque 403.
+    const needsHostedProvider = isPromptOnlyMode || !!effect;
+    if (needsHostedProvider && !(await hostedMotionAvailable())) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: referenceVideoUrl || referenceUrl
+            ? "This motion style is temporarily unavailable. Please try again later."
+            : "Fun effects are temporarily unavailable. Upload a reference video instead — that mode is working.",
+          code: "PROVIDER_UNAVAILABLE",
+        },
+        { status: 503 }
+      );
+    }
+
     // Calculate credits
     const { credits: creditCost } = estimateMotionCost(quality, duration);
     const ownerAccount = isOwnerClerkId(clerkId);
@@ -128,6 +152,30 @@ export async function POST(req: NextRequest) {
     if (referenceUrl && !referenceVideoUrl) {
       try {
         const downloaded = await downloadVideoFromUrl(referenceUrl, user.id, job.id);
+
+        // Direct uploads are length-checked in the browser, but a pasted URL
+        // reaches here unchecked — and an over-long reference is the joint
+        // largest cause of production motion failures. Kling rejects it after
+        // we have already taken credits; Wan-Animate is worse, since it
+        // animates the whole clip and bills our GPU by the second.
+        if (downloaded.durationSec > MAX_REFERENCE_SECONDS) {
+          if (!ownerAccount) {
+            await refundCredits(user.id, creditCost, job.id, "Reference video too long — automatic refund");
+          }
+          await updateJobStatus(job.id, {
+            status: "failed",
+            errorMessage: `Reference video is ${Math.round(downloaded.durationSec)}s — the limit is ${MAX_REFERENCE_SECONDS}s.`,
+          });
+          return NextResponse.json(
+            {
+              success: false,
+              error: `That video is ${Math.round(downloaded.durationSec)} seconds long. Please use a clip of ${MAX_REFERENCE_SECONDS} seconds or less.`,
+              code: "INVALID_INPUT",
+            },
+            { status: 400 }
+          );
+        }
+
         referenceVideoUrl = downloaded.publicUrl;
       } catch (primaryErr) {
         console.warn("[Motion] Primary video download failed, trying scraper fallback:", primaryErr);
@@ -192,11 +240,16 @@ export async function POST(req: NextRequest) {
         status: "queued",
       });
 
+      // Our own Wan-Animate GPU is far slower than the hosted Kling endpoints
+      // (a 14B diffusion pass plus pose/face preprocessing), so quote honestly
+      // — an optimistic ETA just makes a working job look broken.
+      const onRunpod = result.endpoint.startsWith("rp:");
+
       return NextResponse.json({
         success: true,
         jobId: job.id,
         status: "queued",
-        estimatedTime: duration * 12, // rough estimate
+        estimatedTime: onRunpod ? 30 * 60 : duration * 12,
         creditsCost: creditCost,
       });
     } catch (submitErr) {
@@ -212,13 +265,37 @@ export async function POST(req: NextRequest) {
       }
 
       const errMsg = submitErr instanceof Error ? submitErr.message : "Submission failed";
+
+      // A bare "Forbidden" from a provider means its account is locked or out
+      // of balance — nothing the user can fix by retrying, so don't invite it.
+      const providerLocked = /forbidden|exhausted balance|user is locked/i.test(errMsg);
+      if (providerLocked) {
+        hostedMotionUnavailable();
+        import("@/lib/alerts").then(({ sendSlackAlert }) =>
+          sendSlackAlert({
+            level: "critical",
+            title: "Motion provider locked",
+            message: `Motion control submission was refused: ${errMsg}
+Top up the hosted provider balance — effects and prompt-only motion are down.`,
+          })
+        ).catch(() => {});
+      }
+
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: `${errMsg}. Credits have been refunded.`,
+        errorMessage: providerLocked
+          ? "This motion style is temporarily unavailable. Credits have been refunded."
+          : `${errMsg}. Credits have been refunded.`,
       });
 
       return NextResponse.json(
-        { success: false, error: "Motion control submission failed. Credits refunded.", code: "GENERATION_FAILED" },
+        {
+          success: false,
+          error: providerLocked
+            ? "This motion style is temporarily unavailable — we've been alerted. Your credits were refunded. Uploading a reference video still works."
+            : "Motion control submission failed. Credits refunded.",
+          code: providerLocked ? "PROVIDER_UNAVAILABLE" : "GENERATION_FAILED",
+        },
         { status: 503 }
       );
     }

@@ -60,12 +60,16 @@ export async function GET(
             const motionResult = await getMotionJobResult(falEndpoint, falRequestId);
             const vKey = videoStorageKey(job.user_id, job.id);
 
-            // Download video from FAL and upload to R2
+            // RunPod returns the mp4 inline; hosted providers return a URL.
             let videoBuffer: Buffer;
             try {
-              const videoRes = await fetch(motionResult.videoUrl);
-              if (!videoRes.ok) throw new Error(`Failed to download motion video: ${videoRes.status}`);
-              videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+              if (motionResult.videoBytes) {
+                videoBuffer = Buffer.from(motionResult.videoBytes);
+              } else {
+                const videoRes = await fetch(motionResult.videoUrl!);
+                if (!videoRes.ok) throw new Error(`Failed to download motion video: ${videoRes.status}`);
+                videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+              }
               await uploadVideo(vKey, videoBuffer);
               await verifyR2Upload(vKey);
             } catch (storageErr) {

@@ -27,6 +27,18 @@ export const maxDuration = 60;
 
 const STUCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
+// Wan2.2-Animate on our own RunPod GPU is a long render — preprocessing plus a
+// 14B diffusion pass runs well past 30 minutes on a cold worker, and the
+// endpoint's own execution timeout is 60 minutes. Killing those at the hosted-
+// provider threshold would refund the user while the GPU is still working.
+const RUNPOD_MOTION_TIMEOUT_MS = 90 * 60 * 1000; // 90 minutes
+
+function stuckTimeoutFor(providerJobId: string | null): number {
+  // Motion jobs are stored as "fal:<endpoint>:<requestId>"; a RunPod-backed one
+  // carries the "rp:" endpoint prefix.
+  return providerJobId?.startsWith("fal:rp:") ? RUNPOD_MOTION_TIMEOUT_MS : STUCK_TIMEOUT_MS;
+}
+
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -47,8 +59,13 @@ export async function GET(req: Request) {
   const summary = { checked: 0, completed: 0, failed: 0, timedOut: 0 };
 
   for (const job of stuckJobs || []) {
-    summary.checked++;
     const jobId = job.runpod_job_id as string | null;
+
+    // Long-running providers get a longer leash than the 30-minute query cutoff.
+    const age = Date.now() - new Date(job.created_at as string).getTime();
+    if (age < stuckTimeoutFor(jobId)) continue;
+
+    summary.checked++;
     if (!jobId) {
       // No provider job ID — can't poll, just timeout
       await db.from("generation_jobs").update({
@@ -83,7 +100,7 @@ export async function GET(req: Request) {
 
         if (motionStatus.status === "COMPLETED") {
           const result = await getMotionJobResult(endpoint, requestId);
-          await completeJob(db, job, result.videoUrl);
+          await completeJob(db, job, result.videoUrl, result.videoBytes);
           summary.completed++;
           continue;
         }
@@ -120,16 +137,23 @@ export async function GET(req: Request) {
 async function completeJob(
   db: ReturnType<typeof getDb>,
   job: Record<string, unknown>,
-  videoUrl: string
+  videoUrl?: string,
+  videoBytes?: Uint8Array
 ) {
   const userId = job.user_id as string;
   const jobId = job.id as string;
 
-  // Download and upload to R2
+  // Upload to R2 — RunPod motion hands back bytes, everything else a URL
   const vKey = videoStorageKey(userId, jobId);
-  const videoRes = await fetch(videoUrl);
-  if (!videoRes.ok) throw new Error(`Failed to download: ${videoRes.status}`);
-  const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+  let videoBuffer: Buffer;
+  if (videoBytes) {
+    videoBuffer = Buffer.from(videoBytes);
+  } else {
+    if (!videoUrl) throw new Error("Completed job had neither a video URL nor bytes");
+    const videoRes = await fetch(videoUrl);
+    if (!videoRes.ok) throw new Error(`Failed to download: ${videoRes.status}`);
+    videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+  }
   await uploadVideo(vKey, videoBuffer);
   await verifyR2Upload(vKey);
 

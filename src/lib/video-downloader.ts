@@ -68,9 +68,61 @@ export async function downloadVideoFromUrl(
   return {
     r2Key,
     publicUrl: r2PublicUrl(r2Key),
-    durationSec: 0, // Can't determine without ffprobe
+    durationSec: mp4DurationSec(buffer) ?? 0,
     fileSizeBytes: buffer.byteLength,
   };
+}
+
+/**
+ * Read a duration out of an MP4 without ffprobe.
+ *
+ * The `mvhd` box in the movie header carries a timescale and a duration in that
+ * timescale, so scanning for its four-byte tag is enough — we do not need to
+ * walk the box tree. Returns null for WebM, fragmented MP4s with a zero
+ * duration, or anything else we cannot read, so callers must treat null as
+ * "unknown" rather than "short".
+ */
+export function mp4DurationSec(buffer: ArrayBuffer): number | null {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+
+  // mvhd sits in the moov box, which is near the front for streamable files and
+  // at the very end otherwise. A megabyte from each end covers both layouts
+  // without scanning a 50MB body.
+  const WINDOW = 1024 * 1024;
+  const ranges: Array<[number, number]> =
+    bytes.length <= 2 * WINDOW
+      ? [[0, bytes.length]]
+      : [[0, WINDOW], [bytes.length - WINDOW, bytes.length]];
+
+  for (const [from, to] of ranges) {
+    for (let i = from; i < to - 4; i++) {
+      // "mvhd"
+      if (bytes[i] !== 0x6d || bytes[i + 1] !== 0x76 || bytes[i + 2] !== 0x68 || bytes[i + 3] !== 0x64) {
+        continue;
+      }
+
+      // Immediately after the tag: 1 byte version, 3 bytes flags, then
+      // creation/modification times, timescale and duration. Version 1 widens
+      // the times and the duration to 64 bits.
+      const version = bytes[i + 4];
+      try {
+        if (version === 0) {
+          const timescale = view.getUint32(i + 16);
+          const duration = view.getUint32(i + 20);
+          if (timescale > 0 && duration > 0) return duration / timescale;
+        } else if (version === 1) {
+          const timescale = view.getUint32(i + 24);
+          const duration = Number(view.getBigUint64(i + 28));
+          if (timescale > 0 && duration > 0) return duration / timescale;
+        }
+      } catch {
+        // Truncated near the window edge — keep looking.
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

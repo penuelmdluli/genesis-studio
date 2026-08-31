@@ -7,7 +7,7 @@
 import { ModelId } from "@/types";
 import { AI_MODELS } from "@/lib/constants";
 
-export type VendorProvider = "fal" | "wavespeed" | "runpod" | "replicate" | "runpod-comfyui";
+export type VendorProvider = "fal" | "wavespeed" | "runpod" | "replicate" | "runpod-comfyui" | "runpod-motion";
 
 interface ProviderHealth {
   provider: VendorProvider;
@@ -24,6 +24,9 @@ const providerHealth: Record<VendorProvider, ProviderHealth> = {
   runpod: { provider: "runpod", healthy: true, lastChecked: 0, failCount: 0 },
   replicate: { provider: "replicate", healthy: true, lastChecked: 0, failCount: 0 },
   "runpod-comfyui": { provider: "runpod-comfyui", healthy: true, lastChecked: 0, failCount: 0 },
+  // Wan-Animate lives on its own endpoint; its health is tracked separately so
+  // a motion outage does not take the general RunPod video path down with it.
+  "runpod-motion": { provider: "runpod-motion", healthy: true, lastChecked: 0, failCount: 0 },
 };
 
 const HEALTH_CHECK_INTERVAL = 60_000; // 1 minute

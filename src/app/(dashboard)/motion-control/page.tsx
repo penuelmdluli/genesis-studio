@@ -73,6 +73,11 @@ export default function MotionControlPage() {
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterImagePreview, setCharacterImagePreview] = useState<string | null>(null);
   const [motionTab, setMotionTab] = useState<MotionTab>("effects");
+  // Fun effects and prompt-only motion run on Kling, which is a paid hosted
+  // service; reference-video motion runs on our own GPU. When the hosted
+  // balance is dry the Kling modes cannot run at all, so the page hides them
+  // rather than letting people spend credits on a guaranteed failure.
+  const [effectsAvailable, setEffectsAvailable] = useState(true);
   const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
   const [effectCategoryFilter, setEffectCategoryFilter] = useState("All");
   const [referenceUrl, setReferenceUrl] = useState("");
@@ -122,7 +127,10 @@ export default function MotionControlPage() {
   }, []);
 
   // Poll job status and update progress in real-time
-  const startJobPolling = useCallback((jobId: string) => {
+  // estimatedSec comes from the API, which knows which provider took the job —
+  // our own GPU runs an order of magnitude longer than the hosted ones, and a
+  // bar that pins at 95% for half an hour reads as a hang.
+  const startJobPolling = useCallback((jobId: string, estimatedSec?: number) => {
     if (pollRef.current) clearInterval(pollRef.current);
 
     let pollCount = 0;
@@ -154,7 +162,7 @@ export default function MotionControlPage() {
         // Estimate progress based on poll count and status
         if (data.status === "processing") {
           const elapsed = pollCount * 5; // 5 sec per poll
-          const estTotal = duration * 12; // rough total seconds
+          const estTotal = estimatedSec || duration * 12; // rough total seconds
           const pct = Math.min(55 + Math.round((elapsed / estTotal) * 40), 95);
           progress.setProgress(pct, "AI is generating your video...");
           if (pollCount === 1) progress.advanceStep("Generating video...");
@@ -185,6 +193,26 @@ export default function MotionControlPage() {
       startJobPolling(activeMotionJob.id);
     }
   }, [isInitialized, activeJobs, progress, startJobPolling]);
+
+  // Ask the server which motion modes a funded provider can actually serve.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/features/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.motion) return;
+        const available = data.motion.effectsAvailable !== false;
+        setEffectsAvailable(available);
+        // Don't strand the user on a tab they cannot generate from.
+        if (!available) setMotionTab((tab) => (tab === "effects" ? "upload" : tab));
+      })
+      .catch(() => {
+        /* Availability is a hint — a failed probe shouldn't block the page. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load character image history from localStorage on mount
   useEffect(() => {
@@ -671,9 +699,12 @@ export default function MotionControlPage() {
     }
   }, [familyCharacter, familyScene, familyDance, toast, shouldBrand, brandImage]);
 
-  // Allow generation with motion source OR prompt-only mode (just character image + prompt)
+  // Allow generation with motion source OR prompt-only mode (just character image + prompt).
+  // Prompt-only needs a hosted Kling provider — Wan-Animate has no motion to
+  // transfer without a driving video — so it follows the same availability flag
+  // as the effects.
   const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
-  const hasPromptOnly = !hasMotionSource && prompt.trim().length > 0;
+  const hasPromptOnly = !hasMotionSource && effectsAvailable && prompt.trim().length > 0;
   const canGenerate =
     (hasMotionSource || hasPromptOnly) &&
     (characterImage || characterImagePreview) &&
@@ -691,7 +722,18 @@ export default function MotionControlPage() {
     setError(null);
 
     if (!motionVideo && !selectedEffect && !referenceUrl.trim() && !prompt.trim()) {
-      setError("Upload a reference video, paste a URL, pick an effect, or describe the motion.");
+      setError(
+        effectsAvailable
+          ? "Upload a reference video, paste a URL, pick an effect, or describe the motion."
+          : "Upload a reference video or paste a URL to use as the motion."
+      );
+      generateLockRef.current = false;
+      return;
+    }
+
+    if (!hasMotionSource && !effectsAvailable) {
+      setError("Describing the motion isn't available right now — upload a reference video or paste a URL instead.");
+      toast("Add a reference video to continue", "error");
       generateLockRef.current = false;
       return;
     }
@@ -834,7 +876,7 @@ export default function MotionControlPage() {
         // Start live polling for real-time progress updates
         progress.advanceStep("Generating video...");
         progress.setProgress(55, "Submitted to AI — generating your video...");
-        startJobPolling(data.jobId);
+        startJobPolling(data.jobId, data.estimatedTime);
         toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min.`, "success");
         setError(null);
       } else {
@@ -1120,7 +1162,9 @@ export default function MotionControlPage() {
               {/* Tabs: Fun Effects / Upload / History */}
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
-                  { key: "effects" as const, label: "Effects", icon: Sparkles },
+                  ...(effectsAvailable
+                    ? [{ key: "effects" as const, label: "Effects", icon: Sparkles }]
+                    : []),
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                 ]).map((tab) => (
@@ -1139,8 +1183,18 @@ export default function MotionControlPage() {
                 ))}
               </div>
 
+              {!effectsAvailable && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-200/90">
+                    One-tap effects are taking a short break. Upload a reference video or paste a
+                    link and we&apos;ll transfer that motion onto your character.
+                  </p>
+                </div>
+              )}
+
               {/* Fun Effects Tab */}
-              {motionTab === "effects" && (
+              {motionTab === "effects" && effectsAvailable && (
                 <div className="space-y-3">
                   {/* Category Filter */}
                   <div className="flex gap-1.5 flex-wrap">

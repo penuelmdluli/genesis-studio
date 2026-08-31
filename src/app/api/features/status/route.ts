@@ -19,5 +19,20 @@ export async function GET() {
     status[feature.id] = !!endpointValue && endpointValue.length > 0;
   }
 
-  return NextResponse.json({ features: status });
+  // Motion control's fun effects and prompt-only mode are Kling-only — our own
+  // Wan-Animate GPU needs a driving video and cannot serve them at any price.
+  // The page uses this to hide those modes rather than letting users spend
+  // credits on a request no funded provider can take.
+  let motionEffectsAvailable = false;
+  try {
+    const { hostedMotionAvailable } = await import("@/lib/motion-control");
+    motionEffectsAvailable = await hostedMotionAvailable();
+  } catch (err) {
+    console.warn("[features/status] Motion provider probe failed:", err);
+  }
+
+  return NextResponse.json({
+    features: status,
+    motion: { effectsAvailable: motionEffectsAvailable },
+  });
 }

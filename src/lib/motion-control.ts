@@ -2,17 +2,26 @@
 // GENESIS STUDIO — Motion Control Service
 // ============================================
 // Provider chain for a custom reference video:
-//   1. RunPod (Wan2.2-Animate on GPU capacity we already pay for)
-//   2. WaveSpeed (hosted Kling)
-//   3. FAL.AI (hosted Kling)
+//   1. WaveSpeed (hosted Kling)
+//   2. FAL.AI (hosted Kling)
+//   3. RunPod Wan2.2-Animate — opt-in only, see below
 //
-// RunPod leads because it is the capacity we own, not because it is cheap: a
-// 5s clip measured ~30 min and ~$1.40 of GPU time against ~$0.70 for hosted
-// Kling. It leads anyway since both hosted accounts have run their balance to
-// zero before, which takes motion control down entirely.
+// RunPod is last and off by default despite being the capacity we own. A
+// controlled run on 2026-08-31 (job 18ca7ace, character = a still of an older
+// man, driving video = a child dancing in a plaza) returned a 29-minute,
+// ~$2.50 clip of an unrelated man carrying a beam through a crowd — neither
+// input appears in it, and its first frame matches an artifact from an earlier
+// unrelated run. The worker's handler falls back to globbing animate-14B*.mp4
+// when its --save_file does not land, so it can return a previous render
+// instead of failing. It also writes 25fps preprocessing at 30fps, so a 5.0s
+// driver comes back as 4.167s.
+//
+// Set MOTION_RUNPOD_ENABLED=true to put it back in the chain once the worker
+// is fixed; hosted Kling is meanwhile both cheaper and an order of magnitude
+// faster, so this is not a cost tradeoff.
 //
 // Built-in fun effects and prompt-only mode are Kling-specific — Wan-Animate
-// needs a driving video — so they skip step 1 and go straight to WaveSpeed/FAL.
+// needs a driving video — so they can only ever run on WaveSpeed/FAL.
 
 import { fal } from "@fal-ai/client";
 import { envString } from "@/lib/env";
@@ -125,6 +134,8 @@ async function tryRunpodMotion(params: {
   effect?: string;
   seed?: number;
 }): Promise<{ requestId: string; endpoint: string } | null> {
+  if (envString("MOTION_RUNPOD_ENABLED") !== "true") return null;
+
   const endpointId = runpodMotionEndpointId();
   if (!endpointId) return null;
   if (!envString("RUNPOD_API_KEY")) return null;
@@ -293,21 +304,7 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     throw new Error("Either a reference video or a fun effect is required");
   }
 
-  // Try our own RunPod GPU first: it is the capacity we control, and it keeps
-  // working when a hosted balance runs dry. Returns null for anything it cannot
-  // serve (effects, prompt-only) so the hosted providers still get their turn.
-  const rpResult = await tryRunpodMotion({
-    characterImageUrl,
-    referenceVideoUrl,
-    effect,
-    seed,
-  });
-
-  if (rpResult) {
-    return rpResult;
-  }
-
-  // Then WaveSpeed (cheaper of the two hosted providers)
+  // WaveSpeed first — cheapest of the two hosted providers
   const wsResult = await tryWavespeedMotion({
     characterImageUrl,
     referenceVideoUrl,
@@ -324,7 +321,21 @@ export async function submitMotionControlJob(params: MotionControlParams): Promi
     return wsResult;
   }
 
-  // Fallback to FAL.AI (always available, supports effects)
+  // Then our own RunPod GPU, if it has been explicitly re-enabled. Returns
+  // null for anything it cannot serve (effects, prompt-only) and whenever the
+  // opt-in flag is unset, which is the default.
+  const rpResult = await tryRunpodMotion({
+    characterImageUrl,
+    referenceVideoUrl,
+    effect,
+    seed,
+  });
+
+  if (rpResult) {
+    return rpResult;
+  }
+
+  // Fallback to FAL.AI (supports effects)
   const endpoint = MOTION_ENDPOINTS[model]?.[quality] || MOTION_ENDPOINTS["kling-v3"]["standard"];
 
   const input: Record<string, unknown> = {

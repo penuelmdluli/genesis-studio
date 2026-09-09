@@ -113,8 +113,9 @@ export async function GET() {
     ? { status: "ok", detail: "Page tokens set" }
     : { status: "error", detail: "No FB tokens" };
 
-  // Clerk webhook
-  health.clerk_webhook = { status: "ok", detail: "Route: /api/webhooks/clerk" };
+  // The Clerk webhook health row was removed with the route. It reported
+  // "ok" unconditionally — it checked that a file existed, not that anything
+  // worked, and Clerk itself was replaced by custom D1 sessions long ago.
 
   // Automation
   health.automation = process.env.AUTOMATION_PAUSED === "true"

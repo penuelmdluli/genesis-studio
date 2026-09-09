@@ -10,7 +10,7 @@ const websiteSchema = {
   name: "Genesis Studio",
   url: "https://ivideostudio.ai",
   description:
-    "AI video creation platform. Text to video, dance transfer, short films. 12 AI models.",
+    "AI video creation platform. Text to video, dance transfer, short films.",
   potentialAction: {
     "@type": "SearchAction",
     target: "https://ivideostudio.ai/explore?q={search_term_string}",

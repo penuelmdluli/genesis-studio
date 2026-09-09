@@ -20,7 +20,7 @@ export default function AboutPage() {
           </p>
           <h2 className="text-2xl font-semibold text-white mt-8">What We Offer</h2>
           <ul className="list-disc list-inside space-y-2 text-zinc-400">
-            <li>Text-to-video generation with 10+ AI models</li>
+            <li>Text-to-video generation with multiple AI models</li>
             <li>Native audio — dialogue, sound effects, and lip sync</li>
             <li>Motion control — transfer dance and movement to any character</li>
             <li>Brain Studio — AI-powered short film creation</li>

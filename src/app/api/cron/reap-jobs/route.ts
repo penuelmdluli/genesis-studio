@@ -79,6 +79,20 @@ export async function GET(req: NextRequest) {
 
       if (await releaseHoldForJob(job.id, "Job exceeded its deadline")) {
         creditsReturned += job.credits_cost ?? 0;
+      } else if ((job.credits_cost ?? 0) > 0) {
+        // No hold means this job predates escrow. Its credits were taken by
+        // the old deductCredits path — which wrote the ledger row with an
+        // empty job_id, so the debit cannot even be linked back here. The
+        // user was still charged, so they are still owed. refundCredits is
+        // now idempotent per job, so this cannot double-credit.
+        const { refundCredits } = await import("@/lib/credits");
+        await refundCredits(
+          job.user_id,
+          job.credits_cost,
+          job.id,
+          "Generation timed out - automatic refund"
+        );
+        creditsReturned += job.credits_cost;
       }
       reaped++;
     } catch (err) {

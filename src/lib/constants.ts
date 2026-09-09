@@ -19,7 +19,19 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     creditCost: { "480p": 20, "720p": 40, "1080p": 80 },
     gpuRequirement: "48GB+ (A6000/H100)",
     license: "Apache 2.0",
-    provider: "runpod-hub",
+    // Was provider:"runpod-hub" against RUNPOD_ENDPOINT_WAN22, which has
+    // answered 404 since the endpoint was deleted; every RunPod endpoint on
+    // the account is also scaled to workersMax=0. "fal" here means "the
+    // hosted router" (WaveSpeed, then FAL) rather than FAL specifically —
+    // see lib/provider-router.ts. Slugs verified live on WaveSpeed
+    // 2026-09-09: a bogus slug answers "Model not found", these answer with
+    // a field-validation error, and t2v-480p-ultra-fast completed a real
+    // generation.
+    provider: "fal",
+    wavespeedModelId: "wavespeed-ai/wan-2.2/t2v-480p",
+    wavespeedModelIdI2V: "wavespeed-ai/wan-2.2/i2v-480p",
+    wavespeedModelIdDraft: "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
+    wavespeedModelIdDraftI2V: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
     maxDuration: 8,
   },
   "hunyuan-video": {
@@ -608,7 +620,14 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
   // All generation routes through FAL.AI (always warm, managed infrastructure).
   // RunPod models kept in AI_MODELS registry for historical job lookups but
   // not offered to users for new generations.
-  free: ["seedance-1.5", "mimic-motion"],
+  // seedance-1.5 was the free default and was the single worst path in the
+  // product: 59 failed / 7 completed (89%) across production history, which
+  // is ~46% of every failure ever recorded. Its failures were RunPod 404s
+  // inherited from the old fallback branch, so new users' first impression
+  // was an error from a vendor their model never used. Free now gets wan-2.2,
+  // which routes to WaveSpeed 480p — the cheapest path we have verified end
+  // to end. seedance stays available on paid tiers.
+  free: ["wan-2.2", "mimic-motion"],
   creator: [
     "seedance-1.5",
     "kling-2.6",

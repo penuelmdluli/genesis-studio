@@ -138,6 +138,7 @@ export async function submitVideoJob(params: {
   aspectRatio?: string;
   enableAudio?: boolean;
   seed?: number;
+  isDraft?: boolean;
 }): Promise<VideoSubmitResult> {
   // Try WaveSpeed first (cheaper for video gen)
   if (canUseWavespeed(params.modelId, params.type)) {

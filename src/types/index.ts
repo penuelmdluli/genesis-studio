@@ -105,6 +105,11 @@ export interface AIModel {
   falModelIdI2V?: string;   // FAL.AI model ID for i2v
   wavespeedModelId?: string;    // WaveSpeed model ID for t2v
   wavespeedModelIdI2V?: string; // WaveSpeed model ID for i2v
+  // Cheaper/faster slugs used when the caller asks for a draft. Optional — a
+  // model without them ignores the draft flag and uses the ones above, so
+  // adding a draft tier can never break an existing model.
+  wavespeedModelIdDraft?: string;    // WaveSpeed draft model ID for t2v
+  wavespeedModelIdDraftI2V?: string; // WaveSpeed draft model ID for i2v
   maxDuration?: number;     // max duration in seconds
   launchAvailable?: boolean; // visible in model selector at launch
 }

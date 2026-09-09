@@ -113,6 +113,21 @@ function buildRequestBody(params: {
     return body;
   }
 
+  if (params.modelId === "wan-2.2") {
+    // Wan takes an explicit pixel `size` and ignores `aspect_ratio` entirely —
+    // verified 2026-09-09, the endpoint accepts aspect_ratio without error and
+    // then returns its default 832*480 regardless. Sending the wrong field is
+    // therefore silent, not loud, which is why it is mapped explicitly here.
+    return {
+      prompt: params.prompt,
+      duration: params.duration || 5,
+      size: wanSize(params.aspectRatio),
+      ...(params.negativePrompt && { negative_prompt: params.negativePrompt }),
+      ...(params.seed !== undefined && params.seed !== -1 && { seed: params.seed }),
+      ...(params.imageUrl && params.type === "i2v" && { image: params.imageUrl }),
+    };
+  }
+
   // Generic fallback
   return {
     prompt: params.prompt,
@@ -121,6 +136,23 @@ function buildRequestBody(params: {
     ...(params.negativePrompt && { negative_prompt: params.negativePrompt }),
     ...(params.imageUrl && params.type === "i2v" && { image: params.imageUrl }),
   };
+}
+
+/**
+ * Wan 2.2 480p frame sizes. The slugs this maps onto are all 480p tiers, so
+ * the long edge is fixed at 832 and only the orientation changes.
+ */
+function wanSize(aspectRatio?: string): string {
+  switch (aspectRatio) {
+    case "portrait":
+    case "9:16":
+      return "480*832";
+    case "square":
+    case "1:1":
+      return "640*640";
+    default:
+      return "832*480";
+  }
 }
 
 // Submit a video generation job to WaveSpeed (async, returns prediction ID)
@@ -134,13 +166,23 @@ export async function submitWavespeedJob(params: {
   aspectRatio?: string;
   enableAudio?: boolean;
   seed?: number;
+  isDraft?: boolean;
 }): Promise<WavespeedSubmitResult> {
   const model = AI_MODELS[params.modelId];
   if (!model) throw new Error(`Unknown model: ${params.modelId}`);
 
-  const wavespeedModelId = params.type === "i2v" && model.wavespeedModelIdI2V
-    ? model.wavespeedModelIdI2V
-    : model.wavespeedModelId;
+  // A draft uses the cheaper/faster slug where the model declares one. Models
+  // without draft slugs fall through to their standard ones, so passing
+  // isDraft is always safe.
+  const draftModelId = params.isDraft
+    ? (params.type === "i2v" ? model.wavespeedModelIdDraftI2V : model.wavespeedModelIdDraft)
+    : undefined;
+
+  const wavespeedModelId =
+    draftModelId ||
+    (params.type === "i2v" && model.wavespeedModelIdI2V
+      ? model.wavespeedModelIdI2V
+      : model.wavespeedModelId);
 
   if (!wavespeedModelId) {
     throw new Error(`No WaveSpeed model ID configured for ${params.modelId} (${params.type})`);

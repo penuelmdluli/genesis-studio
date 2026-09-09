@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Move,
+  Bookmark,
   Menu,
   X,
   Shield,
@@ -39,7 +40,7 @@ import {
   Globe,
   ShoppingBag,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface NavItem {
   href: string;
@@ -50,40 +51,75 @@ interface NavItem {
   comingSoon?: boolean;
 }
 
+// Four sections, not nine.
+//
+// The menu previously split 26 items across Discover / Create / Enhance /
+// Audio / Image / Edit / Manage — three of which held a single item. A section
+// header above one link is not navigation, it is noise, and it pushed the
+// things people actually use below the fold.
+//
+// Badges were cut back to one. Five simultaneous animated "HOT" badges read as
+// decoration rather than emphasis, and three of them sat on tools that could
+// not run at all.
 const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/explore", label: "Explore", icon: Globe, section: "Discover" },
-  // --- CREATE ---
+
+  // --- CREATE: makes a new video ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
-  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create", badge: "HOT" },
-  { href: "/brain/templates", label: "Templates", icon: Film, section: "Create" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
+  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
+  { href: "/react-studio", label: "React Studio", icon: Users, section: "Create" },
   { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create" },
   { href: "/music-video", label: "Music Video", icon: Radio, section: "Create" },
-  { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "HOT" },
-  { href: "/react-studio", label: "React Studio", icon: Users, section: "Create", badge: "HOT" },
-  // --- ENHANCE ---
-  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Enhance" },
-  // --- AUDIO ---
-  { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Audio" },
-  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Audio" },
-  // --- IMAGE ---
-  { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Image" },
-  { href: "/images", label: "Image Gen", icon: Image, section: "Image", badge: "HOT" },
-  // --- EDIT ---
-  { href: "/edit", label: "Video Editor", icon: Scissors, section: "Edit" },
-  // --- MANAGE ---
-  { href: "/gallery", label: "Gallery", icon: Film, section: "Manage" },
-  { href: "/collections", label: "Collections", icon: FolderOpen, section: "Manage" },
-  { href: "/api-keys", label: "API Keys", icon: Key, section: "Manage" },
-  { href: "/pricing", label: "Pricing", icon: CreditCard, section: "Manage" },
-  { href: "/settings", label: "Settings", icon: Settings, section: "Manage" },
+  { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create" },
+
+  // --- TOOLS: works on something that already exists ---
+  { href: "/images", label: "Image Gen", icon: Image, section: "Tools" },
+  { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Tools" },
+  { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Tools" },
+  { href: "/captions", label: "Auto Captions", icon: Subtitles, section: "Tools" },
+  { href: "/upscale", label: "Upscaler", icon: ArrowUpCircle, section: "Tools" },
+  { href: "/edit", label: "Video Editor", icon: Scissors, section: "Tools" },
+
+  // --- LIBRARY: things you already have or saved ---
+  { href: "/gallery", label: "Gallery", icon: Film, section: "Library" },
+  { href: "/collections", label: "Collections", icon: FolderOpen, section: "Library" },
+  { href: "/lead-videos", label: "Lead Videos", icon: Bookmark, section: "Library" },
+  { href: "/brain/templates", label: "Templates", icon: Film, section: "Library" },
+  { href: "/explore", label: "Explore", icon: Globe, section: "Library" },
+
+  // --- ACCOUNT ---
+  { href: "/pricing", label: "Pricing", icon: CreditCard, section: "Account" },
+  { href: "/api-keys", label: "API Keys", icon: Key, section: "Account" },
+  { href: "/settings", label: "Settings", icon: Settings, section: "Account" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen, isInitialized } = useStore();
+
+  // Which features can actually serve a request right now. A tool whose
+  // provider is down used to look identical to one that works — users clicked
+  // it, were charged, and got an error. Three of the nine open support tickets
+  // are that experience. An empty map means "assume everything works", so a
+  // failed probe never hides the product.
+  const [unavailable, setUnavailable] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/features/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { routes?: Record<string, { available: boolean; reason?: string }> } | null) => {
+        if (cancelled || !data?.routes) return;
+        const out: Record<string, string> = {};
+        for (const [href, s] of Object.entries(data.routes)) {
+          if (!s.available) out[href] = s.reason || "Unavailable";
+        }
+        setUnavailable(out);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Add admin nav item for owners
   const navItems = useMemo(() => {
@@ -305,18 +341,19 @@ export function Sidebar() {
                     {item.section}
                   </div>
                 )}
-                {item.comingSoon ? (
+                {item.comingSoon || unavailable[item.href] ? (
                   <div
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 cursor-default group relative"
-                    title={`${item.label} — Coming Soon`}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-500 cursor-default group relative"
+                    title={`${item.label} — ${item.comingSoon ? "Coming Soon" : unavailable[item.href]}`}
                   >
-                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-400" />
+                    <item.icon className="w-[18px] h-[18px] shrink-0 text-zinc-500" />
                     {(sidebarOpen || mobileMenuOpen) && (
                       <span className="truncate flex-1">{item.label}</span>
                     )}
                     {(sidebarOpen || mobileMenuOpen) && (
                       <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full leading-none bg-zinc-800 text-zinc-400">
-                        <Lock className="w-2.5 h-2.5" /> Soon
+                        <Lock className="w-2.5 h-2.5" />
+                        {item.comingSoon ? "Soon" : unavailable[item.href]}
                       </span>
                     )}
                   </div>

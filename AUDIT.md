@@ -412,3 +412,72 @@ Phase 1 stopped users being charged for generations that cannot succeed. It
 cannot make generations succeed. With FAL locked, RunPod at zero workers and
 WaveSpeed at $1.74, the product has roughly one generation of runway. **Funding
 a provider is the prerequisite for every remaining phase.**
+
+---
+
+# Phase 2 — outcome (2026-09-09)
+
+Credit escrow and the job reaper. Deployed as version `72a43949`.
+
+## Changed
+
+| Commit | Concern |
+|---|---|
+| `11f8398` | `credit_holds` table + `lib/credit-escrow.ts` — hold / capture / release |
+| `ae7cf6e` | Settlement centralised in `updateJobStatus`; legacy refunds made idempotent; `/api/generate` reserves instead of debiting, with `Idempotency-Key` |
+| `91bbcfd` | `/api/cron/reap-jobs`, scheduled every minute |
+| `8594ad1` | Reaper telemetry corrected |
+| (+1) | `demo-assets` billing leak closed |
+
+## Proof — escrow invariants, against production D1
+
+| Test | Expected | Result |
+|---|---|---|
+| Hold 30 of 100 | balance 70 | **70** |
+| Release | balance 100 | **100** |
+| **Release a second time** | 0 rows, balance 100 | **0 rows, 100** |
+| Overdraw 500 of 100 | 0 rows, balance 100 | **0 rows, 100** |
+| Duplicate idempotency key | rejected | **rejected by partial unique index** |
+
+The third row is the bug that produced 104 refunds against 117 failures. It is
+now structurally impossible, not merely unlikely: the balance restore rides in
+the same D1 batch as a `WHERE status = 'held'` guard, so a losing racer rolls
+back both.
+
+## Proof — reaper, live
+
+First run reaped the four jobs that had been stuck in `queued` and returned
+**328 credits to four real users** (balances 20→100, 28→100, 4→100, 20→100).
+Those users had been charged in April–June and never refunded, because the old
+debit path wrote `job_id = ""` and nothing could link the debit back to the job.
+
+A second pass over the same job returned nothing and left the balance at 100,
+confirming the idempotency guard end to end.
+
+## Corrections found while building
+
+- Settlement was first written per call site; there are 9 places that mark a
+  job completed and 7 that mark one failed. Moved into `updateJobStatus` so no
+  path can forget.
+- The reaper initially reported credits it had not returned — it counted the
+  job cost even when `refundCredits` no-op'd. Caught by the live double-pass
+  test, fixed, redeployed.
+
+## New finding (P0) — unbilled generation on page load
+
+`/api/music-video/demo-assets` is called from a `useEffect` on `/music-video`,
+so it fired for every visitor on page load and generated three songs on
+`fal-ai/stable-audio` plus character portraits on `fal-ai/flux-pro` — billable
+provider work, no credit charged, nothing asked of the user. An R2 existence
+check limited it to "the first visitor pays for everyone", and any purge of the
+`demo/` prefix silently re-armed it. Seeding is now owner-only.
+
+Two other routes generate images without charging: `dev/produce` (dev-only) and
+the owner bypass in `isOwnerClerkId`, which is deliberate but means all
+automated cron generation is unbilled and invisible to margin tracking.
+
+## Still open from Phase 0
+
+F3 (`PAYSTACK_SECRET_KEY` unset — non-ZAR users cannot pay), F6, F12, and the
+whole P2 cleanup list. F5 and F11 are closed by escrow; F4 and F8 are closed
+for `/api/generate`.

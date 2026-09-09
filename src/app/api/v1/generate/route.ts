@@ -12,6 +12,7 @@ import { submitVideoJob } from "@/lib/provider-router";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
+import { modelAvailability } from "@/lib/config";
 import { createHash } from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -71,6 +72,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: `Unknown model: ${modelId}. Available: ${Object.keys(AI_MODELS).join(", ")}` },
         { status: 400 }
+      );
+    }
+
+    // Same preflight as the dashboard route — refuse before charging.
+    const availability = modelAvailability(modelId as ModelId, type);
+    if (!availability.runnable) {
+      console.warn(`[V1] ${modelId} unavailable: ${availability.detail}`);
+      return NextResponse.json(
+        { error: availability.reason || "That model is unavailable right now.", code: "model_unavailable" },
+        { status: 503 }
       );
     }
 
@@ -135,6 +146,7 @@ export async function POST(req: NextRequest) {
           aspectRatio,
           enableAudio: body.enable_audio,
           seed: body.seed,
+          isDraft,
         });
 
         await updateJobStatus(job.id, {

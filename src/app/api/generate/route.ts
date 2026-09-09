@@ -11,6 +11,7 @@ import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
+import { modelAvailability } from "@/lib/config";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -95,6 +96,19 @@ export async function POST(req: NextRequest) {
       body.isDraft || false
     );
 
+    // Refuse an unrunnable model BEFORE taking credits. Production has
+    // charged users and then discovered the config was missing — three
+    // cogvideo-x jobs died on "No GPU endpoint configured", one ai-singer job
+    // on "RUNPOD_ENDPOINT_ACE_STEP not configured". Both debited first.
+    const availability = modelAvailability(body.modelId, effectiveType);
+    if (!availability.runnable) {
+      console.warn(`[GENERATE] ${body.modelId} unavailable: ${availability.detail}`);
+      return NextResponse.json(
+        { error: availability.reason || "That model is unavailable right now.", code: "MODEL_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+
     if (!ownerAccount) {
       // Deduct credits
       const { success, newBalance } = await deductCredits(
@@ -145,46 +159,47 @@ export async function POST(req: NextRequest) {
       audioUrl: audioTrack?.url,
     });
 
-    // Route to the correct provider (FAL.AI or RunPod)
-    // FAL auto-fallback: if FAL fails (balance exhausted, forbidden), retry on RunPod Wan 2.2
-    let usedFallback = false;
-    let actualModelId: string = body.modelId;
+    // Route to the correct provider.
+    //
+    // This used to fall back to RunPod Wan 2.2 whenever a hosted provider
+    // answered with a billing or auth error. That failover was the single
+    // largest source of production failures: RUNPOD_ENDPOINT_WAN22 was deleted
+    // months ago, so every exhausted-balance error became an opaque
+    // "RunPod API error: 404" on a model the user never chose. 54 of the 55
+    // RunPod 404s in production history came through this branch, on
+    // seedance-1.5 — a model declared provider:"fal" that never intentionally
+    // touches RunPod. Audited 2026-09-09: all 8 configured RunPod video
+    // endpoints 404, and every endpoint on the account is scaled to
+    // workersMax=0, so there is nothing to fail over TO.
+    //
+    // A hosted provider being out of balance is now reported as itself. The
+    // catch below refunds either way; the difference is that the user gets a
+    // true reason instead of a 404 from an unrelated vendor.
+    const actualModelId: string = body.modelId;
     try {
       if (model.provider === "fal") {
-        // Premium models — route through provider router (WaveSpeed → FAL fallback)
-        try {
-          const routerResult = await submitVideoJob({
-            modelId: body.modelId,
-            type: effectiveType as "t2v" | "i2v",
-            prompt: body.prompt,
-            negativePrompt: body.negativePrompt,
-            imageUrl: body.inputImageUrl,
-            duration,
-            aspectRatio: body.aspectRatio,
-            enableAudio: body.enableAudio,
-            seed: body.seed,
-          });
+        // Premium models — route through provider router (WaveSpeed → FAL)
+        const routerResult = await submitVideoJob({
+          modelId: body.modelId,
+          type: effectiveType as "t2v" | "i2v",
+          prompt: body.prompt,
+          negativePrompt: body.negativePrompt,
+          imageUrl: body.inputImageUrl,
+          duration,
+          aspectRatio: body.aspectRatio,
+          enableAudio: body.enableAudio,
+          seed: body.seed,
+          isDraft: body.isDraft || false,
+        });
 
-          await updateJobStatus(job.id, {
-            runpodJobId: routerResult.request_id,
-            status: "queued",
-          });
-        } catch (falError) {
-          const falMsg = falError instanceof Error ? falError.message : String(falError);
-          // Auto-fallback to RunPod Wan 2.2 on billing/auth errors
-          if (falMsg.includes("Forbidden") || falMsg.includes("locked") || falMsg.includes("balance") || falMsg.includes("403")) {
-            console.warn(`[FAL_FALLBACK] ${body.modelId} failed (${falMsg}), falling back to wan-2.2`);
-            usedFallback = true;
-            actualModelId = "wan-2.2" as ModelId;
-            // Fall through to RunPod block below
-          } else {
-            throw falError; // Re-throw non-billing errors
-          }
-        }
+        await updateJobStatus(job.id, {
+          runpodJobId: routerResult.request_id,
+          status: "queued",
+        });
       }
 
-      if (model.provider !== "fal" || usedFallback) {
-        // RunPod — open-source models (or FAL fallback)
+      if (model.provider !== "fal") {
+        // RunPod — open-source models only. Never a fallback target.
         const runpodInput = buildRunPodInput({
           modelId: actualModelId as ModelId,
           type: effectiveType,
@@ -229,13 +244,11 @@ export async function POST(req: NextRequest) {
         message: `User: ${user.name} (${user.email})\nModel: ${model.name} | ${body.duration}s | ${creditCost} credits`,
       }).catch(() => {});
 
-      const fallbackModel = usedFallback ? AI_MODELS[actualModelId as ModelId] : null;
       return NextResponse.json({
         jobId: job.id,
         status: "queued",
-        estimatedTime: (fallbackModel || model).avgGenerationTime * (body.isDraft ? 0.3 : 1),
+        estimatedTime: model.avgGenerationTime * (body.isDraft ? 0.3 : 1),
         creditsCost: creditCost,
-        ...(usedFallback && { fallbackModel: fallbackModel?.name, fallbackNote: `${model.name} is temporarily unavailable. Routed to ${fallbackModel?.name} instead.` }),
       });
     } catch (gpuError) {
       console.error("GPU submission error:", gpuError);

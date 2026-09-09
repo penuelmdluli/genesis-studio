@@ -12,6 +12,7 @@ import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
 import { modelAvailability } from "@/lib/config";
+import { holdCredits, attachHoldToJob, releaseHold } from "@/lib/credit-escrow";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -48,6 +49,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
     const body = parsed.data;
+
+    // Standard Idempotency-Key header. A client that sends one is protected
+    // from double-charging on retries; one that does not is no worse off than
+    // before.
+    const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 200) || "";
 
     // Validate model access (owners have access to all models)
     const ownerAccount = isOwnerClerkId(clerkId);
@@ -109,21 +115,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reserve credits rather than spending them. The hold is settled only if
+    // the provider accepts the job, and released on any failure — so a job
+    // that never runs cannot leave the user charged. This replaces a debit
+    // that was written before the job row existed, with jobId "" and a
+    // comment promising to fill it in later that never happened.
+    let holdId: string | null = null;
     if (!ownerAccount) {
-      // Deduct credits
-      const { success, newBalance } = await deductCredits(
-        user.id,
-        creditCost,
-        "", // job ID will be updated after job creation
-        `Video generation: ${model.name} ${resolution} ${duration}s`
-      );
+      const held = await holdCredits({
+        userId: user.id,
+        amount: creditCost,
+        description: `Video generation: ${model.name} ${resolution} ${duration}s`,
+        // A double-click, a retry or a flaky connection must not create two
+        // jobs and two charges. Callers that send no key get no protection,
+        // which is the previous behaviour rather than a regression.
+        idempotencyKey: idempotencyKey || undefined,
+      });
 
-      if (!success) {
+      if (!held.ok) {
         return NextResponse.json(
-          { error: "Insufficient credits", required: creditCost, balance: newBalance },
+          { error: "Insufficient credits", required: creditCost, balance: held.balance },
           { status: 402 }
         );
       }
+
+      // A reused hold means this exact request already went through. Return
+      // the job it created instead of starting a second one.
+      if (held.reused && held.hold?.jobId) {
+        return NextResponse.json({
+          jobId: held.hold.jobId,
+          status: "queued",
+          estimatedTime: model.avgGenerationTime * (body.isDraft ? 0.3 : 1),
+          creditsCost: creditCost,
+          duplicate: true,
+        });
+      }
+
+      holdId = held.hold?.id ?? null;
     }
 
     // Log profitability metrics
@@ -157,6 +185,27 @@ export async function POST(req: NextRequest) {
       aspectRatio: body.aspectRatio,
       audioTrackId: body.audioTrackId,
       audioUrl: audioTrack?.url,
+    });
+
+    // Bind the reservation to the job the moment the row exists. Until this
+    // runs the hold is orphaned, which is why releaseOrphanedHolds() exists —
+    // a crash in between must not strand a user's credits.
+    if (holdId) {
+      await attachHoldToJob(holdId, job.id);
+    }
+
+    // Every job gets a point past which it is not worth waiting for. Without
+    // one a job can sit in "queued" forever, which is what the 18 timeout
+    // failures were: nothing owned the decision to give up. Three times the
+    // model's own average, floored at five minutes for fast models and capped
+    // at forty for slow ones.
+    const deadlineMs = Math.min(
+      Math.max(model.avgGenerationTime * 3 * 1000, 5 * 60 * 1000),
+      40 * 60 * 1000
+    );
+    await updateJobStatus(job.id, {
+      deadlineAt: new Date(Date.now() + deadlineMs).toISOString(),
+      creditHoldId: holdId ?? undefined,
     });
 
     // Route to the correct provider.
@@ -264,13 +313,12 @@ export async function POST(req: NextRequest) {
         message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}`,
       }).catch(() => {});
 
-      const { refundCredits } = await import("@/lib/credits");
-      await refundCredits(
-        user.id,
-        creditCost,
-        job.id,
-        "GPU submission failed — automatic refund"
-      );
+      // Release the reservation rather than refunding a debit. The hold is
+      // guarded, so this is safe even if the reaper reaches the same job
+      // first — exactly the race that produced double refunds before.
+      if (holdId) {
+        await releaseHold(holdId, "Provider submission failed");
+      }
 
       await updateJobStatus(job.id, {
         status: "failed",

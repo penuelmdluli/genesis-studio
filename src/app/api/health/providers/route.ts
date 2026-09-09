@@ -112,18 +112,23 @@ async function checkRunpod(): Promise<{ status: ProviderStatus; endpoints: Recor
       const res = await fetch(`https://api.runpod.ai/v2/${id}/health`, {
         headers: { Authorization: `Bearer ${key}` },
       });
-      endpoints[v] = res.ok ? `alive (${id})` : `HTTP ${res.status} — endpoint gone (${id})`;
+      endpoints[v] = res.ok ? `alive (${id})` : `HTTP ${res.status} - endpoint gone (${id})`;
     } catch {
       endpoints[v] = `unreachable (${id})`;
     }
   }
 
   const alive = Object.values(endpoints).filter((s) => s.startsWith("alive")).length;
+  // Reported as never ok on purpose. Endpoint reachability is not capability:
+  // every endpoint on the account is scaled to workersMax=0, so even an id
+  // that answers /health cannot execute a job. Reporting "ok" on reachability
+  // alone is exactly the false green that let this rot unnoticed for months.
+  // Flip this to `alive > 0` once workers are provisioned.
   return {
     status: {
       name: "runpod",
-      ok: alive > 0,
-      detail: `${alive}/${configured.length} configured endpoints alive`,
+      ok: false,
+      detail: `${alive}/${configured.length} endpoints reachable, but all workers are scaled to zero - cannot execute jobs`,
     },
     endpoints,
   };

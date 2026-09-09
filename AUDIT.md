@@ -481,3 +481,94 @@ automated cron generation is unbilled and invisible to margin tracking.
 F3 (`PAYSTACK_SECRET_KEY` unset — non-ZAR users cannot pay), F6, F12, and the
 whole P2 cleanup list. F5 and F11 are closed by escrow; F4 and F8 are closed
 for `/api/generate`.
+
+---
+
+# Phase 3 — outcome (2026-09-09)
+
+Deduplication and cleanup. Deployed as version `ccb45d7b`.
+
+## Deleted (traced first, in separate commits)
+
+| What | Evidence it was dead |
+|---|---|
+| `src/lib/analytics.ts` | 0 importers; wrote to an `analytics_events` table that does not exist in D1. Its sibling `analytics-events.ts` has 2 importers and stays. |
+| `/api/webhooks/clerk` | Clerk was replaced by custom D1 sessions. No source file imports `@clerk/nextjs`; every remaining "clerk" hit is the `clerk_id` column name or `isOwnerClerkId`. |
+| `clerk_webhook` health row | Reported `ok` unconditionally — it asserted a file existed, not that anything worked. |
+| `genesis-studio.vercel.app` fallback | Last stale host in live code. If `APP_URL` were unset, the content pipeline would have posted links to a dead domain, publicly. |
+
+193 lines removed. `bash scripts/verify.sh` passes.
+
+## Deliberately NOT deleted
+
+**Files carrying uncommitted work.** `cron/check-mimic/route.ts` and
+`mimic/status/[jobId]/route.ts` are both modified in the working tree. The
+mimic module is otherwise a closed dead loop — `mimic_jobs` has been cold since
+2026-06-07, `/mimic` is a redirect stub, and nothing outside the module imports
+it — but deleting a file with unsaved changes destroys work. **Needs a decision:
+commit or discard that WIP first, then the module can go.**
+
+Note `mimic-motion` is still a live *model id* used by `/api/motion-control`.
+It is unrelated to the `/api/mimic/*` routes and must not be removed with them.
+
+**Dormant, not dead.** PayFast is fully implemented and merely unconfigured; it
+is a mainstream South African gateway and deleting it would remove a capability
+rather than dead code. The Stripe webhook is likewise inert but costs nothing.
+Both left in place.
+
+**The five unwired crons.** `auto-rebalance`, `fetch-insights`,
+`outcome-tracker`, `run-analysis` and `retention` exist but are in no schedule.
+They should be wired or deleted, not left in limbo — but `retention` sends
+**win-back and digest emails to real users**, and enabling that is an
+outward-facing decision, not a cleanup. Left untouched pending a call.
+
+## Needs your confirmation before anything is dropped
+
+Tracing changed the picture materially. Of the tables the Phase 0 audit
+flagged as empty, **all but three still have live code referencing them** —
+they are unused features, not dead schema, and dropping them would break code.
+
+Only three have both zero rows and zero code references:
+
+| Table | Rows | Code refs | Recommendation |
+|---|---:|---:|---|
+| `explore_favorites` | 0 | 0 | Safe to drop |
+| `referral_signups` | 0 | 0 | Safe to drop |
+| `signup_attribution` | 0 | 0 | **Keep** — wire it up instead; it is exactly the attribution the new tracking wants |
+
+Nothing has been dropped. Say the word and it takes one migration.
+
+Env vars read by code but unset in production include `PAYSTACK_SECRET_KEY`
+(blocks non-ZAR checkout — mitigated in Phase 4 by falling back to Yoco),
+`NEXT_PUBLIC_CF_ANALYTICS_TOKEN` (why the Cloudflare beacon recorded nothing),
+the three dead `SUPABASE_*` values, and twelve `RUNPOD_ENDPOINT_*` names.
+
+## The merge gate
+
+`scripts/verify.sh` — typecheck, lint, tests, build, plus `--health` to probe
+live providers.
+
+It gates on **regression, not perfection**: `src` carries 226 pre-existing lint
+errors and 32 failing tests, all predating this work. Demanding zero would mean
+the gate never passes and therefore never runs.
+
+Both counters were wrong on the first attempt — the test parser matched the
+"Test Files" line and reported 3 failures when there were 32. Fixed, then
+verified by injecting a deliberate lint error: the gate failed with 228 > 226
+and passed again once removed.
+
+## Search visibility (asked during this phase)
+
+The site **is indexed** — homepage, pricing, explore, about, contact, sign-up
+and several blog posts all appear under `site:ivideostudio.ai`, and it ranks
+first for "ivideo studio ai video". robots.txt, sitemap.xml, canonical tags and
+`robots: index, follow` are all correct.
+
+The problem is the name. **Every indexed page is titled "Genesis Studio"** while
+the domain, the email and the watermark say iVideo Studio. Someone searching the
+brand sees a different brand, and the name collides with an unrelated "UQ iVideo
+studio" product. Google's cached snippets also still quote "10+ AI models" and
+"60 seconds"; those will correct on recrawl now the copy is fixed.
+
+Resolving the name is a business decision, not a technical one, so it has not
+been touched.

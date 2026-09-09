@@ -128,7 +128,7 @@ export default function DashboardLayout({
 
                 // Browser notification (if permission granted)
                 if (typeof window !== "undefined" && Notification.permission === "granted") {
-                  new Notification("Genesis Studio", {
+                  new Notification("iVideo Studio", {
                     body: `Your video is ready! "${label}"`,
                     icon: "/icon-192.png",
                   });

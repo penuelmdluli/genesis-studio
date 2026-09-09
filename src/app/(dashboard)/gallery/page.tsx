@@ -95,7 +95,7 @@ export default function GalleryPage() {
 
   const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/explore/${video.id}`;
-    const shareText = `Check out this AI video: "${video.title}" — Made with Genesis Studio`;
+    const shareText = `Check out this AI video: "${video.title}" — Made with iVideo Studio`;
 
     // Native share on mobile (opens WhatsApp, IG, etc.)
     if (typeof navigator !== "undefined" && navigator.share) {
@@ -502,7 +502,7 @@ export default function GalleryPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with Genesis Studio 🎬\n\nhttps://ivideostudio.ai/explore/${currentVideo.id}`);
+                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with iVideo Studio 🎬\n\nhttps://ivideostudio.ai/explore/${currentVideo.id}`);
                     window.open(`https://wa.me/?text=${text}`, "_blank");
                     toast("Opening WhatsApp...", "info");
                   }}
@@ -711,7 +711,7 @@ function VideoCard({
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/40 to-cyan-500/30 flex items-center justify-center mb-2 border border-white/[0.12]">
                 <span className="text-sm font-bold text-white/60">G</span>
               </div>
-              <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">Genesis Studio</span>
+              <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">iVideo Studio</span>
             </div>
             <div className="absolute inset-0 overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-[shimmer_3s_infinite]" />

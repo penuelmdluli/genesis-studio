@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         currency,
         email: user.email,
         userId: user.id,
-        description: `Genesis Studio ${pack.credits} Credit Pack`,
+        description: `iVideo Studio ${pack.credits} Credit Pack`,
         metadata: {
           type: "credit_pack",
           packId: pack.id,
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           currency: "ZAR",
           email: user.email,
           userId: user.id,
-          description: `Genesis Studio ${pack.credits} Credit Pack`,
+          description: `iVideo Studio ${pack.credits} Credit Pack`,
           metadata: {
             type: "credit_pack",
             packId: pack.id,

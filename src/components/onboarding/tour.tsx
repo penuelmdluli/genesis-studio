@@ -10,7 +10,7 @@ const TOUR_KEY = "genesis-onboarding-complete";
 const STEPS = [
   {
     icon: Sparkles,
-    title: "Welcome to Genesis Studio!",
+    title: "Welcome to iVideo Studio!",
     description: "You have 100 free credits to start creating AI videos. Let's make your first one in 90 seconds.",
     action: "Let's Go!",
   },

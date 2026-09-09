@@ -184,7 +184,7 @@ export function VideoViewerModal({
               &ldquo;{video.prompt}&rdquo;
             </p>
             <p className="text-purple-400 text-xs mt-1.5 font-medium">
-              Made with Genesis Studio
+              Made with iVideo Studio
             </p>
           </div>
         </div>

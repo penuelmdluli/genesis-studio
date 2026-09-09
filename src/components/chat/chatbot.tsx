@@ -109,7 +109,7 @@ export function ChatBot() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
             {/* Welcome */}
             <div className="bg-white/[0.04] rounded-xl p-3 text-sm text-white/80 mr-6 space-y-2">
-              <p>Hey there! I&apos;m your Genesis Studio assistant. I can help you:</p>
+              <p>Hey there! I&apos;m your iVideo Studio assistant. I can help you:</p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {[
                   { label: "Create a video", q: "How do I create my first video?" },

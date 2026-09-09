@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         currency,
         email: user.email,
         userId: user.id,
-        description: `Genesis Studio ${plan.name} Plan`,
+        description: `iVideo Studio ${plan.name} Plan`,
         metadata: {
           type: "subscription",
           planId: plan.id,
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           currency: "ZAR",
           email: user.email,
           userId: user.id,
-          description: `Genesis Studio ${plan.name} Plan`,
+          description: `iVideo Studio ${plan.name} Plan`,
           metadata: {
             type: "subscription",
             planId: plan.id,

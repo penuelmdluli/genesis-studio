@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Dunning (Failed Payment Recovery)
+ * iVideo Studio — Dunning (Failed Payment Recovery)
  *
  * Schedule:
  *   Day 0: Auto-retry charge via Stripe

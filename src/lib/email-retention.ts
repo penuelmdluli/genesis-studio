@@ -1,11 +1,11 @@
 /**
- * Genesis Studio — Retention & Dunning Emails
+ * iVideo Studio — Retention & Dunning Emails
  * Win-back campaigns, credit expiry warnings, weekly digests, dunning.
  */
 
 // Env reads deferred to function scope — module-level reads break Cloudflare Workers
 function getResendApiKey() { return process.env.RESEND_API_KEY; }
-function getFromEmail() { return process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>"; }
+function getFromEmail() { return process.env.RESEND_FROM_EMAIL || "iVideo Studio <onboarding@resend.dev>"; }
 function getAppUrl() { return process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"; }
 
 async function sendEmail(to: string, subject: string, html: string) {
@@ -51,7 +51,7 @@ export async function sendDunningEmail(to: string, name: string) {
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">Payment Update Needed</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, your recent payment for Genesis Studio failed.
+        Hi ${name}, your recent payment for iVideo Studio failed.
         Please update your payment method to keep your plan active and avoid losing access to premium features.
       </p>
       <p style="margin:24px 0;">
@@ -71,7 +71,7 @@ export async function sendDowngradeEmail(to: string, name: string) {
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">Plan Downgraded</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, due to an unresolved payment issue, your Genesis Studio plan has been downgraded to Free.
+        Hi ${name}, due to an unresolved payment issue, your iVideo Studio plan has been downgraded to Free.
         Your videos and data are safe — you can resubscribe anytime to get your credits and features back.
       </p>
       <p style="margin:24px 0;">
@@ -108,9 +108,9 @@ export async function sendWeeklyDigestEmail(to: string, name: string, stats: {
 }) {
   return sendEmail(
     to,
-    "Your Genesis Studio weekly recap",
+    "Your iVideo Studio weekly recap",
     `<div style="${baseStyle}"><div style="${card}">
-      <h2 style="margin:0 0 12px;color:#ededed;">Your Week in Genesis Studio</h2>
+      <h2 style="margin:0 0 12px;color:#ededed;">Your Week in iVideo Studio</h2>
       <p style="color:#a1a1aa;line-height:1.6;">Hi ${name}, here's your weekly recap:</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;">
         <div style="background:rgba(124,58,237,0.1);border-radius:12px;padding:16px;text-align:center;">
@@ -139,7 +139,7 @@ export async function sendWinBackEmail(to: string, name: string, bonusCredits: n
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">We Miss You!</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, it's been a while since you created something on Genesis Studio.
+        Hi ${name}, it's been a while since you created something on iVideo Studio.
         We've added <strong style="color:#7c3aed;">${bonusCredits} bonus credits</strong> to your account.
         Come back and see what's new — we've added new models and features!
       </p>

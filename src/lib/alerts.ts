@@ -66,7 +66,7 @@ export async function sendSlackAlert(payload: AlertPayload): Promise<void> {
             title: `${LEVEL_EMOJI[payload.level]} ${payload.title}`,
             description: payload.message.slice(0, 2000),
             color: LEVEL_COLORS[payload.level],
-            footer: { text: `${envTag} | Genesis Studio` },
+            footer: { text: `${envTag} | iVideo Studio` },
             timestamp: new Date().toISOString(),
             ...(payload.context ? {
               fields: Object.entries(payload.context).slice(0, 5).map(([k, v]) => ({

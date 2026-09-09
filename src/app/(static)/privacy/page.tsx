@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "Privacy Policy — Genesis Studio",
-  description: "Genesis Studio privacy policy — how we collect, use, and protect your data.",
+  title: "Privacy Policy — iVideo Studio",
+  description: "iVideo Studio privacy policy — how we collect, use, and protect your data.",
 };
 
 export default function PrivacyPage() {
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">9. Children&apos;s Privacy</h2>
-            <p>Genesis Studio is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover such data has been collected, we will delete it promptly.</p>
+            <p>iVideo Studio is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover such data has been collected, we will delete it promptly.</p>
           </section>
 
           <section>

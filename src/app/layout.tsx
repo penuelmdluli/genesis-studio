@@ -25,8 +25,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://ivideostudio.ai"),
   title: {
-    default: "Genesis Studio | AI Video Generation Platform",
-    template: "%s | Genesis Studio",
+    default: "iVideo Studio | AI Video Generation Platform",
+    template: "%s | iVideo Studio",
   },
   description:
     "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     "text to video",
     "image to video",
     "AI dance video",
-    "Genesis Studio",
+    "iVideo Studio",
     "Motion Control",
     "Brain Studio",
     "AI video South Africa",
@@ -47,16 +47,16 @@ export const metadata: Metadata = {
     "AI short film maker",
   ],
   openGraph: {
-    title: "Genesis Studio — AI Video Creation Platform",
+    title: "iVideo Studio — AI Video Creation Platform",
     description:
       "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
     type: "website",
-    siteName: "Genesis Studio",
+    siteName: "iVideo Studio",
     locale: "en_ZA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Genesis Studio — Create AI Videos in Seconds",
+    title: "iVideo Studio — Create AI Videos in Seconds",
     description:
       "Text to video, dance transfer, short films with audio. 100 free credits.",
   },
@@ -73,7 +73,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Genesis Studio",
+    title: "iVideo Studio",
   },
   icons: {
     icon: [

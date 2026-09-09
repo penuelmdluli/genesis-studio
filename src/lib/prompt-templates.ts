@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Prompt Suggestions & Templates for Genesis Studio
+// Prompt Suggestions & Templates for iVideo Studio
 // ---------------------------------------------------------------------------
 
 /**

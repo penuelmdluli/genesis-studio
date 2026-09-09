@@ -289,7 +289,7 @@ const LANGUAGES = [
 ] as const;
 
 function computeCreditCost(duration: number): number {
-  return Math.ceil(duration / 10) * 15;
+  return Math.ceil(duration / 10) * 120;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {

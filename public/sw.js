@@ -1,4 +1,4 @@
-// Genesis Studio Service Worker — PWA support
+// iVideo Studio Service Worker — PWA support
 const SW_VERSION = "v3-2026-05-01";
 const CACHE_NAME = "genesis-v3";
 const STATIC_ASSETS = ["/", "/dashboard", "/generate"];
@@ -59,7 +59,7 @@ self.addEventListener("push", (event) => {
   } catch {
     // Malformed push payload — use defaults
   }
-  const title = data.title || "Genesis Studio";
+  const title = data.title || "iVideo Studio";
   const options = {
     body: data.body || "Your video is ready!",
     icon: "/icons/icon-192.png",

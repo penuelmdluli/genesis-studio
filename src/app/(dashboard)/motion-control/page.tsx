@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,8 @@ import {
   Link as LinkIcon,
   Clock,
   Download,
+  Bookmark,
+  Star,
 } from "lucide-react";
 import {
   FUN_EFFECTS,
@@ -54,7 +57,21 @@ import {
   type DanceStyle,
 } from "@/lib/sa-family";
 
-type MotionTab = "effects" | "upload" | "url";
+type MotionTab = "effects" | "upload" | "url" | "leads";
+
+/** A saved trending clip from /lead-videos, already downloaded to our CDN. */
+interface LeadVideo {
+  id: string;
+  sourceUrl: string;
+  platform: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  videoUrl: string | null;
+  durationSec: number;
+  status: string;
+  timesUsed: number;
+  starred: boolean;
+}
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
@@ -64,6 +81,7 @@ const MOTION_DURATIONS = [5, 10, 15, 20];
 export default function MotionControlPage() {
   const { user, addJob, updateCreditBalance, isInitialized, videos, activeJobs } = useStore();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const isLoading = !isInitialized;
 
@@ -81,6 +99,13 @@ export default function MotionControlPage() {
   const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
   const [effectCategoryFilter, setEffectCategoryFilter] = useState("All");
   const [referenceUrl, setReferenceUrl] = useState("");
+  // A lead is a trending clip already saved and downloaded on /lead-videos.
+  // Picking one skips the download step entirely — its videoUrl is on our own
+  // CDN, so it goes straight through as the reference video.
+  const [leads, setLeads] = useState<LeadVideo[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsLoaded, setLeadsLoaded] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<LeadVideo | null>(null);
   const [prompt, setPrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -428,6 +453,7 @@ export default function MotionControlPage() {
       setMotionVideo(file);
       setSelectedEffect(null);
       setReferenceUrl("");
+      setSelectedLead(null);
       setMotionVideoPreview(url);
       setError(null);
     };
@@ -455,11 +481,71 @@ export default function MotionControlPage() {
     reader.readAsDataURL(file);
   };
 
+  const loadLeads = useCallback(async () => {
+    setLeadsLoading(true);
+    try {
+      const res = await fetch("/api/lead-videos");
+      const data = (await res.json()) as { leads?: LeadVideo[] };
+      setLeads((data.leads || []).filter((l) => l.status === "ready" && !!l.videoUrl));
+    } catch {
+      // A failed list is not worth an error toast here — the other three tabs
+      // still work, and the empty state says to go and save some links.
+      setLeads([]);
+    } finally {
+      setLeadsLoading(false);
+      setLeadsLoaded(true);
+    }
+  }, []);
+
+  const handleLeadSelect = (lead: LeadVideo) => {
+    setSelectedLead(lead);
+    setMotionVideo(null);
+    setMotionVideoPreview(null);
+    setSelectedEffect(null);
+    setReferenceUrl("");
+    // Match the generated clip to the reference so the motion is not cut off
+    // half way, or padded out past where the dance ends.
+    const d = Math.round(lead.durationSec);
+    if (d > 0) setDuration(d <= 7 ? 5 : d <= 12 ? 10 : d <= 17 ? 15 : 20);
+    setError(null);
+  };
+
+  // "Use this" on the Lead Videos list lands here with ?lead=<id>. Load the
+  // list once and preselect that clip, so the trip from spotting a trending
+  // reel to generating from it is two taps.
+  const leadDeepLinked = useRef(false);
+  useEffect(() => {
+    const leadId = searchParams.get("lead");
+    if (!leadId || leadDeepLinked.current) return;
+    leadDeepLinked.current = true;
+
+    (async () => {
+      setMotionTab("leads");
+      const res = await fetch("/api/lead-videos").catch(() => null);
+      if (!res?.ok) return;
+      const data = (await res.json()) as { leads?: LeadVideo[] };
+      const ready = (data.leads || []).filter((l) => l.status === "ready" && !!l.videoUrl);
+      setLeads(ready);
+      setLeadsLoaded(true);
+
+      const lead = ready.find((l) => l.id === leadId);
+      if (lead) {
+        handleLeadSelect(lead);
+        toast("Lead video loaded — now pick your character", "info");
+      } else {
+        toast("That lead is not ready yet", "warning");
+      }
+      window.history.replaceState({}, "", "/motion-control");
+    })();
+    // handleLeadSelect only calls setState, so it does not belong in the deps.
+  }, [searchParams, toast]);
+
   const handleEffectSelect = (effect: FunEffect) => {
     setSelectedEffect(effect.id);
     setMotionVideo(null);
     setMotionVideoPreview(null);
     setReferenceUrl("");
+    setSelectedLead(null);
   };
 
   const clearMotionVideo = () => {
@@ -467,6 +553,7 @@ export default function MotionControlPage() {
     setMotionVideoPreview(null);
     setSelectedEffect(null);
     setReferenceUrl("");
+    setSelectedLead(null);
     if (motionVideoRef.current) motionVideoRef.current.value = "";
   };
 
@@ -703,7 +790,7 @@ export default function MotionControlPage() {
   // Prompt-only needs a hosted Kling provider — Wan-Animate has no motion to
   // transfer without a driving video — so it follows the same availability flag
   // as the effects.
-  const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
+  const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim() || selectedLead);
   const hasPromptOnly = !hasMotionSource && effectsAvailable && prompt.trim().length > 0;
   const canGenerate =
     (hasMotionSource || hasPromptOnly) &&
@@ -721,11 +808,11 @@ export default function MotionControlPage() {
     generateLockRef.current = true;
     setError(null);
 
-    if (!motionVideo && !selectedEffect && !referenceUrl.trim() && !prompt.trim()) {
+    if (!hasMotionSource && !prompt.trim()) {
       setError(
         effectsAvailable
-          ? "Upload a reference video, paste a URL, pick an effect, or describe the motion."
-          : "Upload a reference video or paste a URL to use as the motion."
+          ? "Pick a lead video, upload a reference, paste a URL, choose an effect, or describe the motion."
+          : "Pick a lead video, upload a reference, or paste a URL to use as the motion."
       );
       generateLockRef.current = false;
       return;
@@ -749,7 +836,7 @@ export default function MotionControlPage() {
     }
 
     setIsGenerating(true);
-    progress.start(["Uploading files", referenceUrl ? "Downloading video" : "Applying motion reference", "Generating video", "Saving to gallery"]);
+    progress.start(["Uploading files", referenceUrl && !selectedLead ? "Downloading video" : "Applying motion reference", "Generating video", "Saving to gallery"]);
     try {
       progress.setProgress(10, "Uploading character image...");
 
@@ -819,7 +906,9 @@ export default function MotionControlPage() {
       progress.advanceStep("Applying motion reference...");
 
       // Upload motion video if provided
-      let referenceVideoUrl: string | undefined;
+      // A lead is already downloaded and sitting on our CDN, so it skips both
+      // the upload and the server-side social-media download.
+      let referenceVideoUrl: string | undefined = selectedLead?.videoUrl || undefined;
       if (motionVideo) {
         try {
           referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
@@ -877,6 +966,21 @@ export default function MotionControlPage() {
         progress.advanceStep("Generating video...");
         progress.setProgress(55, "Submitted to AI — generating your video...");
         startJobPolling(data.jobId, data.estimatedTime);
+
+        // Only count a lead as used once the job was actually accepted, so the
+        // "not used yet" filter stays true after a failed or refunded attempt.
+        if (selectedLead) {
+          const usedId = selectedLead.id;
+          fetch(`/api/lead-videos/${usedId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ markUsed: true }),
+          }).catch(() => {});
+          setLeads((prev) =>
+            prev.map((l) => (l.id === usedId ? { ...l, timesUsed: l.timesUsed + 1 } : l))
+          );
+        }
+
         toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min.`, "success");
         setError(null);
       } else {
@@ -922,7 +1026,7 @@ export default function MotionControlPage() {
         {/* Step indicator */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
           {[
-            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect || referenceUrl.trim() || prompt.trim()) },
+            { num: 1, label: "Motion", done: !!(hasMotionSource || prompt.trim()) },
             { num: 2, label: "Character", done: !!characterImage },
             { num: 3, label: "Generate", done: false },
           ].map((step, i) => (
@@ -1165,12 +1269,16 @@ export default function MotionControlPage() {
                   ...(effectsAvailable
                     ? [{ key: "effects" as const, label: "Effects", icon: Sparkles }]
                     : []),
+                  { key: "leads" as const, label: "My Leads", icon: Bookmark },
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setMotionTab(tab.key)}
+                    onClick={() => {
+                      setMotionTab(tab.key);
+                      if (tab.key === "leads" && !leadsLoaded) loadLeads();
+                    }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
                       motionTab === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
@@ -1318,6 +1426,121 @@ export default function MotionControlPage() {
                 </div>
               )}
 
+              {/* Lead Videos Tab — trending clips saved earlier */}
+              {motionTab === "leads" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-zinc-400">
+                      Trending clips you saved earlier, already downloaded and ready.
+                    </p>
+                    <a
+                      href="/lead-videos"
+                      className="text-[11px] text-violet-300 hover:text-violet-200 shrink-0"
+                    >
+                      Manage list
+                    </a>
+                  </div>
+
+                  {leadsLoading ? (
+                    <div className="py-10 text-center text-xs text-zinc-500">Loading your leads…</div>
+                  ) : leads.length === 0 ? (
+                    <div className="py-8 px-4 text-center rounded-xl border border-dashed border-white/[0.12]">
+                      <Bookmark className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
+                      <p className="text-xs text-zinc-400 mb-3">
+                        No lead videos yet. Save a trending Facebook or TikTok link and it will be
+                        waiting here, downloaded and ready to use.
+                      </p>
+                      <a
+                        href="/lead-videos"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/25 transition-colors"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Add your first lead
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[22rem] overflow-y-auto pr-1">
+                      {leads.map((lead) => {
+                        const tooLong = lead.durationSec > 30;
+                        const active = selectedLead?.id === lead.id;
+                        return (
+                          <button
+                            key={lead.id}
+                            onClick={() => !tooLong && handleLeadSelect(lead)}
+                            disabled={tooLong}
+                            title={
+                              tooLong
+                                ? `${Math.round(lead.durationSec)}s is over the 30s motion limit`
+                                : lead.title || lead.sourceUrl
+                            }
+                            className={`relative rounded-lg overflow-hidden border text-left transition-all ${
+                              active
+                                ? "border-violet-500/60 ring-1 ring-violet-500/40"
+                                : "border-white/[0.10] hover:border-white/[0.25]"
+                            } ${tooLong ? "opacity-40 cursor-not-allowed" : ""}`}
+                          >
+                            <div className="aspect-video bg-black/40">
+                              {lead.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={lead.thumbnailUrl}
+                                  alt={lead.title || "Lead"}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <video
+                                  src={lead.videoUrl || undefined}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  preload="metadata"
+                                />
+                              )}
+                            </div>
+
+                            {lead.starred && (
+                              <Star
+                                className="absolute top-1 right-1 w-3 h-3 text-amber-400"
+                                fill="currentColor"
+                              />
+                            )}
+
+                            {lead.durationSec > 0 && (
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-zinc-300">
+                                {Math.round(lead.durationSec)}s
+                              </span>
+                            )}
+
+                            <div className="p-1.5">
+                              <p className="text-[10px] text-zinc-300 line-clamp-1">
+                                {lead.title || lead.sourceUrl.replace(/^https?:\/\/(www\.)?/, "")}
+                              </p>
+                              <p className="text-[9px] text-zinc-500">
+                                {lead.timesUsed === 0 ? "Unused" : `Used ${lead.timesUsed}×`}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {selectedLead && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                      <Bookmark className="w-4 h-4 text-violet-400 shrink-0" />
+                      <span className="text-xs text-violet-300 truncate flex-1">
+                        {selectedLead.title || selectedLead.sourceUrl}
+                      </span>
+                      <button
+                        onClick={() => setSelectedLead(null)}
+                        className="p-1 rounded text-zinc-400 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* URL Tab */}
               {motionTab === "url" && (
                 <div className="space-y-3">
@@ -1329,7 +1552,7 @@ export default function MotionControlPage() {
                       <input
                         type="url"
                         value={referenceUrl}
-                        onChange={(e) => { setReferenceUrl(e.target.value); setMotionVideo(null); setMotionVideoPreview(null); setSelectedEffect(null); }}
+                        onChange={(e) => { setReferenceUrl(e.target.value); setMotionVideo(null); setMotionVideoPreview(null); setSelectedEffect(null); setSelectedLead(null); }}
                         placeholder="https://www.tiktok.com/@user/video/..."
                         className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
                       />
@@ -1821,6 +2044,13 @@ export default function MotionControlPage() {
                         <Sparkles className="w-8 h-8 text-violet-400 mx-auto mb-1" />
                         <p className="text-[10px] text-violet-300 font-medium">{selectedEffectObj?.name}</p>
                       </div>
+                    ) : selectedLead ? (
+                      selectedLead.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={selectedLead.thumbnailUrl} alt="Lead" className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={selectedLead.videoUrl || undefined} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                      )
                     ) : referenceUrl.trim() ? (
                       <div className="text-center p-2">
                         <LinkIcon className="w-8 h-8 text-violet-400 mx-auto mb-1" />
@@ -1860,7 +2090,7 @@ export default function MotionControlPage() {
                   </div>
                 </div>
                 {/* Ready badge */}
-                {(motionVideo || selectedEffect || referenceUrl.trim()) && characterImagePreview && (
+                {hasMotionSource && characterImagePreview && (
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10">
                     <Badge className="bg-violet-500/90 text-white text-[10px] shadow-lg">
                       Ready to Generate
@@ -1898,6 +2128,8 @@ export default function MotionControlPage() {
                         ? selectedEffectObj?.name
                         : motionVideo
                         ? motionVideo.name
+                        : selectedLead
+                        ? selectedLead.title || "Lead video"
                         : referenceUrl.trim()
                         ? "URL Import"
                         : "—"}

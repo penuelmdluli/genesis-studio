@@ -149,7 +149,7 @@ function generateInsertSQL(
 }
 
 async function main() {
-  console.log("=== Genesis Studio: Supabase → D1 Migration ===\n");
+  console.log("=== iVideo Studio: Supabase → D1 Migration ===\n");
   console.log(`Source: ${SUPABASE_URL}`);
   console.log(`Target: D1 database "${D1_DB_NAME}"\n`);
 

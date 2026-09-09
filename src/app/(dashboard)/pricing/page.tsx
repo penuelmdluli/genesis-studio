@@ -145,7 +145,7 @@ export default function PricingPage() {
     { q: "Can I cancel anytime?", a: "Yes. Cancel anytime from your Settings page with no penalties. Your remaining credits stay in your account and never expire." },
     { q: "What happens to unused credits?", a: "They roll over forever. Credits from subscriptions and packs never expire, even if you cancel." },
     { q: "Can I upgrade or downgrade mid-month?", a: "Yes. Upgrading takes effect immediately and prorates the charge. Downgrading takes effect at the end of the current billing period." },
-    { q: "Is my content really mine?", a: "Yes. You own all videos you generate on Genesis Studio. Use them commercially, post them anywhere, edit them however you like." },
+    { q: "Is my content really mine?", a: "Yes. You own all videos you generate on iVideo Studio. Use them commercially, post them anywhere, edit them however you like." },
     { q: "Do you offer team plans?", a: "Not yet. Studio plan supports agency workflows today. Dedicated team features are coming in a future update." },
     { q: "What payment methods do you accept?", a: "We accept all major credit and debit cards via Yoco — South Africa's trusted payment provider. Visa, Mastercard, and local bank cards all supported." },
     { q: "Do you offer refunds?", a: "Failed generations are automatically refunded. For subscription refunds, contact us within 14 days of your charge for a full refund." },
@@ -300,7 +300,7 @@ export default function PricingPage() {
       <Card className="border-white/[0.10]">
         <CardContent className="p-6 sm:p-8">
           <h3 className="text-lg font-bold text-zinc-100 mb-2">How we compare</h3>
-          <p className="text-sm text-zinc-400 mb-6">Genesis Studio is the only platform with full multi-scene production from a single prompt.</p>
+          <p className="text-sm text-zinc-400 mb-6">iVideo Studio is the only platform with full multi-scene production from a single prompt.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

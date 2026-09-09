@@ -650,7 +650,7 @@ export default function LandingPage() {
           {/* Copyright */}
           <div className="pt-8 border-t border-white/[0.10] text-center">
             <p className="text-sm text-zinc-400">
-              &copy; 2026 Genesis Studio. All rights reserved.
+              &copy; 2026 iVideo Studio. All rights reserved.
             </p>
           </div>
         </div>

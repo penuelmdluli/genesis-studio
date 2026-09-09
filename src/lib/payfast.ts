@@ -86,7 +86,7 @@ export function createCreditPackPayment(params: {
     m_payment_id: `${params.userId}_${params.packId}_${Date.now()}`,
     amount: params.amountZAR.toFixed(2),
     item_name: params.packName,
-    item_description: `Genesis Studio Credit Pack: ${params.packName}`,
+    item_description: `iVideo Studio Credit Pack: ${params.packName}`,
   };
 
   paymentData.signature = generateSignature(paymentData, PAYFAST_PASSPHRASE || undefined);
@@ -121,7 +121,7 @@ export function createSubscriptionPayment(params: {
     email_address: params.userEmail,
     m_payment_id: `${params.userId}_${params.planId}_${Date.now()}`,
     amount: params.monthlyAmountZAR.toFixed(2),
-    item_name: `Genesis Studio ${params.planName} Plan`,
+    item_name: `iVideo Studio ${params.planName} Plan`,
     item_description: `Monthly subscription: ${params.planName}`,
     subscription_type: "1",
     recurring_amount: params.monthlyAmountZAR.toFixed(2),

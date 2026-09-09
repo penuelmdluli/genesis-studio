@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Apply consistency engine
     plan = consistencyEngine.applyAll(plan, body.brandKit);
 
-    // Owner branding: append Genesis Studio marketing outro to voiceover
+    // Owner branding: append iVideo Studio marketing outro to voiceover
     if (isOwnerClerkId(clerkId)) {
       appendOwnerBranding(plan);
     }

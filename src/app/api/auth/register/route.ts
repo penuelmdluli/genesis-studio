@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     sendSlackAlert({
       level: "info",
       title: "New customer signed up",
-      message: `${name} (${email}) just joined Genesis Studio with 100 free credits.`,
+      message: `${name} (${email}) just joined iVideo Studio with 100 free credits.`,
     }).catch(() => {});
 
     const response = NextResponse.json({

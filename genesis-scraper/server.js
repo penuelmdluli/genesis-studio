@@ -496,7 +496,7 @@ app.post("/list-facebook-videos", auth, async (req, res) => {
 });
 
 // ─── POST /brand-genesis ───
-// Adds Genesis Studio branding to any video:
+// Adds iVideo Studio branding to any video:
 // 1. "ivideostudio.ai" watermark (top-right, subtle)
 // 2. 4-second outro with logo + voiceover "Created with iVideo Studio"
 app.post("/brand-genesis", auth, async (req, res) => {
@@ -544,8 +544,8 @@ app.post("/brand-genesis", auth, async (req, res) => {
       `drawbox=x=${Math.floor(width*0.2)}:y=${Math.floor(height*0.3)}:w=${Math.floor(width*0.6)}:h=${Math.floor(height*0.1)}:color=0x7c3aed@0.15:t=fill`,
       // "G" logo text (large, centered)
       `drawtext=text='G':${fontOpt}:fontsize=${Math.floor(height*0.08)}:fontcolor=#7c3aed:x=(w-tw)/2:y=h*0.3`,
-      // "Genesis Studio" brand name
-      `drawtext=text='Genesis Studio':${fontOpt}:fontsize=${Math.floor(height*0.035)}:fontcolor=white:x=(w-tw)/2:y=h*0.42`,
+      // "iVideo Studio" brand name
+      `drawtext=text='iVideo Studio':${fontOpt}:fontsize=${Math.floor(height*0.035)}:fontcolor=white:x=(w-tw)/2:y=h*0.42`,
       // "AI Video Creation Platform"
       `drawtext=text='AI Video Creation Platform':${fontOpt}:fontsize=${Math.floor(height*0.02)}:fontcolor=#a78bfa:x=(w-tw)/2:y=h*0.48`,
       // Website URL

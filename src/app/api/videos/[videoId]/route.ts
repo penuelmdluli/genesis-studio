@@ -9,6 +9,7 @@ async function findVideoKeyInR2(
   jobId: string
 ): Promise<string | null> {
   const candidates = [
+    `mimic-final/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}`,
     `videos/${userId}/${jobId}.webm`,

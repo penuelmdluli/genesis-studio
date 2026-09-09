@@ -4,10 +4,10 @@ import { BLOG_POSTS } from "@/lib/blog-posts";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Blog | Genesis Studio — AI Video Generation Insights",
+  title: "Blog | iVideo Studio — AI Video Generation Insights",
   description: "Guides, tutorials, and insights about AI video generation. Learn to create stunning AI videos for TikTok, YouTube, and business marketing.",
   openGraph: {
-    title: "Genesis Studio Blog",
+    title: "iVideo Studio Blog",
     description: "AI video generation guides, tutorials, and insights for creators and businesses.",
   },
 };
@@ -26,7 +26,7 @@ export default function BlogPage() {
       <div className="max-w-4xl mx-auto px-6 py-20">
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold text-zinc-100 mb-4">
-            Genesis Studio Blog
+            iVideo Studio Blog
           </h1>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
             Guides, tutorials, and insights to help you create stunning AI-generated videos.

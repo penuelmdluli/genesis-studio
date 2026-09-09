@@ -7,7 +7,7 @@ test.describe("PWA & SEO", () => {
     const res = await request.get(`${BASE}/manifest.webmanifest`);
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.name).toBe("Genesis Studio");
+    expect(body.name).toBe("iVideo Studio");
     expect(body.short_name).toBe("Genesis");
     expect(body.icons.length).toBeGreaterThanOrEqual(2);
   });
@@ -36,7 +36,7 @@ test.describe("PWA & SEO", () => {
   test("66: Landing page has unique title and meta", async ({ page }) => {
     await page.goto(BASE);
     const title = await page.title();
-    expect(title).toContain("Genesis Studio");
+    expect(title).toContain("iVideo Studio");
     const desc = await page.locator('meta[name="description"]').getAttribute("content");
     expect(desc).toBeTruthy();
     expect(desc!.length).toBeGreaterThan(50);

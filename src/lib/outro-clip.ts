@@ -11,7 +11,7 @@
  *
  * Format: 3-5 second clip with:
  * - Dark gradient background with subtle particle effects
- * - Genesis Studio logo (or text fallback)
+ * - iVideo Studio logo (or text fallback)
  * - "ivideostudio.ai" URL prominently displayed
  * - CTA text: "Create YOUR own AI videos FREE"
  * - Optional: short voiceover saying the CTA
@@ -48,7 +48,7 @@ export const OUTRO_PRESETS: OutroConfig[] = [
     name: "MBS Vibrant",
     duration: 4,
     bgColor: "#1a0533",
-    textLines: ["MZANSI BABY STARS", "by Genesis Studio"],
+    textLines: ["MZANSI BABY STARS", "by iVideo Studio"],
     websiteUrl: "ivideostudio.ai",
     ctaText: "Make YOUR character dance → ivideostudio.ai",
     style: "vibrant",

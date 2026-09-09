@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 // runtime removed for CF Workers compat
-export const alt = "Genesis Studio — AI Video Generation Platform";
+export const alt = "iVideo Studio — AI Video Generation Platform";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -50,7 +50,7 @@ export default async function Image() {
             letterSpacing: "-0.02em",
           }}
         >
-          Genesis Studio
+          iVideo Studio
         </div>
 
         {/* Subtitle */}

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "API Documentation — Genesis Studio",
-  description: "Genesis Studio API documentation for developers.",
+  title: "API Documentation — iVideo Studio",
+  description: "iVideo Studio API documentation for developers.",
 };
 
 export default function DocsPage() {
@@ -14,7 +14,7 @@ export default function DocsPage() {
         <h1 className="text-4xl font-bold mb-6">API Documentation</h1>
         <div className="space-y-6 text-zinc-300 leading-relaxed">
           <p>
-            The Genesis Studio API lets you generate AI videos programmatically.
+            The iVideo Studio API lets you generate AI videos programmatically.
             Available on Pro and Studio plans.
           </p>
 

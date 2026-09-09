@@ -41,7 +41,7 @@ function LogoMark({ size = 32, className = "" }: { size?: number; className?: st
 function LogoText({ className = "" }: { className?: string }) {
   return (
     <span className={`font-bold gradient-text ${className}`}>
-      Genesis Studio
+      iVideo Studio
     </span>
   );
 }

@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.redirect(url);
   } catch (err) {
     console.error("[AUTH] Google auth error:", err);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
     return NextResponse.redirect(`${appUrl}/sign-in?error=oauth_failed`);
   }
 }

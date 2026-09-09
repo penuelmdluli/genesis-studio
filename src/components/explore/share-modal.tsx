@@ -26,7 +26,7 @@ function buildShareUrl(videoId: string): string {
 
 function buildShareText(prompt: string, url: string): string {
   const truncated = prompt.length > 50 ? prompt.slice(0, 50) + "..." : prompt;
-  return `Check out this AI video: "${truncated}" — Made with Genesis Studio ✨ ${url}`;
+  return `Check out this AI video: "${truncated}" — Made with iVideo Studio ✨ ${url}`;
 }
 
 async function trackShare(videoId: string, platform: string) {

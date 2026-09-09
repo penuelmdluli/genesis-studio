@@ -129,7 +129,7 @@ export default function ApiKeysPage() {
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">API Keys</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Manage your API keys for programmatic access to Genesis Studio.
+          Manage your API keys for programmatic access to iVideo Studio.
         </p>
       </div>
 

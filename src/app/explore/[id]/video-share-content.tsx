@@ -211,7 +211,7 @@ export function VideoShareContent({
 
   // ── Platform share helpers ─────────────────────────────────
   const encodedUrl = encodeURIComponent(shareUrl);
-  const shareText = `Check out this AI video — Made with Genesis Studio`;
+  const shareText = `Check out this AI video — Made with iVideo Studio`;
   const encodedText = encodeURIComponent(shareText);
 
   const sharePlatforms = [
@@ -584,7 +584,7 @@ export function VideoShareContent({
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-[#111118]/90 border border-white/[0.12] backdrop-blur-xl shadow-lg">
           <Link href="/?utm_source=explore_share" className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
             <LogoMark size={20} />
-            Made with Genesis Studio
+            Made with iVideo Studio
           </Link>
         </div>
       )}

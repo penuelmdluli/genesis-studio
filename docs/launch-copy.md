@@ -1,4 +1,4 @@
-# Genesis Studio Launch Copy
+# iVideo Studio Launch Copy
 
 All copy below is ready to paste. URL: https://ivideostudio.ai
 
@@ -16,7 +16,7 @@ https://ivideostudio.ai
 
 **Tweet 2 (Features):**
 
-What you can do with Genesis Studio:
+What you can do with iVideo Studio:
 
 - Text-to-video with 12 different AI models
 - Dance transfer (Mimic Studio) — upload a reference, the AI copies the moves
@@ -62,7 +62,7 @@ https://ivideostudio.ai
 
 Hey everyone,
 
-I've been building Genesis Studio (https://ivideostudio.ai) for the past few months and it's now live.
+I've been building iVideo Studio (https://ivideostudio.ai) for the past few months and it's now live.
 
 **What it is:** An AI video creation platform that bundles 12 different AI models into one interface. You can do text-to-video, dance transfer (upload a reference video and the AI replicates the choreography), multi-scene short films where you stitch scenes into a coherent narrative, and music video generation.
 
@@ -94,7 +94,7 @@ Happy to answer questions about the tech or the business side. This is a solo/sm
 
 **Body:**
 
-I just launched Genesis Studio (https://ivideostudio.ai), an AI video creation platform. Wanted to share some pricing and positioning decisions in case they're useful to others here.
+I just launched iVideo Studio (https://ivideostudio.ai), an AI video creation platform. Wanted to share some pricing and positioning decisions in case they're useful to others here.
 
 **The product:** AI video creation with 12 models, dance transfer, multi-scene short films, and music video generation. Think of it as a studio rather than a single-trick tool.
 
@@ -129,11 +129,11 @@ Happy to go deeper on any of this.
 
 ## 4. Hacker News "Show HN" Post
 
-**Title:** Show HN: Genesis Studio -- AI video platform with 12 models, dance transfer, multi-scene films
+**Title:** Show HN: iVideo Studio -- AI video platform with 12 models, dance transfer, multi-scene films
 
 **Description:**
 
-Genesis Studio (https://ivideostudio.ai) is an AI video creation platform that bundles 12 AI models into a single interface. The main capabilities are text-to-video, dance transfer (motion replication from reference video), multi-scene short film generation, and music videos.
+iVideo Studio (https://ivideostudio.ai) is an AI video creation platform that bundles 12 AI models into a single interface. The main capabilities are text-to-video, dance transfer (motion replication from reference video), multi-scene short film generation, and music videos.
 
 The interesting engineering problems:
 
@@ -153,13 +153,13 @@ I'm interested in feedback on the multi-scene generation approach and the model 
 
 ## 5. LinkedIn Post
 
-I just launched Genesis Studio, an AI video creation platform built in South Africa.
+I just launched iVideo Studio, an AI video creation platform built in South Africa.
 
 It gives creators access to 12 AI models for text-to-video, dance transfer, multi-scene short films, and music video generation. One interface, multiple creative workflows.
 
 Why this matters to me: AI video tools are advancing rapidly, but access is not evenly distributed. Most platforms price in USD, require international credit cards, and are designed for markets where $30/month is a casual expense.
 
-Genesis Studio supports ZAR payments through Yoco. It has a free tier with 100 credits and no credit card required. Paid plans start at $12/month.
+iVideo Studio supports ZAR payments through Yoco. It has a free tier with 100 credits and no credit card required. Paid plans start at $12/month.
 
 This is not about competing with Silicon Valley on model quality. It is about making AI video creation accessible to the millions of creators across Africa and emerging markets who are building media businesses, telling stories, and growing audiences right now, with or without these tools.
 
@@ -177,11 +177,11 @@ https://ivideostudio.ai
 AI video studio with 12 models. Create, don't wait.
 
 **Description (253 chars):**
-Genesis Studio bundles 12 AI video models into one platform. Text-to-video, dance transfer, multi-scene short films, and music videos. 100 free credits, no credit card. Built in South Africa with ZAR payment support. https://ivideostudio.ai
+iVideo Studio bundles 12 AI video models into one platform. Text-to-video, dance transfer, multi-scene short films, and music videos. 100 free credits, no credit card. Built in South Africa with ZAR payment support. https://ivideostudio.ai
 
 **First Comment (Maker's Story):**
 
-Hey Product Hunt! I'm the maker of Genesis Studio.
+Hey Product Hunt! I'm the maker of iVideo Studio.
 
 I built this because I wanted a single place where creators could access multiple AI video models without juggling five different tools and subscriptions.
 

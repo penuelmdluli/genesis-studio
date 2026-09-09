@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "Contact — Genesis Studio",
-  description: "Get in touch with the Genesis Studio team.",
+  title: "Contact — iVideo Studio",
+  description: "Get in touch with the iVideo Studio team.",
 };
 
 export default function ContactPage() {

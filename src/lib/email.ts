@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Email System
+ * iVideo Studio — Email System
  * Uses Resend for transactional emails.
  * Install: npm install resend
  */
@@ -7,7 +7,7 @@
 function getEmailConfig() {
   return {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
-    FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>",
+    FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "iVideo Studio <onboarding@resend.dev>",
     APP_URL: process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai",
   };
 }
@@ -76,12 +76,12 @@ function wrap(content: string): string {
     <div style="${baseStyle}">
       <div style="max-width: 560px; margin: 0 auto;">
         <div style="margin-bottom: 32px;">
-          <span style="font-size: 24px; font-weight: 800; color: white;">Genesis Studio</span>
+          <span style="font-size: 24px; font-weight: 800; color: white;">iVideo Studio</span>
         </div>
         ${content}
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #71717a;">
-          <p>Genesis Studio — AI Video Creation Platform</p>
-          <p><a href="${APP_URL}" style="color: #8b5cf6;">Genesis Studio</a></p>
+          <p>iVideo Studio — AI Video Creation Platform</p>
+          <p><a href="${APP_URL}" style="color: #8b5cf6;">iVideo Studio</a></p>
         </div>
       </div>
     </div>
@@ -92,7 +92,7 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
-    subject: "Welcome to Genesis Studio! Your 100 free credits are ready",
+    subject: "Welcome to iVideo Studio! Your 100 free credits are ready",
     html: wrap(`
       <h1 style="color: white; font-size: 28px; margin-bottom: 8px;">Welcome, ${name}!</h1>
       <p style="color: #a1a1aa; margin-bottom: 24px;">
@@ -161,7 +161,7 @@ export async function sendSupportReply(email: string, name: string, reply: strin
   const { APP_URL } = getEmailConfig();
   return sendEmail({
     to: email,
-    subject: "Re: Your Genesis Studio support request",
+    subject: "Re: Your iVideo Studio support request",
     html: wrap(`
       <h1 style="color: white; font-size: 24px; margin-bottom: 8px;">We've got you covered 🙌</h1>
       <p style="color: #a1a1aa; margin-bottom: 16px;">Hey ${name}, thanks for reaching out. Here's our response:</p>
@@ -173,7 +173,7 @@ export async function sendSupportReply(email: string, name: string, reply: strin
         <p style="color: #a1a1aa; font-size: 13px; margin: 0;">"${originalMessage.slice(0, 500)}"</p>
       </div>
       <p style="color: #a1a1aa; margin-bottom: 24px;">If you need more help, just reply to this email or use the chat on <a href="${APP_URL}" style="color: #8b5cf6;">ivideostudio.ai</a>.</p>
-      <a href="${APP_URL}/dashboard" style="${buttonStyle}">Back to Genesis Studio</a>
+      <a href="${APP_URL}/dashboard" style="${buttonStyle}">Back to iVideo Studio</a>
     `),
   });
 }

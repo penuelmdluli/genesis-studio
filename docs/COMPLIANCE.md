@@ -2,7 +2,7 @@
 
 ## Overview
 
-Genesis Studio processes personal data of users in South Africa and internationally. This document outlines obligations under POPIA (South Africa) and GDPR (EU/EEA).
+iVideo Studio processes personal data of users in South Africa and internationally. This document outlines obligations under POPIA (South Africa) and GDPR (EU/EEA).
 
 ---
 
@@ -47,7 +47,7 @@ Requests must be responded to within a **reasonable time** (POPIA does not speci
 
 ## Sub-Processors
 
-The following third-party services process user data on behalf of Genesis Studio:
+The following third-party services process user data on behalf of iVideo Studio:
 
 | Service | Purpose | Location |
 |---|---|---|

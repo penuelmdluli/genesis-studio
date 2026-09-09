@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Genesis Studio",
-    short_name: "Genesis",
+    name: "iVideo Studio",
+    short_name: "iVideo",
     description:
       "AI video generation for African creators. Generate, voice, caption, and auto-post in minutes.",
     start_url: "/dashboard",
@@ -39,7 +39,25 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
+    // Makes the installed app appear in the phone's own share sheet, so a
+    // trending reel goes from Facebook onto the lead list in one tap. Android
+    // sends the link in `url` on most apps but in `text` on some (Facebook
+    // included), which is why /lead-videos reads either.
+    share_target: {
+      action: "/lead-videos",
+      method: "GET",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+      },
+    },
     shortcuts: [
+      {
+        name: "Save a Lead Video",
+        url: "/lead-videos",
+        description: "Paste a trending link to use later",
+      },
       {
         name: "Generate Video",
         url: "/generate",

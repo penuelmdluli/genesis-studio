@@ -37,10 +37,11 @@ export async function GET(
     }
 
     // Already terminal — return cached result
+    // Prefer final_video_url (dance + marketing outro combined) over raw dance
     if (job.status === "completed") {
       return NextResponse.json({
         status: "completed",
-        outputVideoUrl: job.output_video_url,
+        outputVideoUrl: job.final_video_url || job.output_video_url,
         costUsd: job.cost_usd,
       });
     }
@@ -150,6 +151,9 @@ export async function GET(
         sendVideoReadyEmail(user.email, user.name, job.id);
       }).catch(() => {});
 
+      // Marketing outro is triggered by the cron (owner-only, awaited)
+      // Not triggered here — fire-and-forget dies on Workers
+
       // Auto-publish to Explore feed (fire-and-forget)
       if (r2PersistOk) {
         import("@/lib/auto-publish").then(({ autoPublishToExplore }) =>
@@ -165,7 +169,7 @@ export async function GET(
             hasAudio: !!job.keep_video_sound,
             type: "motion",
             userPlan: user.plan,
-            creatorName: user.name || "Genesis Studio",
+            creatorName: user.name || "iVideo Studio",
             creatorAvatarUrl: user.avatar_url || null,
           })
         ).catch((e) => console.error("[Mimic] Auto-publish to explore failed:", e));

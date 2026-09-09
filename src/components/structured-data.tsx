@@ -7,7 +7,7 @@
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "Genesis Studio",
+  name: "iVideo Studio",
   url: "https://ivideostudio.ai",
   description:
     "AI video creation platform. Text to video, dance transfer, short films.",
@@ -21,7 +21,7 @@ const websiteSchema = {
 const appSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Genesis Studio",
+  name: "iVideo Studio",
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Web",
   url: "https://ivideostudio.ai",
@@ -44,15 +44,15 @@ const faqSchema = {
   mainEntity: [
     {
       "@type": "Question",
-      name: "What is Genesis Studio?",
+      name: "What is iVideo Studio?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Genesis Studio is an AI video creation platform that lets you generate videos from text prompts, images, and reference videos. It offers 12+ AI models for text-to-video, image-to-video, dance transfer, and full short film creation with audio.",
+        text: "iVideo Studio is an AI video creation platform that lets you generate videos from text prompts, images, and reference videos. It offers 12+ AI models for text-to-video, image-to-video, dance transfer, and full short film creation with audio.",
       },
     },
     {
       "@type": "Question",
-      name: "Is Genesis Studio free?",
+      name: "Is iVideo Studio free?",
       acceptedAnswer: {
         "@type": "Answer",
         text: "Yes, sign up with 100 free credits, no credit card required. You can generate multiple AI videos for free and upgrade to a paid plan for more credits and premium features.",
@@ -60,15 +60,15 @@ const faqSchema = {
     },
     {
       "@type": "Question",
-      name: "What AI models does Genesis Studio use?",
+      name: "What AI models does iVideo Studio use?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Genesis Studio offers 12+ AI models including Wan 2.2, Kling 3.0, and other state-of-the-art video generation models. Each model excels at different styles and use cases, from fast drafts to cinematic quality output.",
+        text: "iVideo Studio offers 12+ AI models including Wan 2.2, Kling 3.0, and other state-of-the-art video generation models. Each model excels at different styles and use cases, from fast drafts to cinematic quality output.",
       },
     },
     {
       "@type": "Question",
-      name: "Can I use Genesis Studio videos commercially?",
+      name: "Can I use iVideo Studio videos commercially?",
       acceptedAnswer: {
         "@type": "Answer",
         text: "Yes, all videos generated on paid plans come with full commercial usage rights. You can use them for social media, marketing, YouTube, client work, and any other commercial purpose.",

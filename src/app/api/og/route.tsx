@@ -39,7 +39,7 @@ export async function GET(req: Request) {
             fontFamily: "sans-serif",
           }}
         >
-          Genesis Studio
+          iVideo Studio
         </div>
       ),
       { width: 1200, height: 630 }
@@ -159,7 +159,7 @@ export async function GET(req: Request) {
               />
             </svg>
             <span style={{ color: "#a78bfa", fontSize: 22, fontWeight: 700 }}>
-              Genesis Studio
+              iVideo Studio
             </span>
           </div>
 
@@ -291,7 +291,7 @@ export async function GET(req: Request) {
             }}
           >
             <span style={{ color: "#a78bfa", fontSize: 15, fontWeight: 600 }}>
-              Genesis Studio
+              iVideo Studio
             </span>
             <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 15 }}>
               —

@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "Changelog — Genesis Studio",
-  description: "What's new in Genesis Studio.",
+  title: "Changelog — iVideo Studio",
+  description: "What's new in iVideo Studio.",
 };
 
 export default function ChangelogPage() {
@@ -11,7 +11,7 @@ export default function ChangelogPage() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-24">
         <h1 className="text-4xl font-bold mb-6">Changelog</h1>
-        <p className="text-zinc-400 mb-12">What&apos;s new in Genesis Studio.</p>
+        <p className="text-zinc-400 mb-12">What&apos;s new in iVideo Studio.</p>
 
         <div className="space-y-8">
           <div className="relative pl-6 border-l-2 border-violet-500/30">

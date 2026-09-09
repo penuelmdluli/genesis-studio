@@ -332,7 +332,7 @@ export function RecreateModal({ isOpen, onClose, video }: RecreateModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <h2 className="text-lg font-semibold text-zinc-100">
-            {isLoaded && isSignedIn ? "Recreate This Video" : "Join Genesis Studio"}
+            {isLoaded && isSignedIn ? "Recreate This Video" : "Join iVideo Studio"}
           </h2>
           <button
             onClick={onClose}

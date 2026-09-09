@@ -6,7 +6,7 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { sendSlackAlert } from "@/lib/alerts";
 
 export async function GET(req: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
   try {
     const code = req.nextUrl.searchParams.get("code");
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       sendSlackAlert({
         level: "info",
         title: "New customer signed up (Google)",
-        message: `${profile.name} (${profile.email}) just joined Genesis Studio via Google OAuth.`,
+        message: `${profile.name} (${profile.email}) just joined iVideo Studio via Google OAuth.`,
       }).catch(() => {});
     } else if (user.auth_provider === "clerk_legacy" || !user.auth_provider) {
       // Link existing Clerk user to Google auth

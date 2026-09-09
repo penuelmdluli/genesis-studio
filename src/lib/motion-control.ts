@@ -82,6 +82,10 @@ const WAVESPEED_MOTION_ENDPOINTS: Record<string, Record<string, string>> = {
   },
 };
 
+// Named effects live on their own model, which takes an image + effect_scene
+// and no driving video.
+const WAVESPEED_EFFECTS_ENDPOINT = "kwaivgi/kling-effects";
+
 const WAVESPEED_API_BASE = "https://api.wavespeed.ai/api/v3";
 const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 
@@ -223,27 +227,41 @@ async function tryWavespeedMotion(params: {
   // Must have either a reference video or an effect
   if (!params.referenceVideoUrl && !params.effect) return null;
 
-  const wsEndpoint = WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
-    || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"];
+  // Named effects and reference-video transfer are two different WaveSpeed
+  // models, not one model with an extra field.
+  //
+  // This used to POST both to the motion-control endpoint, which requires a
+  // `video`, and satisfy that for effects with a hardcoded third-party stock
+  // clip. That URL now answers 403, so every effect request failed — the
+  // "Fun Effects" tab had been dead for as long as the link had been rotted.
+  // kling-effects takes the character still and an effect_scene, no video at
+  // all, which is what the tab meant in the first place.
+  const isEffect = !params.referenceVideoUrl && !!params.effect;
+  const wsEndpoint = isEffect
+    ? WAVESPEED_EFFECTS_ENDPOINT
+    : (WAVESPEED_MOTION_ENDPOINTS[params.model]?.[params.quality]
+       || WAVESPEED_MOTION_ENDPOINTS["kling-v3"]["standard"]);
 
-  const body: Record<string, unknown> = {
-    image: params.characterImageUrl,
-    character_orientation: params.orientation,
-    duration: String(params.duration || 10),
-    keep_original_sound: params.keepOriginalSound,
-    cfg_scale: 0.5,
-  };
-  // WaveSpeed requires 'video' field even for effects
-  if (params.referenceVideoUrl) {
-    body.video = params.referenceVideoUrl;
-  } else if (params.effect) {
-    // Use a minimal stock dance video as base reference for effects
-    // WaveSpeed will override motion with the effect but needs a valid video input
-    body.video = "https://d1q70pf5vjeyhc.cloudfront.net/predictions/5c972e863dd24bf9bd2821a3e1e601b3/1.mp4";
+  const body: Record<string, unknown> = isEffect
+    ? {
+        image: params.characterImageUrl,
+        effect_scene: params.effect,
+      }
+    : {
+        image: params.characterImageUrl,
+        video: params.referenceVideoUrl,
+        character_orientation: params.orientation,
+        duration: String(params.duration || 10),
+        keep_original_sound: params.keepOriginalSound,
+        cfg_scale: 0.5,
+      };
+
+  // The effects model takes the scene and the still only — a prompt or a
+  // negative prompt is rejected as an unknown field.
+  if (!isEffect) {
+    if (params.prompt) body.prompt = params.prompt;
+    if (params.negativePrompt) body.negative_prompt = params.negativePrompt;
   }
-  if (params.effect) body.effect = params.effect;
-  if (params.prompt) body.prompt = params.prompt;
-  if (params.negativePrompt) body.negative_prompt = params.negativePrompt;
 
   try {
     console.log(`[Motion] Trying WaveSpeed: ${wsEndpoint}`);
@@ -595,20 +613,22 @@ export const FUN_EFFECT_CATEGORIES = [
   "Gesture",
   "Fantasy",
   "Effects",
-  "Celebration",
   "Style",
   "Fun",
 ] as const;
 
+// Every id here is verified to exist on kwaivgi/kling-effects (2026-08-31).
+// Six were dropped that day — hug, kiss, heart_gesture, celebration,
+// birthday_star and tiger_hug_pro — because the endpoint rejects them; the
+// first three are two-subject effects the model does not offer. Offering an id
+// the provider refuses costs the user a credit deduction and a refund, so
+// check a new id against the endpoint before adding it here.
 export const FUN_EFFECTS: FunEffect[] = [
   // Dance
   { id: "running_man", name: "Running Man", category: "Dance", icon: "running_man" },
   { id: "jazz_jazz", name: "Jazz Dance", category: "Dance", icon: "jazz_jazz" },
   { id: "swing_swing", name: "Swing Dance", category: "Dance", icon: "swing_swing" },
   // Gesture
-  { id: "hug", name: "Hug", category: "Gesture", icon: "hug" },
-  { id: "kiss", name: "Kiss", category: "Gesture", icon: "kiss" },
-  { id: "heart_gesture", name: "Heart Gesture", category: "Gesture", icon: "heart_gesture" },
   { id: "squish", name: "Squish", category: "Gesture", icon: "squish" },
   // Fantasy
   { id: "fly_fly", name: "Flying", category: "Fantasy", icon: "fly_fly" },
@@ -623,9 +643,7 @@ export const FUN_EFFECTS: FunEffect[] = [
   { id: "disappear", name: "Disappear", category: "Effects", icon: "disappear" },
   { id: "day_to_night", name: "Day to Night", category: "Effects", icon: "day_to_night" },
   // Celebration
-  { id: "firework_2026", name: "Fireworks", category: "Celebration", icon: "firework_2026" },
-  { id: "celebration", name: "Celebration", category: "Celebration", icon: "celebration" },
-  { id: "birthday_star", name: "Birthday Star", category: "Celebration", icon: "birthday_star" },
+  { id: "firework_2026", name: "Fireworks", category: "Effects", icon: "firework_2026" },
   // Style
   { id: "anime_figure", name: "Anime Style", category: "Style", icon: "anime_figure" },
   { id: "yearbook", name: "Yearbook", category: "Style", icon: "yearbook" },
@@ -633,7 +651,6 @@ export const FUN_EFFECTS: FunEffect[] = [
   { id: "pixelpixel", name: "Pixel Art", category: "Style", icon: "pixelpixel" },
   // Fun
   { id: "rampage_ape", name: "Rampage Ape", category: "Fun", icon: "rampage_ape" },
-  { id: "tiger_hug_pro", name: "Tiger Hug", category: "Fun", icon: "tiger_hug_pro" },
   { id: "jelly_jiggle", name: "Jelly Jiggle", category: "Fun", icon: "jelly_jiggle" },
   { id: "jelly_press", name: "Jelly Press", category: "Fun", icon: "jelly_press" },
   { id: "skateskate", name: "Skateboard", category: "Fun", icon: "skateskate" },

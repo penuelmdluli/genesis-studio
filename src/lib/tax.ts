@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Tax & Invoicing Helpers
+ * iVideo Studio — Tax & Invoicing Helpers
  *
  * Tax strategy:
  * - SA: 15% VAT when revenue exceeds R1M (SARS requirement)

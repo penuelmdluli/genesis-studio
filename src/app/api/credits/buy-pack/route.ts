@@ -4,7 +4,7 @@ import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { getDb } from "@/lib/db-driver";
 import { CREDIT_PACKS } from "@/lib/constants";
-import { getProvider, getDefaultProvider } from "@/lib/payments";
+import { resolveProvider, getProvider, getDefaultProvider } from "@/lib/payments";
 
 const PACK_PRICE_IDS: Record<string, string | undefined> = {
   "pack-500": process.env.STRIPE_CREDIT_PACK_500_PRICE_ID,
@@ -36,9 +36,16 @@ export async function POST(req: NextRequest) {
 
     // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
-      const paymentProvider = getProvider(providerName);
+      // Resolve rather than demand — see the note in subscribe/route.ts.
+      const paymentProvider = resolveProvider(providerName);
+      if (!paymentProvider) {
+        return NextResponse.json(
+          { error: "Payments are temporarily unavailable. Please try again shortly." },
+          { status: 503 }
+        );
+      }
 
-      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      const useUSD = paymentProvider.name === "paystack" && requestCurrency !== "ZAR";
       const amount = useUSD ? pack.price * 100 : (pack.priceZAR || 0) * 100;
       const currency = useUSD ? "USD" : "ZAR";
 

@@ -4,7 +4,7 @@ import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { getDb } from "@/lib/db-driver";
 import { PLANS } from "@/lib/constants";
-import { getProvider, getDefaultProvider } from "@/lib/payments";
+import { resolveProvider, getProvider, getDefaultProvider } from "@/lib/payments";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,10 +30,22 @@ export async function POST(req: NextRequest) {
 
     // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
-      const paymentProvider = getProvider(providerName);
+      // Resolve rather than demand. PAYSTACK_SECRET_KEY has never been set in
+      // production and the pricing page sends every non-ZAR visitor to
+      // Paystack, so this used to throw and they saw "Failed to start
+      // checkout" with no way to pay at all.
+      const paymentProvider = resolveProvider(providerName);
+      if (!paymentProvider) {
+        return NextResponse.json(
+          { error: "Payments are temporarily unavailable. Please try again shortly." },
+          { status: 503 }
+        );
+      }
 
-      // Determine currency and amount based on provider
-      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      // Currency follows the provider we actually resolved to, not the one
+      // that was asked for — billing a Yoco checkout in USD would fail at the
+      // gateway.
+      const useUSD = paymentProvider.name === "paystack" && requestCurrency !== "ZAR";
       const amount = useUSD ? plan.price * 100 : (plan.priceZAR || 0) * 100; // cents
       const currency = useUSD ? "USD" : "ZAR";
 

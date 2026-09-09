@@ -32,6 +32,40 @@ const providerFactories: Array<{
 // Cached provider instances
 const providerCache = new Map<string, PaymentProvider>();
 
+/** Names of the providers whose credentials are actually present. */
+export function configuredProviders(): string[] {
+  return providerFactories.filter((f) => f.create() !== null).map((f) => f.name);
+}
+
+export function isProviderConfigured(name: string): boolean {
+  const factory = providerFactories.find((f) => f.name === name);
+  return !!factory && factory.create() !== null;
+}
+
+/**
+ * The provider to actually charge with, given the one the caller asked for.
+ *
+ * Returns the requested provider when it is configured, otherwise the first
+ * one that is. Falling back matters: PAYSTACK_SECRET_KEY has never been set in
+ * production, and the pricing page sends every non-ZAR visitor to Paystack, so
+ * getProvider() threw and each of them saw "Failed to start checkout" with no
+ * way to pay. A checkout in the wrong currency is recoverable; a checkout that
+ * cannot happen is lost revenue.
+ *
+ * Returns null only when no provider at all is configured.
+ */
+export function resolveProvider(requested?: string): PaymentProvider | null {
+  if (requested && isProviderConfigured(requested)) return getProvider(requested);
+
+  const fallback = configuredProviders()[0];
+  if (!fallback) return null;
+
+  if (requested) {
+    console.warn(`[PAYMENTS] ${requested} is not configured — falling back to ${fallback}`);
+  }
+  return getProvider(fallback);
+}
+
 /**
  * Get a specific payment provider by name.
  * Throws if the provider is not configured.

@@ -69,7 +69,7 @@ const howItWorksSteps = [
     num: "2",
     icon: Film,
     title: "AI brings it to life",
-    description: "10+ models compete to render the best result in seconds",
+    description: "Your prompt is rendered by the model best suited to it",
   },
   {
     num: "3",
@@ -87,7 +87,7 @@ const capabilities = [
   {
     icon: Zap,
     title: "Motion Control",
-    description: "Upload a character photo + dance video, paste a TikTok URL, or pick from 40+ fun effects. AI makes your character perform the moves.",
+    description: "Upload a character photo + dance video, paste a TikTok URL, or pick from 20+ fun effects. AI makes your character perform the moves.",
     models: [],
     badge: "HOT",
   },
@@ -106,7 +106,7 @@ const capabilities = [
   },
   {
     icon: Film,
-    title: "10+ AI Models",
+    title: "Multiple AI Models",
     description: "From lightning-fast drafts to Hollywood-grade output. Pick the right model for your content, all in one place.",
     models: [],
   },
@@ -201,7 +201,7 @@ export default function LandingPage() {
             <p className="text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto mb-6 sm:mb-8 leading-relaxed">
               Text to video. Image to video. Dance transfer. Full short films.
               <br className="hidden sm:block" />
-              10+ AI models. One platform. Made in South Africa.
+              One platform. Made in South Africa.
             </p>
           </MotionSection>
 
@@ -221,7 +221,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="text-xs sm:text-sm text-zinc-400">
-              No credit card required &bull; First video in 60 seconds
+              No credit card required &bull; Most videos render in a few minutes
             </p>
           </MotionSection>
 
@@ -244,7 +244,7 @@ export default function LandingPage() {
                 </>
               )}
               <span className="hidden sm:block text-zinc-400">
-                Powered by 12 AI models
+                Powered by best-in-class AI models
               </span>
             </div>
           </MotionSection>
@@ -536,7 +536,7 @@ export default function LandingPage() {
                 Create your first AI video now.
               </h2>
               <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
-                100 free credits. No credit card. Your first video renders in under 60 seconds.
+                100 free credits. No credit card. Start creating in minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href="/sign-up" onClick={() => trackEvent("cta_click", { location: "footer" })}>
@@ -569,7 +569,7 @@ export default function LandingPage() {
                 <Logo size="sm" />
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                AI video creation platform built in South Africa. 10+ models, Hollywood quality.
+                AI video creation platform built in South Africa.
               </p>
             </div>
 
@@ -640,27 +640,11 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            {/* Social */}
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-200 mb-4">Social</h4>
-              <ul className="space-y-2.5">
-                {[
-                  { href: "https://twitter.com/genesisstudio", label: "Twitter" },
-                  { href: "https://github.com/genesisstudio", label: "GitHub" },
-                ].map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Social links removed 2026-09-09: twitter.com/genesisstudio
+                returns 404 and the GitHub account is empty (0 repos, no
+                profile). A dead social link on a commercial homepage costs
+                more trust than an absent one. Restore this block when the
+                accounts actually exist. */}
           </div>
 
           {/* Copyright */}

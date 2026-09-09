@@ -83,16 +83,30 @@ export async function GET(req: NextRequest) {
         // No hold means this job predates escrow. Its credits were taken by
         // the old deductCredits path — which wrote the ledger row with an
         // empty job_id, so the debit cannot even be linked back here. The
-        // user was still charged, so they are still owed. refundCredits is
-        // now idempotent per job, so this cannot double-credit.
-        const { refundCredits } = await import("@/lib/credits");
-        await refundCredits(
-          job.user_id,
-          job.credits_cost,
-          job.id,
-          "Generation timed out - automatic refund"
-        );
-        creditsReturned += job.credits_cost;
+        // user was still charged, so they are still owed.
+        //
+        // refundCredits is idempotent per job and silently no-ops on a repeat,
+        // so the already-refunded check here is not a second safety net: it is
+        // what keeps the reported figure honest. Counting the cost regardless
+        // made a re-reaped job look like it returned credits it did not, and
+        // this number feeds the admin dashboard.
+        const alreadyRefunded = await db
+          .from("credit_transactions")
+          .select("id")
+          .eq("job_id", job.id)
+          .eq("type", "generation_refund")
+          .limit(1);
+
+        if (!alreadyRefunded.data?.length) {
+          const { refundCredits } = await import("@/lib/credits");
+          await refundCredits(
+            job.user_id,
+            job.credits_cost,
+            job.id,
+            "Generation timed out - automatic refund"
+          );
+          creditsReturned += job.credits_cost;
+        }
       }
       reaped++;
     } catch (err) {

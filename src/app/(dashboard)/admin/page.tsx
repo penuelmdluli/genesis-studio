@@ -22,6 +22,27 @@ interface DashboardData {
   credits: { debitedThisWeek: number; refundedThisWeek: number; netSpent: number };
   support: { openTickets: number };
   recentActivity: Array<{ id: string; userId: string; status: string; model: string; credits: number; created: string }>;
+  reliability: {
+    today: Window; week: Window; month: Window;
+    byErrorCode: Array<{ code: string; n: number }>;
+    byProvider: Array<{ provider: string; total: number; completed: number; successRate: number | null; p50: number; p95: number }>;
+  };
+  funnel: { signups: number; startedGeneration: number; completedGeneration: number; purchased: number; activationRate: number | null };
+  firstGenerationFailed: Array<{ email: string; plan: string; created_at: string }>;
+  creditLiability: { outstandingHolds: number; outstandingCredits: number; capturedAllTime: number; releasedAllTime: number };
+  spendByModel: Array<{ model_id: string; completed: number; credits: number; usd: number }>;
+}
+
+interface Window { total: number; completed: number; successRate: number | null }
+
+/** Below this, the product is broken for most people who try it. */
+const HEALTHY_SUCCESS_RATE = 90;
+
+function rateColour(rate: number | null): string {
+  if (rate === null) return "text-zinc-400";
+  if (rate >= HEALTHY_SUCCESS_RATE) return "text-emerald-400";
+  if (rate >= 60) return "text-amber-400";
+  return "text-red-400";
 }
 
 export default function AdminPage() {
@@ -46,9 +67,11 @@ export default function AdminPage() {
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "Total Users", value: data.users.total, sub: `+${data.users.newThisWeek} this week`, icon: Users, color: "text-violet-400", bg: "bg-violet-500/20" },
-          { label: "Today's Generations", value: data.generation.today.total, sub: `${data.generation.today.completed} done, ${data.generation.today.failed} failed`, icon: Zap, color: "text-cyan-400", bg: "bg-cyan-500/20" },
-          { label: "Total Videos", value: data.content.totalVideos, sub: `${data.content.totalProductions} productions`, icon: Film, color: "text-emerald-400", bg: "bg-emerald-500/20" },
+          // Success rate leads. It is the number that decides whether anything
+          // else on this page matters.
+          { label: "Success Rate (7d)", value: data.reliability?.week?.successRate ?? 0, sub: `${data.reliability?.week?.completed ?? 0} of ${data.reliability?.week?.total ?? 0} jobs`, icon: TrendingUp, color: rateColour(data.reliability?.week?.successRate ?? null), bg: "bg-violet-500/20" },
+          { label: "Activation", value: data.funnel?.activationRate ?? 0, sub: `${data.funnel?.completedGeneration ?? 0} of ${data.funnel?.signups ?? 0} signups got a video`, icon: Users, color: rateColour(data.funnel?.activationRate ?? null), bg: "bg-cyan-500/20" },
+          { label: "Credits Held", value: data.creditLiability?.outstandingCredits ?? 0, sub: `${data.creditLiability?.outstandingHolds ?? 0} unsettled reservations`, icon: Zap, color: "text-emerald-400", bg: "bg-emerald-500/20" },
           { label: "Open Support", value: data.support.openTickets, sub: data.support.openTickets > 0 ? "Needs attention" : "All clear", icon: MessageCircle, color: data.support.openTickets > 0 ? "text-amber-400" : "text-emerald-400", bg: data.support.openTickets > 0 ? "bg-amber-500/20" : "bg-emerald-500/20" },
         ].map((s) => (
           <Card key={s.label}>
@@ -84,6 +107,170 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      </MotionSection>
+
+      {/* Funnel — where signups actually stop */}
+      <MotionSection delay={0.06} className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-3 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-cyan-400" /> Funnel
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Signed up", value: data.funnel?.signups ?? 0 },
+                { label: "Tried to generate", value: data.funnel?.startedGeneration ?? 0 },
+                { label: "Got a video", value: data.funnel?.completedGeneration ?? 0 },
+                { label: "Purchased", value: data.funnel?.purchased ?? 0 },
+              ].map((s, i, arr) => {
+                const prev = i > 0 ? arr[i - 1].value : null;
+                const drop = prev && prev > 0 ? Math.round(((prev - s.value) / prev) * 100) : null;
+                return (
+                  <div key={s.label} className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                    <p className="text-2xl font-bold text-zinc-100">{s.value}</p>
+                    <p className="text-xs text-zinc-300">{s.label}</p>
+                    {drop !== null && drop > 0 && (
+                      <p className="text-[10px] text-red-400 mt-0.5">-{drop}% from previous step</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </MotionSection>
+
+      {/* Reliability across three windows */}
+      <MotionSection delay={0.07} className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-3 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-violet-400" /> Reliability
+            </h2>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {([
+                ["Today", data.reliability?.today],
+                ["7 days", data.reliability?.week],
+                ["30 days", data.reliability?.month],
+              ] as Array<[string, Window | undefined]>).map(([label, w]) => (
+                <div key={label} className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                  <p className={`text-2xl font-bold ${rateColour(w?.successRate ?? null)}`}>
+                    {w?.successRate === null || w?.successRate === undefined ? "\u2014" : `${w.successRate}%`}
+                  </p>
+                  <p className="text-xs text-zinc-300">{label}</p>
+                  <p className="text-[10px] text-zinc-400">{w?.completed ?? 0} of {w?.total ?? 0}</p>
+                </div>
+              ))}
+            </div>
+
+            {(data.reliability?.byErrorCode?.length ?? 0) > 0 && (
+              <>
+                <p className="text-xs font-medium text-zinc-300 mb-2">Failures by cause</p>
+                <div className="space-y-1.5">
+                  {data.reliability.byErrorCode.slice(0, 8).map((e) => (
+                    <div key={e.code} className="flex items-center gap-3 text-xs">
+                      <span className="text-zinc-300 flex-1 truncate" title={e.code}>{e.code}</span>
+                      <span className="text-red-400 font-medium">{e.n}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {(data.reliability?.byProvider?.length ?? 0) > 0 && (
+              <>
+                <p className="text-xs font-medium text-zinc-300 mt-4 mb-2">By provider (30 days)</p>
+                <div className="space-y-1.5">
+                  {data.reliability.byProvider.map((p) => (
+                    <div key={p.provider} className="flex items-center gap-3 text-xs">
+                      <span className="text-zinc-300 w-24 truncate">{p.provider}</span>
+                      <span className={rateColour(p.successRate)}>{p.successRate ?? 0}%</span>
+                      <span className="text-zinc-400 ml-auto">{p.completed}/{p.total} · ~{p.p50 ?? 0}s</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </MotionSection>
+
+      {/* The churn cohort — everyone whose first impression was a failure */}
+      {(data.firstGenerationFailed?.length ?? 0) > 0 && (
+        <MotionSection delay={0.08} className="mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="text-sm font-semibold text-zinc-200 mb-1 flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-red-400" /> First generation failed
+                <Badge className="bg-red-500/20 text-red-300 text-[10px]">
+                  {data.firstGenerationFailed.length}
+                </Badge>
+              </h2>
+              <p className="text-[11px] text-zinc-400 mb-3">
+                These people tried the product once and it broke. They are the cheapest
+                users to win back &mdash; restore their credits and tell them it is fixed.
+              </p>
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {data.firstGenerationFailed.map((u) => (
+                  <div key={u.email} className="flex items-center gap-3 py-1 text-xs">
+                    <span className="text-zinc-300 flex-1 truncate">{u.email}</span>
+                    <span className="text-zinc-400">{u.plan}</span>
+                    <span className="text-zinc-500 w-20 text-right">
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </MotionSection>
+      )}
+
+      {/* Credit liability + spend */}
+      <MotionSection delay={0.09} className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" /> Credits &amp; spend
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                { label: "Held (unsettled)", value: data.creditLiability?.outstandingCredits ?? 0 },
+                { label: "Captured all time", value: data.creditLiability?.capturedAllTime ?? 0 },
+                { label: "Released all time", value: data.creditLiability?.releasedAllTime ?? 0 },
+                { label: "User balances", value: data.users.totalCreditsOutstanding },
+              ].map((s) => (
+                <div key={s.label} className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                  <p className="text-xl font-bold text-zinc-100">{s.value.toLocaleString()}</p>
+                  <p className="text-[11px] text-zinc-300">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {(data.spendByModel?.length ?? 0) > 0 && (
+              <>
+                <p className="text-xs font-medium text-zinc-300 mb-2">Completed jobs by model (30 days)</p>
+                <div className="space-y-1.5">
+                  {data.spendByModel.map((m) => (
+                    <div key={m.model_id} className="flex items-center gap-3 text-xs">
+                      <span className="text-zinc-300 w-32 truncate">{m.model_id}</span>
+                      <span className="text-zinc-400">{m.completed} done</span>
+                      <span className="text-zinc-400">{m.credits} cr</span>
+                      <span className="text-zinc-400 ml-auto">
+                        {m.usd > 0 ? `$${m.usd.toFixed(2)}` : "cost not reported"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-2">
+                  Provider cost is only recorded where the provider reports it, so margin
+                  per tier is not yet computable. Treat these credit totals as
+                  revenue-side only until cost_usd is populated.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </MotionSection>

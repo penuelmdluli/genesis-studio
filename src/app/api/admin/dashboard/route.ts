@@ -222,6 +222,46 @@ export async function GET() {
       ),
     ]);
 
+  // ── Traffic (first-party, migration 0007) ──────────────────────────
+  const [traffic, topReferrers, topLanding, byDevice] = await Promise.all([
+    one<{ v_today: number; v_week: number; v_month: number; visitors_week: number }>(
+      `SELECT
+         SUM(CASE WHEN created_at >= date('now') THEN 1 ELSE 0 END) v_today,
+         SUM(CASE WHEN created_at >= datetime('now','-7 day') THEN 1 ELSE 0 END) v_week,
+         SUM(CASE WHEN created_at >= datetime('now','-30 day') THEN 1 ELSE 0 END) v_month,
+         COUNT(DISTINCT CASE WHEN created_at >= datetime('now','-7 day') THEN visitor_id END) visitors_week
+       FROM page_views`
+    ),
+
+    // Where people come from. Rows with no referrer are direct traffic, which
+    // is worth seeing rather than hiding.
+    many<{ source: string; n: number }>(
+      `SELECT COALESCE(referrer_host, '(direct)') source, COUNT(*) n
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY source ORDER BY n DESC LIMIT 10`
+    ),
+
+    // The pages people actually land on, and how many of those visits belong
+    // to someone signed in — a page with traffic but no signed-in share is
+    // where anonymous visitors stop.
+    many<{ path: string; views: number; signed_in: number }>(
+      `SELECT path,
+              COUNT(*) views,
+              SUM(CASE WHEN user_id IS NOT NULL THEN 1 ELSE 0 END) signed_in
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY path ORDER BY views DESC LIMIT 12`
+    ),
+
+    many<{ device: string; n: number }>(
+      `SELECT COALESCE(device,'unknown') device, COUNT(*) n
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY device ORDER BY n DESC`
+    ),
+  ]);
+
   const rate = (c?: number, t?: number) => (t && t > 0 ? Math.round(((c ?? 0) / t) * 100) : null);
 
   return NextResponse.json({
@@ -232,6 +272,18 @@ export async function GET() {
       month: { total: reliability?.m_t ?? 0, completed: reliability?.m_c ?? 0, successRate: rate(reliability?.m_c, reliability?.m_t) },
       byErrorCode,
       byProvider: byProvider.map((p) => ({ ...p, successRate: rate(p.completed, p.total) })),
+    },
+    traffic: {
+      viewsToday: traffic?.v_today ?? 0,
+      viewsWeek: traffic?.v_week ?? 0,
+      viewsMonth: traffic?.v_month ?? 0,
+      // Only visitors who accepted analytics cookies carry an id, so this is a
+      // floor on unique visitors, never the true number. Labelled as such in
+      // the UI rather than passed off as exact.
+      identifiedVisitorsWeek: traffic?.visitors_week ?? 0,
+      topReferrers,
+      topLanding,
+      byDevice,
     },
     funnel: {
       signups: funnel?.signups ?? 0,

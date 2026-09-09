@@ -8,6 +8,8 @@ import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import { EmailCapture } from "@/components/email-capture";
 import { WebSiteSchema } from "@/components/structured-data";
 import Script from "next/script";
+import { Suspense } from "react";
+import { PageViewTracker } from "@/components/page-view-tracker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -102,6 +104,12 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
+          {/* First-party page views. Wrapped in Suspense because it reads
+              searchParams for UTM tags, and without a boundary that would
+              client-render every prerendered page above it. */}
+          <Suspense fallback={null}>
+            <PageViewTracker />
+          </Suspense>
           <CookieConsent />
           <RegisterServiceWorker />
           <EmailCapture />

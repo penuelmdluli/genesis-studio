@@ -31,6 +31,13 @@ interface DashboardData {
   firstGenerationFailed: Array<{ email: string; plan: string; created_at: string }>;
   creditLiability: { outstandingHolds: number; outstandingCredits: number; capturedAllTime: number; releasedAllTime: number };
   spendByModel: Array<{ model_id: string; completed: number; credits: number; usd: number }>;
+  traffic: {
+    viewsToday: number; viewsWeek: number; viewsMonth: number;
+    identifiedVisitorsWeek: number;
+    topReferrers: Array<{ source: string; n: number }>;
+    topLanding: Array<{ path: string; views: number; signed_in: number }>;
+    byDevice: Array<{ device: string; n: number }>;
+  };
 }
 
 interface Window { total: number; completed: number; successRate: number | null }
@@ -107,6 +114,95 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      </MotionSection>
+
+      {/* Traffic — the top of the funnel, previously invisible */}
+      <MotionSection delay={0.055} className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-200 mb-1 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" /> Traffic
+            </h2>
+            <p className="text-[11px] text-zinc-400 mb-3">
+              First-party, collected by this app. Counts every visit; only visitors
+              who accepted analytics cookies carry an id, so unique visitors is a
+              floor rather than an exact figure.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                { label: "Views today", value: data.traffic?.viewsToday ?? 0 },
+                { label: "Views (7d)", value: data.traffic?.viewsWeek ?? 0 },
+                { label: "Views (30d)", value: data.traffic?.viewsMonth ?? 0 },
+                { label: "Known visitors (7d)", value: data.traffic?.identifiedVisitorsWeek ?? 0 },
+              ].map((s) => (
+                <div key={s.label} className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                  <p className="text-xl font-bold text-zinc-100">{s.value.toLocaleString()}</p>
+                  <p className="text-[11px] text-zinc-300">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {(data.traffic?.viewsMonth ?? 0) === 0 ? (
+              <p className="text-xs text-amber-300/90">
+                No visits recorded yet. Tracking starts collecting from the moment it
+                ships, so this fills in from today onward &mdash; there is no history to
+                backfill.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-zinc-300 mb-2">Where they come from (30d)</p>
+                  <div className="space-y-1.5">
+                    {data.traffic.topReferrers.map((r) => (
+                      <div key={r.source} className="flex items-center gap-3 text-xs">
+                        <span className="text-zinc-300 flex-1 truncate">{r.source}</span>
+                        <span className="text-zinc-400">{r.n}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(data.traffic.byDevice?.length ?? 0) > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-zinc-300 mt-4 mb-2">Device</p>
+                      <div className="space-y-1.5">
+                        {data.traffic.byDevice.map((d) => (
+                          <div key={d.device} className="flex items-center gap-3 text-xs">
+                            <span className="text-zinc-300 flex-1 capitalize">{d.device}</span>
+                            <span className="text-zinc-400">{d.n}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-zinc-300 mb-2">
+                    Top pages (30d) &mdash; and how many visits were signed in
+                  </p>
+                  <div className="space-y-1.5">
+                    {data.traffic.topLanding.map((p) => {
+                      const share = p.views > 0 ? Math.round((p.signed_in / p.views) * 100) : 0;
+                      return (
+                        <div key={p.path} className="flex items-center gap-3 text-xs">
+                          <span className="text-zinc-300 flex-1 truncate" title={p.path}>{p.path}</span>
+                          <span className="text-zinc-400">{p.views}</span>
+                          <span className={share === 0 ? "text-amber-400 w-12 text-right" : "text-zinc-500 w-12 text-right"}>
+                            {share}% in
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mt-2">
+                    A page with traffic and 0% signed in is where anonymous visitors stop.
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </MotionSection>

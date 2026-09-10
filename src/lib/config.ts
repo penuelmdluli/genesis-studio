@@ -113,6 +113,31 @@ export interface ModelAvailability {
  * that is configured but out of balance still fails at submit time; that path
  * refunds, and the circuit breaker in vendor-failover.ts carries the memory.
  */
+/**
+ * Is this duration one the provider will accept?
+ *
+ * Separate from availability because it is a property of the request, not the
+ * model. Checked before credits are taken: production charged five jobs for a
+ * 10-second wan-2.2 clip that WaveSpeed rejects outright, then reported a FAL
+ * error for a model that never touches FAL.
+ */
+export function durationProblem(modelId: ModelId, duration: number): string | null {
+  const model = AI_MODELS[modelId];
+  if (!model) return null;
+
+  const allowed = model.supportedDurations;
+  if (allowed && allowed.length > 0 && !allowed.includes(duration)) {
+    const list = allowed.length === 2 ? allowed.join(" or ") : allowed.join(", ");
+    return `${model.name} supports ${list} second clips. Please pick one of those.`;
+  }
+
+  if (model.maxDuration && duration > model.maxDuration) {
+    return `${model.name} supports clips up to ${model.maxDuration} seconds.`;
+  }
+
+  return null;
+}
+
 export function modelAvailability(
   modelId: ModelId,
   type: GenerationType

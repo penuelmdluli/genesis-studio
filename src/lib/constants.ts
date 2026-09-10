@@ -33,6 +33,12 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     wavespeedModelIdDraft: "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
     wavespeedModelIdDraftI2V: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
     maxDuration: 8,
+    // Probed against every wan-2.2 tier on 2026-09-09: all six answer
+    // 'field "duration" must be one of [5, 8]'. A request for 10s was
+    // rejected by WaveSpeed, fell through to FAL, and surfaced to the user as
+    // "No FAL.AI model ID configured for wan-2.2" — an error naming a vendor
+    // the model never uses.
+    supportedDurations: [5, 8],
   },
   "hunyuan-video": {
     id: "hunyuan-video",

@@ -11,7 +11,7 @@ import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
-import { modelAvailability } from "@/lib/config";
+import { modelAvailability, durationProblem } from "@/lib/config";
 import { holdCredits, attachHoldToJob, releaseHold } from "@/lib/credit-escrow";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
@@ -112,6 +112,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: availability.reason || "That model is unavailable right now.", code: "MODEL_UNAVAILABLE" },
         { status: 503 }
+      );
+    }
+
+    // The provider rejects some durations outright. Catching it here means
+    // the user is told which lengths work instead of being charged and then
+    // shown an error naming a vendor their model does not use.
+    const durationIssue = durationProblem(body.modelId, duration);
+    if (durationIssue) {
+      return NextResponse.json(
+        { error: durationIssue, code: "INVALID_DURATION" },
+        { status: 400 }
       );
     }
 

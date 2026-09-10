@@ -111,6 +111,12 @@ export interface AIModel {
   wavespeedModelIdDraft?: string;    // WaveSpeed draft model ID for t2v
   wavespeedModelIdDraftI2V?: string; // WaveSpeed draft model ID for i2v
   maxDuration?: number;     // max duration in seconds
+  /**
+   * Exact durations the provider accepts, when it accepts a fixed set rather
+   * than a range. WaveSpeed's wan-2.2 tiers take 5 or 8 only and reject
+   * anything else with a 400 — maxDuration alone cannot express that.
+   */
+  supportedDurations?: number[];
   launchAvailable?: boolean; // visible in model selector at launch
 }
 

@@ -12,7 +12,7 @@ import { submitVideoJob } from "@/lib/provider-router";
 import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
-import { modelAvailability } from "@/lib/config";
+import { modelAvailability, durationProblem } from "@/lib/config";
 import { createHash } from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: availability.reason || "That model is unavailable right now.", code: "model_unavailable" },
         { status: 503 }
+      );
+    }
+
+    const durationIssue = durationProblem(modelId as ModelId, duration);
+    if (durationIssue) {
+      return NextResponse.json(
+        { error: durationIssue, code: "invalid_duration" },
+        { status: 400 }
       );
     }
 

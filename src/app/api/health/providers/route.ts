@@ -134,6 +134,78 @@ async function checkRunpod(): Promise<{ status: ProviderStatus; endpoints: Recor
   };
 }
 
+/**
+ * Is the payment webhook pointing at us?
+ *
+ * This is the check that would have caught a live revenue bug: the Yoco
+ * webhook was registered against https://genesisstudio.app, a suspended Vercel
+ * deployment returning HTTP 402, while the product had long since moved to
+ * ivideostudio.ai. Checkout worked, the customer was charged, and the credits
+ * were never granted — the worst possible failure, because it takes money and
+ * gives nothing back.
+ *
+ * Nothing in the app could notice: the code was correct, the key was valid,
+ * and the only broken part lived in a third-party dashboard. So it is checked
+ * from here, against the host we are actually served from.
+ */
+async function checkPaymentWebhook(selfHost: string): Promise<ProviderStatus> {
+  const key = envString("YOCO_SECRET_KEY");
+  if (!key) return { name: "payments", ok: false, detail: "YOCO_SECRET_KEY not set" };
+
+  if (!envString("YOCO_WEBHOOK_SECRET")) {
+    return {
+      name: "payments",
+      ok: false,
+      detail: "YOCO_WEBHOOK_SECRET not set - webhooks will fail signature checks",
+    };
+  }
+
+  try {
+    const res = await fetch("https://payments.yoco.com/api/webhooks", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) {
+      return { name: "payments", ok: false, detail: `Yoco webhook list failed (HTTP ${res.status})` };
+    }
+
+    const json = (await res.json()) as {
+      subscriptions?: Array<{ url?: string; mode?: string; name?: string }>;
+    };
+
+    // Only our own host counts. The account legitimately carries webhooks for
+    // other products, so a subscription existing is not the same as ours being
+    // correct.
+    const ours = (json.subscriptions ?? []).filter((sub) =>
+      (sub.url ?? "").includes(selfHost)
+    );
+
+    if (ours.length === 0) {
+      const others = (json.subscriptions ?? [])
+        .map((sub) => sub.url ?? "")
+        .filter((u) => u.includes("/api/webhooks/yoco"))
+        .join(", ");
+      return {
+        name: "payments",
+        ok: false,
+        detail: others
+          ? `No webhook points at ${selfHost}. Found instead: ${others} - customers would be charged and receive nothing`
+          : `No Yoco webhook registered for ${selfHost} - customers would be charged and receive nothing`,
+      };
+    }
+
+    const live = ours.some((sub) => sub.mode === "live");
+    return {
+      name: "payments",
+      ok: live,
+      detail: live
+        ? `webhook registered for ${selfHost} (live)`
+        : `webhook for ${selfHost} exists but is in test mode - live payments will not be credited`,
+    };
+  } catch (err) {
+    return { name: "payments", ok: false, detail: `unreachable: ${String(err).slice(0, 120)}` };
+  }
+}
+
 export async function GET(req: NextRequest) {
   const secret =
     req.headers.get("x-cron-secret") ||
@@ -147,10 +219,13 @@ export async function GET(req: NextRequest) {
   }
   if (!authorised) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const [wavespeed, fal, runpod] = await Promise.all([
+  const selfHost = req.headers.get("host") || "ivideostudio.ai";
+
+  const [wavespeed, fal, runpod, payments] = await Promise.all([
     checkWavespeed(),
     checkFal(),
     checkRunpod(),
+    checkPaymentWebhook(selfHost),
   ]);
 
   // Last successful generation — the metric that says whether the product is
@@ -169,7 +244,7 @@ export async function GET(req: NextRequest) {
     // A health endpoint must not fail because one of its readings failed.
   }
 
-  const providers = [wavespeed, fal, runpod.status];
+  const providers = [wavespeed, fal, runpod.status, payments];
   const configProblems = checkCoreConfig();
 
   // Generation needs at least one hosted provider. RunPod is not counted:
@@ -179,8 +254,9 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(
     {
-      ok: canGenerate && configProblems.length === 0,
+      ok: canGenerate && payments.ok && configProblems.length === 0,
       canGenerate,
+      canTakePayment: payments.ok,
       providers,
       runpodEndpoints: runpod.endpoints,
       configProblems,

@@ -105,14 +105,46 @@ export function buildPerformancePrompt(shot: Shot): string {
   return `A person ${performance[shot.emotion] || performance.calm}. Accurate lip sync, natural head movement and expression.`;
 }
 
-/** Pick the voice for a speaker, keeping the same speaker on the same voice. */
-export function voiceForSpeaker(speaker: string, ctx: RenderContext): string {
-  const locale = localeOrDefault(ctx.language);
-  // Stable per name: the same character keeps the same voice for the life of
-  // the series, without anyone having to record the choice anywhere.
+/** A stable number per character name, so choices never drift between episodes. */
+function nameHash(speaker: string): number {
   let hash = 0;
-  for (const ch of speaker.toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return hash % 2 === 0 ? locale.female : locale.male;
+  for (const ch of speaker.toLowerCase().trim()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
+/**
+ * The voice for a speaker.
+ *
+ * Gender comes from the writer, who invented the character — it used to come
+ * from a hash of the name, which is how a woman called Nomsa spoke in a man's
+ * voice.
+ */
+export function voiceForSpeaker(
+  speaker: string,
+  ctx: RenderContext,
+  gender?: "female" | "male"
+): string {
+  const locale = localeOrDefault(ctx.language);
+  if (gender === "female") return locale.female;
+  if (gender === "male") return locale.male;
+  return nameHash(speaker) % 2 === 0 ? locale.female : locale.male;
+}
+
+/**
+ * Most languages give us exactly one female and one male voice, so two men in
+ * a scene would otherwise be the same person talking to himself. Each
+ * character gets a small, fixed shift in pitch and pace — enough to tell them
+ * apart, not enough to sound processed. Derived from the name, so a character
+ * sounds the same in episode 9 as in episode 1.
+ */
+export function voiceCharacter(speaker: string): { pitch: string; rate: string } {
+  const hash = nameHash(speaker);
+  const pitches = ["+0Hz", "-12Hz", "+10Hz", "-6Hz", "+16Hz", "-18Hz"];
+  const rates = ["+0%", "-6%", "+5%", "-3%", "+8%", "-9%"];
+  return {
+    pitch: pitches[hash % pitches.length],
+    rate: rates[(hash >>> 3) % rates.length],
+  };
 }
 
 /** Speak one line, upload it, hand back a URL the lip-sync model can read. */
@@ -120,9 +152,19 @@ export async function synthesiseLine(
   text: string,
   voiceName: string,
   userId: string,
-  tag: string
+  tag: string,
+  character?: { pitch: string; rate: string }
 ): Promise<string> {
-  const audio = await synthesiseSpeech(text, voiceName || "en-ZA-LeahNeural");
+  // The format is deliberately left at the default. Probed on 2026-09-12:
+  // of every documented variant the speech service accepts only
+  // audio-24khz-48kbitrate and audio-24khz-96kbitrate as mp3 — 48kHz and
+  // 160/192kbps all return an empty stream rather than an error. We already
+  // use the better of the two, so the ceiling on voice quality is the free
+  // neural voice itself, not the encoding.
+  const audio = await synthesiseSpeech(text, voiceName || "en-ZA-LeahNeural", {
+    pitch: character?.pitch,
+    rate: character?.rate,
+  });
   const buf = Buffer.from(audio);
   if (buf.length === 0) throw new Error("No audio was produced for this line");
 
@@ -160,7 +202,13 @@ export async function submitShot(
   // 2. Speech, when there is any.
   let audioUrl: string | null = null;
   if (shot.kind === "dialogue" && shot.dialogue.trim()) {
-    audioUrl = await synthesiseLine(shot.dialogue, voiceForSpeaker(shot.speaker, ctx), userId, tag);
+    audioUrl = await synthesiseLine(
+      shot.dialogue,
+      voiceForSpeaker(shot.speaker, ctx, shot.gender),
+      userId,
+      tag,
+      voiceCharacter(shot.speaker)
+    );
   }
 
   // 3. Motion. Speaking shots go through lip sync; the rest get cinematic

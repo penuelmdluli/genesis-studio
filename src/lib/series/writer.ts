@@ -62,6 +62,14 @@ export interface Shot {
   subtitle: string;
   /** English visual direction for the video model. Never shown to the creator. */
   action: string;
+  /**
+   * The speaker's gender, decided by the writer who invented them.
+   *
+   * This used to be guessed from a hash of the name, which is how a woman
+   * called Nomsa ended up speaking in a man's voice. The writer knows; ask
+   * the writer.
+   */
+  gender: "female" | "male";
   /** Drives both the performance and the camera. */
   emotion: "calm" | "angry" | "afraid" | "joyful" | "grieving" | "tense" | "shocked";
   /** Action shots get cinematic motion; dialogue shots get lip sync. */
@@ -97,6 +105,23 @@ function stripFence(raw: string): string {
     return t.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
   }
   return t;
+}
+
+/**
+ * Last resort when the writer omits a gender. Names common in South African
+ * drama, so the usual cast is right rather than coin-flipped; anything
+ * unknown falls to male, which the voice-differentiation step then varies.
+ */
+const FEMALE_NAMES = new Set([
+  "nomsa", "thandi", "thando", "zinhle", "lerato", "naledi", "busi", "busisiwe",
+  "nosipho", "ayanda", "khanyi", "lindiwe", "nokuthula", "precious", "gugu",
+  "mama", "sisi", "nomvula", "palesa", "refilwe", "dineo", "bongi", "zodwa",
+  "andile", "portia", "mercy", "grace", "sarah", "maria", "anna", "adri",
+]);
+
+function guessGender(speaker: string): "female" | "male" {
+  const first = speaker.toLowerCase().trim().split(/[\s,(]/)[0];
+  return FEMALE_NAMES.has(first) ? "female" : "male";
 }
 
 /** Does this look like it is already English? */
@@ -210,6 +235,7 @@ Rules that matter:
 - A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech.
 - Alternate speakers where two people are talking.
 - "action" is a single clear visual sentence: who is in frame, what they do, where. Always name the character.
+- Every dialogue shot MUST carry "gender" for the speaker. Keep it the same every time that character speaks, in this episode and in every later one.
 - Every dialogue shot MUST also carry "subtitle": that same line in natural English. Translate the meaning, not the words — an English viewer should feel what a speaker of the language feels. If the series language is already English, repeat the line.
 - End on a cliffhanger.
 
@@ -218,7 +244,7 @@ Respond with ONLY this JSON, no markdown:
   "title": "episode title",
   "synopsis": "two sentences, English, for the creator",
   "shots": [
-    { "kind": "dialogue", "speaker": "character name", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction", "emotion": "calm" }
+    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction", "emotion": "calm" }
   ],
   "cliffhanger": "one line, English, what is left hanging",
   "storySoFar": "a rewritten recap covering everything from episode 1 through this one, under 250 words, English. This is the only memory the next episode gets, so carry forward every name, relationship and unresolved thread."
@@ -263,6 +289,7 @@ Respond with ONLY this JSON, no markdown:
     const dialogue = String(s.dialogue || "").slice(0, 300).trim();
     return {
       speaker: String(s.speaker || ctx.characterName || "Lead").slice(0, 60),
+      gender: s.gender === "female" ? "female" : s.gender === "male" ? "male" : guessGender(String(s.speaker || "")),
       dialogue,
       // Left empty when missing rather than filled with the original line.
       // Subtitles exist to carry the story to people who do not speak the

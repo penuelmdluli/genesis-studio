@@ -9,6 +9,7 @@ import { VideoPlayer } from "@/components/ui/video-player";
 import { PageTransition, StaggerGroup, StaggerItem, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Film,
@@ -35,8 +36,9 @@ type SortKey = "newest" | "oldest" | "name";
 type FormatFilter = "all" | "standard" | "reel" | "audio";
 
 export default function GalleryPage() {
-  const { user, videos, activeJobs, removeVideo, isInitialized } = useStore();
+  const { user, videos, activeJobs, removeVideo, setVideos, isInitialized } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -94,6 +96,46 @@ export default function GalleryPage() {
       toast("Opening video in new tab for download", "info");
     }
   };
+
+  // Stamp the creator's own logo on a finished video. Saves a branded copy —
+
+  // the original stays untouched so a wrong corner is not destructive.
+
+  const [brandingId, setBrandingId] = useState<string | null>(null);
+
+  const handleBrand = async (videoId: string) => {
+
+    if (brandingId) return;
+    setBrandingId(videoId);
+
+    try {
+      const res = await fetch(`/api/videos/${videoId}/brand`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+
+        reportApiError(res, data, "Could not add your branding.");
+        return;
+      }
+      toast("Branded copy saved to your gallery.", "success");
+      setSelectedVideo(null);
+
+      // Pull the gallery again so the branded copy appears without a reload.
+      try {
+        const r = await fetch("/api/videos");
+        if (r.ok) {
+          const j = await r.json();
+          if (Array.isArray(j.videos)) setVideos(j.videos);
+        }
+      } catch {
+        /* the copy is saved; it will appear on next load */
+      }
+    } catch {
+      toast("Network error. Please try again.", "error");
+    } finally {
+      setBrandingId(null);
+    }
+  };
+
 
   const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/explore/${video.id}`;
@@ -506,6 +548,14 @@ export default function GalleryPage() {
                   <Volume2 className="w-4 h-4" />
                   Add sound
                 </a>
+                <button
+                  onClick={() => handleBrand(currentVideo.id)}
+                  disabled={brandingId === currentVideo.id}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-50 text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {brandingId === currentVideo.id ? "Adding…" : "Add my logo"}
+                </button>
                 <a
                   href={`/captions?videoId=${currentVideo.id}`}
                   className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"

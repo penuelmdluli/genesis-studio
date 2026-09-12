@@ -22,6 +22,7 @@ import { submitWsModel, runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools"
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { guessGender } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
+import { voiceForCharacter } from "@/lib/series/cast";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 
 /** Cinematic i2v. Funded, and the strongest dramatic motion we have. */
@@ -37,6 +38,26 @@ const SCENE_VIDEO_MODEL = "bytedance/seedance-v1.5-pro/image-to-video";
  */
 const UPSCALE_MODEL = "bytedance/video-upscaler";
 
+/**
+ * Lip sync applied to a MOVING shot, rather than to a still photograph.
+ *
+ * The old path animated a still: the mouth moved and nothing else, which is
+ * why the episodes looked like slideshows. Now every shot is filmed first —
+ * real camera movement, real body language — and the speech is matched onto
+ * it afterwards. Verified to preserve 1080x1920 and the motion.
+ */
+const LIPSYNC_VIDEO_MODEL = "sync/lipsync-2";
+
+/** Submits the speech pass onto an already-moving shot. */
+export async function submitLipsync(videoUrl: string, audioUrl: string): Promise<string> {
+  const prediction = await submitWsModel(LIPSYNC_VIDEO_MODEL, {
+    video: videoUrl,
+    audio: audioUrl,
+    sync_mode: "loop",
+  });
+  return prediction.id;
+}
+
 /** Submits the finishing pass. The caller keeps the original either way. */
 export async function submitUpscale(clipUrl: string): Promise<string> {
   const prediction = await submitWsModel(UPSCALE_MODEL, {
@@ -48,13 +69,30 @@ export async function submitUpscale(clipUrl: string): Promise<string> {
 
 /** How each beat is shot. Emotion drives the lens, not just the face. */
 const EMOTION_FRAMING: Record<string, string> = {
-  calm: "medium shot, soft natural light, steady camera",
-  angry: "tight close-up, hard side light, slight handheld tension",
-  afraid: "close-up, low key lighting, shallow focus, unsettled framing",
-  joyful: "medium shot, warm golden light, gentle push in",
-  grieving: "close-up, muted desaturated light, still camera, quiet",
-  tense: "tight two-shot framing, high contrast, shallow depth of field",
-  shocked: "sudden close-up, sharp focus on the eyes, stark light",
+  calm: "medium close-up, soft natural light, slow drifting handheld camera",
+  angry: "tight low-angle close-up, hard side light, restless handheld camera, jaw set",
+  afraid: "close-up, low key lighting, shallow focus, unsteady handheld camera, darting eyes",
+  joyful: "medium close-up, warm golden light, smooth push in, animated expression",
+  grieving: "close-up, muted desaturated light, slow creeping push in, glassy eyes",
+  tense: "tight close-up, high contrast, shallow depth of field, slow dolly in",
+  shocked: "sudden tight close-up, low angle, sharp focus on the eyes, stark light",
+};
+
+/**
+ * Movement direction added to every shot.
+ *
+ * Without this the models return something close to a photograph, which is
+ * exactly the complaint: no action, nothing alive. Naming the camera and the
+ * body separately is what gets both to move.
+ */
+const MOTION_BY_EMOTION: Record<string, string> = {
+  calm: "the camera drifts slowly, the character shifts their weight and gestures lightly while talking",
+  angry: "the camera pushes in hard, the character leans forward, jabs a finger, shoulders rising",
+  afraid: "the camera shakes subtly, the character backs away, glancing over their shoulder",
+  joyful: "the camera rises gently, the character laughs, hands moving, head tilting back",
+  grieving: "the camera creeps closer, the character's shoulders fall, head lowering, breath catching",
+  tense: "the camera circles slowly, the character stands rigid, fists tightening",
+  shocked: "the camera snaps closer, the character recoils, eyes widening, a step backwards",
 };
 
 export interface RenderContext {
@@ -71,11 +109,22 @@ export interface RenderContext {
  */
 export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
   const framing = EMOTION_FRAMING[shot.emotion] || EMOTION_FRAMING.calm;
-  const character = ctx.characterDescription
-    ? `${ctx.characterDescription}. `
-    : "";
+  const character = ctx.characterDescription ? `${ctx.characterDescription}. ` : "";
+
+  // A speaking shot holds ONE person.
+  //
+  // With two people in frame the lip-sync model animates both mouths, so the
+  // audience cannot tell who is talking and neither performance reads as
+  // real. One speaker per shot is also simply how dialogue has been filmed
+  // since sound: you cut, you do not sit on a wide two-shot.
+  const solo =
+    shot.kind === "dialogue"
+      ? `Only ${shot.speaker} is visible, alone in frame, no other people. `
+      : "";
+
   return [
     character,
+    solo,
     shot.action,
     `${framing}.`,
     "Cinematic South African drama, photoreal, film grain, natural skin texture, 35mm.",
@@ -85,11 +134,17 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
     .slice(0, 1200);
 }
 
-/** Motion direction for a shot that carries no dialogue. */
+/** Motion direction. Every shot moves now, speaking ones included. */
 export function buildShotMotionPrompt(shot: Shot): string {
-  return `${shot.action}. Cinematic camera movement, dramatic, photoreal, ${
-    EMOTION_FRAMING[shot.emotion] || EMOTION_FRAMING.calm
-  }.`.slice(0, 600);
+  const motion = MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm;
+  const speaking =
+    shot.kind === "dialogue"
+      ? "The character is talking to someone off camera, mouth moving, expressive. "
+      : "";
+  return `${shot.action}. ${speaking}${motion}. Cinematic handheld camera movement, dramatic, photoreal.`.slice(
+    0,
+    600
+  );
 }
 
 /** Performance direction for a speaking shot — what the lip-sync model reads. */
@@ -193,9 +248,10 @@ export async function submitShot(
   shot: Shot,
   ctx: RenderContext,
   userId: string,
-  tag: string
+  tag: string,
+  seriesId?: string
 ): Promise<SubmittedShot> {
-  // 1. The still. Same character wording every time.
+  // 1. The still. Same character wording every time, one face for dialogue.
   const image = await runWsModelSync(WS_MODELS.textToImage, {
     prompt: buildShotImagePrompt(shot, ctx),
     size: ctx.aspectRatio === "9:16" ? "768*1344" : "1344*768",
@@ -203,32 +259,28 @@ export async function submitShot(
   const imageUrl = Array.isArray(image?.outputs) ? String(image.outputs[0] || "") : "";
   if (!imageUrl) throw new Error("Could not compose this shot");
 
-  // 2. Speech, when there is any.
+  // 2. Speech, when there is any. The voice comes from the series cast, so a
+  //    character sounds the same in every episode they appear in.
   let audioUrl: string | null = null;
   if (shot.kind === "dialogue" && shot.dialogue.trim()) {
-    audioUrl = await synthesiseLine(
-      shot.dialogue,
-      voiceForSpeaker(shot.speaker, ctx, shot.gender),
-      userId,
-      tag,
-      voiceCharacter(shot.speaker)
-    );
+    const gender = shot.gender === "female" || shot.gender === "male" ? shot.gender : guessGender(shot.speaker);
+    const cast = seriesId
+      ? await voiceForCharacter(seriesId, shot.speaker, gender, ctx.language)
+      : { voice: voiceForSpeaker(shot.speaker, ctx, gender), ...voiceCharacter(shot.speaker) };
+    audioUrl = await synthesiseLine(shot.dialogue, cast.voice, userId, tag, {
+      pitch: cast.pitch,
+      rate: cast.rate,
+    });
   }
 
-  // 3. Motion. Speaking shots go through lip sync; the rest get cinematic
-  //    motion. This branch is the whole difference between a series people
-  //    watch and a slideshow they scroll past.
-  const prediction = audioUrl
-    ? await submitWsModel(WS_MODELS.lipsyncFromImage, {
-        image: imageUrl,
-        audio: audioUrl,
-        prompt: buildPerformancePrompt(shot),
-      })
-    : await submitWsModel(SCENE_VIDEO_MODEL, {
-        image: imageUrl,
-        prompt: buildShotMotionPrompt(shot),
-        duration: 5,
-      });
+  // 3. Film it. EVERY shot is filmed, speaking ones included — that is the
+  //    difference between a scene and a slideshow. Speech is matched onto the
+  //    moving footage afterwards, in the polling stage.
+  const prediction = await submitWsModel(SCENE_VIDEO_MODEL, {
+    image: imageUrl,
+    prompt: buildShotMotionPrompt(shot),
+    duration: 5,
+  });
 
   return { imageUrl, audioUrl, providerRef: prediction.id };
 }

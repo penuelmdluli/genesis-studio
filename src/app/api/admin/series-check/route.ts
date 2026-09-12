@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       .filter(({ index }) => retryIndexes.has(index));
 
     const results = await Promise.allSettled(
-      todo.map(({ shot, index }) => submitShot(shot, ctx, ep.user_id, `${ep.id}-${index}-${Date.now()}`))
+      todo.map(({ shot, index }) => submitShot(shot, ctx, ep.user_id, `${ep.id}-${index}-${Date.now()}`, ep.series_id))
     );
 
     let submitted = 0;

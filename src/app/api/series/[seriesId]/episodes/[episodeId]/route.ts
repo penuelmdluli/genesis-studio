@@ -14,7 +14,7 @@ import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
 import { getWsPrediction } from "@/lib/wavespeed-tools";
-import { submitUpscale } from "@/lib/series/render";
+import { submitUpscale, submitLipsync } from "@/lib/series/render";
 import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,8 @@ interface ShotRow {
   id: string;
   shot_index: number;
   status: string;
+  kind: string | null;
+  audio_url: string | null;
   /** "render" while the scene is being made, "upscale" during the finish. */
   stage: string | null;
   provider_ref: string | null;
@@ -62,6 +64,25 @@ async function refreshShots(
         if (prediction.status === "completed") {
           const url = prediction.outputs?.[0];
           if (!url) throw new Error("finished with no video");
+
+          // The shot has been filmed. A speaking shot now gets the voice
+          // matched onto the moving footage — this is the step that replaced
+          // animating a still photograph, and it is why the scenes move.
+          if (row.stage === "render" && row.kind === "dialogue" && row.audio_url) {
+            try {
+              const lipsyncRef = await submitLipsync(url, row.audio_url);
+              row.stage = "lipsync";
+              await db
+                .from("series_shots")
+                .update({ stage: "lipsync", clip_url: url, provider_ref: `ws:${lipsyncRef}`, updated_at: now })
+                .eq("id", row.id);
+              return;
+            } catch (err) {
+              // Rather lose the speech than the shot: a silent moving scene
+              // still cuts into the episode.
+              console.error(`[SERIES] lipsync could not start for shot ${row.shot_index}:`, err);
+            }
+          }
 
           // The scene exists. Now make it match the rest of the episode.
           if (row.stage !== "upscale") {
@@ -167,7 +188,7 @@ export async function GET(
 
   const { data: rendered } = await db
     .from("series_shots")
-    .select("id, shot_index, status, stage, clip_url, raw_clip_url, image_url, provider_ref, error, created_at")
+    .select("id, shot_index, status, stage, kind, audio_url, clip_url, raw_clip_url, image_url, provider_ref, error, created_at")
     .eq("episode_id", episodeId)
     .order("shot_index", { ascending: true })
     .limit(20);

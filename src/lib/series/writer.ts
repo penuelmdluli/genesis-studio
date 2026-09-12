@@ -229,12 +229,15 @@ ${continuity}
 LANGUAGE: ${lang}
 Visual direction ("action") stays in ENGLISH. It is read by a camera system, never by the audience.
 
-Write exactly ${shotCount} shots. This is a drama, so most shots are people SPEAKING to each other, cut the way a real scene is shot. Mark those "dialogue". Use "action" shots (no speech) for arrivals, reveals, and the beats between lines.
+Write exactly ${shotCount} shots. This is a drama, so most shots are people SPEAKING to each other, cut the way a real scene is shot — one speaker per shot, alternating. Mark those "dialogue". Use "action" shots (no speech) for arrivals, reveals, and the beats between lines, and make those genuinely physical: someone arrives, something is taken, someone walks out.
 
 Rules that matter:
 - A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech.
 - Alternate speakers where two people are talking.
 - "action" is a single clear visual sentence: who is in frame, what they do, where. Always name the character.
+- For a DIALOGUE shot, "action" must describe ONLY the speaker and what their body is doing — never two people in the same frame. Dialogue is filmed one person at a time, and a second face on screen makes it impossible to tell who is talking.
+- Give every character ONE name and use that exact name every single time, in this episode and all later ones. Never "The Man" in one shot and "Jabulani" in the next — that is the same person and must read as the same person.
+- Put real physical action in the shots: people arrive, grab, walk out, slam things, turn away. A scene of talking heads is not a drama.
 - Every dialogue shot MUST carry "gender" for the speaker. Keep it the same every time that character speaks, in this episode and in every later one.
 - Every dialogue shot MUST also carry "subtitle": that same line in natural English. Translate the meaning, not the words — an English viewer should feel what a speaker of the language feels. If the series language is already English, repeat the line.
 - End on a cliffhanger.

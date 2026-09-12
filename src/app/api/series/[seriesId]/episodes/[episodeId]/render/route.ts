@@ -143,7 +143,7 @@ export async function POST(
   // Every shot is submitted; none is allowed to take down the others.
   const results = await Promise.allSettled(
     todo.map(({ shot, index }) =>
-      submitShot(shot, ctx, user.id, `${episodeId}-${index}-${Date.now()}`)
+      submitShot(shot, ctx, user.id, `${episodeId}-${index}-${Date.now()}`, seriesId)
     )
   );
 

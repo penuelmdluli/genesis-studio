@@ -152,7 +152,15 @@ export async function POST(
       const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
       console.error(`[SERIES] shot ${index} failed to submit:`, message);
       refundDue += shot.kind === "dialogue" ? DIALOGUE_SHOT_CREDITS : ACTION_SHOT_CREDITS;
-      rows.push({ ...base, status: "failed", error: toUserFacingProviderError(message).slice(0, 300) });
+      rows.push({
+        ...base,
+        status: "failed",
+        error: toUserFacingProviderError(message).slice(0, 300),
+        // The customer sees the friendly line above; this keeps the actual
+        // cause, because storing only the reassurance once left a real
+        // failure impossible to diagnose after the fact.
+        raw_error: message.slice(0, 500),
+      });
     }
   });
 

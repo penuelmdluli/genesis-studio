@@ -191,13 +191,20 @@ export class PayFastProvider implements PaymentProvider {
   }
 
   async handleWebhook(body: unknown, headers: Record<string, string>): Promise<WebhookResult> {
+    // The source-IP allowlist is advisory only. PayFast's published ranges
+    // lag their real infrastructure, and the signature + validate round
+    // trip below already prove the notification is theirs — dropping a
+    // genuine ITN over a stale IP list is how a paid customer stays unpaid.
     const sourceIp = headers["cf-connecting-ip"] || headers["x-forwarded-for"]?.split(",")[0]?.trim() || headers["x-real-ip"] || "";
     if (sourceIp && !this.isSandbox && !isPayFastIP(sourceIp)) {
-      throw new Error(`Invalid PayFast source IP: ${sourceIp}`);
+      console.warn(`[PAYFAST] ITN from unlisted IP ${sourceIp} — relying on signature + validate`);
     }
 
     // Insertion order is the order PayFast sent the fields in.
     const data = body as Record<string, string>;
+    console.log(
+      `[PAYFAST] ITN received: status=${data.payment_status} m_payment_id=${data.m_payment_id} pf_payment_id=${data.pf_payment_id} amount=${data.amount_gross} ip=${sourceIp}`
+    );
     const receivedSignature = data.signature;
     const orderedKeys = Object.keys(data).filter((k) => k !== "signature");
     const expected = pfSignature(data, orderedKeys, this.passphrase);

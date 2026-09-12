@@ -98,7 +98,10 @@ export default function PricingPage() {
   // Which rails are live. PayFast (Instant EFT, SnapScan, Zapper) is only
   // offered once the server says its account is verified and enabled.
   const [methods, setMethods] = useState<string[]>(["yoco"]);
-  const [payMethod, setPayMethod] = useState<"yoco" | "payfast">("yoco");
+  // PayFast is the default rail. Yoco is kept configured server-side but
+  // not offered here for now (its checkout page carries another business's
+  // trading name and card attempts were being declined account-side).
+  const [payMethod] = useState<"yoco" | "payfast">("payfast");
   useEffect(() => {
     fetch("/api/payments/methods")
       .then((r) => (r.ok ? r.json() : null))
@@ -206,20 +209,7 @@ export default function PricingPage() {
           </div>
 
           {currency === "ZAR" && payfastAvailable && (
-            <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.10]">
-              <button
-                onClick={() => setPayMethod("yoco")}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${payMethod === "yoco" ? "bg-emerald-600 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-              >
-                Card
-              </button>
-              <button
-                onClick={() => setPayMethod("payfast")}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${payMethod === "payfast" ? "bg-emerald-600 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-              >
-                Instant EFT / SnapScan / Zapper
-              </button>
-            </div>
+            <p className="text-xs text-zinc-500">Pay by card, Instant EFT, SnapScan, Zapper or Mobicred — secure South African checkout.</p>
           )}
 
           <div className="flex items-center gap-3">

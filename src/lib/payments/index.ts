@@ -17,15 +17,17 @@ export type {
 } from "./types";
 
 /**
- * Provider factory registry. Order determines default provider priority:
- * Yoco first (primary SA provider), then PayFast, then Paystack.
+ * Provider factory registry. Order determines default provider priority.
  */
 const providerFactories: Array<{
   name: string;
   create: () => PaymentProvider | null;
 }> = [
-  { name: "yoco", create: createYocoProvider },
+  // PayFast first: it is the rail that has actually settled a payment for
+  // this business (Instant EFT, cards, SnapScan, Zapper, Mobicred). Yoco
+  // stays configured as a fallback but is not offered in the UI for now.
   { name: "payfast", create: createPayFastProvider },
+  { name: "yoco", create: createYocoProvider },
   { name: "paystack", create: createPaystackProvider },
 ];
 

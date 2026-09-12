@@ -15,8 +15,10 @@ import { processWebhookPayment } from "@/lib/payments/webhook-handler";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  let rawForSupport = "";
   try {
     const text = await req.text();
+    rawForSupport = text;
     // URLSearchParams preserves the order PayFast sent, which the ITN
     // signature depends on.
     const body: Record<string, string> = {};
@@ -39,7 +41,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true, message });
   } catch (error) {
-    console.error("[PAYFAST WEBHOOK] Error:", error);
+    // Logged with the raw form so a rejected ITN can be replayed by hand
+    // through /api/admin/settle-checkout instead of being lost.
+    console.error("[PAYFAST WEBHOOK] Error:", error instanceof Error ? error.message : error, "body:", rawForSupport.slice(0, 1500));
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 });
   }
 }

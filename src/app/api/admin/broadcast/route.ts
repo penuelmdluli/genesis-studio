@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
   if (body.test) {
     const to = body.to || process.env.OWNER_EMAIL || "";
     if (!to) return NextResponse.json({ error: "to required for a test send" }, { status: 400 });
-    const ok = await sendProductUpdateEmail(to, "Creator", update, `${appUrl}/settings`);
-    return NextResponse.json({ ok, test: true, to, subject: update.subject });
+    const r = await sendProductUpdateEmail(to, "Creator", update, `${appUrl}/settings`);
+    return NextResponse.json({ ...r, test: true, to, subject: update.subject });
   }
 
   const db = getDb();
@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
       skipped++;
       continue;
     }
-    const ok = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
-    if (ok) {
+    const r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+    if (r.ok) {
       sent++;
       await db.from("email_sends").insert({ id: crypto.randomUUID(), user_id: u.id, campaign: CAMPAIGN_ID });
     } else {
-      failures.push(u.email);
+      failures.push(`${u.email}: ${r.error || "unknown"}`);
     }
   }
 

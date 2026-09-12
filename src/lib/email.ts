@@ -30,11 +30,23 @@ interface SendEmailParams {
   tags?: Array<{ name: string; value: string }>;
 }
 
-export async function sendEmail({ to, subject, html, replyTo, tags }: SendEmailParams): Promise<boolean> {
-  const { RESEND_API_KEY, FROM_EMAIL } = getEmailConfig();
+/**
+ * Send, and say why it failed. `sendEmail` keeps the boolean contract its
+ * callers expect; anything diagnosing a delivery problem wants the reason,
+ * because a silent `false` is what let a broken sender go unnoticed.
+ */
+export async function sendEmailDetailed({
+  to,
+  subject,
+  html,
+  replyTo,
+  tags,
+}: SendEmailParams): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const { RESEND_API_KEY, FROM_EMAIL, SUPPORT_EMAIL } = getEmailConfig();
   if (!RESEND_API_KEY) {
-    console.warn("[email] RESEND_API_KEY not configured, skipping email");
-    return false;
+    const error = "RESEND_API_KEY is not configured";
+    console.warn("[email]", error);
+    return { ok: false, error };
   }
 
   try {
@@ -49,21 +61,33 @@ export async function sendEmail({ to, subject, html, replyTo, tags }: SendEmailP
         to,
         subject,
         html,
-        reply_to: replyTo || getEmailConfig().SUPPORT_EMAIL,
+        reply_to: replyTo || SUPPORT_EMAIL,
         tags,
       }),
     });
 
+    const body = await res.text();
     if (!res.ok) {
-      const err = await res.text();
-      console.error("[email] Failed to send:", err);
-      return false;
+      const error = `Resend ${res.status}: ${body.slice(0, 300)}`;
+      console.error("[email] Failed to send:", error);
+      return { ok: false, error };
     }
-    return true;
+    let id: string | undefined;
+    try {
+      id = (JSON.parse(body) as { id?: string }).id;
+    } catch {
+      /* body is not JSON — delivery still succeeded */
+    }
+    return { ok: true, id };
   } catch (err) {
-    console.error("[email] Error:", err);
-    return false;
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("[email] Error:", error);
+    return { ok: false, error };
   }
+}
+
+export async function sendEmail(params: SendEmailParams): Promise<boolean> {
+  return (await sendEmailDetailed(params)).ok;
 }
 
 // ============================================
@@ -479,9 +503,14 @@ export function newToolsUpdate(appUrl: string): ProductUpdate {
   };
 }
 
-export async function sendProductUpdateEmail(email: string, name: string, update: ProductUpdate, unsubscribeUrl?: string): Promise<boolean> {
+export async function sendProductUpdateEmail(
+  email: string,
+  name: string,
+  update: ProductUpdate,
+  unsubscribeUrl?: string
+): Promise<{ ok: boolean; error?: string; id?: string }> {
   const first = (name || "there").split(" ")[0];
-  return sendEmail({
+  return sendEmailDetailed({
     to: email,
     subject: update.subject,
     tags: [{ name: "type", value: "product_update" }],

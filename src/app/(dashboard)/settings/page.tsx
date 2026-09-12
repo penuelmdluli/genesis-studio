@@ -10,14 +10,16 @@ import { Modal } from "@/components/ui/modal";
 import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/components/auth/auth-provider";
 import { STORAGE_LIMITS } from "@/lib/profitability";
 import { Switch } from "@/components/ui/switch";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History, Sparkles } from "lucide-react";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History, Sparkles, LogOut } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, isInitialized } = useStore();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
   // Brand Kit — a paid creator's own logo, loaded on mount so the card can
   // show the upsell or the real thing rather than guessing from plan alone.
@@ -507,6 +509,28 @@ export default function SettingsPage() {
               {isExporting ? "Exporting..." : "Export"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Signing out is the thing people look for every day. It was hidden
+          behind an unlabelled avatar while "Delete Account" got its own red
+          section — the reversible action should be easier to find than the
+          irreversible one. */}
+      <Card>
+        <CardContent className="p-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-200">Sign out</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              End this session on this device. Your videos and credits stay exactly as they are.
+            </p>
+          </div>
+          <button
+            onClick={() => signOut()}
+            className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-sm font-medium text-zinc-100 transition-colors flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
         </CardContent>
       </Card>
 

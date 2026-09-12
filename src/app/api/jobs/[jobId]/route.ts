@@ -388,7 +388,11 @@ export async function GET(
         }
 
         // --- RunPod Provider ---
-        if (!isFal) {
+        // Only for jobs that actually went to RunPod. A hosted job that is
+        // still in the queue used to fall through here with a "ws:" id and
+        // be polled against RunPod, which reported it failed — the customer
+        // got a refund for a video that then finished on the provider.
+        if (!isFal && !isWavespeed && !isFalMotion) {
         const runpodStatus = await getRunPodJobStatus(
           job.model_id as ModelId,
           job.runpod_job_id,

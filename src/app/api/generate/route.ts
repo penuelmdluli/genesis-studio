@@ -209,10 +209,14 @@ export async function POST(req: NextRequest) {
     // Every job gets a point past which it is not worth waiting for. Without
     // one a job can sit in "queued" forever, which is what the 18 timeout
     // failures were: nothing owned the decision to give up. Three times the
-    // model's own average, floored at five minutes for fast models and capped
-    // at forty for slow ones.
+    // model's own average, floored at fifteen minutes and capped at forty.
+    //
+    // The floor was five minutes. Seedance Pro and Kling routinely take six
+    // to ten under load, and the reaper killed a paid render at 5:01 that the
+    // provider finished (and billed) at 7:40. The reaper now also asks the
+    // provider before giving up, so this deadline is a checkpoint, not a kill.
     const deadlineMs = Math.min(
-      Math.max(model.avgGenerationTime * 3 * 1000, 5 * 60 * 1000),
+      Math.max(model.avgGenerationTime * 3 * 1000, 15 * 60 * 1000),
       40 * 60 * 1000
     );
     await updateJobStatus(job.id, {

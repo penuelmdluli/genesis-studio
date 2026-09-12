@@ -15,13 +15,8 @@
 
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db-driver";
-import { getWavespeedJobStatus, getWavespeedJobResult } from "@/lib/wavespeed";
-import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { refundCredits } from "@/lib/credits";
-import { uploadVideo, videoStorageKey, verifyR2Upload } from "@/lib/storage";
-import { extractAndUploadThumbnail } from "@/lib/thumbnails";
-import { sendVideoReadyEmail } from "@/lib/email";
-import { randomUUID } from "crypto";
+import { pollHostedJob, finalizeHostedJob, failHostedJob, isToolJob, HOSTED_HARD_CAP_MS, type HostedJobRow } from "@/lib/job-finalizer";
 
 export const maxDuration = 60;
 
@@ -78,44 +73,25 @@ export async function GET(req: Request) {
       continue;
     }
 
-    // Try to poll the provider one last time before timing out
-    try {
-      if (jobId.startsWith("ws:")) {
-        // WaveSpeed video gen job
-        const wsId = jobId.slice(3);
-        const status = await getWavespeedJobStatus(wsId);
-
-        if (status.status === "COMPLETED") {
-          const result = await getWavespeedJobResult(wsId);
-          await completeJob(db, job, result.videoUrl);
+    // Ask the provider before giving up. Done → deliver. Still rendering and
+    // under the hard cap → leave it for the reaper's extension logic.
+    if ((jobId.startsWith("ws:") || jobId.startsWith("fal:")) && !isToolJob(job as HostedJobRow)) {
+      const poll = await pollHostedJob(job as HostedJobRow);
+      if (poll.state === "completed") {
+        try {
+          await finalizeHostedJob(job as HostedJobRow, poll, { source: "stuck-sweep" });
           summary.completed++;
           continue;
+        } catch (err) {
+          console.error(`[STUCK-JOBS] Finalize failed for ${job.id}:`, err);
         }
-      } else if (jobId.startsWith("fal:")) {
-        // Motion control job (FAL or WaveSpeed motion)
-        const parts = jobId.split(":");
-        const endpoint = parts.slice(1, -1).join(":");
-        const requestId = parts[parts.length - 1];
-        const motionStatus = await getMotionJobStatus(endpoint, requestId);
-
-        if (motionStatus.status === "COMPLETED") {
-          const result = await getMotionJobResult(endpoint, requestId);
-          await completeJob(db, job, result.videoUrl, result.videoBytes);
-          summary.completed++;
-          continue;
-        }
+      } else if (poll.state === "pending" && age < HOSTED_HARD_CAP_MS) {
+        continue;
       }
-    } catch (pollErr) {
-      console.warn(`[STUCK-JOBS] Poll error for ${job.id}:`, pollErr);
     }
 
     // Still not done after 30 min — fail it
-    await db.from("generation_jobs").update({
-      status: "failed",
-      error_message: "Generation timed out after 30 minutes. Credits have been refunded.",
-      completed_at: new Date().toISOString(),
-    }).eq("id", job.id);
-    await refundCredits(job.user_id, job.credits_cost, job.id, "Generation timed out — automatic refund");
+    await failHostedJob(job as HostedJobRow, "Generation timed out. Credits have been refunded.", "timeout");
     summary.timedOut++;
 
     // Notify via Discord/Slack
@@ -132,78 +108,4 @@ export async function GET(req: Request) {
   console.log(`[STUCK-JOBS] Checked ${summary.checked}: ${summary.completed} completed, ${summary.timedOut} timed out`);
 
   return NextResponse.json({ summary });
-}
-
-async function completeJob(
-  db: ReturnType<typeof getDb>,
-  job: Record<string, unknown>,
-  videoUrl?: string,
-  videoBytes?: Uint8Array
-) {
-  const userId = job.user_id as string;
-  const jobId = job.id as string;
-
-  // Upload to R2 — RunPod motion hands back bytes, everything else a URL
-  const vKey = videoStorageKey(userId, jobId);
-  let videoBuffer: Buffer;
-  if (videoBytes) {
-    videoBuffer = Buffer.from(videoBytes);
-  } else {
-    if (!videoUrl) throw new Error("Completed job had neither a video URL nor bytes");
-    const videoRes = await fetch(videoUrl);
-    if (!videoRes.ok) throw new Error(`Failed to download: ${videoRes.status}`);
-    videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-  }
-  await uploadVideo(vKey, videoBuffer);
-  await verifyR2Upload(vKey);
-
-  // Create video record
-  const videoId = randomUUID();
-  const videoApiUrl = `/api/videos/${videoId}`;
-  const thumbnailUrl = await extractAndUploadThumbnail(vKey, userId, videoId);
-
-  await db.from("videos").insert({
-    id: videoId,
-    user_id: userId,
-    job_id: jobId,
-    title: ((job.prompt as string) || "").slice(0, 100),
-    url: videoApiUrl,
-    thumbnail_url: thumbnailUrl || "",
-    model_id: job.model_id,
-    prompt: job.prompt,
-    resolution: job.resolution,
-    duration: job.duration,
-    fps: job.fps || 24,
-    file_size: videoBuffer.length,
-    aspect_ratio: job.aspect_ratio || "landscape",
-    audio_url: job.audio_url || null,
-    audio_track_id: job.audio_track_id || null,
-  });
-
-  await db.from("generation_jobs").update({
-    status: "completed",
-    progress: 100,
-    output_video_url: videoApiUrl,
-    completed_at: new Date().toISOString(),
-  }).eq("id", jobId);
-
-  // Email notification
-  try {
-    const { data: user } = await db.from("users").select("email, name").eq("id", userId).single();
-    if (user?.email) {
-      sendVideoReadyEmail(user.email, user.name || "Creator", videoId).catch(() => {});
-    }
-  } catch {}
-
-  // Discord notification
-  try {
-    const { sendSlackAlert } = await import("@/lib/alerts");
-    await sendSlackAlert({
-      level: "info",
-      title: "Stuck job recovered!",
-      message: `Job ${jobId.slice(0, 8)} completed after cron recovery\nVideo: ${videoApiUrl}`,
-    });
-  } catch {}
-
-  console.log(`[STUCK-JOBS] Recovered job ${jobId} → ${videoApiUrl}`);
 }

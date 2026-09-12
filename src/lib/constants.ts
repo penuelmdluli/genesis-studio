@@ -792,6 +792,12 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { id: "voice-marcus", name: "Marcus", gender: "male", language: "en" },
   { id: "voice-naledi", name: "Naledi", gender: "female", language: "en-ZA" },
   { id: "voice-thabo", name: "Thabo", gender: "male", language: "en-ZA" },
+  // isiZulu and Afrikaans cost us nothing — the speech engine has had these
+  // voices all along and we were only ever offering English with a SA accent.
+  { id: "voice-thando", name: "Thando", gender: "female", language: "zu-ZA" },
+  { id: "voice-themba", name: "Themba", gender: "male", language: "zu-ZA" },
+  { id: "voice-adri", name: "Adri", gender: "female", language: "af-ZA" },
+  { id: "voice-willem", name: "Willem", gender: "male", language: "af-ZA" },
   { id: "voice-sakura", name: "Sakura", gender: "female", language: "ja" },
   { id: "voice-carlos", name: "Carlos", gender: "male", language: "es" },
   { id: "voice-amelie", name: "Amelie", gender: "female", language: "fr" },

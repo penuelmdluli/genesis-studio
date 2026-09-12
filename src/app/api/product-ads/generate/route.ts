@@ -440,6 +440,10 @@ export async function POST(req: NextRequest) {
             "voice-marcus": "en-US-TonyNeural",
             "voice-naledi": "en-ZA-LeahNeural",
             "voice-thabo": "en-ZA-LukeNeural",
+            "voice-thando": "zu-ZA-ThandoNeural",
+              "voice-themba": "zu-ZA-ThembaNeural",
+              "voice-adri": "af-ZA-AdriNeural",
+              "voice-willem": "af-ZA-WillemNeural",
           };
           const ttsVoice = voiceMap[voiceId || ""] || "en-US-AriaNeural";
           await tts.setMetadata(ttsVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);

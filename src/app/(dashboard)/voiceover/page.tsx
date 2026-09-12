@@ -17,6 +17,8 @@ import { Mic, Play, Square, Download, Zap, AlertCircle, RefreshCw } from "lucide
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "\u{1F1FA}\u{1F1F8}",
   "en-ZA": "\u{1F1FF}\u{1F1E6}",
+  "zu-ZA": "\u{1F1FF}\u{1F1E6}",
+  "af-ZA": "\u{1F1FF}\u{1F1E6}",
   ja: "\u{1F1EF}\u{1F1F5}",
   es: "\u{1F1EA}\u{1F1F8}",
   fr: "\u{1F1EB}\u{1F1F7}",

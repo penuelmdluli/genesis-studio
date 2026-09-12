@@ -16,9 +16,11 @@ import { isOwnerClerkId } from "@/lib/credits";
 import { envString } from "@/lib/env";
 import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
 import { synthesiseSpeech } from "@/lib/edge-tts";
+import { getDb } from "@/lib/db-driver";
+import { assembleEpisode } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 function detail(err: unknown): string {
   if (err instanceof Error) return `${err.name}: ${err.message}`;
@@ -33,7 +35,35 @@ export async function POST(req: NextRequest) {
     if (!clerkId || !isOwnerClerkId(clerkId)) return new NextResponse("Not found", { status: 404 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as { text?: string; voice?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    text?: string;
+    voice?: string;
+    assembleEpisodeId?: string;
+  };
+
+  // Assembly normally runs when a creator opens a finished episode. This
+  // triggers it on demand so it can be proved to work without waiting for
+  // somebody to load a page.
+  if (body.assembleEpisodeId) {
+    const db = getDb();
+    const { data: ep } = await db
+      .from("series_episodes")
+      .select("id, user_id, series_id, title, episode_number, video_id")
+      .eq("id", body.assembleEpisodeId)
+      .maybeSingle();
+    if (!ep) return NextResponse.json({ error: "episode not found" }, { status: 404 });
+    if (ep.video_id) return NextResponse.json({ alreadyAssembled: true, videoId: ep.video_id });
+
+    const { data: ser } = await db.from("series").select("title").eq("id", ep.series_id).maybeSingle();
+    const result = await assembleEpisode(
+      ep.id,
+      ep.user_id,
+      ep.title || `Episode ${ep.episode_number}`,
+      ser?.title || "Series",
+      true
+    );
+    return NextResponse.json({ assembled: result });
+  }
   const text = body.text || "Sisi! Ubuye nini? Bengingazi ukuthi uyeza namhlanje!";
   const voice = body.voice || "zu-ZA-ThembaNeural";
   const steps: Record<string, unknown> = {};

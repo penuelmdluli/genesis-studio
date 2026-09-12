@@ -46,9 +46,14 @@ export function Navbar() {
                       Sign In
                     </Button>
                   </Link>
+                  {/* "Get Started Free" wrapped onto two lines inside the
+                      button on a 375px screen. The short label is for phones,
+                      the full one from sm: up. */}
                   <Link href="/sign-up">
-                    <Button size="sm">
-                      Get Started Free <ArrowRight className="w-3.5 h-3.5" />
+                    <Button size="sm" className="whitespace-nowrap">
+                      <span className="sm:hidden">Start free</span>
+                      <span className="hidden sm:inline">Get Started Free</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Button>
                   </Link>
                 </>

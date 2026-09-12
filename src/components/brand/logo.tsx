@@ -65,7 +65,7 @@ export function Logo({
 }) {
   const config = {
     sm: { icon: 28, text: "text-base", gap: "gap-2" },
-    md: { icon: 32, text: "text-lg", gap: "gap-2.5" },
+    md: { icon: 32, text: "text-lg whitespace-nowrap", gap: "gap-2.5" },
     lg: { icon: 44, text: "text-2xl", gap: "gap-2.5" },
   }[size];
 

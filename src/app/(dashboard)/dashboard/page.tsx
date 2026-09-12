@@ -29,6 +29,46 @@ import {
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
+// Every tool that actually works today, grouped by what the creator is
+// trying to do rather than by which model powers it. Anything still dark
+// (Brain Studio, Product Ads, Music Video) is deliberately absent — the
+// dashboard must never advertise something that cannot run.
+const TOOL_GROUPS: Array<{
+  name: string;
+  items: Array<{ href: string; icon: string; title: string; desc: string; badge?: string }>;
+}> = [
+  {
+    name: "Make a video",
+    items: [
+      { href: "/generate", icon: "🎬", title: "Generate", desc: "Describe a scene, get a cinematic clip with sound" },
+      { href: "/motion-control", icon: "🕺", title: "Motion Control", desc: "Put any dance or move onto your character", badge: "HOT" },
+      { href: "/talking-avatar", icon: "🗣️", title: "AI Avatar", desc: "A photo speaks your script, in SA English too" },
+      { href: "/ai-singer", icon: "🎤", title: "AI Singer", desc: "Your face singing your lyrics, any genre", badge: "NEW" },
+      { href: "/react-studio", icon: "👥", title: "React Studio", desc: "Put yourself inside a scene with your own photos" },
+    ],
+  },
+  {
+    name: "Finish it properly",
+    items: [
+      { href: "/tools", icon: "🧰", title: "Creator Tools", desc: "Add sound, dub, remove background, make a beat", badge: "NEW" },
+      { href: "/captions", icon: "💬", title: "Auto Captions", desc: "Feeds play on mute — captions in 75+ languages" },
+      { href: "/voiceover", icon: "🎧", title: "AI Voiceover", desc: "Natural narration, free on every plan" },
+      { href: "/upscale", icon: "🔍", title: "Upscaler", desc: "Push a clip to crisp 1080p or 4K" },
+      { href: "/thumbnails", icon: "🖼️", title: "AI Thumbnails", desc: "Covers people actually click" },
+      { href: "/images", icon: "🎨", title: "Image Gen", desc: "Posters, characters, product shots" },
+    ],
+  },
+  {
+    name: "Grow your page",
+    items: [
+      { href: "/grow", icon: "🔥", title: "Weekly plan", desc: "One loop a week: make, finish, post", badge: "NEW" },
+      { href: "/explore", icon: "🌍", title: "Explore", desc: "See what is working for other creators" },
+      { href: "/gallery", icon: "📁", title: "Your Gallery", desc: "Everything you have made, ready to post" },
+      { href: "/lead-videos", icon: "🔗", title: "Lead Videos", desc: "Paste a trending reel to reuse its motion" },
+    ],
+  },
+];
+
 export default function DashboardPage() {
   const { user, activeJobs, videos, isInitialized, setUser } = useStore();
   const { toast } = useToast();
@@ -225,46 +265,28 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ====== STATS ROW ====== */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : (
-        <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: "Credits", value: user?.creditBalance ?? 50, icon: Zap, color: "violet" },
-            { label: "Videos", value: (videos || []).length, icon: Film, color: "emerald" },
-            { label: "Active Jobs", value: pendingJobs.length, icon: Clock, color: "amber" },
-            { label: "Plan", value: planLabel, icon: user?.plan === "free" ? Rocket : Crown, color: "cyan" },
-          ].map((stat) => {
-            const c = colorMap[stat.color] || colorMap.violet;
-            return (
-              <StaggerItem key={stat.label}>
-                <motion.div
-                  className={`relative rounded-xl border ${c.border} bg-gradient-to-br from-${stat.color}-500/10 to-transparent p-4 overflow-hidden group cursor-default`}
-                  whileHover={{ y: -2 }}
-                >
-                  <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full ${c.bg} opacity-50 group-hover:opacity-100 transition-opacity duration-500`} />
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-zinc-400 font-medium">{stat.label}</p>
-                      <div className={`w-8 h-8 rounded-lg ${c.bg} flex items-center justify-center`}>
-                        <stat.icon className={`w-4 h-4 ${c.text}`} />
-                      </div>
-                    </div>
-                    {typeof stat.value === "number" ? (
-                      <AnimatedCounter value={stat.value} className="text-2xl font-bold text-white" />
-                    ) : (
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                    )}
-                  </div>
-                </motion.div>
-              </StaggerItem>
-            );
-          })}
-        </StaggerGroup>
-      )}
+      {/* ====== AT A GLANCE ======
+          Four large cards for numbers the sidebar already shows pushed the
+          actual product below the fold. Same information, one line. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { label: "credits", value: (user?.creditBalance ?? 0).toLocaleString(), icon: Zap, tone: "text-violet-300 bg-violet-500/10 border-violet-500/25" },
+          { label: "videos", value: String((videos || []).length), icon: Film, tone: "text-emerald-300 bg-emerald-500/10 border-emerald-500/25" },
+          ...(pendingJobs.length > 0
+            ? [{ label: "rendering now", value: String(pendingJobs.length), icon: Clock, tone: "text-amber-300 bg-amber-500/10 border-amber-500/25" }]
+            : []),
+          { label: "plan", value: planLabel, icon: user?.plan === "free" ? Rocket : Crown, tone: "text-cyan-300 bg-cyan-500/10 border-cyan-500/25" },
+        ].map((s) => (
+          <span
+            key={s.label}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${s.tone}`}
+          >
+            <s.icon className="w-3.5 h-3.5" />
+            <strong className="text-white font-semibold">{s.value}</strong>
+            {s.label}
+          </span>
+        ))}
+      </div>
 
       {/* ====== QUICK ACTIONS ====== */}
       <MotionSection delay={0.1}>
@@ -389,38 +411,54 @@ export default function DashboardPage() {
         </MotionSection>
       )}
 
-      {/* ====== RECOMMENDED FOR YOU ====== */}
+      {/* ====== EVERYTHING YOU CAN MAKE ======
+          The dashboard is the shop window. Six hand-picked "recommended"
+          cards meant most of the product was invisible unless you already
+          knew the sidebar — so this lists every tool that actually works,
+          grouped by what you are trying to do, with what it is for. */}
       <MotionSection delay={0.2}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-              <Wand2 className="w-3.5 h-3.5 text-white" />
-            </div>
-            <h2 className="text-lg font-bold text-zinc-100">Recommended for You</h2>
+        <div className="flex items-end justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Everything you can make</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">Every tool, one tap away</p>
           </div>
         </div>
-        <StaggerGroup fast className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-          {recommended.map((item) => {
-            const c = colorMap[item.color] || colorMap.violet;
-            return (
-              <StaggerItem key={item.title}>
-                <Link href={item.href}>
-                  <motion.div
-                    className={`rounded-xl border ${c.border} bg-[#111118]/80 p-4 cursor-pointer group transition-all duration-300 hover:shadow-lg ${c.glow}`}
-                    whileHover={{ y: -4, scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                      <item.icon className={`w-5 h-5 ${c.text}`} />
+
+        {TOOL_GROUPS.map((group) => (
+          <div key={group.name} className="mb-5">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2 px-0.5">
+              {group.name}
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {group.items.map((t) => (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  className="group relative rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.05] to-transparent p-3.5 transition-all hover:-translate-y-0.5 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/10"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-xl leading-none shrink-0">{t.icon}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-semibold text-zinc-100 leading-tight">{t.title}</span>
+                        {t.badge && (
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${
+                            t.badge === "HOT"
+                              ? "bg-orange-500/20 text-orange-300 border-orange-400/30"
+                              : "bg-violet-500/20 text-violet-200 border-violet-400/30"
+                          }`}>
+                            {t.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-snug mt-1">{t.desc}</p>
                     </div>
-                    <p className="text-sm font-semibold text-zinc-200 mb-1">{item.title}</p>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed line-clamp-2">{item.desc}</p>
-                  </motion.div>
+                  </div>
                 </Link>
-              </StaggerItem>
-            );
-          })}
-        </StaggerGroup>
+              ))}
+            </div>
+          </div>
+        ))}
       </MotionSection>
 
       {/* ====== CREDIT USAGE ====== */}
@@ -478,32 +516,6 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold text-amber-300">{pendingJobs.length}</p>
             <p className="text-[10px] text-zinc-400">In Progress</p>
           </div>
-        </div>
-      </MotionSection>
-
-      {/* ====== QUICK ACTIONS ====== */}
-      <MotionSection delay={0.27}>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-          <Link href="/generate" className="flex items-center gap-2 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/15 transition-all group">
-            <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Generate Video</span>
-          </Link>
-          <Link href="/tools" className="flex items-center gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15 transition-all group">
-            <Wand2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Creator Tools</span>
-          </Link>
-          <Link href="/ai-singer" className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all group">
-            <Volume2 className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">AI Singer</span>
-          </Link>
-          <Link href="/talking-avatar" className="flex items-center gap-2 p-3 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500/15 transition-all group">
-            <Mic className="w-4 h-4 text-pink-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">AI Avatar</span>
-          </Link>
-          <Link href="/explore" className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all group">
-            <ArrowUpRight className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Explore</span>
-          </Link>
         </div>
       </MotionSection>
 

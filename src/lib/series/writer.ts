@@ -18,33 +18,34 @@
 // what the video models were trained to read — the creator never sees it.
 
 import { envString } from "@/lib/env";
+import { localeOrDefault } from "@/lib/series/locales";
 
-export type SeriesLanguage = "zu-ZA" | "af-ZA" | "en-ZA" | "en";
+/** Any locale id from the catalogue of languages we can actually speak. */
+export type SeriesLanguage = string;
 
-export const SERIES_LANGUAGES: Array<{ id: SeriesLanguage; label: string; native: string }> = [
-  { id: "zu-ZA", label: "isiZulu", native: "isiZulu" },
-  { id: "af-ZA", label: "Afrikaans", native: "Afrikaans" },
-  { id: "en-ZA", label: "South African English", native: "SA English" },
-  { id: "en", label: "English", native: "English" },
-];
-
-/** Default voices per language, from the TTS voices we already ship. */
-export const LANGUAGE_VOICES: Record<SeriesLanguage, { female: string; male: string }> = {
-  "zu-ZA": { female: "voice-thando", male: "voice-themba" },
-  "af-ZA": { female: "voice-adri", male: "voice-willem" },
-  "en-ZA": { female: "voice-naledi", male: "voice-thabo" },
-  en: { female: "voice-aria", male: "voice-james" },
-};
-
-const LANGUAGE_INSTRUCTION: Record<SeriesLanguage, string> = {
-  "zu-ZA":
-    "Write ALL spoken dialogue in natural, conversational isiZulu as spoken in Gauteng and KwaZulu-Natal today, not textbook isiZulu. Code-switching into English for a word or two is normal and welcome, exactly how people actually speak.",
-  "af-ZA":
-    "Write ALL spoken dialogue in natural, conversational South African Afrikaans as spoken today, including the everyday code-switching into English that a real person would use.",
-  "en-ZA":
-    "Write ALL spoken dialogue in South African English, using the rhythm, slang and expressions people actually use here.",
-  en: "Write ALL spoken dialogue in natural conversational English.",
-};
+/**
+ * How to write in this language. The three South African ones are spelled
+ * out because getting them wrong is obvious to the people who speak them —
+ * textbook isiZulu in a township drama reads as a school play. Everything
+ * else gets a good generic instruction built from its own name.
+ */
+function languageInstruction(id: string): string {
+  switch (id) {
+    case "zu-ZA":
+      return "Write ALL spoken dialogue in natural, conversational isiZulu as spoken in Gauteng and KwaZulu-Natal today, not textbook isiZulu. Code-switching into English for a word or two is normal and welcome, exactly how people actually speak.";
+    case "af-ZA":
+      return "Write ALL spoken dialogue in natural, conversational South African Afrikaans as spoken today, including the everyday code-switching into English that a real person would use.";
+    case "en-ZA":
+      return "Write ALL spoken dialogue in South African English, using the rhythm, slang and expressions people actually use here.";
+    default: {
+      const label = localeOrDefault(id).label.replace(/ — .*$/, "");
+      const place = localeOrDefault(id).label.includes(" — ")
+        ? ` as it is actually spoken in ${localeOrDefault(id).label.split(" — ")[1]}`
+        : "";
+      return `Write ALL spoken dialogue in natural, conversational ${label}${place}. Use the way people really talk, not formal written language.`;
+    }
+  }
+}
 
 /** A single shot. Either somebody speaks, or something happens. */
 export interface Shot {
@@ -106,7 +107,7 @@ export async function writeEpisode(ctx: SeriesContext, shotCount = 6): Promise<E
   const key = envString("ANTHROPIC_API_KEY");
   if (!key) throw new Error("The writer is not configured");
 
-  const lang = LANGUAGE_INSTRUCTION[ctx.language] || LANGUAGE_INSTRUCTION.en;
+  const lang = languageInstruction(ctx.language);
   const first = ctx.episodeNumber <= 1;
 
   const continuity = first

@@ -20,21 +20,29 @@
 
 import { submitWsModel, runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
-import { LANGUAGE_VOICES } from "@/lib/series/writer";
+import { localeOrDefault } from "@/lib/series/locales";
 
 /** Cinematic i2v. Funded, and the strongest dramatic motion we have. */
 const SCENE_VIDEO_MODEL = "bytedance/seedance-v1.5-pro/image-to-video";
 
-const VOICE_MAP: Record<string, string> = {
-  "voice-aria": "en-US-AriaNeural",
-  "voice-james": "en-US-GuyNeural",
-  "voice-naledi": "en-ZA-LeahNeural",
-  "voice-thabo": "en-ZA-LukeNeural",
-  "voice-thando": "zu-ZA-ThandoNeural",
-  "voice-themba": "zu-ZA-ThembaNeural",
-  "voice-adri": "af-ZA-AdriNeural",
-  "voice-willem": "af-ZA-WillemNeural",
-};
+/**
+ * Every shot is finished at 1080p.
+ *
+ * The lip-sync model returns about 352x624 — fine on its own, but next to a
+ * cinematic action shot in the same episode it reads as a different
+ * production. Uniformity matters more here than any single shot does, and at
+ * well under a cent a shot there is no reason to accept the mismatch.
+ */
+const UPSCALE_MODEL = "bytedance/video-upscaler";
+
+/** Submits the finishing pass. The caller keeps the original either way. */
+export async function submitUpscale(clipUrl: string): Promise<string> {
+  const prediction = await submitWsModel(UPSCALE_MODEL, {
+    video: clipUrl,
+    target_resolution: "1080p",
+  });
+  return prediction.id;
+}
 
 /** How each beat is shot. Emotion drives the lens, not just the face. */
 const EMOTION_FRAMING: Record<string, string> = {
@@ -98,27 +106,24 @@ export function buildPerformancePrompt(shot: Shot): string {
 
 /** Pick the voice for a speaker, keeping the same speaker on the same voice. */
 export function voiceForSpeaker(speaker: string, ctx: RenderContext): string {
-  const voices = LANGUAGE_VOICES[ctx.language] || LANGUAGE_VOICES.en;
+  const locale = localeOrDefault(ctx.language);
   // Stable per name: the same character keeps the same voice for the life of
   // the series, without anyone having to record the choice anywhere.
   let hash = 0;
   for (const ch of speaker.toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return hash % 2 === 0 ? voices.female : voices.male;
+  return hash % 2 === 0 ? locale.female : locale.male;
 }
 
 /** Speak one line, upload it, hand back a URL the lip-sync model can read. */
 export async function synthesiseLine(
   text: string,
-  voiceId: string,
+  voiceName: string,
   userId: string,
   tag: string
 ): Promise<string> {
   const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
   const tts = new MsEdgeTTS();
-  await tts.setMetadata(
-    VOICE_MAP[voiceId] || "en-ZA-LeahNeural",
-    OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3
-  );
+  await tts.setMetadata(voiceName || "en-ZA-LeahNeural", OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
   const { audioStream } = tts.toStream(text);
   const chunks: Buffer[] = [];
   for await (const chunk of audioStream) {

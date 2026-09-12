@@ -13,11 +13,9 @@ import { randomUUID } from "crypto";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { getDb } from "@/lib/db-driver";
-import { SERIES_LANGUAGES, type SeriesLanguage } from "@/lib/series/writer";
+import { localeById } from "@/lib/series/locales";
 
 export const dynamic = "force-dynamic";
-
-const VALID_LANGUAGES = new Set(SERIES_LANGUAGES.map((l) => l.id));
 
 export async function GET() {
   const clerkId = await getAuthUserId();
@@ -62,9 +60,9 @@ export async function POST(req: NextRequest) {
   const title = (body.title || "").trim();
   if (!title) return NextResponse.json({ error: "Give your series a name" }, { status: 400 });
 
-  const language = (VALID_LANGUAGES.has(body.language as SeriesLanguage)
-    ? body.language
-    : "en-ZA") as SeriesLanguage;
+  // Only a language we can actually speak. An unknown id falling back to SA
+  // English is better than a series nobody can voice.
+  const language = localeById(body.language || "") ? body.language! : "en-ZA";
 
   const db = getDb();
 

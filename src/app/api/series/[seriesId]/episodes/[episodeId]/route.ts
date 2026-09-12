@@ -14,6 +14,7 @@ import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
 import { getWsPrediction } from "@/lib/wavespeed-tools";
+import { submitUpscale } from "@/lib/series/render";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,8 +30,11 @@ interface ShotRow {
   id: string;
   shot_index: number;
   status: string;
+  /** "render" while the scene is being made, "upscale" during the finish. */
+  stage: string | null;
   provider_ref: string | null;
   clip_url: string | null;
+  raw_clip_url: string | null;
   created_at: string;
 }
 
@@ -52,19 +56,57 @@ async function refreshShots(
       try {
         const prediction = await getWsPrediction(ref);
 
+        const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+
         if (prediction.status === "completed") {
           const url = prediction.outputs?.[0];
           if (!url) throw new Error("finished with no video");
+
+          // The scene exists. Now make it match the rest of the episode.
+          if (row.stage !== "upscale") {
+            try {
+              const upscaleRef = await submitUpscale(url);
+              row.stage = "upscale";
+              row.raw_clip_url = url;
+              await db
+                .from("series_shots")
+                .update({
+                  stage: "upscale",
+                  raw_clip_url: url,
+                  clip_url: url,
+                  provider_ref: `ws:${upscaleRef}`,
+                  updated_at: now,
+                })
+                .eq("id", row.id);
+              return;
+            } catch (err) {
+              // A finishing pass that will not start is not worth losing a
+              // paid scene over — keep what we have and call it done.
+              console.error(`[SERIES] upscale could not start for shot ${row.shot_index}:`, err);
+            }
+          }
+
           row.status = "completed";
           row.clip_url = url;
           await db
             .from("series_shots")
-            .update({ status: "completed", clip_url: url, updated_at: new Date().toISOString().slice(0, 19).replace("T", " ") })
+            .update({ status: "completed", stage: "done", clip_url: url, updated_at: now })
             .eq("id", row.id);
           return;
         }
 
         if (prediction.status === "failed") {
+          // Same rule: if only the finishing pass failed, the creator still
+          // gets the scene they paid for.
+          if (row.stage === "upscale" && row.raw_clip_url) {
+            row.status = "completed";
+            row.clip_url = row.raw_clip_url;
+            await db
+              .from("series_shots")
+              .update({ status: "completed", stage: "done", clip_url: row.raw_clip_url, updated_at: now })
+              .eq("id", row.id);
+            return;
+          }
           row.status = "failed";
           await db
             .from("series_shots")
@@ -124,7 +166,7 @@ export async function GET(
 
   const { data: rendered } = await db
     .from("series_shots")
-    .select("id, shot_index, status, clip_url, image_url, provider_ref, error, created_at")
+    .select("id, shot_index, status, stage, clip_url, raw_clip_url, image_url, provider_ref, error, created_at")
     .eq("episode_id", episodeId)
     .order("shot_index", { ascending: true })
     .limit(20);

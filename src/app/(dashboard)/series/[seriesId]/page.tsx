@@ -9,6 +9,7 @@
 // the button that says what it costs.
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageTransition } from "@/components/ui/motion";
 import { useApiError } from "@/hooks/use-api-error";
@@ -24,12 +25,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-const LANGUAGE_LABEL: Record<string, string> = {
-  "zu-ZA": "isiZulu",
-  "af-ZA": "Afrikaans",
-  "en-ZA": "SA English",
-  en: "English",
-};
+import { localeOrDefault } from "@/lib/series/locales";
 
 interface Series {
   id: string;
@@ -191,9 +187,9 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
         <p className="text-zinc-400">That series is not in your studio.</p>
-        <a href="/series" className="text-violet-400 text-sm mt-2 inline-block">
+        <Link href="/series" className="text-violet-400 text-sm mt-2 inline-block">
           Back to Series Studio
-        </a>
+        </Link>
       </div>
     );
   }
@@ -202,10 +198,10 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
 
   return (
     <PageTransition className="max-w-4xl mx-auto space-y-6">
-      <a href="/series" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200">
+      <Link href="/series" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200">
         <ArrowLeft className="w-4 h-4" />
         Series Studio
-      </a>
+      </Link>
 
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2">
@@ -213,7 +209,7 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
           {series.title}
         </h1>
         <p className="text-sm text-zinc-400 mt-1">
-          {LANGUAGE_LABEL[series.language] || series.language}
+          {localeOrDefault(series.language).label}
           {series.genre ? ` · ${series.genre}` : ""}
           {series.character_name ? ` · ${series.character_name}` : ""}
         </p>

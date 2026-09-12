@@ -34,3 +34,29 @@ CREATE TABLE IF NOT EXISTS series_episodes (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_episodes_series ON series_episodes(series_id, episode_number);
+
+-- One shot of one episode. Kept separate from the script so a re-render
+-- never rewrites the words, and so a failed shot can be refunded on its own.
+CREATE TABLE IF NOT EXISTS series_shots (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  shot_index INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'dialogue',   -- dialogue | action
+  speaker TEXT,
+  dialogue TEXT,                            -- the line, in the series language
+  subtitle TEXT,                            -- the same line in English
+  action TEXT,                              -- English visual direction
+  emotion TEXT,
+  image_url TEXT,
+  audio_url TEXT,
+  clip_url TEXT,                            -- what the creator sees
+  raw_clip_url TEXT,                        -- before the 1080p finishing pass
+  stage TEXT DEFAULT 'render',              -- render | upscale | done
+  provider_ref TEXT,
+  status TEXT DEFAULT 'pending',
+  error TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_shots_episode ON series_shots(episode_id, shot_index);

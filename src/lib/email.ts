@@ -526,7 +526,7 @@ export function seriesStudioUpdate(appUrl: string): ProductUpdate {
       {
         icon: "🗣️",
         title: "Characters who speak your language",
-        text: "Dialogue written in isiZulu, Afrikaans or SA English, performed with real lip-sync. Not a voice over a still picture — a person saying the words.",
+        text: "isiZulu, Afrikaans and SA English up front, plus 137 more languages — every one of them actually spoken, with lip movement that matches. Not a voice over a still picture.",
         href: `${appUrl}/series`,
       },
       {

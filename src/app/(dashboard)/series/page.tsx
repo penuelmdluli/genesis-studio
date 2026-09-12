@@ -13,12 +13,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageTransition } from "@/components/ui/motion";
 import { Clapperboard, Plus, ArrowRight, Loader2 } from "lucide-react";
 
-const LANGUAGES = [
-  { id: "zu-ZA", label: "isiZulu" },
-  { id: "af-ZA", label: "Afrikaans" },
-  { id: "en-ZA", label: "SA English" },
-  { id: "en", label: "English" },
-];
+import { SERIES_LOCALES, localeOrDefault } from "@/lib/series/locales";
+
+// The three anyone here is most likely to want, one tap away. The other 137
+// are behind a search box, because a wall of 140 buttons is not a choice.
+const QUICK_LANGUAGES = ["zu-ZA", "af-ZA", "en-ZA"];
 
 const GENRES = ["Drama", "Family", "Township comedy", "Crime", "Romance", "Thriller"];
 
@@ -41,6 +40,8 @@ export default function SeriesShelfPage() {
 
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState("zu-ZA");
+  const [moreLanguages, setMoreLanguages] = useState(false);
+  const [languageQuery, setLanguageQuery] = useState("");
   const [genre, setGenre] = useState("Drama");
   const [logline, setLogline] = useState("");
   const [characterName, setCharacterName] = useState("");
@@ -89,7 +90,8 @@ export default function SeriesShelfPage() {
         </h1>
         <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
           Make a drama in your own language, episode after episode. Same characters, a story that
-          carries on, and English subtitles so everyone can follow it.
+          carries on, and English subtitles so everyone can follow it. isiZulu, Afrikaans, SA
+          English and 137 more.
         </p>
       </div>
 
@@ -124,22 +126,71 @@ export default function SeriesShelfPage() {
             <div>
               <label className="text-xs font-medium text-zinc-400">Which language do they speak?</label>
               <div className="mt-1.5 flex flex-wrap gap-2">
-                {LANGUAGES.map((l) => (
+                {QUICK_LANGUAGES.map((id) => (
                   <button
-                    key={l.id}
-                    onClick={() => setLanguage(l.id)}
+                    key={id}
+                    onClick={() => setLanguage(id)}
                     className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
-                      language === l.id
+                      language === id
                         ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
                         : "border-white/[0.10] bg-white/[0.03] text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    {l.label}
+                    {localeOrDefault(id).label}
                   </button>
                 ))}
+                <button
+                  onClick={() => setMoreLanguages((v) => !v)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                    !QUICK_LANGUAGES.includes(language)
+                      ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
+                      : "border-white/[0.10] bg-white/[0.03] text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {QUICK_LANGUAGES.includes(language)
+                    ? `${SERIES_LOCALES.length - QUICK_LANGUAGES.length} more…`
+                    : localeOrDefault(language).label}
+                </button>
               </div>
+
+              {moreLanguages && (
+                <div className="mt-2 rounded-xl border border-white/[0.10] bg-white/[0.02] p-2">
+                  <input
+                    value={languageQuery}
+                    onChange={(e) => setLanguageQuery(e.target.value)}
+                    placeholder="Search 140 languages…"
+                    className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                  />
+                  <div className="mt-2 max-h-56 overflow-y-auto">
+                    {SERIES_LOCALES.filter((l) =>
+                      l.label.toLowerCase().includes(languageQuery.trim().toLowerCase())
+                    )
+                      .slice(0, 60)
+                      .map((l) => (
+                        <button
+                          key={l.id}
+                          onClick={() => {
+                            setLanguage(l.id);
+                            setMoreLanguages(false);
+                            setLanguageQuery("");
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                            language === l.id
+                              ? "bg-violet-500/20 text-violet-200"
+                              : "text-zinc-300 hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          {l.label}
+                          <span className="text-[10px] text-zinc-600 ml-2">{l.group}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-[11px] text-zinc-500 mt-1.5">
-                Your characters speak this. English subtitles are added either way.
+                Your characters speak this, with their mouths matched to it. English subtitles are
+                written either way.
               </p>
             </div>
 
@@ -238,7 +289,7 @@ export default function SeriesShelfPage() {
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-300 shrink-0 mt-0.5" />
                 </div>
                 <p className="text-xs text-zinc-500 mt-1">
-                  {LANGUAGES.find((l) => l.id === s.language)?.label || s.language}
+                  {localeOrDefault(s.language).label}
                   {s.genre ? ` · ${s.genre}` : ""}
                   {s.character_name ? ` · ${s.character_name}` : ""}
                 </p>

@@ -31,6 +31,8 @@ import { sqlTimestamp } from "@/lib/job-finalizer";
 export const maxDuration = 60;
 
 const ESCALATE_AFTER_MIN = 30;
+/** A subscription payment this long after its checkout is a renewal, not a replay. */
+const RENEWAL_MIN_DAYS = 20;
 const MAX_AGE_HOURS = 48;
 
 export async function GET(req: NextRequest) {
@@ -47,6 +49,7 @@ export async function GET(req: NextRequest) {
     payfast: { seen: 0, settled: 0, alreadyDone: 0, failed: 0 },
     yoco: { checked: 0, settled: 0 },
     escalated: 0,
+    abandoned: 0,
   };
 
   // ── Pass 1: PayFast transaction feed ───────────────────────────────────
@@ -78,21 +81,50 @@ export async function GET(req: NextRequest) {
           metadata.credits = String(CREDIT_PACKS.find((p) => p.id === metadata.packId)?.credits || 0);
         }
 
-        // A monthly renewal is a NEW payment against the SAME checkout id.
-        // processWebhookPayment refuses to settle a checkout that is already
-        // completed — correct for a replayed first payment, fatal for a
-        // renewal. Once the original is settled, the pf_payment_id check
-        // above is the idempotency guard, so the checkout id is dropped and
-        // the renewal is allowed to extend the plan.
+        // A monthly renewal is a NEW payment against the SAME checkout id,
+        // and processWebhookPayment refuses to settle a checkout that is
+        // already completed — correct for a replay, fatal for a renewal.
+        //
+        // Renewal is decided by TIME, never by checkout status. Status alone
+        // double-credited two payments that had been settled by hand under a
+        // different reference: they looked "already completed", so the guard
+        // was dropped and they were credited a second time. A renewal is a
+        // payment that lands at least a billing period after the checkout
+        // was created; anything sooner is the first payment, however it was
+        // recorded.
         if (metadata.checkoutId) {
-          const { data: firstSettled } = await db
+          const { data: checkout } = await db
             .from("pending_checkouts")
-            .select("status")
+            .select("status, created_at")
             .eq("id", metadata.checkoutId)
             .maybeSingle();
-          if (firstSettled?.status === "completed") {
-            console.log(`[RECONCILE] ${reference} is a renewal of ${metadata.checkoutId}`);
+
+          const paidAt = Date.parse(row.date.replace(" ", "T") + "+02:00");
+          const createdAt = checkout?.created_at
+            ? Date.parse(String(checkout.created_at).replace(" ", "T") + "Z")
+            : NaN;
+          const ageDays =
+            Number.isFinite(paidAt) && Number.isFinite(createdAt)
+              ? (paidAt - createdAt) / 86_400_000
+              : 0;
+          const isRenewal = metadata.type === "subscription" && ageDays >= RENEWAL_MIN_DAYS;
+
+          if (isRenewal) {
+            console.log(`[RECONCILE] ${reference} is a renewal of ${metadata.checkoutId} (${Math.round(ageDays)}d later)`);
             delete metadata.checkoutId;
+          } else if (checkout?.status === "completed") {
+            // First payment, already settled under some other reference.
+            // Record the payment id so this row is skipped from now on.
+            await db.from("webhook_events").insert({
+              id: crypto.randomUUID(),
+              reference,
+              provider: "payfast",
+              event: metadata.type,
+              user_id: metadata.userId,
+              metadata: JSON.stringify({ ...metadata, note: "already settled under another reference" }),
+            });
+            out.payfast.alreadyDone++;
+            continue;
           }
         }
 
@@ -152,12 +184,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Pass 3: escalate what is still unpaid-or-unexplained ───────────────
+  // ── Pass 3: escalate what is still unpaid-or-unexplained, ONCE ─────────
+  //
+  // `escalated_at` is the guard, not the status column: status has a CHECK
+  // constraint of pending/completed/failed, so an earlier attempt to write
+  // "needs_review" was rejected silently and the same four checkouts were
+  // re-escalated every five minutes — an owner email every five minutes,
+  // forever. A dedicated column cannot be rejected and cannot be confused
+  // with a payment state.
   const escalateBefore = sqlTimestamp(new Date(Date.now() - ESCALATE_AFTER_MIN * 60_000));
   const { data: stuck } = await db
     .from("pending_checkouts")
-    .select("id, provider, user_id, type, product_id, amount, currency, created_at")
+    .select("id, provider, user_id, type, product_id, amount, currency, created_at, escalated_at")
     .eq("status", "pending")
+    .is("escalated_at", null)
     .lt("created_at", escalateBefore)
     .gt("created_at", oldest)
     .limit(20);
@@ -179,8 +219,30 @@ export async function GET(req: NextRequest) {
       title: `Unsettled ${c.provider} checkout`,
       message: `${user?.email || c.user_id} — ${c.product_id} — ${amount} — ${c.id}`,
     }).catch(() => {});
-    await db.from("pending_checkouts").update({ status: "needs_review" }).eq("id", c.id);
+    const { error: markError } = await db
+      .from("pending_checkouts")
+      .update({ escalated_at: new Date().toISOString() })
+      .eq("id", c.id);
+    if (markError) {
+      // Never leave this unreported: a failed mark means this checkout is
+      // about to page the owner again on the next run.
+      console.error(`[RECONCILE] Could not mark ${c.id} escalated: ${markError.message}`);
+    }
     out.escalated++;
+  }
+
+  // Abandoned checkouts: nobody paid, the window has closed. Mark them
+  // failed so they stop being scanned, and so the funnel numbers are real.
+  const abandonBefore = sqlTimestamp(new Date(Date.now() - MAX_AGE_HOURS * 3_600_000));
+  const { data: abandoned } = await db
+    .from("pending_checkouts")
+    .select("id")
+    .eq("status", "pending")
+    .lt("created_at", abandonBefore)
+    .limit(50);
+  for (const c of abandoned || []) {
+    await db.from("pending_checkouts").update({ status: "failed" }).eq("id", c.id);
+    out.abandoned++;
   }
 
   if (out.payfast.settled || out.yoco.settled || out.escalated) {

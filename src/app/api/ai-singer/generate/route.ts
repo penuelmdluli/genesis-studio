@@ -3,14 +3,19 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
-import { submitAceStepJob, submitSadTalkerJob } from "@/lib/runpod-singer";
+import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
+import { toUserFacingProviderError } from "@/lib/user-errors";
 
-// Async submit-and-return pattern (Cloudflare Workers compatible).
-// Pipeline is advanced by /api/cron/check-singer.
+// AI Singer: lyrics + genre → song → your face sings it.
 //
-// Progress stages:
-//   10 = ACE-Step (song generation) submitted on RunPod
-//   50 = SadTalker (lip-sync) submitted on RunPod
+// Async submit-and-return; /api/cron/check-singer advances the pipeline
+// every minute. Both stages run on the hosted provider now — the RunPod
+// ACE-Step/SadTalker endpoints this used to depend on were never deployed,
+// so "Coming soon" was permanent.
+//
+// Progress stages (runpod_job_id holds the current provider prediction id):
+//   10 = song generation submitted
+//   50 = lip-sync submitted
 //  100 = completed
 
 const GENRE_TAGS: Record<string, string> = {
@@ -23,7 +28,7 @@ const GENRE_TAGS: Record<string, string> = {
   jazz: "jazz, smooth, saxophone, piano, sophisticated",
   electronic: "electronic, synth, dance, EDM, bass drop",
   acoustic: "acoustic, folk, guitar, intimate, warm",
-  amapiano: "amapiano, log drum, south african house, piano, bass",
+  amapiano: "amapiano, log drum, south african house, piano, deep bass",
 };
 
 export async function POST(req: NextRequest) {
@@ -44,15 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      faceImageUrl,
-      lyrics,
-      genre,
-      songUrl,
-      songTitle,
-      duration,
-      aspectRatio,
-    } = body as {
+    const { faceImageUrl, lyrics, genre, songUrl, songTitle, duration, aspectRatio } = body as {
       faceImageUrl: string;
       lyrics?: string;
       genre?: string;
@@ -62,7 +59,7 @@ export async function POST(req: NextRequest) {
       aspectRatio?: string;
     };
 
-    if (!faceImageUrl) {
+    if (!faceImageUrl || !/^https:\/\//.test(faceImageUrl)) {
       return NextResponse.json({ error: "Face image is required" }, { status: 400 });
     }
     if (!lyrics && !songUrl) {
@@ -70,23 +67,19 @@ export async function POST(req: NextRequest) {
     }
 
     const ownerAccount = isOwnerClerkId(clerkId);
-    const targetDuration = Math.min(duration || 30, 60);
+    const targetDuration = Math.min(Math.max(Number(duration) || 30, 10), 60);
     const ar = aspectRatio === "16:9" ? "16:9" : "9:16";
-    const creditsCost = 30 + targetDuration;
+    // Song ≈ $0.02 flat; lip-sync ≈ $0.075/s → 30s ≈ $2.27. 30 + 30 = 60
+    // credits ≈ $1.44 was underwater, so the per-second rate is now 3.
+    const creditsCost = 30 + targetDuration * 3;
 
     if (!ownerAccount) {
-      const { success, newBalance } = await deductCredits(
-        user.id, creditsCost, "",
-        `AI Singer: ${targetDuration}s ${genre || "custom"}`
-      );
+      const { success, newBalance } = await deductCredits(user.id, creditsCost, "", `AI Singer: ${targetDuration}s ${genre || "custom"}`);
       if (!success) {
         return NextResponse.json({ error: "Insufficient credits", required: creditsCost, balance: newBalance }, { status: 402 });
       }
     }
 
-    // ────────────────────────────────────────────────────────────────
-    // Create job — store everything the cron needs to advance pipeline
-    // ────────────────────────────────────────────────────────────────
     const jobTitle = songTitle || `AI Singer: ${genre || "Custom"}`;
 
     const job = await createJob({
@@ -94,65 +87,53 @@ export async function POST(req: NextRequest) {
       type: "i2v",
       modelId: "ai-singer",
       prompt: jobTitle,
-      negativePrompt: lyrics || undefined, // full lyrics stored here for cron
+      negativePrompt: lyrics || undefined, // full lyrics stored here for the cron
       inputImageUrl: faceImageUrl,
       resolution: "720p",
       duration: targetDuration,
       fps: 30,
       isDraft: false,
-      creditsCost,
+      creditsCost: ownerAccount ? 0 : creditsCost,
       aspectRatio: ar === "9:16" ? "portrait" : "landscape",
       audioUrl: songUrl || undefined,
     });
 
     try {
       if (!songUrl && lyrics) {
-        // ── Submit ACE-Step on RunPod ─────────────────────────────
-        const genreTags = GENRE_TAGS[genre || "pop"] || GENRE_TAGS.pop;
-
-        const runpodJobId = await submitAceStepJob({
-          tags: genreTags,
-          lyrics: lyrics,
-          duration: targetDuration,
-        });
-
+        const tags = GENRE_TAGS[genre || "pop"] || GENRE_TAGS.pop;
+        const prediction = await submitWsModel(WS_MODELS.music, { tags, lyrics, duration: targetDuration });
         await updateJobStatus(job.id, {
           status: "processing",
-          runpodJobId: runpodJobId,
+          runpodJobId: prediction.id,
+          provider: "wavespeed",
           progress: 10,
           startedAt: new Date().toISOString(),
         });
-
-        console.log(`[AI-SINGER] ACE-Step submitted on RunPod: ${runpodJobId}`);
+        console.log(`[AI-SINGER] Song submitted: ${prediction.id}`);
       } else if (songUrl) {
-        // ── Song provided — submit SadTalker directly ────────────
-        const runpodJobId = await submitSadTalkerJob({
-          faceImageUrl,
-          audioUrl: songUrl,
+        const prediction = await submitWsModel(WS_MODELS.lipsyncFromImage, {
+          image: faceImageUrl,
+          audio: songUrl,
+          prompt: "A person singing passionately to camera, expressive, natural head movement",
         });
-
         await updateJobStatus(job.id, {
           status: "processing",
-          runpodJobId: runpodJobId,
+          runpodJobId: prediction.id,
+          provider: "wavespeed",
           progress: 50,
           startedAt: new Date().toISOString(),
         });
-
-        console.log(`[AI-SINGER] SadTalker submitted on RunPod (user song): ${runpodJobId}`);
+        console.log(`[AI-SINGER] Lip-sync submitted (user song): ${prediction.id}`);
       }
     } catch (submitErr) {
-      console.error("[AI-SINGER] Submit error:", submitErr);
+      const raw = submitErr instanceof Error ? submitErr.message : String(submitErr);
+      console.error("[AI-SINGER] Submit error:", raw);
       if (!ownerAccount) {
         await refundCredits(user.id, creditsCost, job.id, "AI Singer submit failed — automatic refund");
       }
-      await updateJobStatus(job.id, {
-        status: "failed",
-        errorMessage: submitErr instanceof Error ? submitErr.message : "Submission failed",
-      });
-      return NextResponse.json(
-        { error: `AI Singer submission failed. Credits refunded. ${submitErr instanceof Error ? submitErr.message : ""}`.trim() },
-        { status: 503 }
-      );
+      const msg = toUserFacingProviderError(raw);
+      await updateJobStatus(job.id, { status: "failed", errorMessage: msg });
+      return NextResponse.json({ error: msg }, { status: 503 });
     }
 
     return NextResponse.json({

@@ -56,7 +56,7 @@ my Chrome extension is currently disconnected from.
 | Step | Status |
 |---|---|
 | Sign-in page widget loads with prod key | ✅ confirmed via page source |
-| Sign-up with throwaway email → user created in prod Clerk | ⏳ **Please test:** open https://genesisstudio.app/sign-in in incognito, complete sign-up. Check at https://dashboard.clerk.com → Genesis Studio → Production → Users that the new user appears. |
+| Sign-up with throwaway email → user created in prod Clerk | ⏳ **Please test:** open https://genesisstudio.app/sign-in in incognito, complete sign-up. Check at https://dashboard.clerk.com → iVideo Studio → Production → Users that the new user appears. |
 | Sign-in with that user → session persists | ⏳ Same session — sign out, sign back in, navigate to dashboard, confirm auth gate passes |
 | Hit credit-gated route → Supabase row created | ⏳ Note: this app has **no Clerk webhook**. User rows are created lazily by `GET /api/user/route.ts` on first dashboard load via `getUserByClerkId` + `createUser`. As long as you can load `/dashboard` after signing up, that route runs and inserts the Supabase row. |
 

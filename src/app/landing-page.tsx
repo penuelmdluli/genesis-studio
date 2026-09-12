@@ -39,6 +39,7 @@ import {
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 import { trackEvent } from "@/lib/analytics-events";
 import { AppSchema, FAQSchema } from "@/components/structured-data";
+import { useAuth } from "@/components/auth/auth-provider";
 
 // No hardcoded videos — everything pulled from API/database
 
@@ -117,6 +118,11 @@ const capabilities = [
 // ============================================
 
 export default function LandingPage() {
+  // A signed-in visitor (owner, paying customer, or free user) is not a
+  // prospect. Every "Get 100 Free Credits" call to action becomes a way back
+  // into the product instead, and plan cards reflect what they already have.
+  const { isSignedIn, user: authUser } = useAuth();
+  const currentPlan = isSignedIn ? authUser?.plan ?? "free" : null;
   // Real platform stats
   const [stats, setStats] = useState<{ totalVideos: number; totalUsers: number; videosToday: number } | null>(null);
 
@@ -207,10 +213,10 @@ export default function LandingPage() {
 
           <MotionSection delay={0.2}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 w-full sm:w-auto px-4 sm:px-0">
-              <Link href="/sign-up" className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
+              <Link href={isSignedIn ? "/generate" : "/sign-up"} className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
-                  Get 100 Free Credits
+                  {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
                 </Button>
               </Link>
               <Link href="#community" className="w-full sm:w-auto">
@@ -462,15 +468,24 @@ export default function LandingPage() {
                       ))}
                     </ul>
 
-                    <Link href={plan.price === 0 ? "/sign-up" : "/pricing"}>
-                      <Button
-                        variant={isPopular ? "primary" : "secondary"}
-                        className="w-full"
-                      >
-                        {plan.price === 0 ? "Get 100 Free Credits" : "Subscribe"}
-                        <ArrowRight className="w-4 h-4" />
+                    {currentPlan === plan.id ? (
+                      <Button variant="secondary" className="w-full" disabled>
+                        <Check className="w-4 h-4" />
+                        Your current plan
                       </Button>
-                    </Link>
+                    ) : (
+                      <Link href={plan.price === 0 ? (isSignedIn ? "/dashboard" : "/sign-up") : "/pricing"}>
+                        <Button
+                          variant={isPopular ? "primary" : "secondary"}
+                          className="w-full"
+                        >
+                          {plan.price === 0
+                            ? isSignedIn ? "Open Studio" : "Get 100 Free Credits"
+                            : isSignedIn ? "Upgrade" : "Subscribe"}
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </StaggerItem>
               );
@@ -539,10 +554,10 @@ export default function LandingPage() {
                 100 free credits. No credit card. Start creating in minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href="/sign-up" onClick={() => trackEvent("cta_click", { location: "footer" })}>
+                <Link href={isSignedIn ? "/generate" : "/sign-up"} onClick={() => trackEvent("cta_click", { location: "footer" })}>
                   <Button size="lg" className="text-base px-10 py-4">
                     <Sparkles className="w-5 h-5" />
-                    Get 100 Free Credits
+                    {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
                   </Button>
                 </Link>
                 <Link href="/motion-control">

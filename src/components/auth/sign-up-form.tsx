@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics-events";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -29,9 +30,11 @@ export function SignUpForm() {
 
       if (!res.ok) {
         setError(data.error || "Registration failed");
+        trackEvent("signup_failed", { reason: String(data.error || "").slice(0, 80) });
         return;
       }
 
+      trackEvent("signup_completed", { method: "email" });
       router.push("/onboarding/first-video");
     } catch {
       setError("Something went wrong. Please try again.");

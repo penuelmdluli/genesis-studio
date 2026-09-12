@@ -23,7 +23,6 @@ import {
   Type,
   ImageIcon,
   Wand2,
-  Brain,
   Crown,
   Rocket,
   Video,
@@ -31,21 +30,47 @@ import {
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { user, activeJobs, videos, isInitialized } = useStore();
+  const { user, activeJobs, videos, isInitialized, setUser } = useStore();
   const { toast } = useToast();
   const isLoading = !isInitialized;
 
-  // Handle payment success/pack_success redirects from Yoco
+  // Landing back from a checkout. Don't just celebrate — confirm the payment
+  // with the provider and credit the account right now, then reload the user
+  // so the balance on screen is real. The webhook may still be in flight (or,
+  // as happened for months, never arrive); this path does not depend on it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true") {
-      toast("Payment successful! Your plan has been upgraded.", "success");
-      window.history.replaceState({}, "", "/dashboard");
-    } else if (params.get("pack_success") === "true") {
-      toast("Credits added to your account!", "success");
-      window.history.replaceState({}, "", "/dashboard");
-    }
-  }, [toast]);
+    const isPlan = params.get("success") === "true";
+    const isPack = params.get("pack_success") === "true";
+    if (!isPlan && !isPack) return;
+    window.history.replaceState({}, "", "/dashboard");
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/payments/verify", { method: "POST" });
+        const data = res.ok ? await res.json() : null;
+        if (cancelled) return;
+
+        if (data?.credited || data?.alreadyCredited) {
+          toast(
+            isPlan ? "Payment confirmed — your plan is active!" : "Payment confirmed — credits added to your account!",
+            "success"
+          );
+        } else {
+          toast("Payment received. Your credits will appear within a few minutes.", "info");
+        }
+
+        const userRes = await fetch("/api/user");
+        if (userRes.ok && !cancelled) setUser(await userRes.json());
+      } catch {
+        if (!cancelled) toast("Payment received. Your credits will appear within a few minutes.", "info");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [toast, setUser]);
 
   const pendingJobs = (activeJobs || []).filter(
     (j) => j.status === "processing" || j.status === "queued"
@@ -73,12 +98,13 @@ export default function DashboardPage() {
       hot: true,
     },
     {
-      label: "Brain Studio",
-      desc: "Multi-scene AI director",
-      icon: Brain,
-      href: "/brain",
+      label: "Creator Tools",
+      desc: "Add sound, dub, remove BG, beats",
+      icon: Wand2,
+      href: "/tools",
       gradient: "from-cyan-600 to-blue-600",
       shadow: "shadow-cyan-600/25",
+      hot: true,
     },
     {
       label: "AI Voiceover",
@@ -413,13 +439,13 @@ export default function DashboardPage() {
             <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
             <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Generate Video</span>
           </Link>
-          <Link href="/brain" className="flex items-center gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15 transition-all group">
-            <Brain className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Brain Studio</span>
+          <Link href="/tools" className="flex items-center gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15 transition-all group">
+            <Wand2 className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Creator Tools</span>
           </Link>
-          <Link href="/brain/templates" className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all group">
-            <Film className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">Templates</span>
+          <Link href="/ai-singer" className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all group">
+            <Volume2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200 group-hover:text-white">AI Singer</span>
           </Link>
           <Link href="/talking-avatar" className="flex items-center gap-2 p-3 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500/15 transition-all group">
             <Mic className="w-4 h-4 text-pink-400 shrink-0" />
@@ -432,15 +458,46 @@ export default function DashboardPage() {
         </div>
       </MotionSection>
 
-      {/* ====== REFERRAL BANNER ====== */}
-      {(user?.creditBalance ?? 0) < 200 && (
+      {/* ====== PLAN-AWARE UPSELL ======
+          Free users who are running low: upgrade. Paid users running low: top
+          up. Owners and anyone with plenty of credits: nothing. */}
+      {!user?.isOwner && user && user.creditBalance < 200 && (
+        <MotionSection delay={0.27}>
+          <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-violet-500/5 p-4 flex items-center gap-4 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+              <Crown className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-200">
+                {user.plan === "free"
+                  ? `${user.creditBalance} credits left on the Free plan`
+                  : `${user.creditBalance} credits left this month`}
+              </p>
+              <p className="text-xs text-zinc-400">
+                {user.plan === "free"
+                  ? "Upgrade to Creator for 500 credits a month, premium models and 1080p."
+                  : "Top up with a credit pack — credits never expire."}
+              </p>
+            </div>
+            <Link
+              href="/pricing"
+              className="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors shrink-0"
+            >
+              {user.plan === "free" ? "Upgrade" : "Buy credits"}
+            </Link>
+          </div>
+        </MotionSection>
+      )}
+
+      {/* ====== REFERRAL BANNER (free plan only) ====== */}
+      {!user?.isOwner && user?.plan === "free" && (
         <MotionSection delay={0.28}>
           <div className="rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-500/10 to-cyan-500/5 p-4 flex items-center gap-4 mb-4">
             <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shrink-0">
               <span className="text-lg">🎁</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-200">Get 100 free credits</p>
+              <p className="text-sm font-medium text-zinc-200">Earn bonus credits</p>
               <p className="text-xs text-zinc-400">Invite a friend → you both get bonus credits</p>
             </div>
             <button

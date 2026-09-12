@@ -672,16 +672,7 @@ export default function CaptionsPage() {
                   <Button onClick={handleDownloadSrt} className="flex-1">
                     <Download className="w-4 h-4" /> Download SRT
                   </Button>
-                  <Button
-                    variant={captionStyle === "srt_only" ? "ghost" : "outline"}
-                    className="flex-1"
-                    disabled={captionStyle === "srt_only" || isBurning}
-                    loading={isBurning}
-                    onClick={handleBurnIntoVideo}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {isBurning ? "Burning..." : "Burn into Video"}
-                  </Button>
+                  {/* Burn-in needs a video re-encode step the current provider cannot run; the SRT downloads and drops straight into CapCut / Premiere / YouTube. */}
                 </div>
 
                 {/* Burn progress */}

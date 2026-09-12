@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FEATURES } from "@/lib/constants";
+import { envString } from "@/lib/env";
 
 /**
  * Returns which features have their RunPod endpoints configured.
@@ -15,7 +16,7 @@ export async function GET() {
       status[feature.id] = true;
       continue;
     }
-    const endpointValue = process.env[envKey];
+    const endpointValue = envString(envKey);
     status[feature.id] = !!endpointValue && endpointValue.length > 0;
   }
 

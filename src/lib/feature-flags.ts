@@ -7,7 +7,6 @@
 export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/dashboard": true,
   "/generate": true,
-  "/brain": true,
   "/gallery": true,
   "/explore": true,
   "/voiceover": true,
@@ -20,12 +19,16 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/upscale": true,
   "/thumbnails": true,
   "/images": true,
-  "/brain/templates": true,
   "/collections": true,
   "/api-keys": true,
-  "/product-ads": true,
-  "/music-video": true,
-  // Hidden — not ready yet
+  "/tools": true,
+  // Hidden — these still depend on a provider we cannot run right now
+  // (lib/video-pipeline.ts on FAL). The code stays; the menu does not
+  // advertise what cannot be delivered.
+  "/brain": false,
+  "/brain/templates": false,
+  "/product-ads": false,
+  "/music-video": false,
   "/edit": false,
 };
 

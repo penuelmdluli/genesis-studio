@@ -30,25 +30,27 @@ export type Requirement =
  * intent: a feature is listed against the provider its code actually calls.
  */
 export const FEATURE_REQUIREMENTS: Record<string, Requirement> = {
-  // Works on WaveSpeed alone — the paths verified end to end on 2026-09-09.
+  // Everything that generates runs on the hosted router now. WaveSpeed is
+  // the funded provider; FAL is a fallback for the video models that list
+  // one. Verified end to end on 2026-09-12 after every FAL-only tool was
+  // moved across.
   "/generate": { kind: "hosted" },
   "/motion-control": { kind: "hosted" },
   "/react-studio": { kind: "hosted" },
+  "/talking-avatar": { kind: "wavespeed" },   // infinitetalk-fast
+  "/upscale": { kind: "wavespeed" },          // bytedance/video-upscaler
+  "/captions": { kind: "wavespeed" },         // openai-whisper-with-video
+  "/thumbnails": { kind: "wavespeed" },       // flux-2-flash
+  "/images": { kind: "wavespeed" },           // flux-dev (was mislabelled fal)
+  "/ai-singer": { kind: "wavespeed" },        // ace-step-1.5 + infinitetalk-fast
+  "/tools": { kind: "wavespeed" },            // creator tools registry
 
-  // FAL-only. These call fal-ai/* directly with no WaveSpeed equivalent
-  // wired up, so they are dark whenever FAL is locked.
-  "/talking-avatar": { kind: "fal" },   // fal-ai/flux-pro, ffmpeg-api/*
-  "/upscale": { kind: "fal" },          // fal-ai/creative-upscaler
-  "/captions": { kind: "fal" },         // fal-ai/workflow-utilities/auto-subtitle
-  "/thumbnails": { kind: "fal" },       // fal-ai/flux-pro/v1.1
-  "/product-ads": { kind: "fal" },      // fal-ai/kling-video, ffmpeg-api/*
-  "/music-video": { kind: "fal" },      // fal-ai/stable-audio, flux-pro
-  "/images": { kind: "fal" },
-  "/brain": { kind: "fal" },            // lib/video-pipeline.ts, fal.subscribe
+  // Still FAL-only: lib/video-pipeline.ts calls fal.subscribe for audio,
+  // loudnorm and compose. Hidden from the menu until moved.
+  "/product-ads": { kind: "fal" },
+  "/music-video": { kind: "fal" },
+  "/brain": { kind: "fal" },
   "/brain/templates": { kind: "fal" },
-
-  // RunPod-backed, each against a named endpoint.
-  "/ai-singer": { kind: "runpod", envKey: "RUNPOD_ENDPOINT_ACE_STEP" },
 
   // No external generation — these work whatever the providers are doing.
   "/voiceover": { kind: "none" },       // msedge-tts, runs in-process

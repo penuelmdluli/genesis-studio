@@ -152,3 +152,41 @@ export async function sendWinBackEmail(to: string, name: string, bonusCredits: n
     </div></div>`
   );
 }
+
+// --- Campaigns ---
+
+/**
+ * "Come back and try the new tools" — sent by the owner through
+ * /api/admin/campaign. Mentions the credits they already hold so the ask is
+ * concrete rather than generic.
+ */
+export async function sendNewToolsEmail(to: string, name: string, creditBalance: number) {
+  const credits = Math.max(0, creditBalance || 0);
+  const creditLine =
+    credits > 0
+      ? `You still have <strong style="color:#7c3aed;">${credits.toLocaleString()} credits</strong> waiting in your account — enough for your next video today.`
+      : `Sign in and we'll make sure you have credits to try them.`;
+  return sendEmail(
+    to,
+    `${name}, new tools are live on iVideo Studio`,
+    `<div style="${baseStyle}"><div style="${card}">
+      <h2 style="margin:0 0 12px;color:#ededed;">New tools are live</h2>
+      <p style="color:#a1a1aa;line-height:1.6;">
+        Hi ${name}, since you last visited we've shipped a lot:
+      </p>
+      <ul style="color:#d4d4d8;line-height:1.8;padding-left:20px;">
+        <li><strong>Motion Control</strong> — paste a trending dance or move, apply it to your own character</li>
+        <li><strong>Lead Videos</strong> — drop a TikTok / Facebook link and reuse it as a reference</li>
+        <li><strong>Image-to-video</strong> — animate any photo into a cinematic clip</li>
+        <li><strong>AI Voiceover</strong> — 300+ voices, including South African English</li>
+      </ul>
+      <p style="color:#a1a1aa;line-height:1.6;">${creditLine}</p>
+      <p style="margin:24px 0;">
+        <a href="${getAppUrl()}/generate" style="${btn}">Try the new tools</a>
+      </p>
+      <p style="color:#71717a;font-size:13px;">
+        You're receiving this because you have an iVideo Studio account. Reply to this email if you'd rather not hear from us.
+      </p>
+    </div></div>`
+  );
+}

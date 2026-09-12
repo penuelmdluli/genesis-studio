@@ -1,4 +1,4 @@
-# Genesis Studio - System Status Report
+# iVideo Studio - System Status Report
 
 ## Date: 2026-04-05
 

@@ -16,6 +16,7 @@ import { holdCredits, attachHoldToJob, releaseHold } from "@/lib/credit-escrow";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 import { sendSlackAlert } from "@/lib/alerts";
+import { toUserFacingProviderError, isOperatorActionable } from "@/lib/user-errors";
 
 export async function POST(req: NextRequest) {
   try {
@@ -318,10 +319,13 @@ export async function POST(req: NextRequest) {
       const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
       recordProviderFailure(provider as "fal" | "runpod", errorMsg);
 
+      // A provider out of balance is an operator emergency: every customer
+      // from now on fails the same way. Shout, don't whisper.
+      const operatorMustAct = isOperatorActionable(errorMsg);
       sendSlackAlert({
-        level: "warning",
-        title: "Video generation failed",
-        message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}`,
+        level: operatorMustAct ? "critical" : "warning",
+        title: operatorMustAct ? "GENERATION DOWN — provider balance/access" : "Video generation failed",
+        message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}${operatorMustAct ? "\n\nTop up the provider now — all generations are failing." : ""}`,
       }).catch(() => {});
 
       // Release the reservation rather than refunding a debit. The hold is
@@ -331,14 +335,17 @@ export async function POST(req: NextRequest) {
         await releaseHold(holdId, "Provider submission failed");
       }
 
+      // The raw error is in the log and the alert above. The customer gets
+      // plain language with no vendor names in it.
+      const userMessage = toUserFacingProviderError(errorMsg);
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: `Submission failed: ${errorMsg}. Credits refunded.`,
+        errorMessage: userMessage,
       });
 
       return NextResponse.json(
         {
-          error: `${model.name} submission failed. Credits refunded.`,
+          error: userMessage,
           jobId: job.id,
         },
         { status: 503 }

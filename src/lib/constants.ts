@@ -663,8 +663,8 @@ export const FEATURES: FeatureConfig[] = [
     description: "Upload a photo + audio/text to create a talking video with lip sync",
     category: "create",
     creditCost: "120 credits / 10s",
-    minPlan: "pro",
-    endpointEnvKey: "RUNPOD_ENDPOINT_TALKING_AVATAR",
+    minPlan: "creator",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "avatar-generator",
@@ -690,9 +690,9 @@ export const FEATURES: FeatureConfig[] = [
     name: "Auto Captions",
     description: "Transcribe and add subtitles to any video in 75+ languages",
     category: "audio",
-    creditCost: "10 credits / min",
+    creditCost: "2 credits / video",
     minPlan: "free",
-    endpointEnvKey: "RUNPOD_ENDPOINT_CAPTIONS",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "voice-clone",
@@ -721,7 +721,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "enhance",
     creditCost: "20 credits / 5s",
     minPlan: "creator",
-    endpointEnvKey: "RUNPOD_ENDPOINT_UPSCALE",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "face-swap",
@@ -740,7 +740,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "image",
     creditCost: "10 credits / 4 images",
     minPlan: "free",
-    endpointEnvKey: "FAL_KEY", // Switched from RunPod SDXL to FAL.AI FLUX Pro
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "character-designer",

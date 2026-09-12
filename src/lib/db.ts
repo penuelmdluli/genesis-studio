@@ -65,7 +65,7 @@ export async function updateUserPlan(
   stripeSubscriptionId?: string
 ) {
   const creditLimits: Record<PlanId, number> = {
-    free: 50,
+    free: 100,
     creator: 500,
     pro: 2000,
     studio: 8000,

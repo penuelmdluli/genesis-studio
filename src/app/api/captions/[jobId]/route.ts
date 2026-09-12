@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { fal } from "@fal-ai/client";
+import { getWsPrediction, wsStatusOf, type WsPrediction } from "@/lib/wavespeed-tools";
 
-// Ensure FAL client is configured
-fal.config({ credentials: process.env.FAL_KEY || "" });
+// Poll a transcription and turn it into SRT + segments for the captions page.
 
-/**
- * Convert FAL Whisper chunks to SRT subtitle format.
- * FAL Whisper output: { chunks: [{ timestamp: [0.0, 2.5], text: "Hello" }, ...] }
- */
-function chunksToSrt(
-  chunks: Array<{ timestamp: [number, number]; text: string }>
-): string {
-  return chunks
-    .map((chunk, i) => {
-      const startTime = formatSrtTime(chunk.timestamp[0]);
-      const endTime = formatSrtTime(chunk.timestamp[1]);
-      return `${i + 1}\n${startTime} --> ${endTime}\n${chunk.text.trim()}\n`;
-    })
-    .join("\n");
+interface Segment {
+  start: number;
+  end: number;
+  text: string;
 }
 
 function formatSrtTime(seconds: number): string {
@@ -26,20 +15,77 @@ function formatSrtTime(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
   const ms = Math.round((seconds % 1) * 1000);
-  return `${pad(h)}:${pad(m)}:${pad(s)},${pad3(ms)}`;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)},${ms.toString().padStart(3, "0")}`;
 }
 
-function pad(n: number): string {
-  return n.toString().padStart(2, "0");
-}
-function pad3(n: number): string {
-  return n.toString().padStart(3, "0");
+function segmentsToSrt(segments: Segment[]): string {
+  return segments
+    .map((seg, i) => `${i + 1}\n${formatSrtTime(seg.start)} --> ${formatSrtTime(seg.end)}\n${seg.text.trim()}\n`)
+    .join("\n");
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
-) {
+/**
+ * Whisper-style outputs vary by host: some return `segments`, some
+ * `chunks` with `timestamp: [start, end]`, some only `text`, and some put a
+ * JSON document behind `outputs[0]`. Accept all of them.
+ */
+async function extractSegments(p: WsPrediction): Promise<{ segments: Segment[]; text: string; language: string }> {
+  let doc: Record<string, unknown> = p as unknown as Record<string, unknown>;
+
+  const first = p.outputs?.[0];
+  if (typeof first === "string" && /^https?:\/\//.test(first)) {
+    try {
+      const res = await fetch(first);
+      const ct = res.headers.get("content-type") || "";
+      const body = await res.text();
+      if (ct.includes("json") || body.trim().startsWith("{")) {
+        doc = { ...doc, ...(JSON.parse(body) as Record<string, unknown>) };
+      } else {
+        doc = { ...doc, text: body };
+      }
+    } catch {
+      // fall through to whatever the prediction itself carries
+    }
+  } else if (typeof first === "string" && first.trim().startsWith("{")) {
+    try {
+      doc = { ...doc, ...(JSON.parse(first) as Record<string, unknown>) };
+    } catch {
+      doc = { ...doc, text: first };
+    }
+  } else if (typeof first === "string") {
+    doc = { ...doc, text: first };
+  }
+
+  const output = (doc.output && typeof doc.output === "object" ? (doc.output as Record<string, unknown>) : null);
+  if (output) doc = { ...doc, ...output };
+
+  const segments: Segment[] = [];
+  const rawSegments = (doc.segments || doc.chunks) as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(rawSegments)) {
+    for (const s of rawSegments) {
+      const ts = s.timestamp as [number, number] | undefined;
+      const start = Number(s.start ?? ts?.[0] ?? 0);
+      const end = Number(s.end ?? ts?.[1] ?? start + 2);
+      const text = String(s.text ?? "").trim();
+      if (text) segments.push({ start, end, text });
+    }
+  }
+
+  const text = String(doc.text ?? segments.map((s) => s.text).join(" ")).trim();
+  if (segments.length === 0 && text) {
+    // No timing information at all — chunk the text into readable lines,
+    // ~3s each, so the SRT is still usable.
+    const words = text.split(/\s+/);
+    for (let i = 0, t = 0; i < words.length; i += 8, t += 3) {
+      segments.push({ start: t, end: t + 3, text: words.slice(i, i + 8).join(" ") });
+    }
+  }
+  const language = String(doc.language ?? doc.detected_language ?? "auto");
+  return { segments, text, language };
+}
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const clerkId = await getAuthUserId();
     if (!clerkId) {
@@ -48,79 +94,54 @@ export async function GET(
 
     const { jobId } = await params;
 
-    // Poll FAL for job status
     try {
-      const statusResult = await fal.queue.status("fal-ai/whisper", {
-        requestId: jobId,
-        logs: false,
-      });
+      const p = await getWsPrediction(jobId);
+      const status = wsStatusOf(p);
 
-      if (statusResult.status === "COMPLETED") {
-        // Fetch the actual result
-        const result = await fal.queue.result("fal-ai/whisper", {
-          requestId: jobId,
-        });
+      if (status === "COMPLETED") {
+        const { segments, text, language } = await extractSegments(p);
 
-        const data = result.data as Record<string, unknown>;
-        const chunks = data?.chunks as Array<{ timestamp: [number, number]; text: string }> | undefined;
-
-        if (!chunks || chunks.length === 0) {
+        if (segments.length === 0) {
           return NextResponse.json({
             status: "completed",
             output: {
               srt: "1\n00:00:00,000 --> 00:05:00,000\n(No speech detected)\n",
               segments: [],
-              detectedLanguage: "auto",
+              detectedLanguage: language,
               plainText: "(No speech detected)",
             },
           });
         }
 
-        const srt = chunksToSrt(chunks);
-        const segments = chunks.map((chunk) => ({
-          start: chunk.timestamp[0],
-          end: chunk.timestamp[1],
-          text: chunk.text.trim(),
-        }));
-        const plainText = segments.map((s) => s.text).join(" ");
-
         return NextResponse.json({
           status: "completed",
           output: {
-            srt,
+            srt: segmentsToSrt(segments),
             segments,
-            detectedLanguage: (data?.detected_language as string) || "auto",
-            plainText,
+            detectedLanguage: language,
+            plainText: text,
           },
         });
       }
 
-      if ((statusResult.status as string) === "FAILED") {
+      if (status === "FAILED") {
+        const raw = p.error || "";
+        const noAudio = /extract audio|no audio|audio stream/i.test(raw);
         return NextResponse.json({
           status: "failed",
-          errorMessage: "Caption generation failed. Please try again.",
+          errorMessage: noAudio
+            ? "This video has no audio track, so there is nothing to caption. Add a voiceover first, then run captions."
+            : "Caption generation failed. Please try again.",
         });
       }
 
-      // Still processing
-      const progress = statusResult.status === "IN_PROGRESS" ? 60 : 20;
-      return NextResponse.json({
-        status: "processing",
-        progress,
-      });
-    } catch (falError) {
-      console.error("FAL status check error:", falError);
-      // Return processing status if we can't reach FAL (transient error)
-      return NextResponse.json({
-        status: "processing",
-        progress: 30,
-      });
+      return NextResponse.json({ status: "processing", progress: status === "IN_PROGRESS" ? 60 : 20 });
+    } catch (pollError) {
+      console.error("Caption status check error:", pollError);
+      return NextResponse.json({ status: "processing", progress: 30 });
     }
   } catch (error) {
     console.error("Caption status error:", error);
-    return NextResponse.json(
-      { error: "Failed to check caption status" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to check caption status" }, { status: 500 });
   }
 }

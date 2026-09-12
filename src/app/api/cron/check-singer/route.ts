@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db-driver";
 import { updateJobStatus, createVideo } from "@/lib/db";
-import { refundCredits, isOwnerClerkId } from "@/lib/credits";
+import { refundCredits } from "@/lib/credits";
 import { sendSlackAlert } from "@/lib/alerts";
-import {
-  getAceStepStatus,
-  extractAceStepAudio,
-  submitSadTalkerJob,
-  getSadTalkerStatus,
-  extractSadTalkerVideo,
-} from "@/lib/runpod-singer";
+import { getWsPrediction, wsStatusOf, submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
+import { toUserFacingProviderError } from "@/lib/user-errors";
 
-// Cron: polls AI Singer pipeline jobs on RunPod and advances them.
-// Run every 1 minute via Cloudflare Workers cron trigger.
+// Cron: advances AI Singer jobs. Runs every minute.
 //
-// Stage 10 → ACE-Step (song gen) on RunPod
-// Stage 50 → SadTalker (lip-sync) on RunPod
+// Stage 10 → song generating   (runpod_job_id = song prediction id)
+// Stage 50 → lip-sync running  (runpod_job_id = lip-sync prediction id)
 // Stage 100 → complete
 
 export async function GET(req: NextRequest) {
@@ -32,10 +26,7 @@ export async function GET(req: NextRequest) {
   let lipsyncCompleted = 0;
   let failed = 0;
 
-  // ══════════════════════════════════════════════════════════════════
-  // PHASE 1: Poll ACE-Step jobs (progress = 10)
-  // When done → upload audio to R2 → submit SadTalker → progress = 50
-  // ══════════════════════════════════════════════════════════════════
+  // ── Stage 10: song ready? → persist to R2 → submit lip-sync ──────────
   const { data: songJobs } = await db
     .from("generation_jobs")
     .select("id, user_id, runpod_job_id, input_image_url, aspect_ratio, duration, negative_prompt, prompt, credits_cost")
@@ -45,71 +36,43 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(10);
 
-  if (songJobs?.length) {
-    for (const job of songJobs) {
-      if (!job.runpod_job_id) continue;
+  for (const job of songJobs || []) {
+    if (!job.runpod_job_id) continue;
+    try {
+      const p = await getWsPrediction(job.runpod_job_id);
+      const status = wsStatusOf(p);
+      if (status === "FAILED") throw new Error(p.error || "Song generation failed");
+      if (status !== "COMPLETED") continue;
 
-      try {
-        const status = await getAceStepStatus(job.runpod_job_id);
+      const providerAudio = p.outputs?.[0];
+      if (!providerAudio) throw new Error("Song generation returned no audio");
 
-        if (status.status === "COMPLETED" && status.output) {
-          const audio = extractAceStepAudio(status.output);
+      // Provider URLs expire; keep our own copy.
+      const { uploadAudio, r2PublicUrl } = await import("@/lib/storage");
+      const res = await fetch(providerAudio);
+      if (!res.ok) throw new Error(`Could not download song (${res.status})`);
+      const songKey = `ai-singer-songs/${job.user_id}/${job.id}.mp3`;
+      await uploadAudio(songKey, Buffer.from(await res.arrayBuffer()), res.headers.get("content-type") || "audio/mpeg");
+      const songUrl = r2PublicUrl(songKey);
 
-          // Upload base64 audio to R2
-          let songUrl = audio.audioUrl || "";
+      await db.from("generation_jobs").update({ audio_url: songUrl }).eq("id", job.id);
 
-          if (audio.audioBase64 && !songUrl) {
-            try {
-              const { uploadVideo, r2PublicUrl } = await import("@/lib/storage");
-              const songKey = `ai-singer-songs/${job.user_id}/${job.id}.wav`;
-              const audioBuffer = Buffer.from(audio.audioBase64, "base64");
-              await uploadVideo(songKey, audioBuffer);
-              songUrl = r2PublicUrl(songKey);
-            } catch (uploadErr) {
-              console.error(`[CRON-SINGER] Audio upload failed for ${job.id}:`, uploadErr);
-              throw new Error("Failed to upload generated song");
-            }
-          }
-
-          if (!songUrl) throw new Error("ACE-Step returned no audio");
-
-          console.log(`[CRON-SINGER] Song ready for ${job.id}: ${songUrl.slice(0, 80)}...`);
-
-          // Store song URL in job
-          await db.from("generation_jobs")
-            .update({ audio_url: songUrl })
-            .eq("id", job.id);
-
-          // Submit SadTalker for lip-sync
-          const sadTalkerJobId = await submitSadTalkerJob({
-            faceImageUrl: job.input_image_url,
-            audioUrl: songUrl,
-          });
-
-          await updateJobStatus(job.id, {
-            runpodJobId: sadTalkerJobId,
-            progress: 50,
-          });
-
-          songCompleted++;
-          console.log(`[CRON-SINGER] SadTalker submitted for ${job.id}: ${sadTalkerJobId}`);
-
-        } else if (status.status === "FAILED") {
-          throw new Error(status.error || "Song generation failed on RunPod");
-        }
-        // IN_QUEUE / IN_PROGRESS → skip, check next cycle
-      } catch (err) {
-        console.error(`[CRON-SINGER] Song stage error for ${job.id}:`, err);
-        await failJob(db, job, err);
-        failed++;
-      }
+      const lip = await submitWsModel(WS_MODELS.lipsyncFromImage, {
+        image: job.input_image_url,
+        audio: songUrl,
+        prompt: "A person singing passionately to camera, expressive, natural head movement",
+      });
+      await updateJobStatus(job.id, { runpodJobId: lip.id, progress: 50 });
+      songCompleted++;
+      console.log(`[CRON-SINGER] Song ready for ${job.id}; lip-sync submitted ${lip.id}`);
+    } catch (err) {
+      console.error(`[CRON-SINGER] Song stage error for ${job.id}:`, err);
+      await failJob(job, err);
+      failed++;
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // PHASE 2: Poll SadTalker jobs (progress = 50)
-  // When done → upload video to R2 → save gallery → mark completed
-  // ══════════════════════════════════════════════════════════════════
+  // ── Stage 50: lip-sync ready? → persist → gallery → complete ─────────
   const { data: lipsyncJobs } = await db
     .from("generation_jobs")
     .select("id, user_id, runpod_job_id, input_image_url, aspect_ratio, duration, prompt, credits_cost, audio_url")
@@ -119,128 +82,88 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(10);
 
-  if (lipsyncJobs?.length) {
-    for (const job of lipsyncJobs) {
-      if (!job.runpod_job_id) continue;
+  for (const job of lipsyncJobs || []) {
+    if (!job.runpod_job_id) continue;
+    try {
+      const p = await getWsPrediction(job.runpod_job_id);
+      const status = wsStatusOf(p);
+      if (status === "FAILED") throw new Error(p.error || "Lip-sync failed");
+      if (status !== "COMPLETED") continue;
+
+      const providerVideo = p.outputs?.[0];
+      if (!providerVideo) throw new Error("Lip-sync returned no video");
+
+      const { uploadVideo, videoStorageKey } = await import("@/lib/storage");
+      const res = await fetch(providerVideo);
+      if (!res.ok) throw new Error(`Could not download video (${res.status})`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const storageKey = videoStorageKey(job.user_id, job.id);
+      await uploadVideo(storageKey, buffer);
+      const outputUrl = `/api/videos/${job.id}`;
+
+      let thumbnailUrl = "";
+      try {
+        const { extractAndUploadThumbnail } = await import("@/lib/thumbnails");
+        thumbnailUrl = await extractAndUploadThumbnail(storageKey, job.user_id, job.id);
+      } catch {
+        // thumbnail is cosmetic
+      }
 
       try {
-        const status = await getSadTalkerStatus(job.runpod_job_id);
-
-        if (status.status === "COMPLETED" && status.output) {
-          const video = extractSadTalkerVideo(status.output);
-
-          // Upload base64 video to R2
-          const { uploadVideo, videoStorageKey, r2PublicUrl } = await import("@/lib/storage");
-          const storageKey = videoStorageKey(job.user_id, `ai-singer-${Date.now()}`);
-          let outputUrl = video.videoUrl || "";
-
-          if (video.videoBase64) {
-            try {
-              const videoBuffer = Buffer.from(video.videoBase64, "base64");
-              await uploadVideo(storageKey, videoBuffer);
-              outputUrl = r2PublicUrl(storageKey);
-            } catch (uploadErr) {
-              console.error(`[CRON-SINGER] Video upload failed for ${job.id}:`, uploadErr);
-              throw new Error("Failed to upload lip-sync video");
-            }
-          } else if (video.videoUrl) {
-            try {
-              const { persistExternalVideo } = await import("@/lib/storage");
-              await persistExternalVideo(video.videoUrl, storageKey);
-              outputUrl = r2PublicUrl(storageKey);
-            } catch (persistErr) {
-              console.warn(`[CRON-SINGER] R2 persist failed for ${job.id}, using direct URL:`, persistErr);
-              outputUrl = video.videoUrl;
-            }
-          }
-
-          if (!outputUrl) throw new Error("SadTalker returned no video");
-
-          console.log(`[CRON-SINGER] Video ready for ${job.id}: ${outputUrl.slice(0, 80)}...`);
-
-          // Save to gallery
-          try {
-            await createVideo({
-              id: job.id,
-              userId: job.user_id,
-              jobId: job.id,
-              title: job.prompt || "AI Singer",
-              url: `/api/videos/${job.id}`,
-              thumbnailUrl: "",
-              modelId: "ai-singer",
-              prompt: job.prompt || "AI Singer",
-              resolution: "720p",
-              duration: job.duration || 30,
-              fps: 30,
-              fileSize: video.fileSize || 0,
-              aspectRatio: job.aspect_ratio || "portrait",
-              audioUrl: job.audio_url || undefined,
-            });
-          } catch (dbErr) {
-            console.warn(`[CRON-SINGER] Gallery insert failed for ${job.id}:`, dbErr);
-          }
-
-          // Mark completed
-          await updateJobStatus(job.id, {
-            status: "completed",
-            progress: 100,
-            outputVideoUrl: outputUrl,
-            completedAt: new Date().toISOString(),
-          });
-
-          // Slack alert
-          sendSlackAlert({
-            level: "info",
-            title: "AI Singer video completed (RunPod)",
-            message: `Job: ${job.id}\nUser: ${job.user_id}\nCredits: ${job.credits_cost}`,
-          }).catch(() => {});
-
-          // Email notification
-          try {
-            const { data: user } = await db.from("users").select("email, name").eq("id", job.user_id).single();
-            if (user?.email) {
-              const { sendVideoReadyEmail } = await import("@/lib/email");
-              await sendVideoReadyEmail(user.email, user.name || "Creator", job.id);
-            }
-          } catch { /* non-blocking */ }
-
-          // Auto-publish to explore
-          import("@/lib/auto-publish").then(({ autoPublishToExplore }) =>
-            autoPublishToExplore({
-              jobId: job.id,
-              userId: job.user_id,
-              prompt: job.prompt || "AI Singer",
-              modelId: "ai-singer",
-              videoUrl: outputUrl,
-              duration: job.duration || 30,
-              resolution: "720p",
-              hasAudio: true,
-              type: "standard",
-              userPlan: undefined,
-              creatorName: "iVideo Studio",
-            })
-          ).catch((e) => console.error(`[CRON-SINGER] Auto-publish failed for ${job.id}:`, e));
-
-          lipsyncCompleted++;
-
-        } else if (status.status === "FAILED") {
-          throw new Error(status.error || "Lip-sync generation failed on RunPod");
-        }
-        // IN_QUEUE / IN_PROGRESS → skip, check next cycle
-      } catch (err) {
-        console.error(`[CRON-SINGER] LipSync stage error for ${job.id}:`, err);
-        await failJob(db, job, err);
-        failed++;
+        await createVideo({
+          id: job.id,
+          userId: job.user_id,
+          jobId: job.id,
+          title: job.prompt || "AI Singer",
+          url: outputUrl,
+          thumbnailUrl,
+          modelId: "ai-singer",
+          prompt: job.prompt || "AI Singer",
+          resolution: "720p",
+          duration: job.duration || 30,
+          fps: 30,
+          fileSize: buffer.length,
+          aspectRatio: job.aspect_ratio || "portrait",
+          audioUrl: job.audio_url || undefined,
+        });
+      } catch (dbErr) {
+        console.warn(`[CRON-SINGER] Gallery insert failed for ${job.id}:`, dbErr);
       }
+
+      await updateJobStatus(job.id, {
+        status: "completed",
+        progress: 100,
+        outputVideoUrl: outputUrl,
+        completedAt: new Date().toISOString(),
+      });
+
+      sendSlackAlert({
+        level: "info",
+        title: "AI Singer video completed",
+        message: `Job: ${job.id}\nUser: ${job.user_id}\nCredits: ${job.credits_cost}`,
+      }).catch(() => {});
+
+      try {
+        const { data: user } = await db.from("users").select("email, name").eq("id", job.user_id).single();
+        if (user?.email) {
+          const { sendVideoReadyEmail } = await import("@/lib/email");
+          await sendVideoReadyEmail(user.email, user.name || "Creator", job.id);
+        }
+      } catch {
+        // non-blocking
+      }
+
+      lipsyncCompleted++;
+    } catch (err) {
+      console.error(`[CRON-SINGER] Lip-sync stage error for ${job.id}:`, err);
+      await failJob(job, err);
+      failed++;
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // PHASE 3: Timeout stale jobs (older than 20 minutes)
-  // ══════════════════════════════════════════════════════════════════
+  // ── Timeout stale jobs (older than 20 minutes) ───────────────────────
   let timedOut = 0;
   const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-
   const { data: staleJobs } = await db
     .from("generation_jobs")
     .select("id, user_id, credits_cost")
@@ -249,18 +172,19 @@ export async function GET(req: NextRequest) {
     .lt("created_at", cutoff)
     .limit(10);
 
-  if (staleJobs?.length) {
-    for (const job of staleJobs) {
-      try {
-        await updateJobStatus(job.id, {
-          status: "failed",
-          errorMessage: "Generation timed out. Credits refunded.",
-          completedAt: new Date().toISOString(),
-        });
+  for (const job of staleJobs || []) {
+    try {
+      await updateJobStatus(job.id, {
+        status: "failed",
+        errorMessage: "This generation took longer than expected and was stopped. Your credits have been returned.",
+        completedAt: new Date().toISOString(),
+      });
+      if (job.credits_cost > 0) {
         await refundCredits(job.user_id, job.credits_cost, job.id, "AI Singer timed out — auto refund");
-        timedOut++;
-        console.log(`[CRON-SINGER] Timed out: ${job.id}`);
-      } catch { /* non-blocking */ }
+      }
+      timedOut++;
+    } catch {
+      // non-blocking
     }
   }
 
@@ -274,22 +198,17 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// ── Helper: fail a job and refund credits ─────────────────────────
-async function failJob(
-  db: ReturnType<typeof getDb>,
-  job: { id: string; user_id: string; credits_cost: number },
-  err: unknown
-) {
-  const msg = err instanceof Error ? err.message : "Generation failed";
+async function failJob(job: { id: string; user_id: string; credits_cost: number }, err: unknown) {
+  const raw = err instanceof Error ? err.message : String(err);
   try {
     await updateJobStatus(job.id, {
       status: "failed",
-      errorMessage: msg,
+      errorMessage: toUserFacingProviderError(raw),
       completedAt: new Date().toISOString(),
     });
-    const { data: user } = await db.from("users").select("clerk_id").eq("id", job.user_id).single();
-    if (user?.clerk_id && !isOwnerClerkId(user.clerk_id)) {
-      await refundCredits(job.user_id, job.credits_cost, job.id, `AI Singer failed — auto refund: ${msg}`);
+    // credits_cost is 0 for owner accounts, so this is a no-op for them.
+    if (job.credits_cost > 0) {
+      await refundCredits(job.user_id, job.credits_cost, job.id, "AI Singer failed — auto refund");
     }
   } catch (e) {
     console.error(`[CRON-SINGER] Failed to fail job ${job.id}:`, e);

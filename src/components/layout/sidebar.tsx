@@ -39,6 +39,7 @@ import {
   Radio,
   Globe,
   ShoppingBag,
+  Wand2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -67,14 +68,15 @@ const baseNavItems: NavItem[] = [
   // --- CREATE: makes a new video ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
-  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
+  { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "NEW" },
   { href: "/react-studio", label: "React Studio", icon: Users, section: "Create" },
+  { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create" },
   { href: "/product-ads", label: "Product Ads", icon: ShoppingBag, section: "Create" },
   { href: "/music-video", label: "Music Video", icon: Radio, section: "Create" },
-  { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create" },
 
   // --- TOOLS: works on something that already exists ---
+  { href: "/tools", label: "Creator Tools", icon: Wand2, section: "Tools", badge: "NEW" },
   { href: "/images", label: "Image Gen", icon: Image, section: "Tools" },
   { href: "/thumbnails", label: "AI Thumbnails", icon: ImageIcon, section: "Tools" },
   { href: "/voiceover", label: "AI Voiceover", icon: Mic, section: "Tools" },
@@ -129,6 +131,7 @@ export function Sidebar() {
       items.push({ href: "/intelligence", label: "Intelligence", icon: Brain, section: "Automate", badge: "AI" });
       items.push({ href: "/admin/mbs-config", label: "MBS Config", icon: Users, section: "Automate", badge: "NEW" });
       items.push({ href: "/admin/support", label: "Support Inbox", icon: MessageCircle, section: "Admin", badge: "NEW" });
+      items.push({ href: "/admin/customers", label: "Customers", icon: Users, section: "Admin", badge: "NEW" });
       items.push({ href: "/admin", label: "Admin", icon: Shield, section: "Admin" });
     }
     return items;

@@ -5,6 +5,7 @@ import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { getDb } from "@/lib/db-driver";
 import { PLANS } from "@/lib/constants";
 import { resolveProvider, getProvider, getDefaultProvider } from "@/lib/payments";
+import { recordPendingCheckout } from "@/lib/payments/pending";
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,6 +73,17 @@ export async function POST(req: NextRequest) {
         notifyUrl: `${webhookBaseUrl}/api/webhooks/${paymentProvider.name}`,
       });
 
+      await recordPendingCheckout({
+        checkoutId: checkout.checkoutId,
+        provider: paymentProvider.name,
+        userId: user.id,
+        type: "subscription",
+        productId: plan.id,
+        amount,
+        currency,
+        metadata: { type: "subscription", planId: plan.id, userId: user.id },
+      });
+
       return NextResponse.json({ url: checkout.redirectUrl });
     }
 
@@ -101,6 +113,17 @@ export async function POST(req: NextRequest) {
           successUrl: `${appUrl}/dashboard?success=true`,
           cancelUrl: `${appUrl}/pricing?cancelled=true`,
           notifyUrl: `${webhookBaseUrl}/api/webhooks/${defaultProvider.name}`,
+        });
+
+        await recordPendingCheckout({
+          checkoutId: checkout.checkoutId,
+          provider: defaultProvider.name,
+          userId: user.id,
+          type: "subscription",
+          productId: plan.id,
+          amount: priceZAR * 100,
+          currency: "ZAR",
+          metadata: { type: "subscription", planId: plan.id, userId: user.id },
         });
 
         return NextResponse.json({ url: checkout.redirectUrl });

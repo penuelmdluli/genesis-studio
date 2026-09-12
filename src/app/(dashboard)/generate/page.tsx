@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, HelpTip } from "@/components/ui/tooltip";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
+import { trackEvent } from "@/lib/analytics-events";
 import { useToast } from "@/components/ui/toast";
 import {
   AI_MODELS,
@@ -393,10 +394,12 @@ export default function GeneratePage() {
         progress.setProgress(60, "Generating on AI servers...");
         const estMin = Math.ceil((data.estimatedTime || 120) / 60);
         toast(`Video submitted! Est. ~${estMin} min. We'll notify you when it's ready.`, "success");
+        trackEvent("generate_submitted", { model: modelId, type: form.type, resolution: form.resolution, duration: form.duration, credits: creditCost });
       } else {
         setError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");
         progress.fail("Generation failed");
+        trackEvent("generate_failed", { model: modelId, type: form.type, status: res.status, reason: String(data.error || "").slice(0, 80) });
       }
     } catch (err) {
       console.error("Generation failed:", err);

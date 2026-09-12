@@ -177,3 +177,68 @@ export async function sendSupportReply(email: string, name: string, reply: strin
     `),
   });
 }
+
+// ============================================
+// BILLING EMAILS
+// ============================================
+
+export async function sendCreditPackReceiptEmail(
+  email: string,
+  name: string,
+  credits: number,
+  newBalance: number
+): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
+  return sendEmail({
+    to: email,
+    subject: `${credits.toLocaleString()} credits added to your account`,
+    html: wrap(`
+      <h1 style="color: white; font-size: 24px; margin-bottom: 8px;">Payment received — thank you!</h1>
+      <p style="color: #a1a1aa; margin-bottom: 16px;">
+        Hey ${name}, <strong style="color: #8b5cf6;">${credits.toLocaleString()} credits</strong> are now in your account.
+        Your balance is <strong style="color: white;">${newBalance.toLocaleString()} credits</strong>. Credits never expire.
+      </p>
+      <a href="${APP_URL}/generate" style="${buttonStyle}">Start Creating</a>
+    `),
+  });
+}
+
+export async function sendPlanExpiringEmail(
+  email: string,
+  name: string,
+  plan: string,
+  expiresAt: string
+): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
+  const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const date = new Date(expiresAt).toLocaleDateString("en-ZA", { day: "numeric", month: "long" });
+  return sendEmail({
+    to: email,
+    subject: `Your ${planName} plan renews on ${date}`,
+    html: wrap(`
+      <h1 style="color: white; font-size: 24px; margin-bottom: 8px;">Keep your ${planName} plan going</h1>
+      <p style="color: #a1a1aa; margin-bottom: 16px;">
+        Hey ${name}, your <strong style="color: #8b5cf6;">${planName}</strong> plan ends on <strong style="color: white;">${date}</strong>.
+        Renew before then to keep your premium models and next month's credit grant. Any credits you already have stay yours either way.
+      </p>
+      <a href="${APP_URL}/pricing" style="${buttonStyle}">Renew ${planName}</a>
+    `),
+  });
+}
+
+export async function sendPlanExpiredEmail(email: string, name: string, plan: string): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
+  const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+  return sendEmail({
+    to: email,
+    subject: `Your ${planName} plan has ended`,
+    html: wrap(`
+      <h1 style="color: white; font-size: 24px; margin-bottom: 8px;">Your ${planName} plan has ended</h1>
+      <p style="color: #a1a1aa; margin-bottom: 16px;">
+        Hey ${name}, your <strong style="color: #8b5cf6;">${planName}</strong> month is over, so your account is back on the Free plan.
+        Every credit you still have is safe — credits never expire. Renew any time to get premium models and your monthly credits back.
+      </p>
+      <a href="${APP_URL}/pricing" style="${buttonStyle}">Renew ${planName}</a>
+    `),
+  });
+}

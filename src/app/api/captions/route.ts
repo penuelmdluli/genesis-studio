@@ -3,10 +3,14 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
-import { fal } from "@fal-ai/client";
+import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
+import { toUserFacingProviderError } from "@/lib/user-errors";
 
-// Ensure FAL client is configured
-fal.config({ credentials: process.env.FAL_KEY || "" });
+// Video → transcript with timestamps → SRT. The job id returned is the
+// provider prediction id; /api/captions/[jobId] polls it and formats the
+// result. Transcription is cheap (~$0.001), so the credit price is a
+// convenience fee rather than a margin play — captions are what make a
+// Reel watchable on mute, and we want every video to have them.
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +24,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Rate limiting
     const rateCategory = user.plan === "free" ? "feature:free" : "feature:paid";
     const rateCheck = checkRateLimit(user.id, rateCategory);
     if (!rateCheck.allowed) {
@@ -29,80 +32,45 @@ export async function POST(req: NextRequest) {
 
     const { videoUrl, language } = await req.json();
 
-    if (!videoUrl || typeof videoUrl !== "string") {
-      return NextResponse.json(
-        { error: "videoUrl is required" },
-        { status: 400 }
-      );
+    if (!videoUrl || typeof videoUrl !== "string" || !/^https:\/\//.test(videoUrl)) {
+      return NextResponse.json({ error: "videoUrl is required" }, { status: 400 });
     }
 
-    // Calculate credits: 2 per minute, minimum 2
     const creditCost = 2;
-
     const ownerAccount = isOwnerClerkId(clerkId);
 
     if (!ownerAccount) {
-      const { success, newBalance } = await deductCredits(
-        user.id,
-        creditCost,
-        "",
-        `Auto captions: ${language || "en"}`
-      );
-
+      const { success, newBalance } = await deductCredits(user.id, creditCost, "", `Auto captions: ${language || "auto"}`);
       if (!success) {
-        return NextResponse.json(
-          {
-            error: "Insufficient credits",
-            required: creditCost,
-            balance: newBalance,
-          },
-          { status: 402 }
-        );
+        return NextResponse.json({ error: "Insufficient credits", required: creditCost, balance: newBalance }, { status: 402 });
       }
     }
 
-    // Submit to FAL Whisper (same engine as Brain Studio subtitles)
     try {
-      const result = await fal.queue.submit("fal-ai/whisper", {
-        input: {
-          audio_url: videoUrl,
-          task: "transcribe",
-          chunk_level: "segment",
-          language: language && language !== "auto" ? language : undefined,
-        },
+      const prediction = await submitWsModel(WS_MODELS.transcribeVideo, {
+        video: videoUrl,
+        task: "transcribe",
+        enable_timestamps: true,
+        language: language && language !== "auto" ? language : "auto",
       });
 
       return NextResponse.json({
-        jobId: result.request_id,
+        jobId: prediction.id,
         status: "processing",
         estimatedTime: 30,
       });
     } catch (gpuError) {
-      console.error("Caption FAL submission error:", gpuError);
+      const raw = gpuError instanceof Error ? gpuError.message : String(gpuError);
+      console.error("Caption submission error:", raw);
 
-      // Refund credits on submission failure
       if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditCost,
-          "",
-          "Caption submission failed — automatic refund"
-        );
+        await refundCredits(user.id, creditCost, "", "Caption submission failed — automatic refund");
       }
 
-      const errorMsg =
-        gpuError instanceof Error ? gpuError.message : "Unknown error";
-
-      return NextResponse.json(
-        { error: `Caption processing failed: ${errorMsg}. Credits refunded.` },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: toUserFacingProviderError(raw) }, { status: 503 });
     }
   } catch (error) {
     console.error("Captions API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

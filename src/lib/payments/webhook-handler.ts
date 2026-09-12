@@ -11,9 +11,12 @@ import { PlanId } from "@/types";
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 import { WebhookResult } from "./types";
 import { sendSlackAlert } from "@/lib/alerts";
+import { getPendingCheckout, markCheckout } from "./pending";
+import { nextPeriodEnd } from "@/lib/billing";
+import { sendPlanUpgradeEmail, sendCreditPackReceiptEmail } from "@/lib/email";
 
 const PLAN_CREDITS: Record<PlanId, number> = {
-  free: 50,
+  free: 100,
   creator: 500,
   pro: 2000,
   studio: 8000,
@@ -138,6 +141,20 @@ export async function processWebhookPayment(
     return { success: true, message: "Duplicate webhook — already processed" };
   }
 
+  // Second guard, keyed on the checkout rather than the event reference. The
+  // post-checkout verify path and the webhook both settle the same checkout;
+  // whichever runs second must find it already completed.
+  const checkoutId = result.metadata?.checkoutId || "";
+  if (checkoutId) {
+    const pending = await getPendingCheckout(checkoutId);
+    if (pending?.status === "completed") {
+      console.log(
+        `[${providerName.toUpperCase()}] Checkout ${checkoutId} already settled — skipping`
+      );
+      return { success: true, message: "Duplicate webhook — checkout already settled" };
+    }
+  }
+
   // --- Amount verification ---
   if (!verifyPaymentAmount(result, providerName)) {
     return { success: false, message: "Payment amount does not match expected price" };
@@ -181,12 +198,28 @@ export async function processWebhookPayment(
     await updateUserPlan(user.id, planId);
     await grantSubscriptionCredits(user.id, PLAN_CREDITS[planId]);
 
+    // A one-off card payment buys 31 days. Renewing early extends from the
+    // current end, so nobody loses days by paying before the reminder.
+    const currentEnd = user.plan_expires_at ? new Date(user.plan_expires_at) : null;
+    const extendFrom = currentEnd && currentEnd > new Date() && user.plan === planId ? currentEnd : new Date();
+    await supabase
+      .from("users")
+      .update({ plan_expires_at: nextPeriodEnd(extendFrom) })
+      .eq("id", user.id);
+
     // Record successful processing for idempotency
     await recordWebhookEvent(result.reference, providerName, "subscription", user.id, metadata);
+    await markCheckout(checkoutId, "completed");
 
     console.log(
       `[${providerName.toUpperCase()}] Subscription activated: user ${user.id}, plan ${planId}, ${PLAN_CREDITS[planId]} credits`
     );
+
+    if (user.email) {
+      sendPlanUpgradeEmail(user.email, user.name || "Creator", planId.charAt(0).toUpperCase() + planId.slice(1)).catch(
+        (err) => console.error(`[${providerName.toUpperCase()}] Upgrade email failed:`, err)
+      );
+    }
 
     sendSlackAlert({
       level: "info",
@@ -211,7 +244,7 @@ export async function processWebhookPayment(
       return { success: false, message: "Invalid credit amount" };
     }
 
-    await addCreditPackCredits(
+    const newBalance = await addCreditPackCredits(
       user.id,
       credits,
       `${credits} credit pack (${providerName})`
@@ -219,6 +252,13 @@ export async function processWebhookPayment(
 
     // Record successful processing for idempotency
     await recordWebhookEvent(result.reference, providerName, "credit_pack", user.id, metadata);
+    await markCheckout(checkoutId, "completed");
+
+    if (user.email) {
+      sendCreditPackReceiptEmail(user.email, user.name || "Creator", credits, newBalance).catch(
+        (err) => console.error(`[${providerName.toUpperCase()}] Receipt email failed:`, err)
+      );
+    }
 
     console.log(
       `[${providerName.toUpperCase()}] Credit pack purchased: user ${user.id}, ${credits} credits (pack ${packId})`

@@ -4,13 +4,20 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X, Sparkles } from "lucide-react";
 import { trackEvent } from "@/lib/analytics-events";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function EmailCapture() {
   const [visible, setVisible] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
 
   useEffect(() => {
     // Only show on homepage
     if (window.location.pathname !== "/") return;
+
+    // A sign-up pitch is for people without an account. Wait until we know
+    // who we are talking to; a signed-in user (including the owner) never
+    // sees it.
+    if (!isLoaded || isSignedIn) return;
 
     // Only show once per session
     if (sessionStorage.getItem("gs_email_shown")) return;
@@ -43,9 +50,9 @@ export function EmailCapture() {
       clearTimeout(timer);
       window.removeEventListener("scroll", onScroll);
     };
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
-  if (!visible) return null;
+  if (!visible || isSignedIn) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">

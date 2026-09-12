@@ -9,7 +9,7 @@
 
 ## EXECUTIVE SUMMARY
 
-Genesis Studio has **strong fundamentals**: a clean dark theme, well-structured component architecture, type-safe codebase, and a competitive feature set (model tiers, draft mode, background audio, reels). However, it falls short of Runway/Kling/Pika in visual polish, micro-interactions, loading states, and brand atmosphere. The gap is bridgeable — the codebase is modern (Next.js 16, React 19, Tailwind v4, Framer Motion installed but unused) and ready for a design-system-driven overhaul.
+iVideo Studio has **strong fundamentals**: a clean dark theme, well-structured component architecture, type-safe codebase, and a competitive feature set (model tiers, draft mode, background audio, reels). However, it falls short of Runway/Kling/Pika in visual polish, micro-interactions, loading states, and brand atmosphere. The gap is bridgeable — the codebase is modern (Next.js 16, React 19, Tailwind v4, Framer Motion installed but unused) and ready for a design-system-driven overhaul.
 
 **Overall Score: 5.2 / 10** (competitor parity target: 8.0+)
 
@@ -250,7 +250,7 @@ Genesis Studio has **strong fundamentals**: a clean dark theme, well-structured 
 |-----------|-------|-------|
 | Visual Impact | 4 | Clerk-hosted components. Dark theme applied via ClerkProvider variables. But minimal customization beyond colors. |
 | Professional Polish | 5 | Clerk handles form validation, OAuth buttons, error states. Functional but generic. |
-| Brand Identity | 3 | Shows "Genesis Studio" in Clerk modal. But feels like a Clerk page, not a Genesis page. |
+| Brand Identity | 3 | Shows "iVideo Studio" in Clerk modal. But feels like a Clerk page, not a Genesis page. |
 | Competitor Parity | 4 | Adequate. But Runway/Pika have fully custom auth pages with background art. |
 | Responsiveness | 6 | Clerk components are responsive. |
 | Loading States | 5 | Clerk handles loading states internally. |
@@ -475,7 +475,7 @@ Genesis Studio has **strong fundamentals**: a clean dark theme, well-structured 
 
 ## CONCLUSION
 
-Genesis Studio is a **functional MVP with solid engineering** but needs significant design investment to compete with Runway, Kling, and Pika on user experience. The biggest wins are:
+iVideo Studio is a **functional MVP with solid engineering** but needs significant design investment to compete with Runway, Kling, and Pika on user experience. The biggest wins are:
 
 1. **Quick wins (1-2 days):** Custom 404, toast system, error boundary, confirmation modals
 2. **Design system (3-5 days):** Token consolidation, Framer Motion integration, atmospheric backgrounds, skeleton screens

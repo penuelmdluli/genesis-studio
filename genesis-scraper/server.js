@@ -697,6 +697,156 @@ app.post("/brand-custom", auth, async (req, res) => {
   }
 });
 
+// ─── POST /stitch-episode ───
+// Six clips are not an episode. This joins the shots of one episode into a
+// single video the creator can actually watch, download and post, with the
+// English subtitle burned onto each shot.
+//
+// Each shot carries exactly one line, so the subtitle is drawn across that
+// whole clip rather than timed from a subtitle file. That removes the entire
+// class of drift bugs that comes with building timings by hand.
+//
+// Clips arrive at slightly different sizes (the lip-sync model returns
+// 1080x1916, the motion model 1080x1920), so every clip is normalised to one
+// canvas, one frame rate and one audio layout before joining. Concatenating
+// mismatched streams is the usual reason a join produces a file that plays
+// for five seconds and stops.
+app.post("/stitch-episode", auth, async (req, res) => {
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+  const { execFile } = require("child_process");
+  const tmp = os.tmpdir();
+  const stamp = Date.now();
+  const scratch = [];
+  const cleanup = () => scratch.forEach((f) => { try { fs.unlinkSync(f); } catch {} });
+
+  const FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  const W = 1080, H = 1920, FPS = 30;
+
+  const run = (args, label) =>
+    new Promise((resolve, reject) => {
+      execFile("ffmpeg", args, { maxBuffer: 1024 * 1024 * 64 }, (err, _o, stderr) => {
+        if (err) return reject(new Error(`${label}: ${String(stderr || err.message).slice(-400)}`));
+        resolve();
+      });
+    });
+
+  const probe = (file, streamType) =>
+    new Promise((resolve) => {
+      execFile(
+        "ffprobe",
+        ["-v", "error", "-select_streams", streamType, "-show_entries", "stream=codec_type", "-of", "csv=p=0", file],
+        (err, out) => resolve(!err && String(out).trim().length > 0)
+      );
+    });
+
+  // Long lines need breaking by hand: drawtext will happily run a sentence
+  // off both edges of the frame.
+  const wrap = (text, width) => {
+    const words = String(text).replace(/\s+/g, " ").trim().split(" ");
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      if ((line + " " + word).trim().length > width) {
+        if (line) lines.push(line.trim());
+        line = word;
+      } else {
+        line = (line + " " + word).trim();
+      }
+    }
+    if (line) lines.push(line.trim());
+    return lines.slice(0, 3).join("\n");
+  };
+
+  try {
+    const { clips, outputR2Key, burnSubtitles } = req.body || {};
+    if (!Array.isArray(clips) || clips.length === 0) {
+      return res.status(400).json({ error: "clips array required" });
+    }
+    if (!outputR2Key) return res.status(400).json({ error: "outputR2Key required" });
+    if (clips.length > 20) return res.status(400).json({ error: "too many clips (max 20)" });
+
+    const normalised = [];
+
+    for (let i = 0; i < clips.length; i++) {
+      const clip = clips[i] || {};
+      if (!clip.url) throw new Error(`clip ${i} has no url`);
+
+      const rawPath = path.join(tmp, `st-raw-${stamp}-${i}.mp4`);
+      const normPath = path.join(tmp, `st-norm-${stamp}-${i}.mp4`);
+      scratch.push(rawPath, normPath);
+
+      const got = await fetch(clip.url);
+      if (!got.ok) throw new Error(`clip ${i} download failed (${got.status})`);
+      fs.writeFileSync(rawPath, Buffer.from(await got.arrayBuffer()));
+
+      let filter = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS}`;
+
+      const subtitle = burnSubtitles === false ? "" : String(clip.subtitle || "").trim();
+      if (subtitle) {
+        const subPath = path.join(tmp, `st-sub-${stamp}-${i}.txt`);
+        scratch.push(subPath);
+        // Written to a file rather than inlined: subtitle text contains
+        // apostrophes and colons, which are filter syntax.
+        fs.writeFileSync(subPath, wrap(subtitle, 34), "utf8");
+        filter +=
+          `,drawtext=textfile='${subPath}':fontfile='${FONT}':fontsize=46:fontcolor=white` +
+          `:borderw=4:bordercolor=black@0.85:line_spacing=10` +
+          `:x=(w-text_w)/2:y=h-text_h-170`;
+      }
+
+      // A clip with no audio track would break the join, so one is supplied.
+      const hasAudio = await probe(rawPath, "a");
+      const args = ["-y", "-i", rawPath];
+      if (!hasAudio) args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+      args.push(
+        "-vf", filter,
+        "-map", "0:v:0",
+        "-map", hasAudio ? "0:a:0" : "1:a:0",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"
+      );
+      if (!hasAudio) args.push("-shortest");
+      args.push(normPath);
+
+      await run(args, `normalise clip ${i}`);
+      normalised.push(normPath);
+    }
+
+    const listPath = path.join(tmp, `st-list-${stamp}.txt`);
+    scratch.push(listPath);
+    fs.writeFileSync(listPath, normalised.map((f) => `file '${f}'`).join("\n"), "utf8");
+
+    const outputPath = path.join(tmp, `st-out-${stamp}.mp4`);
+    scratch.push(outputPath);
+
+    // Every part is now identical, so the join is a stream copy — fast, and
+    // it does not re-compress what was just encoded.
+    await run(
+      ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", outputPath],
+      "join"
+    );
+
+    const episode = fs.readFileSync(outputPath);
+    await r2.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: outputR2Key,
+      Body: episode,
+      ContentType: "video/mp4",
+    }));
+
+    cleanup();
+    console.log(`[stitch-episode] ${clips.length} clips → ${outputR2Key} (${(episode.length / 1024 / 1024).toFixed(1)}MB)`);
+    res.json({ r2Key: outputR2Key, fileSizeBytes: episode.length, clips: clips.length });
+  } catch (err) {
+    cleanup();
+    console.error("[stitch-episode]", err.message);
+    res.status(500).json({ error: String(err.message).slice(0, 400) });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);
 });

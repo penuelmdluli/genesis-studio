@@ -19,8 +19,14 @@ import { CREDIT_PACKS } from "@/lib/constants";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const guard = await requireOwnerOrNotFound();
-  if (guard instanceof NextResponse) return guard;
+  // Owner session, or the cron secret so it can be run from an operator
+  // shell during an incident (same rule as /api/admin/recover-job).
+  const secret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
+  const viaSecret = !!process.env.CRON_SECRET && secret === process.env.CRON_SECRET;
+  if (!viaSecret) {
+    const guard = await requireOwnerOrNotFound();
+    if (guard instanceof NextResponse) return guard;
+  }
 
   const { checkoutId, reference } = (await req.json().catch(() => ({}))) as { checkoutId?: string; reference?: string };
   if (!checkoutId) return NextResponse.json({ error: "checkoutId required" }, { status: 400 });

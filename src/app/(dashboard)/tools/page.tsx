@@ -26,6 +26,7 @@ interface ToolField {
   default?: string | number;
   required?: boolean;
   help?: string;
+  assist?: "lyrics";
 }
 
 interface Tool {
@@ -61,6 +62,37 @@ export default function ToolsPage() {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [mediaSeconds, setMediaSeconds] = useState(0);
+  const [assisting, setAssisting] = useState(false);
+
+  // "Write lyrics for me" — 5 credits, uses the same songwriter as AI Singer.
+  const writeLyrics = async () => {
+    if (!selected || assisting) return;
+    const theme = (values.lyrics || values.vibe || "").trim();
+    if (theme.length < 5) {
+      toast("Type a few words about the song first (who it's for, the vibe), then tap Write lyrics.", "error");
+      return;
+    }
+    setAssisting(true);
+    try {
+      const res = await fetch("/api/ai-singer/generate-lyrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme, genre: values.genre, duration: Number(values.duration) || 30 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.lyrics) {
+        toast(data.error || "Couldn't write lyrics right now.", "error");
+        return;
+      }
+      setValues((v) => ({ ...v, lyrics: data.lyrics }));
+      if (!user?.isOwner && data.creditsCost) updateCreditBalance((user?.creditBalance ?? 0) - data.creditsCost);
+      toast("Lyrics written — edit anything you like, then Run.", "success");
+    } catch {
+      toast("Network error writing lyrics.", "error");
+    } finally {
+      setAssisting(false);
+    }
+  };
   const [running, setRunning] = useState(false);
   const [stage, setStage] = useState<string>("");
   const [progress, setProgress] = useState(0);
@@ -357,6 +389,16 @@ export default function ToolsPage() {
                     />
                   )}
                   {f.help && <p className="text-xs text-zinc-500 mt-1">{f.help}</p>}
+                  {f.assist === "lyrics" && (
+                    <button
+                      type="button"
+                      onClick={writeLyrics}
+                      disabled={assisting || running}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 px-3 py-1.5 text-xs font-medium text-violet-200 disabled:opacity-50"
+                    >
+                      ✨ {assisting ? "Writing…" : "Write lyrics for me"} <span className="text-violet-400/80">· 5 credits</span>
+                    </button>
+                  )}
                 </div>
               ))}
 

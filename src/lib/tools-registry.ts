@@ -28,6 +28,8 @@ export interface ToolField {
   default?: string | number;
   required?: boolean;
   help?: string;
+  /** Offer an AI helper next to the field ("lyrics" → /api/ai-singer/generate-lyrics). */
+  assist?: "lyrics";
 }
 
 export interface ToolDef {
@@ -78,6 +80,30 @@ const MUSIC_GENRES: Array<{ value: string; label: string; tags: string }> = [
   { value: "lofi", label: "Lo-fi Chill", tags: "lofi, chill, mellow, vinyl, 80 bpm" },
   { value: "cinematic", label: "Cinematic", tags: "cinematic, orchestral, epic, emotional" },
 ];
+
+/**
+ * The song model sings exactly what it is given and plays instrumental for
+ * the rest. A one-liner ("Sihle my daughter") over 30 seconds came out as
+ * one sung phrase and 25 seconds of beat — technically correct, not what
+ * anyone wants. Short input becomes a structured hook that repeats to fill
+ * the length; anything already structured or long enough is left alone.
+ */
+export function shapeLyrics(raw: string, durationSec: number): string {
+  const text = raw.trim();
+  if (!text) return "[instrumental]";
+  if (/\[(verse|chorus|hook|bridge|intro|outro|inst|instrumental)/i.test(text)) return text;
+  const words = text.split(/\s+/).filter(Boolean);
+  const target = Math.round(durationSec * 1.6); // ≈ words a vocal covers at song pace
+  if (words.length >= target * 0.6) return text;
+
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const hook = lines.slice(0, 2).join("\n");
+  const verse = lines.length > 2 ? lines.slice(2).join("\n") : hook;
+  const sections = [`[verse]\n${verse}`, `[chorus]\n${hook}\n${hook}`];
+  if (durationSec >= 60) sections.push(`[verse]\n${verse}`, `[chorus]\n${hook}\n${hook}`);
+  if (durationSec >= 120) sections.push(`[bridge]\n${verse}`, `[chorus]\n${hook}\n${hook}\n${hook}`);
+  return sections.join("\n\n");
+}
 
 export const TOOLS: ToolDef[] = [
   {
@@ -164,7 +190,14 @@ export const TOOLS: ToolDef[] = [
     fields: [
       { key: "genre", label: "Genre", kind: "select", options: MUSIC_GENRES.map((g) => ({ value: g.value, label: g.label })), default: "amapiano", required: true },
       { key: "duration", label: "Length (seconds)", kind: "select", options: [{ value: "30", label: "30s (Reel / TikTok)" }, { value: "60", label: "60s" }, { value: "120", label: "2 min" }], default: "30" },
-      { key: "lyrics", label: "Lyrics (leave empty for an instrumental beat)", kind: "textarea", placeholder: "Verse 1...\nChorus..." },
+      {
+        key: "lyrics",
+        label: "Lyrics (leave empty for an instrumental beat)",
+        kind: "textarea",
+        placeholder: "[verse]\nSihle, my daughter, light of my morning...\n[chorus]\n...",
+        help: "A 30s track sings roughly 40–60 words; 60s about 100. A single line becomes a hook that repeats — or tap \"Write lyrics for me\".",
+        assist: "lyrics",
+      },
       { key: "vibe", label: "Extra vibe words (optional)", kind: "text", placeholder: "e.g. summer, braai, sunset, energetic" },
     ],
     credits: 8,
@@ -176,8 +209,8 @@ export const TOOLS: ToolDef[] = [
     buildInput: (i) => {
       const genre = MUSIC_GENRES.find((g) => g.value === i.genre) || MUSIC_GENRES[0];
       const tags = [genre.tags, i.vibe].filter(Boolean).join(", ");
-      const lyrics = (i.lyrics || "").trim() || "[instrumental]";
-      return { tags, lyrics, duration: Number(i.duration) || 30 };
+      const duration = Number(i.duration) || 30;
+      return { tags, lyrics: shapeLyrics(i.lyrics || "", duration), duration };
     },
   },
   {

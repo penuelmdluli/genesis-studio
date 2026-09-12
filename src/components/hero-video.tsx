@@ -153,8 +153,24 @@ export function HeroVideo() {
           />
         ))}
 
-      {/* ---- Dark overlays for text readability — always on top ---- */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-transparent" />
+      {/* ---- Readability scrim — always on top ----
+           The old stack faded to fully transparent by mid-frame, which is
+           exactly where the vertically-centred headline sits: over a bright
+           video (a sunlit bird, a white studio) the copy washed out. Worst on
+           phones, where the text block fills much more of the screen.
+
+           Three layers: a top-down wash that never reaches zero, a soft
+           radial pool behind the words themselves, and the existing fade into
+           the page below. The radial is what buys legibility without muddying
+           the whole image — it darkens the middle and leaves the edges alone. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/40 sm:from-black/70 sm:via-black/45 sm:to-black/25" />
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse 80% 55% at 50% 45%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 55%, transparent 100%)",
+        }}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-transparent to-transparent" />
     </div>
   );

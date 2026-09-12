@@ -18,6 +18,8 @@ import { getTool, planAllows, publicTools, toolPrice } from "@/lib/tools-registr
 import { submitWsModel, runWsModelSync, wsJobRef } from "@/lib/wavespeed-tools";
 import { toUserFacingProviderError, isOperatorActionable } from "@/lib/user-errors";
 import { sendSlackAlert } from "@/lib/alerts";
+import { getDb } from "@/lib/db-driver";
+import { r2PublicUrl, videoStorageKey } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,24 @@ export async function POST(req: NextRequest) {
     const inputs: Record<string, string> = {};
     for (const [k, v] of Object.entries(body.inputs || {})) {
       if (typeof v === "string") inputs[k] = v.slice(0, 4000);
+    }
+
+    // A video already in the user's gallery is addressed by id, not URL: the
+    // page only ever sees /api/videos/<id>, and making someone download and
+    // re-upload their own video to add sound to it is the kind of friction
+    // that stops a creator finishing the job. Ownership is re-checked here.
+    if (inputs.videoId && !inputs.video) {
+      const db = getDb();
+      const { data: video } = await db
+        .from("videos")
+        .select("id, user_id, job_id")
+        .eq("id", inputs.videoId)
+        .maybeSingle();
+      if (!video || video.user_id !== user.id) {
+        return NextResponse.json({ error: "That video is not in your gallery" }, { status: 404 });
+      }
+      inputs.video = r2PublicUrl(videoStorageKey(video.user_id, video.job_id));
+      delete inputs.videoId;
     }
     for (const spec of tool.inputs) {
       const v = inputs[spec.key];

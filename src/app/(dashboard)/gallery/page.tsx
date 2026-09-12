@@ -26,6 +26,8 @@ import {
   Sparkles,
   RefreshCw,
   Share2,
+  Type,
+  Globe,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
@@ -493,6 +495,31 @@ export default function GalleryPage() {
                   <Share2 className="w-4 h-4" />
                   Share
                 </button>
+                {/* Finish the job here. A clip usually needs sound and
+                    captions before it is postable, and making someone
+                    download it and upload it again to a different page is
+                    where creators gave up. */}
+                <a
+                  href={`/tools?tool=add-sound&videoId=${currentVideo.id}&title=${encodeURIComponent(currentVideo.title)}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  Add sound
+                </a>
+                <a
+                  href={`/captions?videoId=${currentVideo.id}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Type className="w-4 h-4" />
+                  Captions
+                </a>
+                <a
+                  href={`/tools?tool=dub&videoId=${currentVideo.id}&title=${encodeURIComponent(currentVideo.title)}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Globe className="w-4 h-4" />
+                  Translate
+                </a>
                 <button
                   onClick={(e) => handlePostToPages(e, currentVideo.id)}
                   className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 shadow-lg shadow-blue-600/20"

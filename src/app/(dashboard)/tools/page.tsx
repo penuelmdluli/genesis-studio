@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/ui/motion";
@@ -62,6 +63,9 @@ export default function ToolsPage() {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [mediaSeconds, setMediaSeconds] = useState(0);
+  // A video handed over from the Gallery: we hold its id, not a file, so the
+  // creator never has to download and re-upload their own work.
+  const [galleryVideo, setGalleryVideo] = useState<{ id: string; title: string } | null>(null);
   const [assisting, setAssisting] = useState(false);
 
   // "Write lyrics for me" — 5 credits, uses the same songwriter as AI Singer.
@@ -101,6 +105,24 @@ export default function ToolsPage() {
   const lockRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const searchParams = useSearchParams();
+  const deepLinked = useRef(false);
+
+  // Arriving from "Add sound" on a finished video: open that tool with the
+  // video already attached, so the next step is one tap.
+  useEffect(() => {
+    if (deepLinked.current || tools.length === 0) return;
+    const toolId = searchParams.get("tool");
+    const videoId = searchParams.get("videoId");
+    if (!toolId) return;
+    const t = tools.find((x) => x.id === toolId);
+    if (!t) return;
+    deepLinked.current = true;
+    pick(t);
+    if (videoId) setGalleryVideo({ id: videoId, title: searchParams.get("title") || "Your video" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tools, searchParams]);
+
   useEffect(() => {
     fetch("/api/tools")
       .then((r) => (r.ok ? r.json() : { tools: [] }))
@@ -119,6 +141,7 @@ export default function ToolsPage() {
     setError(null);
     setProgress(0);
     setMediaSeconds(0);
+    setGalleryVideo(null);
     const defaults: Record<string, string> = {};
     for (const f of tool.fields || []) if (f.default !== undefined) defaults[f.key] = String(f.default);
     setValues(defaults);
@@ -162,7 +185,7 @@ export default function ToolsPage() {
 
   const ready =
     !!selected &&
-    selected.inputs.every((i) => !i.required || !!files[i.key]) &&
+    selected.inputs.every((i) => !i.required || !!files[i.key] || (i.key === "video" && !!galleryVideo)) &&
     (selected.fields || []).every((f) => !f.required || !!values[f.key]);
 
   const run = useCallback(async () => {
@@ -185,6 +208,7 @@ export default function ToolsPage() {
     try {
       const inputs: Record<string, string> = { ...values };
       if (mediaSeconds > 0) inputs.duration_seconds = String(mediaSeconds);
+      if (galleryVideo && !files.video) inputs.videoId = galleryVideo.id;
       for (const spec of selected.inputs) {
         const f = files[spec.key];
         if (!f) continue;
@@ -323,6 +347,20 @@ export default function ToolsPage() {
                     {spec.label}
                     {spec.required && <span className="text-red-400"> *</span>}
                   </label>
+                  {spec.key === "video" && galleryVideo && !files.video ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                      <div className="min-w-0">
+                        <div className="text-sm text-emerald-300 font-medium truncate">{galleryVideo.title}</div>
+                        <div className="text-xs text-zinc-500">From your gallery — nothing to upload</div>
+                      </div>
+                      <button
+                        onClick={() => setGalleryVideo(null)}
+                        className="shrink-0 text-xs text-zinc-400 hover:text-white underline"
+                      >
+                        Use a different video
+                      </button>
+                    </div>
+                  ) : (
                   <label
                     className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 cursor-pointer transition ${
                       files[spec.key] ? "border-emerald-500/40 bg-emerald-500/5" : "border-white/[0.12] hover:border-violet-500/40"
@@ -350,6 +388,7 @@ export default function ToolsPage() {
                     )}
                     {files[spec.key] && <span className="text-xs text-zinc-500">{files[spec.key]?.name}</span>}
                   </label>
+                  )}
                 </div>
               ))}
 

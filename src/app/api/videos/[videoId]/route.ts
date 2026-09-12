@@ -6,9 +6,20 @@ import { r2PublicUrl, deleteFile, verifyR2Upload } from "@/lib/storage";
 
 async function findVideoKeyInR2(
   userId: string,
-  jobId: string
+  jobId: string,
+  videoId?: string
 ): Promise<string | null> {
+  // Derived files are stored under their OWN id with a prefix, never under
+  // the job they came from. Those are tried first: a joined episode and a
+  // branded copy both share a job id with something else, so falling through
+  // to the job-based names would serve the wrong video — an assembled
+  // episode returned 404, and a branded copy played the unbranded original.
+  const derived = videoId
+    ? [`videos/${userId}/episode-${videoId}.mp4`, `videos/${userId}/branded-${videoId}.mp4`]
+    : [];
+
   const candidates = [
+    ...derived,
     `mimic-final/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}`,
@@ -65,7 +76,7 @@ export async function GET(
 
     // Find the video file in R2 (tries multiple key formats)
     const r2LookupId = video.job_id || videoId;
-    const key = await findVideoKeyInR2(video.user_id, r2LookupId);
+    const key = await findVideoKeyInR2(video.user_id, r2LookupId, videoId);
     if (!key) {
       return NextResponse.json(
         { error: "Video file not found in storage" },
@@ -76,6 +87,24 @@ export async function GET(
     // Redirect to the public R2 URL (custom domain).
     // Bytes flow R2 → browser directly, never through the Worker.
     const publicUrl = r2PublicUrl(key);
+
+    // A plain redirect sends the browser to another origin, where the
+    // download attribute on a link is ignored and the file simply plays.
+    // `?download=1` streams it back with a filename attached so Save works.
+    if (req.nextUrl.searchParams.get("download") === "1") {
+      const upstream = await fetch(publicUrl);
+      if (!upstream.ok || !upstream.body) {
+        return NextResponse.json({ error: "Could not fetch that video" }, { status: 502 });
+      }
+      const safeName = (video.title || "video").replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "video";
+      return new NextResponse(upstream.body, {
+        headers: {
+          "Content-Type": "video/mp4",
+          "Content-Disposition": `attachment; filename="${safeName}.mp4"`,
+          "Cache-Control": "private, max-age=3540",
+        },
+      });
+    }
 
     return NextResponse.redirect(publicUrl, {
       status: 302,

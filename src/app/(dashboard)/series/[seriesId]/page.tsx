@@ -330,8 +330,7 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                               />
                               <div className="flex flex-wrap gap-2 mt-3">
                                 <a
-                                  href={detail.episode.videoUrl}
-                                  download
+                                  href={`${detail.episode.videoUrl}?download=1`}
                                   className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium"
                                 >
                                   Download

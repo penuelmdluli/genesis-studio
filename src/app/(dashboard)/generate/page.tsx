@@ -814,7 +814,8 @@ export default function GeneratePage() {
                 </div>
               </div>
 
-              {/* Draft Mode Toggle */}
+              {/* Draft Mode Toggle — only for models with a real draft engine; otherwise it would be full price with a "draft" label */}
+              {(currentModel?.wavespeedModelIdDraft || currentModel?.wavespeedModelIdDraftI2V) && (
               <div className="p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
                 <Switch
                   checked={form.isDraft}
@@ -823,6 +824,7 @@ export default function GeneratePage() {
                   description="Fast preview, 70% cheaper. Refine later."
                 />
               </div>
+              )}
 
               {/* Advanced Settings */}
               <button

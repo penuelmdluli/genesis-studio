@@ -5,6 +5,7 @@ import { refundCredits } from "@/lib/credits";
 import { sendSlackAlert } from "@/lib/alerts";
 import { getWsPrediction, wsStatusOf, submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
 import { toUserFacingProviderError } from "@/lib/user-errors";
+import { sqlTimestamp } from "@/lib/job-finalizer";
 
 // Cron: advances AI Singer jobs. Runs every minute.
 //
@@ -163,7 +164,9 @@ export async function GET(req: NextRequest) {
 
   // ── Timeout stale jobs (older than 20 minutes) ───────────────────────
   let timedOut = 0;
-  const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  // created_at is SQL-formatted ("YYYY-MM-DD HH:MM:SS"); an ISO cutoff
+  // string-compares as newer than every same-day row. See sqlTimestamp().
+  const cutoff = sqlTimestamp(new Date(Date.now() - 20 * 60 * 1000));
   const { data: staleJobs } = await db
     .from("generation_jobs")
     .select("id, user_id, credits_cost")

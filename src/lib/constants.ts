@@ -16,7 +16,7 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "MoE architecture. Best cinematic quality. Complex motion & camera movements.",
     maxResolution: "1080p",
     avgGenerationTime: 300,
-    creditCost: { "480p": 20, "720p": 40, "1080p": 80 },
+    creditCost: { "480p": 30, "720p": 40, "1080p": 80 },
     gpuRequirement: "48GB+ (A6000/H100)",
     license: "Apache 2.0",
     // Was provider:"runpod-hub" against RUNPOD_ENDPOINT_WAN22, which has

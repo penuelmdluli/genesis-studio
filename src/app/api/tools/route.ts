@@ -14,7 +14,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
-import { getTool, planAllows, publicTools } from "@/lib/tools-registry";
+import { getTool, planAllows, publicTools, toolPrice } from "@/lib/tools-registry";
 import { submitWsModel, runWsModelSync, wsJobRef } from "@/lib/wavespeed-tools";
 import { toUserFacingProviderError, isOperatorActionable } from "@/lib/user-errors";
 import { sendSlackAlert } from "@/lib/alerts";
@@ -62,10 +62,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${tool.name} needs the ${planName} plan or higher.`, upgrade: true }, { status: 403 });
     }
 
+    // Media length comes from the browser's metadata probe; the server clamps
+    // it and bills a full minute when it is missing.
+    const mediaSeconds = Number(inputs.duration_seconds) || 0;
+    const credits = toolPrice(tool, mediaSeconds);
+
     if (!ownerAccount) {
-      const { success, newBalance } = await deductCredits(user.id, tool.credits, "", `${tool.name}`);
+      const { success, newBalance } = await deductCredits(user.id, credits, "", `${tool.name}`);
       if (!success) {
-        return NextResponse.json({ error: "Insufficient credits", required: tool.credits, balance: newBalance }, { status: 402 });
+        return NextResponse.json({ error: "Insufficient credits", required: credits, balance: newBalance }, { status: 402 });
       }
     }
 
@@ -76,7 +81,7 @@ export async function POST(req: NextRequest) {
         const p = await runWsModelSync(tool.model, providerInput, { timeoutMs: 90_000 });
         const output = p.outputs?.[0];
         if (!output) throw new Error("no output returned");
-        return NextResponse.json({ status: "completed", outputUrl: output, outputKind: tool.outputKind, creditsCost: tool.credits });
+        return NextResponse.json({ status: "completed", outputUrl: output, outputKind: tool.outputKind, creditsCost: credits });
       }
 
       // Job mode — a row the poller can finish later.
@@ -88,10 +93,10 @@ export async function POST(req: NextRequest) {
         inputVideoUrl: inputs.video || inputs.audio || undefined,
         inputImageUrl: inputs.image || undefined,
         resolution: "720p",
-        duration: Number(inputs.duration) || 0,
+        duration: Math.round(mediaSeconds) || Number(inputs.duration) || 0,
         fps: 30,
         isDraft: false,
-        creditsCost: ownerAccount ? 0 : tool.credits,
+        creditsCost: ownerAccount ? 0 : credits,
         aspectRatio: "landscape",
       });
 
@@ -103,11 +108,11 @@ export async function POST(req: NextRequest) {
         startedAt: new Date().toISOString(),
       });
 
-      return NextResponse.json({ status: "processing", jobId: job.id, estimatedTime: tool.estimatedSeconds, creditsCost: tool.credits });
+      return NextResponse.json({ status: "processing", jobId: job.id, estimatedTime: tool.estimatedSeconds, creditsCost: credits });
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       console.error(`[TOOLS] ${tool.id} failed:`, raw);
-      if (!ownerAccount) await refundCredits(user.id, tool.credits, "", `${tool.name} failed — automatic refund`);
+      if (!ownerAccount) await refundCredits(user.id, credits, "", `${tool.name} failed — automatic refund`);
       sendSlackAlert({
         level: isOperatorActionable(raw) ? "critical" : "warning",
         title: `Tool failed: ${tool.name}`,

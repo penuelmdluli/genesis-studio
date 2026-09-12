@@ -34,6 +34,23 @@ import { getMotionJobStatus, getMotionJobResult } from "@/lib/motion-control";
 import { AI_MODELS } from "@/lib/constants";
 import { ModelId, GenerationType, AspectRatio } from "@/types";
 
+/**
+ * D1 writes `created_at` as "YYYY-MM-DD HH:MM:SS" (CURRENT_TIMESTAMP), and the
+ * shim compares it as a string. An ISO cutoff ("...T...Z") sorts AFTER every
+ * same-day SQL timestamp because " " < "T", so `created_at < isoCutoff` was
+ * true for every job created today — the reaper killed brand-new tool jobs
+ * two seconds after creation. Cutoffs on created_at must use this format.
+ */
+export function sqlTimestamp(d: Date): string {
+  return d.toISOString().replace("T", " ").slice(0, 19);
+}
+
+/** Age in ms from either timestamp format. */
+export function jobAgeMs(createdAt: string): number {
+  const iso = createdAt.includes("T") ? createdAt : createdAt.replace(" ", "T") + "Z";
+  return Date.now() - new Date(iso).getTime();
+}
+
 /** Absolute longest we wait for any hosted render before giving up. */
 export const HOSTED_HARD_CAP_MS = 45 * 60 * 1000;
 /** How much extra time a still-running job gets when its deadline passes. */
@@ -216,7 +233,7 @@ export async function sweepActiveHostedJobs(opts: { minAgeSec?: number; limit?: 
   const minAgeSec = opts.minAgeSec ?? 45;
   const limit = opts.limit ?? 25;
   const db = getDb();
-  const cutoff = new Date(Date.now() - minAgeSec * 1000).toISOString();
+  const cutoff = sqlTimestamp(new Date(Date.now() - minAgeSec * 1000));
 
   const { data: jobs } = await db
     .from("generation_jobs")
@@ -231,6 +248,7 @@ export async function sweepActiveHostedJobs(opts: { minAgeSec?: number; limit?: 
   const hosted = ((jobs || []) as HostedJobRow[])
     .filter((j) => !!j.runpod_job_id && (j.runpod_job_id.startsWith("ws:") || j.runpod_job_id.startsWith("fal:")))
     .filter((j) => !isToolJob(j))
+    .filter((j) => jobAgeMs(j.created_at) >= minAgeSec * 1000)
     .slice(0, limit);
   for (const job of hosted) {
     summary.checked++;

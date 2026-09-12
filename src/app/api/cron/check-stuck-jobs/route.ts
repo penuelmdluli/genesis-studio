@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db-driver";
 import { refundCredits } from "@/lib/credits";
-import { pollHostedJob, finalizeHostedJob, failHostedJob, isToolJob, HOSTED_HARD_CAP_MS, type HostedJobRow } from "@/lib/job-finalizer";
+import { pollHostedJob, finalizeHostedJob, failHostedJob, isToolJob, HOSTED_HARD_CAP_MS, sqlTimestamp, jobAgeMs, type HostedJobRow } from "@/lib/job-finalizer";
 
 export const maxDuration = 60;
 
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   }
 
   const db = getDb();
-  const cutoff = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
+  const cutoff = sqlTimestamp(new Date(Date.now() - STUCK_TIMEOUT_MS));
 
   // Find jobs stuck in queued/processing for 30+ minutes
   const { data: stuckJobs } = await db
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     const jobId = job.runpod_job_id as string | null;
 
     // Long-running providers get a longer leash than the 30-minute query cutoff.
-    const age = Date.now() - new Date(job.created_at as string).getTime();
+    const age = jobAgeMs(job.created_at as string);
     if (age < stuckTimeoutFor(jobId)) continue;
 
     summary.checked++;

@@ -15,6 +15,7 @@ import { uploadVideo, uploadAudio, videoStorageKey, audioStorageKey, r2PublicUrl
 import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { getTool } from "@/lib/tools-registry";
 import { toUserFacingProviderError } from "@/lib/user-errors";
+import { jobAgeMs } from "@/lib/job-finalizer";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
       return NextResponse.json({ status: "completed", outputUrl, outputKind, progress: 100 });
     }
 
-    const age = Date.now() - new Date(job.created_at).getTime();
+    const age = jobAgeMs(job.created_at);
     if (age > TIMEOUT_MS) return fail("timed out");
 
     const progress = status === "IN_PROGRESS" ? Math.min(90, 30 + Math.round(age / 2000)) : 15;

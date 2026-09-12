@@ -26,6 +26,8 @@ import {
   isToolJob,
   HOSTED_HARD_CAP_MS,
   DEADLINE_EXTENSION_MS,
+  sqlTimestamp,
+  jobAgeMs,
   type HostedJobRow,
 } from "@/lib/job-finalizer";
 
@@ -59,7 +61,8 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Pass 2: deadlines ──────────────────────────────────────────────────
-  const fallbackCutoff = new Date(Date.now() - FALLBACK_TIMEOUT_MINUTES * 60_000).toISOString();
+  // created_at is SQL-formatted; see sqlTimestamp().
+  const fallbackCutoff = sqlTimestamp(new Date(Date.now() - FALLBACK_TIMEOUT_MINUTES * 60_000));
   const cols =
     "id, user_id, model_id, type, runpod_job_id, credits_cost, prompt, resolution, duration, fps, aspect_ratio, audio_url, audio_track_id, created_at, status, deadline_at";
 
@@ -94,7 +97,10 @@ export async function GET(req: NextRequest) {
 
   for (const job of stale) {
     try {
-      const age = Date.now() - new Date(job.created_at).getTime();
+      const age = jobAgeMs(job.created_at);
+      // Belt and braces for the no-deadline branch: never time out anything
+      // younger than the fallback window whatever the query returned.
+      if (!job.deadline_at && age < FALLBACK_TIMEOUT_MINUTES * 60_000) continue;
       const hosted = !!job.runpod_job_id && (job.runpod_job_id.startsWith("ws:") || job.runpod_job_id.startsWith("fal:"));
 
       // Tool jobs are finalized by their own poller; only the hard cap applies.

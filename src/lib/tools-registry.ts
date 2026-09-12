@@ -38,7 +38,10 @@ export interface ToolDef {
   /** What the user must supply. */
   inputs: Array<{ kind: ToolInputKind; key: string; label: string; required?: boolean }>;
   fields?: ToolField[];
+  /** Base credits. */
   credits: number;
+  /** Extra credits per second of input media, for providers that bill per second. */
+  creditsPerSecond?: number;
   minPlan: PlanId;
   /** "sync" tools answer in one request; "job" tools return a job id to poll. */
   mode: "sync" | "job";
@@ -123,7 +126,9 @@ export const TOOLS: ToolDef[] = [
       { kind: "video", key: "video", label: "Video", required: true },
       { kind: "image", key: "background_image", label: "New background (optional)" },
     ],
-    credits: 25,
+    // Provider bills ≈ $0.05/s.
+    credits: 10,
+    creditsPerSecond: 8,
     minPlan: "creator",
     mode: "job",
     outputKind: "video",
@@ -140,7 +145,9 @@ export const TOOLS: ToolDef[] = [
     fields: [
       { key: "target_lang", label: "Translate into", kind: "select", options: DUB_LANGS, default: "pt", required: true },
     ],
-    credits: 40,
+    // Dubbing bills per second of speech (≈ $0.01/s list, ≈ $0.02/s effective).
+    credits: 10,
+    creditsPerSecond: 4,
     minPlan: "creator",
     mode: "job",
     outputKind: "video",
@@ -199,7 +206,9 @@ export const TOOLS: ToolDef[] = [
       { kind: "video", key: "video", label: "Talking video", required: true },
       { kind: "audio", key: "audio", label: "New audio (MP3/WAV)", required: true },
     ],
-    credits: 30,
+    // sync/lipsync-2 bills ≈ $0.05/s.
+    credits: 10,
+    creditsPerSecond: 8,
     minPlan: "creator",
     mode: "job",
     outputKind: "video",
@@ -208,6 +217,14 @@ export const TOOLS: ToolDef[] = [
     buildInput: (i) => ({ video: i.video, audio: i.audio, sync_mode: "cut_off" }),
   },
 ];
+
+/** Credits for a run, given the input media length in seconds (0 when unknown). */
+export function toolPrice(tool: ToolDef, seconds: number): number {
+  if (!tool.creditsPerSecond) return tool.credits;
+  // Unknown length is billed as a full minute so a missing probe can never undercharge.
+  const s = seconds > 0 ? Math.min(seconds, 600) : 60;
+  return tool.credits + Math.ceil(s) * tool.creditsPerSecond;
+}
 
 export function getTool(id: string): ToolDef | undefined {
   return TOOLS.find((t) => t.id === id);

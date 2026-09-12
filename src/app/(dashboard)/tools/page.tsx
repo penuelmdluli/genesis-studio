@@ -36,6 +36,7 @@ interface Tool {
   inputs: Array<{ kind: InputKind; key: string; label: string; required?: boolean }>;
   fields?: ToolField[];
   credits: number;
+  creditsPerSecond?: number;
   minPlan: "free" | "creator" | "pro" | "studio";
   mode: "sync" | "job";
   outputKind: "image" | "video" | "audio";
@@ -59,6 +60,7 @@ export default function ToolsPage() {
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [values, setValues] = useState<Record<string, string>>({});
+  const [mediaSeconds, setMediaSeconds] = useState(0);
   const [running, setRunning] = useState(false);
   const [stage, setStage] = useState<string>("");
   const [progress, setProgress] = useState(0);
@@ -84,13 +86,35 @@ export default function ToolsPage() {
     setResult(null);
     setError(null);
     setProgress(0);
+    setMediaSeconds(0);
     const defaults: Record<string, string> = {};
     for (const f of tool.fields || []) if (f.default !== undefined) defaults[f.key] = String(f.default);
     setValues(defaults);
   };
 
+  // Per-second tools need the clip length up front so the price shown is the
+  // price charged. Read it from the browser's metadata decode.
+  const probeDuration = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const el = document.createElement(file.type.startsWith("audio/") ? "audio" : "video");
+    el.preload = "metadata";
+    el.onloadedmetadata = () => {
+      if (Number.isFinite(el.duration)) setMediaSeconds(Math.ceil(el.duration));
+      URL.revokeObjectURL(url);
+    };
+    el.src = url;
+  };
+
+  const priceFor = (tool: Tool) => {
+    if (!tool.creditsPerSecond) return tool.credits;
+    const s = mediaSeconds > 0 ? Math.min(mediaSeconds, 600) : 60;
+    return tool.credits + s * tool.creditsPerSecond;
+  };
+
   const onFile = (key: string, file: File | null) => {
     setFiles((prev) => ({ ...prev, [key]: file }));
+    if (file && key === "video") probeDuration(file);
+    if (!file && key === "video") setMediaSeconds(0);
     setPreviews((prev) => {
       const next = { ...prev };
       if (prev[key]) URL.revokeObjectURL(prev[key]);
@@ -102,7 +126,7 @@ export default function ToolsPage() {
 
   const userPlan = user?.plan || "free";
   const canUse = (tool: Tool) => !!user?.isOwner || PLAN_RANK[userPlan as keyof typeof PLAN_RANK] >= PLAN_RANK[tool.minPlan];
-  const hasCredits = (tool: Tool) => !!user?.isOwner || (user?.creditBalance ?? 0) >= tool.credits;
+  const hasCredits = (tool: Tool) => !!user?.isOwner || (user?.creditBalance ?? 0) >= priceFor(tool);
 
   const ready =
     !!selected &&
@@ -128,6 +152,7 @@ export default function ToolsPage() {
 
     try {
       const inputs: Record<string, string> = { ...values };
+      if (mediaSeconds > 0) inputs.duration_seconds = String(mediaSeconds);
       for (const spec of selected.inputs) {
         const f = files[spec.key];
         if (!f) continue;
@@ -149,7 +174,7 @@ export default function ToolsPage() {
         trackEvent("tool_failed", { tool: selected.id, status: res.status });
         return;
       }
-      if (!user?.isOwner) updateCreditBalance((user?.creditBalance ?? 0) - (data.creditsCost || selected.credits));
+      if (!user?.isOwner) updateCreditBalance((user?.creditBalance ?? 0) - (data.creditsCost || priceFor(selected)));
 
       if (data.status === "completed") {
         setResult({ url: data.outputUrl, kind: data.outputKind });
@@ -228,7 +253,7 @@ export default function ToolsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-3xl">{t.emoji}</span>
                   <span className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 whitespace-nowrap">
-                    {t.credits} credits
+                    {t.creditsPerSecond ? `${t.credits} + ${t.creditsPerSecond}/s` : `${t.credits} credits`}
                   </span>
                 </div>
                 <h3 className="mt-3 font-semibold text-zinc-100">{t.name}</h3>
@@ -337,7 +362,8 @@ export default function ToolsPage() {
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-sm text-zinc-400 flex items-center gap-1">
-                  <Zap className="w-4 h-4 text-violet-400" /> {selected.credits} credits · ~{selected.estimatedSeconds}s
+                  <Zap className="w-4 h-4 text-violet-400" /> {priceFor(selected)} credits
+                  {selected.creditsPerSecond && mediaSeconds > 0 ? ` (${mediaSeconds}s clip)` : selected.creditsPerSecond ? " (per second of video)" : ""} · ~{selected.estimatedSeconds}s
                 </span>
                 <Button onClick={run} disabled={!ready || running || !canUse(selected)}>
                   {running ? <GenesisButtonLoader /> : <Zap className="w-4 h-4" />}
@@ -346,7 +372,7 @@ export default function ToolsPage() {
               </div>
               {!hasCredits(selected) && canUse(selected) && (
                 <p className="text-xs text-amber-400">
-                  You need {selected.credits} credits.{" "}
+                  You need {priceFor(selected)} credits.{" "}
                   <button onClick={() => setCreditPurchaseOpen(true)} className="underline">
                     Buy credits
                   </button>

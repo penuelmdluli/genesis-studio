@@ -69,9 +69,10 @@ export async function POST(req: NextRequest) {
     const ownerAccount = isOwnerClerkId(clerkId);
     const targetDuration = Math.min(Math.max(Number(duration) || 30, 10), 60);
     const ar = aspectRatio === "16:9" ? "16:9" : "9:16";
-    // Song ≈ $0.02 flat; lip-sync ≈ $0.075/s → 30s ≈ $2.27. 30 + 30 = 60
-    // credits ≈ $1.44 was underwater, so the per-second rate is now 3.
-    const creditsCost = 30 + targetDuration * 3;
+    // Song ≈ $0.02 flat; lip-sync ≈ $0.075/s → 30s ≈ $2.27. At the cheapest
+    // credit tier ($0.01) that needs 230+ credits just to break even, so the
+    // rate is 10/s + 30: 30s = 330 credits ($3.30 floor, $7.90 at Creator).
+    const creditsCost = 30 + targetDuration * 10;
 
     if (!ownerAccount) {
       const { success, newBalance } = await deductCredits(user.id, creditsCost, "", `AI Singer: ${targetDuration}s ${genre || "custom"}`);

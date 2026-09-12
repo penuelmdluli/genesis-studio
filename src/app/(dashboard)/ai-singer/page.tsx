@@ -126,7 +126,7 @@ export default function AiSingerPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const credits = user?.creditBalance ?? 0;
-  const creditCost = 30 + duration;
+  const creditCost = 30 + duration * 10;
   const hasEnoughCredits = user?.isOwner || credits >= creditCost;
   const hasFace = !!faceFile;
   const hasSong = songSource === "lyrics" || songSource === "ai-generate" ? lyrics.trim().length > 20 : !!(songFile || songUrl);

@@ -99,10 +99,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Talking Avatar requires a Creator or higher plan" }, { status: 403 });
     }
 
-    // 120 credits per 10s. The lip-sync model bills per second of output
-    // (~$0.075/s → 10s ≈ $0.75); 120 credits ≈ $2.88, a healthy margin.
-    const effectiveDuration = duration || 10;
-    const creditsCost = Math.ceil(effectiveDuration / 10) * 120;
+    // 150 credits per 10s. The lip-sync model bills per second of output
+    // (~$0.075/s → 10s ≈ $0.75). Credits are worth $0.010–0.024 depending on
+    // the plan, so 150 is 2x cost at the cheapest tier and 4.8x at Creator.
+    const effectiveDuration = Math.min(Math.max(Number(duration) || 10, 5), 60);
+    const creditsCost = Math.ceil(effectiveDuration / 10) * 150;
 
     if (!ownerAccount) {
       const { success, newBalance } = await deductCredits(

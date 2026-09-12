@@ -19,8 +19,8 @@ import { CREDIT_PACKS } from "@/lib/constants";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const denied = await requireOwnerOrNotFound();
-  if (denied) return denied;
+  const guard = await requireOwnerOrNotFound();
+  if (guard instanceof NextResponse) return guard;
 
   const { checkoutId, reference } = (await req.json().catch(() => ({}))) as { checkoutId?: string; reference?: string };
   if (!checkoutId) return NextResponse.json({ error: "checkoutId required" }, { status: 400 });

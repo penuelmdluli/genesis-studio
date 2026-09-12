@@ -14,6 +14,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 import { getPendingCheckout, markCheckout } from "./pending";
 import { nextPeriodEnd } from "@/lib/billing";
 import { sendPlanUpgradeEmail, sendCreditPackReceiptEmail } from "@/lib/email";
+import { notifyOwner } from "@/lib/owner-notify";
 
 const PLAN_CREDITS: Record<PlanId, number> = {
   free: 100,
@@ -124,6 +125,13 @@ export async function processWebhookPayment(
       `[${providerName.toUpperCase()}] Non-success event: ${result.event} (ref: ${result.reference})`
     );
     if (result.event === "payment.failed") {
+      notifyOwner({
+        subject: "A customer payment failed",
+        title: "Payment failed",
+        body: `A ${providerName} payment did not go through. If this repeats across customers, the payment rail itself may be down.`,
+        severity: "warning",
+        details: [["Provider", providerName], ["Reference", result.reference || "—"], ["User", result.metadata?.userId || "unknown"]],
+      }).catch(() => {});
       sendSlackAlert({
         level: "warning",
         title: "Payment failed",
@@ -202,9 +210,10 @@ export async function processWebhookPayment(
     // current end, so nobody loses days by paying before the reminder.
     const currentEnd = user.plan_expires_at ? new Date(user.plan_expires_at) : null;
     const extendFrom = currentEnd && currentEnd > new Date() && user.plan === planId ? currentEnd : new Date();
+    const periodEnd = nextPeriodEnd(extendFrom);
     await supabase
       .from("users")
-      .update({ plan_expires_at: nextPeriodEnd(extendFrom) })
+      .update({ plan_expires_at: periodEnd })
       .eq("id", user.id);
 
     // Record successful processing for idempotency
@@ -215,11 +224,33 @@ export async function processWebhookPayment(
       `[${providerName.toUpperCase()}] Subscription activated: user ${user.id}, plan ${planId}, ${PLAN_CREDITS[planId]} credits`
     );
 
+    const planLabel = planId.charAt(0).toUpperCase() + planId.slice(1);
+
     if (user.email) {
-      sendPlanUpgradeEmail(user.email, user.name || "Creator", planId.charAt(0).toUpperCase() + planId.slice(1)).catch(
-        (err) => console.error(`[${providerName.toUpperCase()}] Upgrade email failed:`, err)
-      );
+      sendPlanUpgradeEmail(
+        user.email,
+        user.name || "Creator",
+        planLabel,
+        { amountCents: result.amount, currency: "ZAR", reference: result.reference, provider: providerName },
+        periodEnd
+      ).catch((err) => console.error(`[${providerName.toUpperCase()}] Upgrade email failed:`, err));
     }
+
+    notifyOwner({
+      subject: `New ${planLabel} subscriber — ${user.email}`,
+      title: "You have a new subscriber",
+      body: `<strong>${user.name || "A customer"}</strong> (${user.email}) just subscribed to the <strong>${planLabel}</strong> plan.`,
+      severity: "info",
+      details: [
+        ["Plan", planLabel],
+        ["Amount", result.amount ? `R${(result.amount / 100).toFixed(2)}` : "—"],
+        ["Credits granted", PLAN_CREDITS[planId].toLocaleString()],
+        ["Paid via", providerName],
+        ["Reference", result.reference],
+      ],
+      ctaLabel: "View customers",
+      ctaHref: `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/customers`,
+    }).catch(() => {});
 
     sendSlackAlert({
       level: "info",
@@ -255,10 +286,29 @@ export async function processWebhookPayment(
     await markCheckout(checkoutId, "completed");
 
     if (user.email) {
-      sendCreditPackReceiptEmail(user.email, user.name || "Creator", credits, newBalance).catch(
-        (err) => console.error(`[${providerName.toUpperCase()}] Receipt email failed:`, err)
-      );
+      sendCreditPackReceiptEmail(user.email, user.name || "Creator", credits, newBalance, {
+        amountCents: result.amount,
+        currency: "ZAR",
+        reference: result.reference,
+        provider: providerName,
+      }).catch((err) => console.error(`[${providerName.toUpperCase()}] Receipt email failed:`, err));
     }
+
+    notifyOwner({
+      subject: `Credit pack sold — ${user.email}`,
+      title: "Credit pack purchased",
+      body: `<strong>${user.name || "A customer"}</strong> (${user.email}) bought <strong>${credits.toLocaleString()} credits</strong>.`,
+      severity: "info",
+      details: [
+        ["Credits", credits.toLocaleString()],
+        ["Amount", result.amount ? `R${(result.amount / 100).toFixed(2)}` : "—"],
+        ["New balance", newBalance.toLocaleString()],
+        ["Paid via", providerName],
+        ["Reference", result.reference],
+      ],
+      ctaLabel: "View customers",
+      ctaHref: `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/customers`,
+    }).catch(() => {});
 
     console.log(
       `[${providerName.toUpperCase()}] Credit pack purchased: user ${user.id}, ${credits} credits (pack ${packId})`

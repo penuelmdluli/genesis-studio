@@ -35,6 +35,7 @@ const PAYFAST_IP_RANGES = [
   "197.110.64.128/27",
 ];
 
+const API_BASE = "https://api.payfast.co.za";
 const SANDBOX_HOST = "https://sandbox.payfast.co.za";
 const PRODUCTION_HOST = "https://www.payfast.co.za";
 
@@ -111,6 +112,80 @@ export function pfSignature(params: Record<string, string>, order: string[], pas
   return crypto.createHash("md5").update(str).digest("hex");
 }
 
+export interface PayFastTransaction {
+  date: string;
+  type: string;
+  mPaymentId: string;
+  pfPaymentId: string;
+  amountCents: number;
+  currency: string;
+  metadata: Record<string, string>;
+}
+
+/** RFC-4180 row splitter — fields may be quoted and contain commas. */
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/**
+ * The history endpoint answers in CSV. Only money actually received counts:
+ * fees, payouts and reversals share the feed and must never credit anyone.
+ */
+export function parseTransactionCsv(csv: string): PayFastTransaction[] {
+  const lines = csv.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = splitCsvLine(lines[0]).map((h) => h.replace(/"/g, "").trim().toLowerCase());
+  const idx = (name: string) => headers.indexOf(name);
+  const out: PayFastTransaction[] = [];
+
+  for (const line of lines.slice(1)) {
+    const f = splitCsvLine(line).map((v) => v.replace(/^"|"$/g, "").trim());
+    const type = f[idx("type")] || "";
+    const sign = f[idx("sign")] || "";
+    if (type !== "FUNDS_RECEIVED" || sign !== "CREDIT") continue;
+
+    const gross = parseFloat(f[idx("gross")] || "0");
+    if (!Number.isFinite(gross) || gross <= 0) continue;
+
+    const metadata: Record<string, string> = {
+      userId: f[idx("custom str1")] || "",
+      type: f[idx("custom str2")] || "",
+      credits: f[idx("custom str4")] || "",
+      checkoutId: f[idx("custom str5")] || f[idx("m payment id")] || "",
+    };
+    const product = f[idx("custom str3")] || "";
+    if (metadata.type === "subscription") metadata.planId = product;
+    else metadata.packId = product;
+
+    out.push({
+      date: f[idx("date")] || "",
+      type,
+      mPaymentId: f[idx("m payment id")] || "",
+      pfPaymentId: f[idx("pf payment id")] || "",
+      amountCents: Math.round(gross * 100),
+      currency: f[idx("currency")] || "ZAR",
+      metadata,
+    });
+  }
+  return out.reverse();
+}
+
 export class PayFastProvider implements PaymentProvider {
   name = "payfast";
 
@@ -144,6 +219,11 @@ export class PayFastProvider implements PaymentProvider {
     }
     const amountInRands = (params.amount / 100).toFixed(2);
     const checkoutId = `pf_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    // A plan is a real monthly subscription: PayFast bills the card again
+    // every month on its own. Before this, "monthly" plans were one-off
+    // payments with a 31-day expiry and a dunning email — every renewal
+    // depended on the customer choosing to pay again.
+    const isSubscription = params.metadata.type === "subscription" && params.metadata.recurring !== "false";
 
     const [nameFirst, ...rest] = (params.metadata.name || params.email.split("@")[0] || "Customer").split(" ");
 
@@ -167,6 +247,13 @@ export class PayFastProvider implements PaymentProvider {
       custom_str5: checkoutId,
     };
 
+    if (isSubscription) {
+      pfParams.subscription_type = "1";
+      pfParams.recurring_amount = amountInRands;
+      pfParams.frequency = "3"; // monthly
+      pfParams.cycles = "0"; // until cancelled
+    }
+
     pfParams.signature = pfSignature(pfParams, CHECKOUT_FIELD_ORDER, this.passphrase);
 
     const query = [...CHECKOUT_FIELD_ORDER, "signature"]
@@ -182,12 +269,60 @@ export class PayFastProvider implements PaymentProvider {
   }
 
   /**
-   * PayFast has no "look up by our reference" endpoint. The ITN is the
-   * source of truth (PayFast retries it), so the post-checkout verify step
-   * simply reports "not paid yet" and lets the ITN do the crediting.
+   * Look the payment up in PayFast's Transaction History API.
+   *
+   * This is what makes settlement independent of the ITN. Two real card
+   * payments on 2026-09-12 completed on PayFast and no notification ever
+   * reached the Worker, so the customer sat uncredited until settled by
+   * hand. Polling is not a nicety here — it is the only channel we control.
    */
   async verifyPayment(reference: string): Promise<PaymentVerification> {
-    return { success: false, amount: 0, reference, metadata: {} };
+    const rows = await this.listTransactions(7);
+    const row = rows.find((r) => r.mPaymentId === reference);
+    if (!row) return { success: false, amount: 0, reference, metadata: {} };
+    return {
+      success: true,
+      amount: row.amountCents,
+      reference: row.pfPaymentId || reference,
+      metadata: row.metadata,
+    };
+  }
+
+  /**
+   * Every successful payment in the last `days` days, newest first.
+   * Used by verifyPayment and by the reconciliation sweep, which settles
+   * first payments AND monthly subscription renewals from the same feed.
+   */
+  async listTransactions(days = 3): Promise<PayFastTransaction[]> {
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 86_400_000);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const query = { from: fmt(from), to: fmt(to) };
+
+    // SAST timestamp; the signature covers the header params, the query
+    // params and the passphrase, sorted alphabetically by key.
+    const timestamp = new Date().toISOString().replace(/\.\d+Z$/, "+02:00");
+    const signed: Record<string, string> = {
+      "merchant-id": this.merchantId,
+      timestamp,
+      version: "v1",
+      ...query,
+    };
+    if (this.passphrase) signed.passphrase = this.passphrase;
+    const signature = pfSignature(signed, Object.keys(signed).sort(), "");
+
+    const res = await fetch(`${API_BASE}/transactions/history?from=${query.from}&to=${query.to}`, {
+      headers: {
+        "merchant-id": this.merchantId,
+        version: "v1",
+        timestamp,
+        signature,
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`PayFast history API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    return parseTransactionCsv(await res.text());
   }
 
   async handleWebhook(body: unknown, headers: Record<string, string>): Promise<WebhookResult> {

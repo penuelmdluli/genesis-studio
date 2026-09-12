@@ -6,6 +6,7 @@
 
 export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/dashboard": true,
+  "/grow": true,
   "/generate": true,
   "/gallery": true,
   "/explore": true,

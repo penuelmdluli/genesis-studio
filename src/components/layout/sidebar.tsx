@@ -40,6 +40,7 @@ import {
   Globe,
   ShoppingBag,
   Wand2,
+  Flame,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -64,6 +65,7 @@ interface NavItem {
 // not run at all.
 const baseNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/grow", label: "Grow", icon: Flame, badge: "NEW" },
 
   // --- CREATE: makes a new video ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },

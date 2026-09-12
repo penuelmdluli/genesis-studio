@@ -56,6 +56,7 @@ export const FEATURE_REQUIREMENTS: Record<string, Requirement> = {
   "/voiceover": { kind: "none" },       // msedge-tts, runs in-process
   "/lead-videos": { kind: "none" },     // scraper service
   "/dashboard": { kind: "none" },
+  "/grow": { kind: "none" },
   "/gallery": { kind: "none" },
   "/collections": { kind: "none" },
   "/explore": { kind: "none" },

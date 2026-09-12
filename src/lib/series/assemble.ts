@@ -30,6 +30,21 @@ export interface AssembledEpisode {
 }
 
 /**
+ * Why an assembly did not happen. Returned rather than swallowed: the first
+ * time this failed it returned a bare null, which said nothing at all about
+ * the cause.
+ */
+export interface AssemblyFailure {
+  reason: string;
+}
+
+export type AssemblyResult = AssembledEpisode | AssemblyFailure | null;
+
+export function isAssembled(r: AssemblyResult): r is AssembledEpisode {
+  return !!r && "videoId" in r;
+}
+
+/**
  * Joins one episode's finished shots into a single video and files it in the
  * creator's gallery. Returns null when there is nothing worth assembling, or
  * when assembly fails — a failure here must never cost anyone their shots,
@@ -41,12 +56,11 @@ export async function assembleEpisode(
   episodeTitle: string,
   seriesTitle: string,
   burnSubtitles = true
-): Promise<AssembledEpisode | null> {
+): Promise<AssemblyResult> {
   const scraperUrl = envString("SCRAPER_SERVICE_URL");
   const scraperSecret = envString("SCRAPER_SERVICE_SECRET");
   if (!scraperUrl || !scraperSecret) {
-    console.warn("[SERIES] assembly skipped — the video service is not configured");
-    return null;
+    return { reason: "the video service is not configured" };
   }
 
   const db = getDb();
@@ -62,7 +76,9 @@ export async function assembleEpisode(
   const usable = shots.filter((s) => s.status === "completed" && s.clip_url);
 
   // One clip is not worth a join, and the creator can already play it.
-  if (usable.length < 2) return null;
+  if (usable.length < 2) {
+    return { reason: `only ${usable.length} finished shot(s) — nothing to join` };
+  }
 
   const videoId = randomUUID();
   const outputKey = videoStorageKey(userId, `episode-${videoId}`);
@@ -79,9 +95,9 @@ export async function assembleEpisode(
     });
 
     if (!res.ok) {
-      const detail = (await res.text()).slice(0, 200);
+      const detail = (await res.text()).slice(0, 300);
       console.error(`[SERIES] stitch failed ${res.status}: ${detail}`);
-      return null;
+      return { reason: `stitch ${res.status}: ${detail}` };
     }
 
     const thumbnailUrl = await extractAndUploadThumbnail(outputKey, userId, videoId).catch(() => "");
@@ -112,7 +128,7 @@ export async function assembleEpisode(
     return { videoId, url };
   } catch (err) {
     console.error("[SERIES] assembly failed:", err);
-    return null;
+    return { reason: err instanceof Error ? `${err.name}: ${err.message}` : String(err) };
   }
 }
 

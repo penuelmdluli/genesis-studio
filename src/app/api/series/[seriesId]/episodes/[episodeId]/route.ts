@@ -205,7 +205,7 @@ export async function GET(
       series?.title || "Series",
       true
     );
-    if (assembled) {
+    if (assembled && "videoId" in assembled) {
       episode.video_id = assembled.videoId;
       episode.video_url = assembled.url;
     }

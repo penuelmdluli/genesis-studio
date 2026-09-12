@@ -65,7 +65,16 @@ interface RenderedShot {
 }
 
 interface EpisodeDetail {
-  episode: { id: string; episodeNumber: number; title: string; synopsis: string; status: string; cliffhanger: string };
+  episode: {
+    id: string;
+    episodeNumber: number;
+    title: string;
+    synopsis: string;
+    status: string;
+    cliffhanger: string;
+    videoId: string | null;
+    videoUrl: string | null;
+  };
   shots: Shot[];
   cost: number;
   progress: { total: number; done: number; failed: number } | null;
@@ -305,6 +314,41 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                         <p className="text-sm text-zinc-500">Opening the script…</p>
                       ) : (
                         <>
+                          {/* The episode itself, first — the reason they
+                              came. The script below is for reading and for
+                              seeing which scene is which. */}
+                          {detail.episode.videoUrl && (
+                            <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300 mb-2.5">
+                                Your episode
+                              </h4>
+                              <video
+                                src={detail.episode.videoUrl}
+                                controls
+                                playsInline
+                                className="w-full max-w-[300px] rounded-xl border border-white/[0.10] bg-black"
+                              />
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                <a
+                                  href={detail.episode.videoUrl}
+                                  download
+                                  className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium"
+                                >
+                                  Download
+                                </a>
+                                <a
+                                  href="/gallery"
+                                  className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium"
+                                >
+                                  Open in Gallery
+                                </a>
+                              </div>
+                              <p className="text-[11px] text-zinc-500 mt-2">
+                                All scenes joined, with English subtitles burned in. Also saved to your gallery.
+                              </p>
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between gap-3">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">The script</h4>
                             <button

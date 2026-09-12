@@ -15,6 +15,7 @@ import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
 import { getWsPrediction } from "@/lib/wavespeed-tools";
 import { submitUpscale } from "@/lib/series/render";
+import { assembleEpisode } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -186,6 +187,30 @@ export async function GET(
     episode.status = finalStatus;
   }
 
+  // Join the shots into something watchable, once, as soon as they are all
+  // in. Guarded on video_id rather than on status so a reload mid-assembly
+  // cannot start a second one, and so an episode finished before this
+  // existed still gets assembled the next time it is opened.
+  if (!episode.video_id && episode.status === "completed" && done >= 2) {
+    const { data: series } = await db
+      .from("series")
+      .select("title")
+      .eq("id", seriesId)
+      .maybeSingle();
+
+    const assembled = await assembleEpisode(
+      episodeId,
+      user.id,
+      episode.title || `Episode ${episode.episode_number}`,
+      series?.title || "Series",
+      true
+    );
+    if (assembled) {
+      episode.video_id = assembled.videoId;
+      episode.video_url = assembled.url;
+    }
+  }
+
   return NextResponse.json({
     episode: {
       id: episode.id,
@@ -194,6 +219,8 @@ export async function GET(
       synopsis: episode.synopsis,
       status: episode.status,
       cliffhanger,
+      videoId: episode.video_id || null,
+      videoUrl: episode.video_url || null,
     },
     shots,
     cost: renderCost(shots),

@@ -15,6 +15,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { envString } from "@/lib/env";
 import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
+import { synthesiseSpeech } from "@/lib/edge-tts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -40,17 +41,7 @@ export async function POST(req: NextRequest) {
   // 1. Speech synthesis — the step every dialogue shot failed on.
   let audio: Buffer | null = null;
   try {
-    const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(text);
-    const chunks: Buffer[] = [];
-    for await (const chunk of audioStream) {
-      if (Buffer.isBuffer(chunk)) chunks.push(chunk);
-      else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
-      else if (chunk) chunks.push(Buffer.from(chunk as ArrayBuffer));
-    }
-    audio = Buffer.concat(chunks);
+    audio = Buffer.from(await synthesiseSpeech(text, voice));
     steps.tts = { ok: audio.length > 0, bytes: audio.length };
   } catch (err) {
     steps.tts = { ok: false, error: detail(err) };

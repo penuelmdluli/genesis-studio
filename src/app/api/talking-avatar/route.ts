@@ -7,6 +7,7 @@ import { envString } from "@/lib/env";
 import { submitWsModel, wsJobRef, WS_MODELS } from "@/lib/wavespeed-tools";
 import { toUserFacingProviderError, isOperatorActionable } from "@/lib/user-errors";
 import { sendSlackAlert } from "@/lib/alerts";
+import { synthesiseSpeech } from "@/lib/edge-tts";
 
 // Photo + script → talking video with real lip sync.
 //
@@ -40,18 +41,12 @@ const VOICE_MAP: Record<string, string> = {
 };
 
 async function synthesise(text: string, voiceId: string | undefined, userId: string): Promise<string> {
-  const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
-  const tts = new MsEdgeTTS();
+  // Was `msedge-tts`, which cannot run in this runtime: it reaches the
+  // service through a Node WebSocket built on `https.request`, so every
+  // typed script failed here before producing a byte. Same protocol, spoken
+  // directly.
   const ttsVoice = VOICE_MAP[voiceId || ""] || "en-US-AriaNeural";
-  await tts.setMetadata(ttsVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text);
-  const chunks: Buffer[] = [];
-  for await (const chunk of audioStream) {
-    if (Buffer.isBuffer(chunk)) chunks.push(chunk);
-    else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
-    else if (chunk) chunks.push(Buffer.from(chunk as ArrayBuffer));
-  }
-  const audioBuffer = Buffer.concat(chunks);
+  const audioBuffer = Buffer.from(await synthesiseSpeech(text, ttsVoice));
   if (audioBuffer.length === 0) throw new Error("TTS produced empty audio");
 
   const { uploadAudio, audioStorageKey, r2PublicUrl } = await import("@/lib/storage");

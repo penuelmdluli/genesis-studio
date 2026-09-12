@@ -21,6 +21,7 @@
 import { submitWsModel, runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
+import { synthesiseSpeech } from "@/lib/edge-tts";
 
 /** Cinematic i2v. Funded, and the strongest dramatic motion we have. */
 const SCENE_VIDEO_MODEL = "bytedance/seedance-v1.5-pro/image-to-video";
@@ -121,17 +122,8 @@ export async function synthesiseLine(
   userId: string,
   tag: string
 ): Promise<string> {
-  const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
-  const tts = new MsEdgeTTS();
-  await tts.setMetadata(voiceName || "en-ZA-LeahNeural", OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text);
-  const chunks: Buffer[] = [];
-  for await (const chunk of audioStream) {
-    if (Buffer.isBuffer(chunk)) chunks.push(chunk);
-    else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
-    else if (chunk) chunks.push(Buffer.from(chunk as ArrayBuffer));
-  }
-  const buf = Buffer.concat(chunks);
+  const audio = await synthesiseSpeech(text, voiceName || "en-ZA-LeahNeural");
+  const buf = Buffer.from(audio);
   if (buf.length === 0) throw new Error("No audio was produced for this line");
 
   const { uploadAudio, audioStorageKey, r2PublicUrl } = await import("@/lib/storage");

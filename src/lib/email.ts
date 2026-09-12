@@ -503,6 +503,58 @@ export function newToolsUpdate(appUrl: string): ProductUpdate {
   };
 }
 
+/**
+ * The Series Studio launch. Not a tool list — a pitch for a different way of
+ * working, so it argues one idea (a series, not a clip) and leads with the
+ * language, because that is the part nobody else offers here.
+ */
+export function seriesStudioUpdate(appUrl: string): ProductUpdate {
+  return {
+    subject: "Make a drama in isiZulu — episode after episode",
+    preheader:
+      "Series Studio is live: same characters, a story that continues, real lip-sync, English subtitles.",
+    headline: "Your own series, in your own language",
+    intro:
+      "One clip gets you a view. A series gets you an audience that comes back every week. Series Studio writes your story in isiZulu, Afrikaans or South African English, keeps the same characters across every episode, and makes them actually speak — with lip movement that matches the words.",
+    items: [
+      {
+        icon: "🎬",
+        title: "A story that continues",
+        text: "Episode 7 knows what happened in episode 1. We keep the recap, the cast and the loose ends, so it reads like a real series instead of unrelated clips.",
+        href: `${appUrl}/series`,
+      },
+      {
+        icon: "🗣️",
+        title: "Characters who speak your language",
+        text: "Dialogue written in isiZulu, Afrikaans or SA English, performed with real lip-sync. Not a voice over a still picture — a person saying the words.",
+        href: `${appUrl}/series`,
+      },
+      {
+        icon: "💬",
+        title: "English subtitles, automatically",
+        text: "Every line is translated as it is written, so a drama in isiZulu still reaches the whole country, not only the people who speak it.",
+        href: `${appUrl}/series`,
+      },
+      {
+        icon: "👤",
+        title: "The same face, every episode",
+        text: "Describe your lead once. Those exact words go into every shot of every episode, so they stay recognisable as the series grows.",
+        href: `${appUrl}/series`,
+      },
+      {
+        icon: "📅",
+        title: "Plan a season, make it slowly",
+        text: "Write five episodes for 50 credits, read them all, then make them one at a time whenever you are ready. The scripts wait for you.",
+        href: `${appUrl}/series`,
+      },
+    ],
+    ctaLabel: "Start your series",
+    ctaHref: `${appUrl}/series`,
+    outro:
+      "Writing is almost free — you only pay when you turn an episode into video, and the price is on the button before you press it. Tell us what your series is about, we read every reply.",
+  };
+}
+
 export async function sendProductUpdateEmail(
   email: string,
   name: string,

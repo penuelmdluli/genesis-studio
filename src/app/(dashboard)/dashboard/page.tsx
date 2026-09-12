@@ -61,6 +61,7 @@ const TOOL_GROUPS: Array<{
   {
     name: "Grow your page",
     items: [
+      { href: "/series", icon: "🎬", title: "Series Studio", desc: "A drama in your language, episode after episode", badge: "NEW" },
       { href: "/grow", icon: "🔥", title: "Weekly plan", desc: "One loop a week: make, finish, post", badge: "NEW" },
       { href: "/explore", icon: "🌍", title: "Explore", desc: "See what is working for other creators" },
       { href: "/gallery", icon: "📁", title: "Your Gallery", desc: "Everything you have made, ready to post" },

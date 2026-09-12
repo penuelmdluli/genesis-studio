@@ -13,12 +13,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
-import { newToolsUpdate, sendProductUpdateEmail } from "@/lib/email";
+import { newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const CAMPAIGN_ID = "2026-09-new-tools";
+// Each campaign tracks its own sends, so announcing Series Studio never
+// re-mails the people who already got the tools announcement — and running
+// either one twice is still harmless.
+const CAMPAIGNS = {
+  "2026-09-new-tools": newToolsUpdate,
+  "2026-09-series-studio": seriesStudioUpdate,
+} as const;
+
+type CampaignId = keyof typeof CAMPAIGNS;
+
+const DEFAULT_CAMPAIGN: CampaignId = "2026-09-series-studio";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
@@ -28,9 +38,17 @@ export async function POST(req: NextRequest) {
     if (!clerkId || !isOwnerClerkId(clerkId)) return new NextResponse("Not found", { status: 404 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as { test?: boolean; to?: string; limit?: number };
+  const body = (await req.json().catch(() => ({}))) as {
+    test?: boolean;
+    to?: string;
+    limit?: number;
+    campaign?: string;
+  };
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
-  const update = newToolsUpdate(appUrl);
+
+  const CAMPAIGN_ID: CampaignId =
+    body.campaign && body.campaign in CAMPAIGNS ? (body.campaign as CampaignId) : DEFAULT_CAMPAIGN;
+  const update = CAMPAIGNS[CAMPAIGN_ID](appUrl);
 
   if (body.test) {
     const to = body.to || process.env.OWNER_EMAIL || "";

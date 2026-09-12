@@ -58,7 +58,7 @@ import {
   type DanceStyle,
 } from "@/lib/sa-family";
 
-type MotionTab = "effects" | "upload" | "url" | "leads";
+type MotionTab = "upload" | "url" | "leads";
 
 /** A saved trending clip from /lead-videos, already downloaded to our CDN. */
 interface LeadVideo {
@@ -92,7 +92,7 @@ export default function MotionControlPage() {
   const [motionVideoPreview, setMotionVideoPreview] = useState<string | null>(null);
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterImagePreview, setCharacterImagePreview] = useState<string | null>(null);
-  const [motionTab, setMotionTab] = useState<MotionTab>("effects");
+  const [motionTab, setMotionTab] = useState<MotionTab>("upload");
   // Fun effects and prompt-only motion run on Kling, which is a paid hosted
   // service; reference-video motion runs on our own GPU. When the hosted
   // balance is dry the Kling modes cannot run at all, so the page hides them
@@ -232,10 +232,7 @@ export default function MotionControlPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.motion) return;
-        const available = data.motion.effectsAvailable !== false;
-        setEffectsAvailable(available);
-        // Don't strand the user on a tab they cannot generate from.
-        if (!available) setMotionTab((tab) => (tab === "effects" ? "upload" : tab));
+        setEffectsAvailable(data.motion.effectsAvailable !== false);
       })
       .catch(() => {
         /* Availability is a hint — a failed probe shouldn't block the page. */
@@ -1063,206 +1060,6 @@ export default function MotionControlPage() {
         </div>
       </div>
 
-      {/* ── SA Family Quick Start ── */}
-      <Card className="border-amber-500/20 bg-gradient-to-r from-amber-950/20 via-zinc-900/50 to-orange-950/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <span className="text-lg">🇿🇦</span>
-            SA Family Studio
-            <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px]">
-              NEW
-            </Badge>
-            <button
-              onClick={() => setShowFamilyBuilder(!showFamilyBuilder)}
-              className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
-            >
-              {showFamilyBuilder ? "Hide" : "Build Your Own"}
-              {showFamilyBuilder ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-          </CardTitle>
-          <p className="text-[11px] text-zinc-500">Pick a family character + dance. We generate the image and animate them — one click.</p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Quick Presets */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
-            {SA_FAMILY_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => handleFamilyPreset(preset.id)}
-                disabled={familyImageGenerating || isGenerating}
-                className={`p-2.5 rounded-xl border text-left transition-all group ${
-                  isFamilyFlow && familyCharacter === SA_FAMILY_PRESETS.find(p => p.id === preset.id)?.characterId
-                    ? "border-amber-500/40 bg-amber-500/10 ring-1 ring-amber-500/20"
-                    : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30 hover:bg-amber-500/5"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <div className="text-lg mb-0.5">{preset.emoji}</div>
-                <div className="text-[11px] font-medium text-zinc-300 group-hover:text-amber-300 truncate">{preset.name}</div>
-                <div className="text-[9px] text-zinc-500 truncate">{preset.description}</div>
-              </button>
-            ))}
-          </div>
-
-          {familyImageGenerating && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 animate-pulse">
-              <Wand2 className="w-4 h-4 text-amber-400 animate-spin" />
-              <span className="text-xs text-amber-300">Creating your character... pick your favorite pose when ready</span>
-            </div>
-          )}
-
-          {/* Build Your Own */}
-          {showFamilyBuilder && (
-            <div className="space-y-3 pt-2 border-t border-white/[0.08]">
-              {/* Character picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Character</label>
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                  {SA_FAMILY_CHARACTERS.map((char) => (
-                    <button
-                      key={char.id}
-                      onClick={() => setFamilyCharacter(char.id)}
-                      className={`p-2 rounded-lg border text-center transition-all ${
-                        familyCharacter === char.id
-                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/20"
-                          : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30"
-                      }`}
-                    >
-                      <div className="text-lg">{char.emoji}</div>
-                      <div className={`text-[10px] font-medium truncate ${familyCharacter === char.id ? "text-amber-300" : "text-zinc-400"}`}>
-                        {char.name}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scene picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Scene</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {SA_FAMILY_SCENES.map((scene) => (
-                    <button
-                      key={scene.id}
-                      onClick={() => setFamilyScene(scene.id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                        familyScene === scene.id
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
-                      }`}
-                    >
-                      {scene.emoji} {scene.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dance picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Dance Style</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {SA_DANCE_STYLES.map((dance) => (
-                    <button
-                      key={dance.id}
-                      onClick={() => setFamilyDance(dance.id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                        familyDance === dance.id
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
-                      }`}
-                    >
-                      {dance.emoji} {dance.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Build button */}
-              <Button
-                onClick={handleFamilyBuild}
-                disabled={!familyCharacter || !familyScene || !familyDance || familyImageGenerating}
-                loading={familyImageGenerating}
-                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium"
-                size="sm"
-              >
-                <Wand2 className="w-3.5 h-3.5" />
-                Generate Character Image
-              </Button>
-            </div>
-          )}
-
-          {/* Show generated options for SA Family (pick a pose) */}
-          {isFamilyFlow && generatedCharacters.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
-                Pick your favourite pose {brandedFamilyImages.length > 0 && <span className="text-amber-400">(branded + auto-downloaded)</span>}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {generatedCharacters.map((imgSrc, i) => {
-                  const cdnUrl = generatedCharacterUrls[i];
-                  const brandedSrc = brandedFamilyImages[i];
-                  const displaySrc = brandedSrc || imgSrc; // Show branded version if available
-                  const isSelected = characterImagePreview === (cdnUrl || imgSrc);
-                  return (
-                    <div key={i} className="relative group">
-                      <button
-                        onClick={() => {
-                          // Always use ORIGINAL unbranded URL for animation (AI needs clean image)
-                          setCharacterImagePreview(cdnUrl || imgSrc);
-                          setCharacterImage(new File([], "sa-family.jpg"));
-                        }}
-                        className={`relative w-full aspect-[3/4] rounded-lg border overflow-hidden transition-all ${
-                          isSelected
-                            ? "border-amber-500/50 ring-2 ring-amber-500/30"
-                            : "border-white/[0.10] hover:border-amber-500/40"
-                        }`}
-                      >
-                        <img src={displaySrc} alt={`Pose ${i + 1}`} className="w-full h-full object-cover" />
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        )}
-                        {brandedSrc && (
-                          <div className="absolute bottom-1 left-1">
-                            <span className="px-1.5 py-0.5 rounded bg-black/70 text-[8px] text-amber-300 font-medium">BRANDED</span>
-                          </div>
-                        )}
-                      </button>
-                      {/* Re-download branded version */}
-                      {brandedSrc && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const link = document.createElement("a");
-                            link.download = `genesis-studio-family-${Date.now()}.jpg`;
-                            link.href = brandedSrc;
-                            link.click();
-                            toast("Branded image downloaded!", "success");
-                          }}
-                          className="absolute top-1 left-1 p-1 rounded bg-black/70 hover:bg-amber-600 text-white opacity-0 group-hover:opacity-100 transition-all"
-                          title="Download branded"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-zinc-500 text-center">
-                {brandedFamilyImages.length > 0
-                  ? <>Branded images auto-downloaded. Animation uses the clean original for best quality.</>
-                  : <>Selected image will be animated with {SA_DANCE_STYLES.find(d => d.id === familyDance)?.name || "your chosen dance"}.</>
-                }
-                {" "}Hit <strong>Generate Motion</strong> below to bring them to life.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Inputs */}
         <div className="lg:col-span-2 space-y-4">
@@ -1271,16 +1068,13 @@ export default function MotionControlPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Video className="w-4 h-4 text-violet-400" />
-                Motion Source <HelpTip text="Choose a fun effect, upload your own video, or paste a TikTok/Instagram URL as motion reference." side="right" />
+                Motion Source <HelpTip text="Upload a video, or paste a TikTok/Instagram link — we transfer that motion onto your character." side="right" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Tabs: Fun Effects / Upload / History */}
+              {/* Tabs: Upload / Paste URL */}
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
-                  ...(effectsAvailable
-                    ? [{ key: "effects" as const, label: "Effects", icon: Sparkles }]
-                    : []),
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                 ]).map((tab) => (
@@ -1308,84 +1102,6 @@ export default function MotionControlPage() {
                     One-tap effects are taking a short break. Upload a reference video or paste a
                     link and we&apos;ll transfer that motion onto your character.
                   </p>
-                </div>
-              )}
-
-              {/* Fun Effects Tab */}
-              {motionTab === "effects" && effectsAvailable && (
-                <div className="space-y-3">
-                  {/* Category Filter */}
-                  <div className="flex gap-1.5 flex-wrap">
-                    {FUN_EFFECT_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => setEffectCategoryFilter(cat)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          effectCategoryFilter === cat
-                            ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                            : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Effects Grid */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-2.5 max-h-[320px] sm:max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
-                    {filteredEffects.map((effect) => {
-                      const isSelected = selectedEffect === effect.id;
-                      return (
-                        <button
-                          key={effect.id}
-                          onClick={() => handleEffectSelect(effect)}
-                          className={`relative rounded-xl border p-3 text-center transition-all duration-200 group ${
-                            isSelected
-                              ? "border-violet-500/50 ring-2 ring-violet-500/30 bg-violet-500/10"
-                              : "border-white/[0.10] hover:border-violet-500/30 bg-white/[0.04] hover:bg-white/[0.04]"
-                          }`}
-                        >
-                          {/* Effect icon placeholder */}
-                          <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${
-                            isSelected ? "bg-violet-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
-                          }`}>
-                            <Sparkles className={`w-5 h-5 ${isSelected ? "text-violet-400" : "text-zinc-400 group-hover:text-zinc-400"}`} />
-                          </div>
-                          <div className={`text-[11px] font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-400"}`}>
-                            {effect.name}
-                          </div>
-                          <div className="text-[9px] text-zinc-400 mt-0.5 capitalize">
-                            {effect.category}
-                          </div>
-                          {/* Selected indicator */}
-                          {isSelected && (
-                            <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {selectedEffect && (
-                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                      <svg className="w-4 h-4 text-violet-400 shrink-0" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-xs text-violet-300">
-                        Effect: <strong>{selectedEffectObj?.name}</strong>
-                      </span>
-                      <button
-                        onClick={() => setSelectedEffect(null)}
-                        className="ml-auto text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 

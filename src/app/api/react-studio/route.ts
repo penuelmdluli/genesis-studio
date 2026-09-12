@@ -47,10 +47,13 @@ async function wavespeedPost(
 }
 
 /** Helper: poll a WaveSpeed prediction until terminal state */
+// Element creation completes in seconds. The old 60 x 5s cap meant a single
+// request could block for five minutes — longer than the request itself is
+// allowed to live, so it was killed and reported as a failure.
 async function wavespeedPoll(
   requestId: string,
-  maxAttempts = 60,
-  intervalMs = 5000
+  maxAttempts = 30,
+  intervalMs = 2000
 ): Promise<{ status: string; data: Record<string, unknown> }> {
   for (let i = 0; i < maxAttempts; i++) {
     const res = await fetch(
@@ -82,17 +85,24 @@ async function submitStandardTier(params: {
   aspectRatio: string;
 }): Promise<{ requestId: string; prefix: string }> {
   const wsKey = envString("WAVESPEED_API_KEY");
+  let wavespeedError: string | null = null;
 
   if (wsKey) {
     try {
       // Step 1: Create a Kling Element from the first user photo
       console.log("[ReactStudio] Creating Kling Element from user photo...");
+      // element_refer_list is REQUIRED. Leaving it out returned 400 on every
+      // single request, which then fell through to a locked fallback — React
+      // Studio had never once produced a video. Extra photos of the same
+      // person improve the likeness, so send up to three.
+      const referenceImages = params.userPhotos.slice(0, 3);
       const elementResult = await wavespeedPost(
         "kwaivgi/kling-elements",
         {
           image: params.userPhotos[0],
           name: "user",
           description: "Person to insert into video",
+          element_refer_list: referenceImages.length > 0 ? referenceImages : [params.userPhotos[0]],
         }
       );
 
@@ -104,8 +114,14 @@ async function submitStandardTier(params: {
         throw new Error("Element creation failed: " + (elementPoll.data.error || "unknown error"));
       }
 
-      const elementId = elementPoll.data.id as string;
-      const elementName = (elementPoll.data.name as string) || "user";
+      // The element lives in outputs[0]; data.id is the prediction id, which
+      // the video model does not recognise as an element.
+      const elementOut = (elementPoll.data.outputs as Array<Record<string, unknown>> | undefined)?.[0];
+      const elementId = elementOut?.element_id as string | undefined;
+      const elementName = (elementOut?.element_name as string) || "user";
+      if (!elementId) {
+        throw new Error("Element creation returned no element id");
+      }
 
       // Step 3: Submit Kling V3 Pro I2V with element_list
       console.log("[ReactStudio] Submitting Kling V3 Pro I2V with element...");
@@ -131,13 +147,18 @@ async function submitStandardTier(params: {
 
       return { requestId: i2vResult.request_id, prefix: "ws" };
     } catch (wsErr) {
-      console.warn("[ReactStudio] WaveSpeed standard failed, falling back to FAL:", wsErr);
+      wavespeedError = wsErr instanceof Error ? wsErr.message : String(wsErr);
+      console.warn("[ReactStudio] Standard tier failed, trying fallback:", wavespeedError);
     }
   }
 
-  // FAL fallback — use queue.submit (same pattern as fal.ts)
+  // Fallback. When it also fails the primary reason is what matters, so it
+  // is carried through rather than replaced by a second provider's error.
   const { fal } = await import("@fal-ai/client");
   fal.config({ credentials: process.env.FAL_KEY || "" });
+  if (!process.env.FAL_KEY) {
+    throw new Error(wavespeedError || "No provider available for React Studio");
+  }
   const falResult = await fal.queue.submit("fal-ai/kling-video/v3/pro/image-to-video", {
     input: {
       prompt: params.scenePrompt,

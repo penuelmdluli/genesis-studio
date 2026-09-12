@@ -30,10 +30,28 @@ function segmentsToSrt(segments: Segment[]): string {
  * `chunks` with `timestamp: [start, end]`, some only `text`, and some put a
  * JSON document behind `outputs[0]`. Accept all of them.
  */
-async function extractSegments(p: WsPrediction): Promise<{ segments: Segment[]; text: string; language: string }> {
+async function extractSegments(
+  p: WsPrediction
+): Promise<{ segments: Segment[]; text: string; language: string; srt?: string }> {
   let doc: Record<string, unknown> = p as unknown as Record<string, unknown>;
 
-  const first = p.outputs?.[0];
+  const first = p.outputs?.[0] as unknown;
+
+  // The transcriber answers with an OBJECT here — { srt, text, text_details }
+  // — not a string. Only string shapes were handled, so a perfectly good
+  // transcript fell through every branch and every video came back as
+  // "(No speech detected)".
+  if (first && typeof first === "object") {
+    const o = first as { srt?: string; text?: string; text_details?: Array<{ start: number; end: number; text: string }> };
+    const segments: Segment[] = (o.text_details || [])
+      .map((d) => ({ start: Number(d.start) || 0, end: Number(d.end) || 0, text: String(d.text || "").trim() }))
+      .filter((d) => d.text);
+    const text = String(o.text || segments.map((x) => x.text).join(" ")).trim();
+    if (segments.length || text) {
+      return { segments, text, language: String((doc.language ?? doc.detected_language) || "auto"), srt: o.srt };
+    }
+  }
+
   if (typeof first === "string" && /^https?:\/\//.test(first)) {
     try {
       const res = await fetch(first);
@@ -99,7 +117,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
       const status = wsStatusOf(p);
 
       if (status === "COMPLETED") {
-        const { segments, text, language } = await extractSegments(p);
+        const { segments, text, language, srt } = await extractSegments(p);
 
         if (segments.length === 0) {
           return NextResponse.json({
@@ -116,7 +134,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
         return NextResponse.json({
           status: "completed",
           output: {
-            srt: segmentsToSrt(segments),
+            // Use the provider's own SRT when it gives us one; it already
+            // handles line breaks and timing better than a rebuild.
+            srt: srt || segmentsToSrt(segments),
             segments,
             detectedLanguage: language,
             plainText: text,

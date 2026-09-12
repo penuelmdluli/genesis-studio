@@ -69,9 +69,9 @@ export default function manifest(): MetadataRoute.Manifest {
         description: "View your generated videos",
       },
       {
-        name: "Brain Studio",
-        url: "/brain",
-        description: "Multi-scene AI productions",
+        name: "Creator Tools",
+        url: "/tools",
+        description: "Add sound, dub, remove background, make a beat",
       },
     ],
   };

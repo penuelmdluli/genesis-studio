@@ -19,6 +19,23 @@ export async function POST(req: NextRequest) {
   try {
     const text = await req.text();
     rawForSupport = text;
+
+    // Persist every hit before validating anything. Worker logs are not
+    // retained, and two real payments produced no trace at all — this row
+    // is how we tell "PayFast never called" from "we rejected it".
+    try {
+      const { getDb } = await import("@/lib/db-driver");
+      const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for") || "";
+      await getDb().from("webhook_log").insert({
+        id: crypto.randomUUID(),
+        provider: "payfast",
+        ip,
+        user_agent: req.headers.get("user-agent") || "",
+        body: text.slice(0, 4000),
+      });
+    } catch (logErr) {
+      console.warn("[PAYFAST WEBHOOK] webhook_log insert failed:", logErr);
+    }
     // URLSearchParams preserves the order PayFast sent, which the ITN
     // signature depends on.
     const body: Record<string, string> = {};

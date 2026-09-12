@@ -12,7 +12,7 @@ const CRON_MAP = {
   "0 13 * * *": ["/api/cron/content-pipeline"],
   "0 3 * * *": ["/api/cron/cleanup-storage"],
   "0 9 * * *": ["/api/cron/dunning"],
-  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs"],
+  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments"],
   "0 */6 * * *": ["/api/cron/purge-stale"],
   "*/1 * * * *": ["/api/cron/process-fallbacks", "/api/cron/check-singer", "/api/cron/reap-jobs"],
   "*/2 * * * *": ["/api/cron/process-mbs-queue", "/api/cron/check-mimic"],

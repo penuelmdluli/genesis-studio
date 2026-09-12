@@ -9,6 +9,18 @@ import { processWebhookPayment } from "@/lib/payments/webhook-handler";
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    try {
+      const { getDb } = await import("@/lib/db-driver");
+      await getDb().from("webhook_log").insert({
+        id: crypto.randomUUID(),
+        provider: "yoco",
+        ip: req.headers.get("cf-connecting-ip") || "",
+        user_agent: req.headers.get("user-agent") || "",
+        body: rawBody.slice(0, 4000),
+      });
+    } catch (logErr) {
+      console.warn("[YOCO WEBHOOK] webhook_log insert failed:", logErr);
+    }
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => {
       headers[key] = value;

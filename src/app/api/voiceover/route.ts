@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
-import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { synthesiseSpeech } from "@/lib/edge-tts";
 import { uploadAudio, audioStorageKey } from "@/lib/storage";
 import { randomUUID } from "crypto";
 import { checkRateLimit } from "@/lib/fraud";
@@ -133,27 +133,13 @@ export async function POST(req: NextRequest) {
     try {
       const edgeVoice = VOICE_MAP[voiceId] || "en-US-GuyNeural";
 
-      const tts = new MsEdgeTTS();
-      await tts.setMetadata(edgeVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-
       // Adjust speech rate based on speed parameter
       const ratePercent = Math.round((safeSpeed - 1.0) * 100);
       const rateStr = ratePercent >= 0 ? `+${ratePercent}%` : `${ratePercent}%`;
 
-      const { audioStream } = tts.toStream(text, { rate: rateStr, pitch: "+0Hz" });
-
-      // Collect all audio chunks into a buffer
-      const chunks: Buffer[] = [];
-      await new Promise<void>((resolve, reject) => {
-        audioStream.on("data", (chunk: Buffer) => {
-          chunks.push(chunk);
-        });
-        audioStream.on("end", () => resolve());
-        audioStream.on("error", (err: Error) => reject(err));
-        audioStream.on("close", () => resolve());
-      });
-
-      const audioBuffer = Buffer.concat(chunks);
+      const audioBuffer = Buffer.from(
+        await synthesiseSpeech(text, edgeVoice, { rate: rateStr, pitch: "+0Hz" })
+      );
 
       if (audioBuffer.length === 0) {
         throw new Error("Edge TTS returned empty audio");

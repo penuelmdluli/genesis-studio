@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { synthesiseSpeech } from "@/lib/edge-tts";
 
 // Sample phrases per language for voice previews
 const SAMPLE_TEXT: Record<string, string> = {
@@ -78,20 +78,9 @@ export async function GET(req: NextRequest) {
 
     const sampleText = SAMPLE_TEXT[language] || SAMPLE_TEXT["en"];
 
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(edgeVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-
-    const { audioStream } = tts.toStream(sampleText, { rate: "+0%", pitch: "+0Hz" });
-
-    const chunks: Buffer[] = [];
-    await new Promise<void>((resolve, reject) => {
-      audioStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-      audioStream.on("end", () => resolve());
-      audioStream.on("error", (err: Error) => reject(err));
-      audioStream.on("close", () => resolve());
-    });
-
-    const audioBuffer = Buffer.concat(chunks);
+    const audioBuffer = Buffer.from(
+      await synthesiseSpeech(sampleText, edgeVoice, { rate: "+0%", pitch: "+0Hz" })
+    );
 
     if (audioBuffer.length === 0) {
       return NextResponse.json({ error: "Failed to generate preview" }, { status: 500 });

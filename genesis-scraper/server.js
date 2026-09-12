@@ -721,8 +721,21 @@ app.post("/stitch-episode", auth, async (req, res) => {
   const scratch = [];
   const cleanup = () => scratch.forEach((f) => { try { fs.unlinkSync(f); } catch {} });
 
+  const { Readable } = require("stream");
+  const streamPipeline = require("util").promisify(require("stream").pipeline);
+
   const FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
-  const W = 1080, H = 1920, FPS = 30;
+
+  // 720x1280, not 1080x1920.
+  //
+  // This runs on a 512MB instance, and encoding the full-height episode killed
+  // it outright — Render reported "Ran out of memory (used over 512MB)" three
+  // times in a row. Pixel count is what x264 charges for, and 720x1280 is 44%
+  // of 1080x1920, which is the difference between an episode that exists and
+  // one that does not. Individual shots keep their full resolution; only the
+  // joined episode is encoded at this size. Raise it the day the instance has
+  // the memory to spare.
+  const W = 720, H = 1280, FPS = 30;
 
   const run = (args, label) =>
     new Promise((resolve, reject) => {
@@ -779,7 +792,9 @@ app.post("/stitch-episode", auth, async (req, res) => {
 
       const got = await fetch(clip.url);
       if (!got.ok) throw new Error(`clip ${i} download failed (${got.status})`);
-      fs.writeFileSync(rawPath, Buffer.from(await got.arrayBuffer()));
+      // Streamed to disk. Reading a clip into a Buffer held the whole file in
+      // memory alongside its arrayBuffer copy, on a box with 512MB total.
+      await streamPipeline(Readable.fromWeb(got.body), fs.createWriteStream(rawPath));
 
       let filter = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS}`;
 
@@ -791,9 +806,11 @@ app.post("/stitch-episode", auth, async (req, res) => {
         // apostrophes and colons, which are filter syntax.
         fs.writeFileSync(subPath, wrap(subtitle, 34), "utf8");
         filter +=
-          `,drawtext=textfile='${subPath}':fontfile='${FONT}':fontsize=46:fontcolor=white` +
-          `:borderw=4:bordercolor=black@0.85:line_spacing=10` +
-          `:x=(w-text_w)/2:y=h-text_h-170`;
+          // Sized from the canvas rather than hard-coded, so the subtitle
+          // keeps its proportions if the resolution changes again.
+          `,drawtext=textfile='${subPath}':fontfile='${FONT}':fontsize=${Math.round(W * 0.043)}:fontcolor=white` +
+          `:borderw=3:bordercolor=black@0.85:line_spacing=8` +
+          `:x=(w-text_w)/2:y=h-text_h-${Math.round(H * 0.09)}`;
       }
 
       // A clip with no audio track would break the join, so one is supplied.
@@ -804,6 +821,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
         "-vf", filter,
         "-map", "0:v:0",
         "-map", hasAudio ? "0:a:0" : "1:a:0",
+        "-threads", "1",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"
       );
@@ -811,6 +829,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
       args.push(normPath);
 
       await run(args, `normalise clip ${i}`);
+      try { fs.unlinkSync(rawPath); } catch {}
       normalised.push(normPath);
     }
 
@@ -828,17 +847,22 @@ app.post("/stitch-episode", auth, async (req, res) => {
       "join"
     );
 
-    const episode = fs.readFileSync(outputPath);
+    const bytes = fs.statSync(outputPath).size;
     await r2.send(new PutObjectCommand({
       Bucket: BUCKET,
       Key: outputR2Key,
-      Body: episode,
+      Body: fs.createReadStream(outputPath),
+      ContentLength: bytes,
       ContentType: "video/mp4",
     }));
 
+    // Normalised parts are only needed until the join; drop them before the
+    // upload so peak memory and disk both stay low.
+    normalised.forEach((f) => { try { fs.unlinkSync(f); } catch {} });
+
     cleanup();
-    console.log(`[stitch-episode] ${clips.length} clips → ${outputR2Key} (${(episode.length / 1024 / 1024).toFixed(1)}MB)`);
-    res.json({ r2Key: outputR2Key, fileSizeBytes: episode.length, clips: clips.length });
+    console.log(`[stitch-episode] ${clips.length} clips → ${outputR2Key} (${(bytes / 1024 / 1024).toFixed(1)}MB)`);
+    res.json({ r2Key: outputR2Key, fileSizeBytes: bytes, clips: clips.length });
   } catch (err) {
     cleanup();
     console.error("[stitch-episode]", err.message);

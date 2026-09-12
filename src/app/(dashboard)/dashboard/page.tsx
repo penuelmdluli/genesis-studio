@@ -72,6 +72,24 @@ export default function DashboardPage() {
     };
   }, [toast, setUser]);
 
+  // What is working on the platforms right now. The dashboard used to push
+  // "Generate Video" no matter what — useful once, then wallpaper. A creator
+  // opening this needs an idea, not a reminder that generation exists.
+  const [trends, setTrends] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    platform: string;
+    category: string;
+    suggestedPrompt: string;
+  }>>([]);
+  useEffect(() => {
+    fetch("/api/trends")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setTrends((d?.trends || []).slice(0, 4)))
+      .catch(() => {});
+  }, []);
+
   const pendingJobs = (activeJobs || []).filter(
     (j) => j.status === "processing" || j.status === "queued"
   );
@@ -336,6 +354,37 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </MotionSection>
+      )}
+
+      {/* ====== TRENDING NOW ====== */}
+      {trends.length > 0 && (
+        <MotionSection>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              Trending now
+            </h2>
+            <span className="text-xs text-zinc-500">Tap one to make it</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {trends.map((t) => (
+              <a
+                key={t.id}
+                href={`/generate?prompt=${encodeURIComponent(t.suggestedPrompt)}`}
+                className="group rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.05] to-transparent p-4 transition-all hover:-translate-y-0.5 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/10"
+              >
+                <span className="inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/25">
+                  {t.platform}
+                </span>
+                <h3 className="mt-2 text-sm font-semibold text-zinc-100 leading-snug">{t.title}</h3>
+                <p className="mt-1 text-xs text-zinc-400 leading-snug line-clamp-2">{t.description}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Make this <ArrowRight className="w-3 h-3" />
+                </span>
+              </a>
+            ))}
           </div>
         </MotionSection>
       )}

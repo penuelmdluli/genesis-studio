@@ -19,6 +19,7 @@ import { synthesiseSpeech } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db-driver";
 import { startAssembly, collectAssembly } from "@/lib/series/assemble";
 import { submitShot } from "@/lib/series/render";
+import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import type { Shot as SeriesShot } from "@/lib/series/writer";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
     voice?: string;
     assembleEpisodeId?: string;
     retryEpisodeId?: string;
+    advanceEpisodeId?: string;
     /** Redo every shot, not only the failed ones. */
     force?: boolean;
   };
@@ -144,6 +146,34 @@ export async function POST(req: NextRequest) {
 
     await db.from("series_episodes").update({ status: "rendering" }).eq("id", ep.id);
     return NextResponse.json({ retried: todo.length, submitted, errors });
+  }
+
+  // Advance the shots of an episode through their stages, the same way the
+  // creator's page does when it polls.
+  if (body.advanceEpisodeId) {
+    const db = getDb();
+    const { data: rows } = await db
+      .from("series_shots")
+      .select(SHOT_SELECT)
+      .eq("episode_id", body.advanceEpisodeId)
+      .order("shot_index", { ascending: true })
+      .limit(20);
+    const shotRows = (rows || []) as ShotRow[];
+    await refreshShots(db, shotRows);
+    const done = shotRows.filter((r) => r.status === "completed").length;
+    const failed = shotRows.filter((r) => r.status === "failed").length;
+    if (shotRows.length > 0 && done + failed === shotRows.length) {
+      await db
+        .from("series_episodes")
+        .update({ status: done > 0 ? "completed" : "failed" })
+        .eq("id", body.advanceEpisodeId);
+    }
+    return NextResponse.json({
+      total: shotRows.length,
+      done,
+      failed,
+      stages: shotRows.map((r) => `${r.shot_index}:${r.status}/${r.stage || "-"}`),
+    });
   }
 
   // Assembly normally runs when a creator opens a finished episode. This

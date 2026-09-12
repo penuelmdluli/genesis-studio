@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import {
   Sparkles,
   Upload,
@@ -81,6 +82,7 @@ const MOTION_DURATIONS = [5, 10, 15, 20];
 export default function MotionControlPage() {
   const { user, addJob, updateCreditBalance, isInitialized, videos, activeJobs } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
   const searchParams = useSearchParams();
 
   const isLoading = !isInitialized;
@@ -992,9 +994,11 @@ export default function MotionControlPage() {
         toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min.`, "success");
         setError(null);
       } else {
-        progress.fail(data.error || "Generation failed.");
-        setError(data.error || "Generation failed.");
-        toast(data.error || "Generation failed", "error");
+        // 402 opens the top-up sheet, 403 points at Pricing — a failure the
+        // customer can fix should arrive with the fix.
+        const msg = reportApiError(res, data, "Generation failed.");
+        progress.fail(msg);
+        setError(msg);
       }
     } catch (err) {
       console.error("Motion control generation failed:", err);

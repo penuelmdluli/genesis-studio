@@ -23,7 +23,7 @@ import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
   const { videoId } = await params;
 
   const clerkId = await getAuthUserId();
@@ -32,14 +32,31 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ vi
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const isOwner = isOwnerClerkId(clerkId);
-  if (!isOwner && !["creator", "pro", "studio"].includes(user.plan)) {
+
+  // Two different jobs behind one endpoint.
+  //
+  //   "own"    — a paying creator puts THEIR mark on their work. This is what
+  //              they upgraded for.
+  //   "studio" — we put OUR mark on our own work, because the clips we post
+  //              are how people find the product. Owner only, and never
+  //              applied to a customer's video: a paid creator seeing our
+  //              logo on their export is the exact complaint that started
+  //              this work.
+  const body = (await req.json().catch(() => ({}))) as { mode?: string };
+  const studioBranding = body.mode === "studio";
+
+  if (studioBranding && !isOwner) {
+    return NextResponse.json({ error: "Not available on this account" }, { status: 403 });
+  }
+
+  if (!studioBranding && !isOwner && !["creator", "pro", "studio"].includes(user.plan)) {
     return NextResponse.json(
       { error: "Your own branding is part of the Creator plan and up.", upgrade: true },
       { status: 403 }
     );
   }
 
-  if (!user.brand_logo_url && !user.brand_name) {
+  if (!studioBranding && !user.brand_logo_url && !user.brand_name) {
     return NextResponse.json(
       { error: "Add a logo or brand name in Settings first." },
       { status: 400 }
@@ -70,16 +87,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ vi
   const outputKey = videoStorageKey(user.id, `branded-${brandedId}`);
 
   try {
-    const res = await fetch(`${scraperUrl}/brand-custom`, {
+    const inputVideoUrl = r2PublicUrl(videoStorageKey(video.user_id, video.job_id));
+
+    // `/brand-genesis` applies our watermark and outro; `/brand-custom`
+    // applies the creator's own.
+    const res = await fetch(`${scraperUrl}${studioBranding ? "/brand-genesis" : "/brand-custom"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-scraper-secret": scraperSecret },
-      body: JSON.stringify({
-        inputVideoUrl: r2PublicUrl(videoStorageKey(video.user_id, video.job_id)),
-        logoUrl: user.brand_logo_url || undefined,
-        brandName: user.brand_name || undefined,
-        position: user.brand_position || "bottom-right",
-        outputR2Key: outputKey,
-      }),
+      body: studioBranding
+        ? JSON.stringify({ inputVideoUrl, outputR2Key: outputKey })
+        : JSON.stringify({
+            inputVideoUrl,
+            logoUrl: user.brand_logo_url || undefined,
+            brandName: user.brand_name || undefined,
+            position: user.brand_position || "bottom-right",
+            outputR2Key: outputKey,
+          }),
     });
 
     if (!res.ok) {
@@ -98,7 +121,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ vi
       id: brandedId,
       userId: user.id,
       jobId: video.job_id,
-      title: `${video.title} (branded)`.slice(0, 100),
+      title: `${video.title} (${studioBranding ? "iVideo Studio" : "branded"})`.slice(0, 100),
       url,
       thumbnailUrl,
       modelId: video.model_id,

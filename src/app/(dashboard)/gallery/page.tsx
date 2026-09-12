@@ -103,13 +103,17 @@ export default function GalleryPage() {
 
   const [brandingId, setBrandingId] = useState<string | null>(null);
 
-  const handleBrand = async (videoId: string) => {
+  const handleBrand = async (videoId: string, mode: "own" | "studio" = "own") => {
 
     if (brandingId) return;
     setBrandingId(videoId);
 
     try {
-      const res = await fetch(`/api/videos/${videoId}/brand`, { method: "POST" });
+      const res = await fetch(`/api/videos/${videoId}/brand`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
       const data = await res.json();
       if (!res.ok) {
 
@@ -556,6 +560,19 @@ export default function GalleryPage() {
                   <Sparkles className="w-4 h-4" />
                   {brandingId === currentVideo.id ? "Adding…" : "Add my logo"}
                 </button>
+                {/* Ours, not theirs. Only the operator sees this — it stamps
+                    iVideo Studio branding on a clip we are about to post as
+                    marketing, and never appears on a customer's account. */}
+                {user?.isOwner && (
+                  <button
+                    onClick={() => handleBrand(currentVideo.id, "studio")}
+                    disabled={brandingId === currentVideo.id}
+                    className="px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/30 hover:bg-violet-500/25 disabled:opacity-50 text-violet-200 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {brandingId === currentVideo.id ? "Adding…" : "Brand for marketing"}
+                  </button>
+                )}
                 <a
                   href={`/captions?videoId=${currentVideo.id}`}
                   className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"

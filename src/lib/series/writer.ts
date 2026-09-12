@@ -99,6 +99,78 @@ function stripFence(raw: string): string {
   return t;
 }
 
+/** Does this look like it is already English? */
+function looksEnglish(language: string): boolean {
+  return language === "en" || language.startsWith("en-");
+}
+
+/**
+ * Subtitles are always English. The writer is asked for them inline, but a
+ * model that skips a field or echoes the original line would leave a viewer
+ * reading isiZulu under isiZulu — which defeats the entire point of having
+ * subtitles. Anything missing is translated in one extra call rather than
+ * left to chance.
+ */
+async function ensureEnglishSubtitles(
+  shots: Shot[],
+  language: string,
+  apiKey: string
+): Promise<void> {
+  const english = looksEnglish(language);
+
+  const needing = shots
+    .map((shot, index) => ({ shot, index }))
+    .filter(({ shot }) => {
+      if (shot.kind !== "dialogue" || !shot.dialogue) return false;
+      if (!shot.subtitle) return true;
+      // An "English" subtitle identical to a non-English line is the model
+      // having echoed rather than translated.
+      return !english && shot.subtitle === shot.dialogue;
+    });
+
+  if (needing.length === 0) return;
+
+  // For an English-language series the line is its own subtitle.
+  if (english) {
+    for (const { shot } of needing) shot.subtitle = shot.dialogue;
+    return;
+  }
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 1500,
+        messages: [
+          {
+            role: "user",
+            content: `Translate each line into natural English subtitles. Translate the meaning, not the words — an English viewer should feel what a speaker of the original feels. Keep each translation short enough to read on screen.
+
+Respond with ONLY a JSON array of strings, in the same order, no markdown:
+${JSON.stringify(needing.map(({ shot }) => shot.dialogue))}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`translation failed (${res.status})`);
+    const json = (await res.json()) as { content?: Array<{ text?: string }> };
+    const translations = JSON.parse(stripFence(json.content?.[0]?.text || "[]")) as string[];
+
+    needing.forEach(({ shot }, i) => {
+      const line = String(translations[i] || "").trim();
+      if (line) shot.subtitle = line.slice(0, 300);
+    });
+  } catch (err) {
+    // An episode with some subtitles missing is still worth having; the
+    // creator can read the script and fill them in. Losing the whole episode
+    // over a translation call would be the worse trade.
+    console.error("[SERIES] subtitle translation failed:", err);
+  }
+}
+
 /**
  * Writes the next episode. Reads the recap, writes the scenes, and hands back
  * a rewritten recap so the following episode has somewhere to stand.
@@ -192,15 +264,18 @@ Respond with ONLY this JSON, no markdown:
     return {
       speaker: String(s.speaker || ctx.characterName || "Lead").slice(0, 60),
       dialogue,
-      // Falling back to the original line is better than an empty subtitle:
-      // a viewer reading isiZulu under isiZulu loses nothing, a viewer
-      // reading nothing loses the scene.
-      subtitle: String(s.subtitle || dialogue).slice(0, 300).trim(),
+      // Left empty when missing rather than filled with the original line.
+      // Subtitles exist to carry the story to people who do not speak the
+      // language, so isiZulu under isiZulu is not a fallback, it is a
+      // failure. Anything missing here is translated below.
+      subtitle: String(s.subtitle || "").slice(0, 300).trim(),
       action: String(s.action || "").slice(0, 400),
       emotion: EMOTIONS.includes(s.emotion as never) ? s.emotion : "calm",
       kind: dialogue ? ("dialogue" as const) : ("action" as const),
     };
   });
+
+  await ensureEnglishSubtitles(draft.shots, ctx.language, key);
 
   draft.title = String(draft.title || `Episode ${ctx.episodeNumber}`).slice(0, 120);
   draft.synopsis = String(draft.synopsis || "").slice(0, 600);

@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-12-series-studio",
+    date: "2026-09-12",
+    title: "Series Studio",
+    description:
+      "Make a drama in your own language, episode after episode. The story carries on from where it left off, your characters keep the same faces, and they actually speak — isiZulu, Afrikaans, SA English and 137 more — with English subtitles written alongside every line.",
+    type: "feature",
+    badge: "New",
+  },
+  {
     id: "2026-06-14-react-studio",
     date: "2026-06-14",
     title: "React Studio",

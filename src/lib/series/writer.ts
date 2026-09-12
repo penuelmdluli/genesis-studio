@@ -119,7 +119,7 @@ const FEMALE_NAMES = new Set([
   "andile", "portia", "mercy", "grace", "sarah", "maria", "anna", "adri",
 ]);
 
-function guessGender(speaker: string): "female" | "male" {
+export function guessGender(speaker: string): "female" | "male" {
   const first = speaker.toLowerCase().trim().split(/[\s,(]/)[0];
   return FEMALE_NAMES.has(first) ? "female" : "male";
 }

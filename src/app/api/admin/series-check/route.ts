@@ -18,6 +18,8 @@ import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db-driver";
 import { startAssembly, collectAssembly } from "@/lib/series/assemble";
+import { submitShot } from "@/lib/series/render";
+import type { Shot as SeriesShot } from "@/lib/series/writer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -39,7 +41,95 @@ export async function POST(req: NextRequest) {
     text?: string;
     voice?: string;
     assembleEpisodeId?: string;
+    retryEpisodeId?: string;
   };
+
+  // Re-submit the shots of an episode that failed. Same path the creator's
+  // retry button takes, so verifying it here verifies what they get.
+  if (body.retryEpisodeId) {
+    const db = getDb();
+    const { data: ep } = await db
+      .from("series_episodes")
+      .select("id, user_id, series_id, script")
+      .eq("id", body.retryEpisodeId)
+      .maybeSingle();
+    if (!ep) return NextResponse.json({ error: "episode not found" }, { status: 404 });
+
+    const { data: series } = await db.from("series").select("*").eq("id", ep.series_id).maybeSingle();
+    if (!series) return NextResponse.json({ error: "series not found" }, { status: 404 });
+
+    const { data: existingShots } = await db
+      .from("series_shots")
+      .select("id, shot_index, status")
+      .eq("episode_id", ep.id)
+      .limit(20);
+    const existing = (existingShots || []) as Array<{ id: string; shot_index: number; status: string }>;
+    const retryIndexes = new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
+    if (retryIndexes.size === 0) return NextResponse.json({ retried: 0, note: "no failed shots" });
+
+    let shots: SeriesShot[] = [];
+    try {
+      shots = (JSON.parse(ep.script || "{}") as { shots?: SeriesShot[] }).shots || [];
+    } catch {
+      return NextResponse.json({ error: "unreadable script" }, { status: 400 });
+    }
+
+    const ctx = {
+      language: series.language || "en-ZA",
+      characterDescription: series.character_description || null,
+      characterName: series.character_name || null,
+      aspectRatio: "9:16" as const,
+    };
+
+    const todo = shots
+      .map((shot, index) => ({ shot, index }))
+      .filter(({ index }) => retryIndexes.has(index));
+
+    const results = await Promise.allSettled(
+      todo.map(({ shot, index }) => submitShot(shot, ctx, ep.user_id, `${ep.id}-${index}-${Date.now()}`))
+    );
+
+    let submitted = 0;
+    const errors: string[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const { shot, index } = todo[i];
+      const r = results[i];
+      const previous = existing.find((e) => e.shot_index === index);
+      if (previous) await db.from("series_shots").delete().eq("id", previous.id);
+
+      const base = {
+        id: previous?.id || crypto.randomUUID(),
+        episode_id: ep.id,
+        user_id: ep.user_id,
+        shot_index: index,
+        kind: shot.kind,
+        speaker: shot.speaker,
+        dialogue: shot.dialogue,
+        subtitle: shot.subtitle,
+        action: shot.action,
+        emotion: shot.emotion,
+        stage: "render",
+      };
+
+      if (r.status === "fulfilled") {
+        submitted++;
+        await db.from("series_shots").insert({
+          ...base,
+          image_url: r.value.imageUrl,
+          audio_url: r.value.audioUrl,
+          provider_ref: `ws:${r.value.providerRef}`,
+          status: "processing",
+        });
+      } else {
+        const message = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        errors.push(`shot ${index}: ${message.slice(0, 160)}`);
+        await db.from("series_shots").insert({ ...base, status: "failed", raw_error: message.slice(0, 400) });
+      }
+    }
+
+    await db.from("series_episodes").update({ status: "rendering" }).eq("id", ep.id);
+    return NextResponse.json({ retried: todo.length, submitted, errors });
+  }
 
   // Assembly normally runs when a creator opens a finished episode. This
   // triggers it on demand so it can be proved to work without waiting for

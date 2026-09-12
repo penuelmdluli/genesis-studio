@@ -20,6 +20,7 @@
 
 import { submitWsModel, runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
+import { guessGender } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 
@@ -127,7 +128,10 @@ export function voiceForSpeaker(
   const locale = localeOrDefault(ctx.language);
   if (gender === "female") return locale.female;
   if (gender === "male") return locale.male;
-  return nameHash(speaker) % 2 === 0 ? locale.female : locale.male;
+  // Scripts written before the writer recorded gender carry none, so fall
+  // back to the name rather than to a coin flip — the whole point of the fix
+  // is that Nomsa does not speak in a man's voice.
+  return guessGender(speaker) === "female" ? locale.female : locale.male;
 }
 
 /**

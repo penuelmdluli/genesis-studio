@@ -607,53 +607,27 @@ export interface FunEffect {
   icon: string;
 }
 
-export const FUN_EFFECT_CATEGORIES = [
-  "All",
-  "Dance",
-  "Gesture",
-  "Fantasy",
-  "Effects",
-  "Style",
-  "Fun",
-] as const;
+export const FUN_EFFECT_CATEGORIES = ["All", "Dance", "Effects", "Fun"] as const;
 
-// Every id here is verified to exist on kwaivgi/kling-effects (2026-08-31).
-// Six were dropped that day — hug, kiss, heart_gesture, celebration,
-// birthday_star and tiger_hug_pro — because the endpoint rejects them; the
-// first three are two-subject effects the model does not offer. Offering an id
-// the provider refuses costs the user a credit deduction and a refund, so
-// check a new id against the endpoint before adding it here.
 export const FUN_EFFECTS: FunEffect[] = [
-  // Dance
+  // Twelve effects, not twenty-five. The catalogue had five near-identical
+  // wing variants, two bullet-times and four photo filters — on a phone that
+  // is four screens of scrolling before you reach the button you came to
+  // press. These are the ones creators actually pick.
   { id: "running_man", name: "Running Man", category: "Dance", icon: "running_man" },
   { id: "jazz_jazz", name: "Jazz Dance", category: "Dance", icon: "jazz_jazz" },
   { id: "swing_swing", name: "Swing Dance", category: "Dance", icon: "swing_swing" },
-  // Gesture
-  { id: "squish", name: "Squish", category: "Gesture", icon: "squish" },
-  // Fantasy
-  { id: "fly_fly", name: "Flying", category: "Fantasy", icon: "fly_fly" },
-  { id: "golden_wing", name: "Golden Wings", category: "Fantasy", icon: "golden_wing" },
-  { id: "pure_white_wings", name: "Angel Wings", category: "Fantasy", icon: "pure_white_wings" },
-  { id: "black_wings", name: "Dark Wings", category: "Fantasy", icon: "black_wings" },
-  { id: "pink_pink_wings", name: "Fairy Wings", category: "Fantasy", icon: "pink_pink_wings" },
-  // Effects
+  { id: "skateskate", name: "Skateboard", category: "Dance", icon: "skateskate" },
+
   { id: "lightning_power", name: "Lightning Power", category: "Effects", icon: "lightning_power" },
   { id: "bullet_time", name: "Bullet Time", category: "Effects", icon: "bullet_time" },
-  { id: "bullet_time_360", name: "360 Bullet Time", category: "Effects", icon: "bullet_time_360" },
   { id: "disappear", name: "Disappear", category: "Effects", icon: "disappear" },
-  { id: "day_to_night", name: "Day to Night", category: "Effects", icon: "day_to_night" },
-  // Celebration
   { id: "firework_2026", name: "Fireworks", category: "Effects", icon: "firework_2026" },
-  // Style
-  { id: "anime_figure", name: "Anime Style", category: "Style", icon: "anime_figure" },
-  { id: "yearbook", name: "Yearbook", category: "Style", icon: "yearbook" },
-  { id: "instant_film", name: "Instant Film", category: "Style", icon: "instant_film" },
-  { id: "pixelpixel", name: "Pixel Art", category: "Style", icon: "pixelpixel" },
-  // Fun
-  { id: "rampage_ape", name: "Rampage Ape", category: "Fun", icon: "rampage_ape" },
+
+  { id: "fly_fly", name: "Flying", category: "Fun", icon: "fly_fly" },
+  { id: "pure_white_wings", name: "Angel Wings", category: "Fun", icon: "pure_white_wings" },
   { id: "jelly_jiggle", name: "Jelly Jiggle", category: "Fun", icon: "jelly_jiggle" },
-  { id: "jelly_press", name: "Jelly Press", category: "Fun", icon: "jelly_press" },
-  { id: "skateskate", name: "Skateboard", category: "Fun", icon: "skateskate" },
+  { id: "anime_figure", name: "Anime Style", category: "Fun", icon: "anime_figure" },
 ];
 
 // Cost estimation for motion control

@@ -134,9 +134,13 @@ export default function MotionControlPage() {
   const [quality, setQuality] = useState<MotionQuality>("standard");
   const [duration, setDuration] = useState(10);
   const [enableAudio, setEnableAudio] = useState(false);
-  const [keepOriginalSound, setKeepOriginalSound] = useState(true);
+  // The reference reel's own soundtrack is no longer offered: lifting audio
+  // off someone else's post is a copyright problem, not a feature.
+  const [keepOriginalSound] = useState(false);
   const [seed, setSeed] = useState<number | undefined>(undefined);
-  const [orientation, setOrientation] = useState<"video" | "image">("video");
+  // Portrait by default: this is a phone-first audience posting to Reels
+  // and TikTok, and landscape was costing them a re-crop every time.
+  const [orientation, setOrientation] = useState<"video" | "image">("image");
 
   const motionVideoRef = useRef<HTMLInputElement>(null);
   const characterImageRef = useRef<HTMLInputElement>(null);
@@ -574,7 +578,11 @@ export default function MotionControlPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Full body photo of ${characterPrompt.trim()}, standing in a dance-ready pose, entire body from head to feet visible, sharp focus on main character, blurred crowd and people dancing in the background, vibrant party atmosphere, bokeh background figures, main subject centered and in focus, full length shot, 8K hyperrealistic`,
+          // The description is the user's. Only the framing is ours, and it
+          // is the framing motion control needs: a cropped subject cannot be
+          // animated, which is why generated characters kept losing their
+          // legs. Everything else — scene, mood, styling — comes from them.
+          prompt: `${characterPrompt.trim()}. Full-length portrait, entire body visible from head to feet with space above the head and below the feet, standing upright, feet fully in frame, sharp focus on the subject, photorealistic, high detail`,
           aspectRatio: "portrait",
           numImages: 4,
         }),
@@ -1269,7 +1277,6 @@ export default function MotionControlPage() {
                   ...(effectsAvailable
                     ? [{ key: "effects" as const, label: "Effects", icon: Sparkles }]
                     : []),
-                  { key: "leads" as const, label: "My Leads", icon: Bookmark },
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                 ]).map((tab) => (
@@ -1277,7 +1284,6 @@ export default function MotionControlPage() {
                     key={tab.key}
                     onClick={() => {
                       setMotionTab(tab.key);
-                      if (tab.key === "leads" && !leadsLoaded) loadLeads();
                     }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
                       motionTab === tab.key
@@ -1858,7 +1864,7 @@ export default function MotionControlPage() {
                         <div className="flex flex-col items-center justify-center h-36 text-center">
                           <Clock className="w-8 h-8 text-zinc-600 mb-2" />
                           <span className="text-xs text-zinc-500">No images yet</span>
-                          <span className="text-[10px] text-zinc-600 mt-1">Generate images and they'll appear here</span>
+                          <span className="text-[10px] text-zinc-600 mt-1">Generate images and they&apos;ll appear here</span>
                         </div>
                       )}
                     </div>
@@ -1950,14 +1956,14 @@ export default function MotionControlPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1.5">Orientation</label>
+                  <label className="block text-xs text-zinc-400 mb-1.5">Shape</label>
                   <select
                     value={orientation}
                     onChange={(e) => setOrientation(e.target.value as "video" | "image")}
                     className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
-                    <option value="video">Match Video</option>
-                    <option value="image">Match Image</option>
+                    <option value="image">Portrait — Reels, TikTok</option>
+                    <option value="video">Landscape — YouTube</option>
                   </select>
                 </div>
               </div>
@@ -1965,36 +1971,31 @@ export default function MotionControlPage() {
               {/* Audio */}
               <div>
                 <label className="block text-xs text-zinc-400 mb-1.5">Audio</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: "none", label: "No Audio", icon: VolumeX, desc: "Silent video" },
-                    { value: "generate", label: "AI Audio", icon: Volume2, desc: "Generate sounds" },
-                    { value: "keep", label: "Keep Original", icon: Volume2, desc: "From reference" },
+                    { value: "generate", label: "Add sound", icon: Volume2, desc: "Matched to the action" },
+                    { value: "none", label: "Silent", icon: VolumeX, desc: "Add your own later" },
                   ] as const).map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => {
                         setEnableAudio(opt.value === "generate");
-                        setKeepOriginalSound(opt.value === "keep");
                       }}
                       className={`p-2.5 rounded-xl border text-center transition-all ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20"
                           : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.12]"
                       }`}
                     >
                       <opt.icon className={`w-4 h-4 mx-auto mb-1 ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "text-violet-400" : "text-zinc-400"
                       }`} />
                       <div className={`text-[11px] font-medium ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "text-violet-300" : "text-zinc-400"
                       }`}>{opt.label}</div>
                     </button>

@@ -41,7 +41,23 @@ interface AutoPublishParams {
 export async function autoPublishToExplore(
   params: AutoPublishParams
 ): Promise<void> {
-  const plan = getPlanTier(params.userPlan);
+  // The caller's plan hint is not trusted. getPlanTier(undefined) returns
+  // "free", so any call site that forgot to pass userPlan — the AI Singer
+  // cron, for one — branded a paying customer's video and published it to
+  // Explore. A paid plan is something we can look up, so we look it up.
+  let plan = getPlanTier(params.userPlan);
+  if (!params.userPlan) {
+    try {
+      const sb = getDb();
+      const { data } = await sb.from("users").select("plan").eq("id", params.userId).single();
+      plan = getPlanTier(data?.plan);
+    } catch (err) {
+      // Cannot confirm the plan — treat as paid and publish nothing. Never
+      // brand a video we are not certain belongs to a free account.
+      console.warn("[AUTO-PUBLISH] Plan lookup failed, skipping to be safe:", err);
+      return;
+    }
+  }
 
   // Only auto-publish free tier videos
   if (plan !== "free") {

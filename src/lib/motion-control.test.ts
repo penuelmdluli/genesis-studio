@@ -161,6 +161,10 @@ describe("WaveSpeed effect routing", () => {
     const offered = FUN_EFFECTS.map((e) => e.id);
     for (const id of removed) expect(offered).not.toContain(id);
     expect(offered).toContain("running_man");
-    expect(offered.length).toBe(23);
+    // Curated to 12 on 2026-09-12: the list is a phone screen, not a
+    // catalogue. The count is pinned so a careless re-add is caught, and
+    // every id still has to be one the endpoint accepts.
+    expect(offered.length).toBe(12);
+    expect(new Set(offered).size).toBe(offered.length);
   });
 });

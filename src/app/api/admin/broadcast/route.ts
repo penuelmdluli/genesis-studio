@@ -40,7 +40,10 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDb();
-  const limit = Math.min(Math.max(Number(body.limit) || 200, 1), 500);
+  // Small batches on purpose: Resend rate-limits at ~2 requests a second and
+  // a Worker invocation is capped at 60s, so a single greedy run would drop
+  // recipients silently. The caller repeats until `remaining` is 0.
+  const limit = Math.min(Math.max(Number(body.limit) || 25, 1), 50);
 
   const { data: users } = await db
     .from("users")
@@ -63,7 +66,16 @@ export async function POST(req: NextRequest) {
       skipped++;
       continue;
     }
-    const r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+    // Pace to stay inside the provider's rate limit, and give a throttled
+    // send one more chance before writing the recipient off.
+    if (sent > 0) await new Promise((r) => setTimeout(r, 600));
+
+    let r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+    if (!r.ok && /429|rate/i.test(r.error || "")) {
+      await new Promise((res) => setTimeout(res, 1500));
+      r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+    }
+
     if (r.ok) {
       sent++;
       await db.from("email_sends").insert({ id: crypto.randomUUID(), user_id: u.id, campaign: CAMPAIGN_ID });
@@ -72,5 +84,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ campaign: CAMPAIGN_ID, sent, skipped, failures, remaining: Math.max(0, (users?.length || 0) - sent - skipped) });
+  // How many are still owed this campaign, so the caller knows to run again.
+  const { data: allWithEmail } = await db.from("users").select("id").not("email", "is", null);
+  const { data: sentRows } = await db.from("email_sends").select("user_id").eq("campaign", CAMPAIGN_ID);
+  const remaining = Math.max(0, (allWithEmail?.length || 0) - (sentRows?.length || 0) - out.size);
+
+  return NextResponse.json({ campaign: CAMPAIGN_ID, sent, skipped, failures, remaining });
 }

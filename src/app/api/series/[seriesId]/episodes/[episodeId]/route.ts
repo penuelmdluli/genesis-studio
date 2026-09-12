@@ -14,6 +14,7 @@ import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
+import { retryFailedShots } from "@/lib/series/retry";
 import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,30 @@ export async function GET(
 
   const shotRows = (rendered || []) as ShotRow[];
   await refreshShots(db, shotRows);
+
+  // Any scene that failed for a passing reason is put back in, without the
+  // creator having to notice or ask. Capped, so a genuinely bad shot does not
+  // loop.
+  if (shotRows.some((s) => s.status === "failed")) {
+    const { data: seriesRow } = await db
+      .from("series")
+      .select("language, character_description, character_name")
+      .eq("id", seriesId)
+      .maybeSingle();
+    if (seriesRow) {
+      const outcome = await retryFailedShots(episodeId, seriesId, user.id, shots, seriesRow);
+      if (outcome.submitted > 0) {
+        const { data: refreshed } = await db
+          .from("series_shots")
+          .select(SHOT_SELECT)
+          .eq("episode_id", episodeId)
+          .order("shot_index", { ascending: true })
+          .limit(20);
+        shotRows.length = 0;
+        shotRows.push(...((refreshed || []) as ShotRow[]));
+      }
+    }
+  }
 
   const done = shotRows.filter((s) => s.status === "completed").length;
   const failed = shotRows.filter((s) => s.status === "failed").length;

@@ -604,6 +604,99 @@ app.post("/brand-genesis", auth, async (req, res) => {
   }
 });
 
+// Ported from the standalone genesis-scraper repository, which this
+// service does NOT build from. /brand-custom was added there and so
+// could never deploy; this copy is the one Render actually builds.
+// ─── POST /brand-custom ───
+// A paying creator's OWN logo on their OWN video. Takes a logo we host and
+// burns it into a corner, optionally with their handle beside it.
+//
+// Deliberately narrow: the caller supplies a logo URL and a position from a
+// fixed set, nothing that reaches a shell unescaped. The overlay is scaled
+// relative to the video so it looks the same on a 9:16 reel and a 16:9 cut.
+app.post("/brand-custom", auth, async (req, res) => {
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+  const tmp = os.tmpdir();
+  const stamp = Date.now();
+  const inputPath = path.join(tmp, `bc-in-${stamp}.mp4`);
+  const logoPath = path.join(tmp, `bc-logo-${stamp}.png`);
+  const outputPath = path.join(tmp, `bc-out-${stamp}.mp4`);
+  const cleanup = () => [inputPath, logoPath, outputPath].forEach((f) => { try { fs.unlinkSync(f); } catch {} });
+
+  try {
+    const { inputVideoUrl, logoUrl, brandName, position, outputR2Key } = req.body || {};
+    if (!inputVideoUrl || !outputR2Key) {
+      return res.status(400).json({ error: "inputVideoUrl and outputR2Key required" });
+    }
+    if (!logoUrl && !brandName) {
+      return res.status(400).json({ error: "logoUrl or brandName required" });
+    }
+
+    const POSITIONS = {
+      "top-left": { x: "W*0.04", y: "H*0.04" },
+      "top-right": { x: "W-w-W*0.04", y: "H*0.04" },
+      "bottom-left": { x: "W*0.04", y: "H-h-H*0.04" },
+      "bottom-right": { x: "W-w-W*0.04", y: "H-h-H*0.04" },
+    };
+    const pos = POSITIONS[position] || POSITIONS["bottom-right"];
+
+    const videoRes = await fetch(inputVideoUrl);
+    if (!videoRes.ok) throw new Error(`could not fetch video (${videoRes.status})`);
+    fs.writeFileSync(inputPath, Buffer.from(await videoRes.arrayBuffer()));
+
+    let filter;
+    if (logoUrl) {
+      const logoRes = await fetch(logoUrl);
+      if (!logoRes.ok) throw new Error(`could not fetch logo (${logoRes.status})`);
+      fs.writeFileSync(logoPath, Buffer.from(await logoRes.arrayBuffer()));
+      // Logo is 12% of the video width, aspect preserved, slightly transparent.
+      filter = `[1:v]scale=iw*0.12*main_w/iw:-1[lg];[0:v][lg]overlay=${pos.x}:${pos.y}:format=auto`;
+    }
+
+    // A handle, if they set one, sits under the logo (or alone).
+    let textFilter = "";
+    if (brandName) {
+      const safe = String(brandName).slice(0, 60).replace(/[\':%]/g, "");
+      if (safe) {
+        const ty = position && position.startsWith("top") ? "h*0.04+h*0.10" : "h-h*0.04-h*0.06";
+        const tx = position && position.endsWith("left") ? "w*0.04" : "w-text_w-w*0.04";
+        textFilter = `drawtext=text='${safe}':fontsize=h*0.028:fontcolor=white@0.92:borderw=2:bordercolor=black@0.6:x=${tx}:y=${ty}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
+      }
+    }
+
+    const { execFile } = require("child_process");
+    const args = logoUrl
+      ? ["-y", "-i", inputPath, "-i", logoPath, "-filter_complex", textFilter ? `${filter},${textFilter}` : filter]
+      : ["-y", "-i", inputPath, "-vf", textFilter];
+    args.push("-c:a", "copy", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", outputPath);
+
+    await new Promise((resolve, reject) => {
+      execFile("ffmpeg", args, { maxBuffer: 1024 * 1024 * 32 }, (err, _out, stderr) => {
+        if (err) return reject(new Error(`ffmpeg failed: ${String(stderr || err.message).slice(0, 300)}`));
+        resolve();
+      });
+    });
+
+    const branded = fs.readFileSync(outputPath);
+    await r2.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: outputR2Key,
+      Body: branded,
+      ContentType: "video/mp4",
+    }));
+    cleanup();
+
+    console.log(`[brand-custom] Done → ${outputR2Key} (${(branded.length / 1024 / 1024).toFixed(1)}MB)`);
+    res.json({ r2Key: outputR2Key, fileSizeBytes: branded.length });
+  } catch (err) {
+    cleanup();
+    console.error("[brand-custom]", err.message);
+    res.status(500).json({ error: String(err.message).slice(0, 300) });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);
 });

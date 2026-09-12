@@ -61,12 +61,26 @@ export async function POST(
   }
 
   // Rendering twice is the easiest way for somebody to pay twice for the
-  // same episode, so it is refused outright rather than quietly allowed.
-  if (episode.status === "rendering" || episode.status === "completed") {
-    return NextResponse.json(
-      { error: episode.status === "completed" ? "This episode is already made." : "This episode is being made right now." },
-      { status: 409 }
-    );
+  // same episode. But an episode where some scenes failed is not "done" — it
+  // is half an episode nobody can finish, which is worse. So: never redo a
+  // scene that worked, always allow a retry of one that did not.
+  const { data: existingShots } = await db
+    .from("series_shots")
+    .select("id, shot_index, status")
+    .eq("episode_id", episodeId)
+    .limit(20);
+
+  const existing = (existingShots || []) as Array<{ id: string; shot_index: number; status: string }>;
+
+  if (existing.some((s) => s.status === "processing")) {
+    return NextResponse.json({ error: "This episode is being made right now." }, { status: 409 });
+  }
+
+  const retryIndexes = new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
+  const isRetry = existing.length > 0 && retryIndexes.size > 0;
+
+  if (existing.length > 0 && !isRetry) {
+    return NextResponse.json({ error: "This episode is already made." }, { status: 409 });
   }
 
   const { data: series } = await db.from("series").select("*").eq("id", seriesId).maybeSingle();
@@ -97,13 +111,24 @@ export async function POST(
     aspectRatio: body.aspectRatio === "16:9" ? "16:9" : "9:16",
   };
 
-  const cost = renderCost(shots);
+  // Only the scenes that still need making.
+  const todo = shots
+    .map((shot, index) => ({ shot, index }))
+    .filter(({ index }) => !isRetry || retryIndexes.has(index));
+
+  if (todo.length === 0) {
+    return NextResponse.json({ error: "This episode is already made." }, { status: 409 });
+  }
+
+  const cost = renderCost(todo.map(({ shot }) => shot));
   if (!ownerAccount) {
     const { success, newBalance } = await deductCredits(
       user.id,
       cost,
       "",
-      `Series: ${series.title} episode ${episode.episode_number}`
+      isRetry
+        ? `Series: ${series.title} episode ${episode.episode_number} (${todo.length} scene retry)`
+        : `Series: ${series.title} episode ${episode.episode_number}`
     );
     if (!success) {
       return NextResponse.json(
@@ -117,17 +142,22 @@ export async function POST(
 
   // Every shot is submitted; none is allowed to take down the others.
   const results = await Promise.allSettled(
-    shots.map((shot, index) => submitShot(shot, ctx, user.id, `${episodeId}-${index}`))
+    todo.map(({ shot, index }) =>
+      submitShot(shot, ctx, user.id, `${episodeId}-${index}-${Date.now()}`)
+    )
   );
 
   let submitted = 0;
   let refundDue = 0;
   const rows: Record<string, unknown>[] = [];
 
-  results.forEach((result, index) => {
-    const shot = shots[index];
+  results.forEach((result, position) => {
+    const { shot, index } = todo[position];
+    const previous = existing.find((s) => s.shot_index === index);
     const base = {
-      id: randomUUID(),
+      // Reuse the row when retrying, so an episode never accumulates a pile
+      // of dead attempts next to the scene that finally worked.
+      id: previous?.id || randomUUID(),
       episode_id: episodeId,
       user_id: user.id,
       shot_index: index,
@@ -137,6 +167,11 @@ export async function POST(
       subtitle: shot.subtitle,
       action: shot.action,
       emotion: shot.emotion,
+      stage: "render",
+      error: null,
+      raw_error: null,
+      clip_url: null,
+      raw_clip_url: null,
     };
 
     if (result.status === "fulfilled") {
@@ -165,6 +200,12 @@ export async function POST(
   });
 
   for (const row of rows) {
+    const replacing = existing.some((s) => s.id === row.id);
+    if (replacing) {
+      // Clear the old attempt first: the shim has no upsert, and a stale
+      // failed row left beside a running one would read as a failed episode.
+      await db.from("series_shots").delete().eq("id", row.id as string);
+    }
     const { error } = await db.from("series_shots").insert(row);
     if (error) console.error("[SERIES] could not record shot:", error);
   }
@@ -191,6 +232,7 @@ export async function POST(
     shots: results.length,
     submitted,
     charged: cost - refundDue,
-    estimatedSeconds: 60 + shots.length * 30,
+    estimatedSeconds: 60 + todo.length * 30,
+    retry: isRetry,
   });
 }

@@ -388,12 +388,36 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                               </p>
                             </div>
                           ) : detail.progress ? (
-                            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] px-4 py-3">
-                              <p className="text-sm text-emerald-200 flex items-center gap-2">
-                                <Film className="w-4 h-4" />
-                                {detail.progress.done} of {detail.progress.total} scenes made
-                                {detail.progress.failed > 0 ? ` · ${detail.progress.failed} refunded` : ""}
-                              </p>
+                            <div className="space-y-3">
+                              <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] px-4 py-3">
+                                <p className="text-sm text-emerald-200 flex items-center gap-2">
+                                  <Film className="w-4 h-4" />
+                                  {detail.progress.done} of {detail.progress.total} scenes made
+                                  {detail.progress.failed > 0 ? ` · ${detail.progress.failed} refunded` : ""}
+                                </p>
+                              </div>
+                              {/* A half-made episode is worse than none, so the
+                                  scenes that failed can be tried again on their
+                                  own. The ones that worked are never redone and
+                                  never charged for twice. */}
+                              {detail.progress.failed > 0 && (
+                                <button
+                                  onClick={() => renderEpisode(ep.id)}
+                                  disabled={rendering === ep.id}
+                                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 font-semibold text-amber-200 disabled:opacity-60 flex items-center justify-center gap-2"
+                                >
+                                  {rendering === ep.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Play className="w-4 h-4" />
+                                  )}
+                                  {rendering === ep.id
+                                    ? "Starting…"
+                                    : `Try the ${detail.progress.failed} missing scene${
+                                        detail.progress.failed > 1 ? "s" : ""
+                                      } again`}
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <button

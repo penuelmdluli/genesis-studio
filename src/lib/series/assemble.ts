@@ -5,10 +5,14 @@
 // to play, nothing to download and nothing in the gallery — which is exactly
 // what a creator found when their first episode "finished".
 //
-// This runs once, as soon as the last shot lands, and produces one video with
-// the English subtitle burned onto each shot. It is included rather than
-// charged for: the creator already paid for every scene, and an episode they
-// cannot watch is not a thing worth selling.
+// Joining takes minutes on our hardware, far longer than any HTTP request
+// survives, so it runs as a background job on the video service: we start it,
+// remember the job id, and collect the result the next time the episode is
+// opened. The page already polls while shots render, so this costs no extra
+// machinery.
+//
+// Included rather than charged for: the creator paid for every scene, and an
+// episode they cannot watch is not a thing worth selling.
 
 import { randomUUID } from "crypto";
 import { createVideo } from "@/lib/db";
@@ -29,6 +33,12 @@ export interface AssembledEpisode {
   url: string;
 }
 
+/** Started, but not finished. Collected on a later poll. */
+export interface AssemblyPending {
+  pending: true;
+  jobId: string;
+}
+
 /**
  * Why an assembly did not happen. Returned rather than swallowed: the first
  * time this failed it returned a bare null, which said nothing at all about
@@ -38,33 +48,31 @@ export interface AssemblyFailure {
   reason: string;
 }
 
-export type AssemblyResult = AssembledEpisode | AssemblyFailure | null;
+export type AssemblyResult = AssembledEpisode | AssemblyPending | AssemblyFailure | null;
 
 export function isAssembled(r: AssemblyResult): r is AssembledEpisode {
   return !!r && "videoId" in r;
 }
 
+function service(): { url: string; secret: string } | null {
+  const url = envString("SCRAPER_SERVICE_URL");
+  const secret = envString("SCRAPER_SERVICE_SECRET");
+  return url && secret ? { url, secret } : null;
+}
+
 /**
- * Joins one episode's finished shots into a single video and files it in the
- * creator's gallery. Returns null when there is nothing worth assembling, or
- * when assembly fails — a failure here must never cost anyone their shots,
- * which still exist and still play individually.
+ * Asks the video service to join this episode's finished shots. Returns as
+ * soon as the job is accepted — the file does not exist yet.
  */
-export async function assembleEpisode(
+export async function startAssembly(
   episodeId: string,
   userId: string,
-  episodeTitle: string,
-  seriesTitle: string,
   burnSubtitles = true
 ): Promise<AssemblyResult> {
-  const scraperUrl = envString("SCRAPER_SERVICE_URL");
-  const scraperSecret = envString("SCRAPER_SERVICE_SECRET");
-  if (!scraperUrl || !scraperSecret) {
-    return { reason: "the video service is not configured" };
-  }
+  const svc = service();
+  if (!svc) return { reason: "the video service is not configured" };
 
   const db = getDb();
-
   const { data: shotRows } = await db
     .from("series_shots")
     .select("shot_index, status, clip_url, subtitle")
@@ -72,21 +80,24 @@ export async function assembleEpisode(
     .order("shot_index", { ascending: true })
     .limit(20);
 
-  const shots = (shotRows || []) as ShotForAssembly[];
-  const usable = shots.filter((s) => s.status === "completed" && s.clip_url);
+  const usable = ((shotRows || []) as ShotForAssembly[]).filter(
+    (s) => s.status === "completed" && s.clip_url
+  );
 
-  // One clip is not worth a join, and the creator can already play it.
+  // One clip is not worth joining, and the creator can already play it.
   if (usable.length < 2) {
     return { reason: `only ${usable.length} finished shot(s) — nothing to join` };
   }
 
+  // The destination is chosen now so the video id is stable across the whole
+  // job: the poll that collects the result must know where the file landed.
   const videoId = randomUUID();
   const outputKey = videoStorageKey(userId, `episode-${videoId}`);
 
   try {
-    const res = await fetch(`${scraperUrl}/stitch-episode`, {
+    const res = await fetch(`${svc.url}/stitch-episode`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-scraper-secret": scraperSecret },
+      headers: { "Content-Type": "application/json", "x-scraper-secret": svc.secret },
       body: JSON.stringify({
         clips: usable.map((s) => ({ url: s.clip_url, subtitle: s.subtitle || "" })),
         outputR2Key: outputKey,
@@ -96,10 +107,70 @@ export async function assembleEpisode(
 
     if (!res.ok) {
       const detail = (await res.text()).slice(0, 300);
-      console.error(`[SERIES] stitch failed ${res.status}: ${detail}`);
       return { reason: `stitch ${res.status}: ${detail}` };
     }
 
+    const body = (await res.json()) as { jobId?: string };
+    if (!body.jobId) return { reason: "the video service did not return a job" };
+
+    // videoId travels with the job so the collecting poll can file the result
+    // without guessing.
+    await db
+      .from("series_episodes")
+      .update({ assembly_job: `${body.jobId}|${videoId}` })
+      .eq("id", episodeId);
+
+    return { pending: true, jobId: body.jobId };
+  } catch (err) {
+    return { reason: err instanceof Error ? `${err.name}: ${err.message}` : String(err) };
+  }
+}
+
+/**
+ * Checks a running job and, if it has finished, files the episode in the
+ * creator's gallery. Safe to call on every page load.
+ */
+export async function collectAssembly(
+  episodeId: string,
+  userId: string,
+  assemblyJob: string,
+  episodeTitle: string,
+  seriesTitle: string,
+  shotCount: number
+): Promise<AssemblyResult> {
+  const svc = service();
+  if (!svc) return { reason: "the video service is not configured" };
+
+  const [jobId, videoId] = assemblyJob.split("|");
+  if (!jobId || !videoId) return { reason: "malformed assembly job" };
+
+  const db = getDb();
+
+  try {
+    const res = await fetch(`${svc.url}/stitch-episode/${jobId}`, {
+      headers: { "x-scraper-secret": svc.secret },
+    });
+
+    // The service restarts when it is idle, which loses jobs it was holding
+    // in memory. Clearing the marker lets the next poll start a fresh one
+    // rather than waiting forever on a job that no longer exists.
+    if (res.status === 404) {
+      await db.from("series_episodes").update({ assembly_job: null }).eq("id", episodeId);
+      return { reason: "the join was interrupted — it will start again" };
+    }
+
+    if (!res.ok) return { reason: `status ${res.status}` };
+
+    const body = (await res.json()) as { status?: string; error?: string };
+
+    if (body.status === "running") return { pending: true, jobId };
+
+    if (body.status !== "done") {
+      await db.from("series_episodes").update({ assembly_job: null }).eq("id", episodeId);
+      return { reason: body.error || "the join failed" };
+    }
+
+    const outputKey = videoStorageKey(userId, `episode-${videoId}`);
     const thumbnailUrl = await extractAndUploadThumbnail(outputKey, userId, videoId).catch(() => "");
     const url = `/api/videos/${videoId}`;
 
@@ -112,8 +183,8 @@ export async function assembleEpisode(
       thumbnailUrl,
       modelId: "kling-2.6",
       prompt: `Series episode: ${episodeTitle}`,
-      resolution: "1080p",
-      duration: usable.length * 5,
+      resolution: "720p",
+      duration: shotCount * 5,
       fps: 30,
       fileSize: 0,
       aspectRatio: "portrait",
@@ -121,13 +192,12 @@ export async function assembleEpisode(
 
     await db
       .from("series_episodes")
-      .update({ video_id: videoId, video_url: url })
+      .update({ video_id: videoId, video_url: url, assembly_job: null })
       .eq("id", episodeId);
 
-    console.log(`[SERIES] episode ${episodeId} assembled from ${usable.length} shots → ${videoId}`);
+    console.log(`[SERIES] episode ${episodeId} assembled → ${videoId}`);
     return { videoId, url };
   } catch (err) {
-    console.error("[SERIES] assembly failed:", err);
     return { reason: err instanceof Error ? `${err.name}: ${err.message}` : String(err) };
   }
 }

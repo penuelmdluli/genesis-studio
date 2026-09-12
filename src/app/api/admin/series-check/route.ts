@@ -17,7 +17,7 @@ import { envString } from "@/lib/env";
 import { submitWsModel, WS_MODELS } from "@/lib/wavespeed-tools";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db-driver";
-import { assembleEpisode } from "@/lib/series/assemble";
+import { startAssembly, collectAssembly } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,20 +48,33 @@ export async function POST(req: NextRequest) {
     const db = getDb();
     const { data: ep } = await db
       .from("series_episodes")
-      .select("id, user_id, series_id, title, episode_number, video_id")
+      .select("id, user_id, series_id, title, episode_number, video_id, assembly_job")
       .eq("id", body.assembleEpisodeId)
       .maybeSingle();
     if (!ep) return NextResponse.json({ error: "episode not found" }, { status: 404 });
     if (ep.video_id) return NextResponse.json({ alreadyAssembled: true, videoId: ep.video_id });
 
     const { data: ser } = await db.from("series").select("title").eq("id", ep.series_id).maybeSingle();
-    const result = await assembleEpisode(
-      ep.id,
-      ep.user_id,
-      ep.title || `Episode ${ep.episode_number}`,
-      ser?.title || "Series",
-      true
-    );
+    const { data: shots } = await db
+      .from("series_shots")
+      .select("id")
+      .eq("episode_id", ep.id)
+      .eq("status", "completed")
+      .limit(20);
+
+    // Same two steps the episode page takes: collect a running job, or start
+    // one if there is none.
+    const result = ep.assembly_job
+      ? await collectAssembly(
+          ep.id,
+          ep.user_id,
+          ep.assembly_job,
+          ep.title || `Episode ${ep.episode_number}`,
+          ser?.title || "Series",
+          shots?.length || 0
+        )
+      : await startAssembly(ep.id, ep.user_id, true);
+
     return NextResponse.json({ assembled: result });
   }
   const text = body.text || "Sisi! Ubuye nini? Bengingazi ukuthi uyeza namhlanje!";

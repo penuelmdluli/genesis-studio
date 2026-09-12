@@ -15,7 +15,7 @@ import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
 import { getWsPrediction } from "@/lib/wavespeed-tools";
 import { submitUpscale } from "@/lib/series/render";
-import { assembleEpisode } from "@/lib/series/assemble";
+import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -192,22 +192,24 @@ export async function GET(
   // cannot start a second one, and so an episode finished before this
   // existed still gets assembled the next time it is opened.
   if (!episode.video_id && episode.status === "completed" && done >= 2) {
-    const { data: series } = await db
-      .from("series")
-      .select("title")
-      .eq("id", seriesId)
-      .maybeSingle();
-
-    const assembled = await assembleEpisode(
-      episodeId,
-      user.id,
-      episode.title || `Episode ${episode.episode_number}`,
-      series?.title || "Series",
-      true
-    );
-    if (assembled && "videoId" in assembled) {
-      episode.video_id = assembled.videoId;
-      episode.video_url = assembled.url;
+    if (episode.assembly_job) {
+      // A join is already running. Collect it if it has finished.
+      const { data: series } = await db.from("series").select("title").eq("id", seriesId).maybeSingle();
+      const result = await collectAssembly(
+        episodeId,
+        user.id,
+        episode.assembly_job,
+        episode.title || `Episode ${episode.episode_number}`,
+        series?.title || "Series",
+        done
+      );
+      if (isAssembled(result)) {
+        episode.video_id = result.videoId;
+        episode.video_url = result.url;
+      }
+    } else {
+      // Nothing running: start one. It finishes on a later poll.
+      await startAssembly(episodeId, user.id, true);
     }
   }
 

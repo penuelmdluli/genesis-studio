@@ -711,6 +711,23 @@ app.post("/brand-custom", auth, async (req, res) => {
 // canvas, one frame rate and one audio layout before joining. Concatenating
 // mismatched streams is the usual reason a join produces a file that plays
 // for five seconds and stops.
+// Jobs live here while they run. An episode takes minutes on this hardware —
+// far longer than any HTTP request survives, and a synchronous version
+// returned 524 after the caller gave up. The work is started, acknowledged,
+// and polled.
+const stitchJobs = new Map();
+
+function pruneStitchJobs() {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, job] of stitchJobs) if (job.at < cutoff) stitchJobs.delete(id);
+}
+
+app.get("/stitch-episode/:jobId", auth, (req, res) => {
+  const job = stitchJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "unknown job" });
+  res.json({ status: job.status, r2Key: job.r2Key || null, fileSizeBytes: job.fileSizeBytes || null, error: job.error || null });
+});
+
 app.post("/stitch-episode", auth, async (req, res) => {
   const fs = require("fs");
   const path = require("path");
@@ -772,6 +789,10 @@ app.post("/stitch-episode", auth, async (req, res) => {
     return lines.slice(0, 3).join("\n");
   };
 
+  // Declared out here so a failure can still mark the job, which a
+  // block-scoped id could not: the catch runs in a sibling scope.
+  let jobId = null;
+
   try {
     const { clips, outputR2Key, burnSubtitles } = req.body || {};
     if (!Array.isArray(clips) || clips.length === 0) {
@@ -779,6 +800,11 @@ app.post("/stitch-episode", auth, async (req, res) => {
     }
     if (!outputR2Key) return res.status(400).json({ error: "outputR2Key required" });
     if (clips.length > 20) return res.status(400).json({ error: "too many clips (max 20)" });
+
+    pruneStitchJobs();
+    jobId = `sj-${stamp}-${Math.random().toString(36).slice(2, 8)}`;
+    stitchJobs.set(jobId, { status: "running", at: Date.now() });
+    res.status(202).json({ jobId, status: "running", clips: clips.length });
 
     const normalised = [];
 
@@ -862,11 +888,17 @@ app.post("/stitch-episode", auth, async (req, res) => {
 
     cleanup();
     console.log(`[stitch-episode] ${clips.length} clips → ${outputR2Key} (${(bytes / 1024 / 1024).toFixed(1)}MB)`);
-    res.json({ r2Key: outputR2Key, fileSizeBytes: bytes, clips: clips.length });
+    stitchJobs.set(jobId, { status: "done", r2Key: outputR2Key, fileSizeBytes: bytes, at: Date.now() });
   } catch (err) {
     cleanup();
     console.error("[stitch-episode]", err.message);
-    res.status(500).json({ error: String(err.message).slice(0, 400) });
+    // The caller was acknowledged long ago, so the failure is recorded for
+    // whoever polls rather than returned.
+    if (jobId && stitchJobs.has(jobId)) {
+      stitchJobs.set(jobId, { status: "error", error: String(err.message).slice(0, 400), at: Date.now() });
+    } else if (!res.headersSent) {
+      res.status(500).json({ error: String(err.message).slice(0, 400) });
+    }
   }
 });
 

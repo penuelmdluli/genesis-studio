@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
     voice?: string;
     assembleEpisodeId?: string;
     retryEpisodeId?: string;
+    /** Redo every shot, not only the failed ones. */
+    force?: boolean;
   };
 
   // Re-submit the shots of an episode that failed. Same path the creator's
@@ -64,8 +66,21 @@ export async function POST(req: NextRequest) {
       .eq("episode_id", ep.id)
       .limit(20);
     const existing = (existingShots || []) as Array<{ id: string; shot_index: number; status: string }>;
-    const retryIndexes = new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
+    // A forced run redoes the whole episode — used when the pipeline itself
+    // has changed and the existing shots were made by the old one.
+    const retryIndexes = body.force
+      ? new Set(existing.map((s) => s.shot_index))
+      : new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
     if (retryIndexes.size === 0) return NextResponse.json({ retried: 0, note: "no failed shots" });
+
+    if (body.force) {
+      // The joined episode belongs to the old shots, so it is cleared and
+      // rebuilt once the new ones land.
+      await db
+        .from("series_episodes")
+        .update({ video_id: null, video_url: null, assembly_job: null })
+        .eq("id", ep.id);
+    }
 
     let shots: SeriesShot[] = [];
     try {

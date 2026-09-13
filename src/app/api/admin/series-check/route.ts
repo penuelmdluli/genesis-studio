@@ -74,9 +74,23 @@ export async function POST(req: NextRequest) {
     const existing = (existingShots || []) as Array<{ id: string; shot_index: number; status: string }>;
     // A forced run redoes the whole episode — used when the pipeline itself
     // has changed and the existing shots were made by the old one.
-    const retryIndexes = body.force
-      ? new Set(existing.map((s) => s.shot_index))
-      : new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
+    let shotsForCount: SeriesShot[] = [];
+    try {
+      shotsForCount = (JSON.parse(ep.script || "{}") as { shots?: SeriesShot[] }).shots || [];
+    } catch {
+      return NextResponse.json({ error: "unreadable script" }, { status: 400 });
+    }
+
+    // An episode with no rows at all has never been rendered, so every scene
+    // is due. Otherwise: everything on a forced run, only the failures
+    // normally.
+    const retryIndexes =
+      existing.length === 0
+        ? new Set(shotsForCount.map((_, i) => i))
+        : body.force
+          ? new Set(existing.map((s) => s.shot_index))
+          : new Set(existing.filter((s) => s.status === "failed").map((s) => s.shot_index));
+
     if (retryIndexes.size === 0) return NextResponse.json({ retried: 0, note: "no failed shots" });
 
     if (body.force) {

@@ -78,7 +78,32 @@ export default function GalleryPage() {
     e.stopPropagation();
     toast("Preparing download...", "info");
     try {
-      const res = await fetch(url);
+      const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}download=1`);
+
+      // A free account is offered the trade rather than a failure: take the
+      // copy with our logo on it, or upgrade and take it clean.
+      if (res.status === 402) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.brandedDownload) {
+          toast("Free downloads carry the iVideo Studio logo — adding it now.", "info");
+          const id = url.split("/").pop() || "";
+          const branded = await fetch(`/api/videos/${id}/brand`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "studio" }),
+          });
+          const bd = await branded.json().catch(() => ({}));
+          if (!branded.ok || !bd?.videoId) {
+            reportApiError(branded, bd, "Could not prepare that download.");
+            return;
+          }
+          window.location.href = `/api/videos/${bd.videoId}?download=1`;
+          return;
+        }
+        reportApiError(res, data, "Upgrade to download this.");
+        return;
+      }
+
       if (!res.ok) throw new Error(`Download failed: ${res.status}`);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);

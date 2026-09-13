@@ -3,6 +3,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { getDb } from "@/lib/db-driver";
 import { getUserByClerkId, deleteVideo } from "@/lib/db";
 import { r2PublicUrl, deleteFile, verifyR2Upload } from "@/lib/storage";
+import { isOwnerClerkId } from "@/lib/credits";
 
 async function findVideoKeyInR2(
   userId: string,
@@ -49,7 +50,7 @@ export async function GET(
     const supabase = getDb();
     const { data: video } = await supabase
       .from("videos")
-      .select("user_id, job_id, is_public")
+      .select("user_id, job_id, is_public, title")
       .eq("id", videoId)
       .single();
 
@@ -91,6 +92,28 @@ export async function GET(
     // A plain redirect sends the browser to another origin, where the
     // download attribute on a link is ignored and the file simply plays.
     // `?download=1` streams it back with a filename attached so Save works.
+    // A free account downloads with our mark on it, or upgrades to download
+    // clean. Refused here rather than quietly handing over an unbranded file,
+    // because the watermark is the whole trade for a free plan.
+    if (req.nextUrl.searchParams.get("download") === "1") {
+      const { data: owner } = await supabase
+        .from("users")
+        .select("plan, clerk_id")
+        .eq("id", video.user_id)
+        .maybeSingle();
+      const isBrandedCopy = key.includes("/branded-") || key.includes("/episode-");
+      if (owner?.plan === "free" && !isBrandedCopy && !isOwnerClerkId(owner?.clerk_id || "")) {
+        return NextResponse.json(
+          {
+            error: "Free downloads carry the iVideo Studio logo. Upgrade to download without it.",
+            upgrade: true,
+            brandedDownload: true,
+          },
+          { status: 402 }
+        );
+      }
+    }
+
     if (req.nextUrl.searchParams.get("download") === "1") {
       const upstream = await fetch(publicUrl);
       if (!upstream.ok || !upstream.body) {

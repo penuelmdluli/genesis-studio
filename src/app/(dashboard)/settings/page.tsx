@@ -387,12 +387,20 @@ export default function SettingsPage() {
           ) : (
             <>
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-xl border border-white/[0.12] bg-white/[0.04] flex items-center justify-center overflow-hidden shrink-0">
-                  {brandLogo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={brandLogo} alt="Your logo" className="max-w-full max-h-full object-contain" />
-                  ) : (
-                    <span className="text-[10px] text-zinc-500 text-center px-2">No logo yet</span>
+                <div className="w-20 h-20 rounded-xl border border-white/[0.12] bg-white/[0.04] flex items-center justify-center overflow-hidden shrink-0 relative">
+                  {/* With no logo of their own, videos carry ours — so show
+                      ours here rather than an empty box. "No logo yet" told a
+                      creator nothing about what ends up on their work. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={brandLogo || "/logo.svg"}
+                    alt={brandLogo ? "Your logo" : "iVideo Studio logo"}
+                    className={`max-w-full max-h-full object-contain ${brandLogo ? "" : "opacity-70 p-3"}`}
+                  />
+                  {!brandLogo && (
+                    <span className="absolute bottom-0 inset-x-0 text-[9px] text-zinc-400 bg-black/60 py-0.5 text-center">
+                      Default
+                    </span>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -409,6 +417,11 @@ export default function SettingsPage() {
                   <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
                     PNG with a transparent background works best. Keep it under 2&nbsp;MB.
                   </p>
+                  {!brandLogo && (
+                    <p className="text-[11px] text-amber-300/80 mt-1.5 leading-relaxed">
+                      Until you add one, videos you share carry the iVideo Studio mark.
+                    </p>
+                  )}
                 </div>
               </div>
 

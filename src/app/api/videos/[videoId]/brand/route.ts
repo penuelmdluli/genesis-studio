@@ -45,8 +45,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ vid
   const body = (await req.json().catch(() => ({}))) as { mode?: string };
   const studioBranding = body.mode === "studio";
 
-  if (studioBranding && !isOwner) {
-    return NextResponse.json({ error: "Not available on this account" }, { status: 403 });
+  // Our mark is available to the operator and to free accounts — a free
+  // creator downloading their work gets a branded copy rather than nothing,
+  // and that copy is how people find the product. A paying creator has no
+  // use for it: they upgraded precisely to stop carrying our logo.
+  if (studioBranding && !isOwner && user.plan !== "free") {
+    return NextResponse.json(
+      { error: "Your plan downloads without our logo. Add your own branding in Settings." },
+      { status: 400 }
+    );
   }
 
   if (!studioBranding && !isOwner && !["creator", "pro", "studio"].includes(user.plan)) {

@@ -25,7 +25,9 @@ import { generateScore } from "@/lib/series/score";
 interface ShotForAssembly {
   shot_index: number;
   status: string;
+  kind: string | null;
   clip_url: string | null;
+  audio_url: string | null;
   subtitle: string | null;
 }
 
@@ -91,7 +93,7 @@ export async function startAssembly(
   const db = getDb();
   const { data: shotRows } = await db
     .from("series_shots")
-    .select("shot_index, status, clip_url, subtitle")
+    .select("shot_index, status, kind, clip_url, audio_url, subtitle")
     .eq("episode_id", episodeId)
     .order("shot_index", { ascending: true })
     .limit(20);
@@ -119,7 +121,14 @@ export async function startAssembly(
       method: "POST",
       headers: { "Content-Type": "application/json", "x-scraper-secret": svc.secret },
       body: JSON.stringify({
-        clips: usable.map((s) => ({ url: s.clip_url, subtitle: s.subtitle || "" })),
+        // Each clip carries the voice we synthesised for it. The video
+        // model's own soundtrack is discarded during the join — it invents
+        // speech, in Chinese, under every shot.
+        clips: usable.map((s) => ({
+          url: s.clip_url,
+          subtitle: s.subtitle || "",
+          audioUrl: s.kind === "dialogue" ? s.audio_url || null : null,
+        })),
         outputR2Key: outputKey,
         burnSubtitles,
         height,

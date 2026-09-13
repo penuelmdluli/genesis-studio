@@ -401,6 +401,10 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                                     <video
                                       src={made.clip_url}
                                       controls
+                                      // Muted: a single shot still carries the
+                                      // video model's invented soundtrack. The
+                                      // joined episode above has the real one.
+                                      muted
                                       playsInline
                                       className="mt-2.5 w-full max-w-[220px] rounded-lg border border-white/[0.08]"
                                     />

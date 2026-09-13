@@ -16,7 +16,7 @@ const CRON_MAP = {
   "0 */6 * * *": ["/api/cron/purge-stale"],
   "*/1 * * * *": ["/api/cron/process-fallbacks", "/api/cron/check-singer", "/api/cron/reap-jobs"],
   "*/2 * * * *": ["/api/cron/process-mbs-queue", "/api/cron/check-mimic"],
-  "*/30 * * * *": ["/api/cron/discover-content"],
+  "*/30 * * * *": ["/api/cron/discover-content", "/api/cron/provider-balance"],
   "*/15 * * * *": ["/api/cron/vet-candidates", "/api/cron/fetch-lead-videos"],
 };
 

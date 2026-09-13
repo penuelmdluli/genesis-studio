@@ -121,3 +121,33 @@ export async function voiceForCharacter(
 
   return assigned;
 }
+
+/**
+ * Casts every speaking part in an episode BEFORE any of them is rendered.
+ *
+ * Shots are submitted in parallel, and each one used to look up its own
+ * voice. Running together they all read an empty cast, all counted zero
+ * same-gender characters already cast, and all claimed the first variant — so
+ * two different men in one episode could come out sounding identical. The
+ * unique index prevents duplicate rows for one character but cannot stop two
+ * characters choosing the same voice at the same instant.
+ *
+ * Assigning them one at a time, in the order they speak, removes the race
+ * entirely and costs one pass over the script.
+ */
+export async function ensureCast(
+  seriesId: string,
+  shots: Array<{ kind: string; speaker: string; gender?: "female" | "male"; dialogue?: string }>,
+  language: string,
+  fallbackGender: (speaker: string) => "female" | "male"
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const shot of shots) {
+    if (shot.kind !== "dialogue" || !shot.dialogue?.trim()) continue;
+    const key = characterKey(shot.speaker);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const gender = shot.gender === "female" || shot.gender === "male" ? shot.gender : fallbackGender(shot.speaker);
+    await voiceForCharacter(seriesId, shot.speaker, gender, language);
+  }
+}

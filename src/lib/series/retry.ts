@@ -14,6 +14,8 @@
 import { getDb } from "@/lib/db-driver";
 import { submitShot, type RenderContext } from "@/lib/series/render";
 import { toUserFacingProviderError } from "@/lib/user-errors";
+import { ensureCast } from "@/lib/series/cast";
+import { guessGender } from "@/lib/series/writer";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 
 /** Three goes in total. Past that it is not bad luck, it is a real problem. */
@@ -108,6 +110,8 @@ export async function retryFailedShots(
   }
 
   if (claimed.length === 0) return { attempted: 0, submitted: 0, exhausted };
+
+  await ensureCast(seriesId, shots, ctx.language, guessGender);
 
   const results = await Promise.allSettled(
     claimed.map(({ row, shot }) =>

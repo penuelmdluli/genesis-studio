@@ -19,6 +19,8 @@ import { checkRateLimit } from "@/lib/fraud";
 import { getDb } from "@/lib/db-driver";
 import { envString } from "@/lib/env";
 import { submitShot, type RenderContext } from "@/lib/series/render";
+import { ensureCast } from "@/lib/series/cast";
+import { guessGender } from "@/lib/series/writer";
 import { renderCost, DIALOGUE_SHOT_CREDITS, ACTION_SHOT_CREDITS } from "@/lib/series/pricing";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { toUserFacingProviderError } from "@/lib/user-errors";
@@ -208,6 +210,10 @@ export async function POST(
       );
     }
   }
+
+  // Cast everyone before anything renders, so two characters cannot claim
+  // the same voice at the same instant.
+  await ensureCast(seriesId, shots, ctx.language, guessGender);
 
   await db.from("series_episodes").update({ status: "rendering" }).eq("id", episodeId);
 

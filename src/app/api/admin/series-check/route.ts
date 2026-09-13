@@ -19,7 +19,8 @@ import { synthesiseSpeech } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db-driver";
 import { startAssembly, collectAssembly } from "@/lib/series/assemble";
 import { submitShot } from "@/lib/series/render";
-import { writeEpisode } from "@/lib/series/writer";
+import { writeEpisode, guessGender } from "@/lib/series/writer";
+import { ensureCast } from "@/lib/series/cast";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import type { Shot as SeriesShot } from "@/lib/series/writer";
 
@@ -119,6 +120,8 @@ export async function POST(req: NextRequest) {
     const todo = shots
       .map((shot, index) => ({ shot, index }))
       .filter(({ index }) => retryIndexes.has(index));
+
+    await ensureCast(ep.series_id, shots, ctx.language, guessGender);
 
     const results = await Promise.allSettled(
       todo.map(({ shot, index }) => submitShot(shot, ctx, ep.user_id, `${ep.id}-${index}-${Date.now()}`, ep.series_id))

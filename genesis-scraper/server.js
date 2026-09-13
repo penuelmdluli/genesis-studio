@@ -794,7 +794,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
   let jobId = null;
 
   try {
-    const { clips, outputR2Key, burnSubtitles, watermark } = req.body || {};
+    const { clips, outputR2Key, burnSubtitles, watermark, musicUrl, musicVolume } = req.body || {};
     if (!Array.isArray(clips) || clips.length === 0) {
       return res.status(400).json({ error: "clips array required" });
     }
@@ -896,11 +896,49 @@ app.post("/stitch-episode", auth, async (req, res) => {
       "join"
     );
 
-    const bytes = fs.statSync(outputPath).size;
+    // Score. A micro-drama without music under it reads as a rehearsal, and
+    // mixing it here is nearly free: the picture is copied untouched and only
+    // the audio is re-encoded, so this adds seconds rather than minutes and
+    // barely touches memory.
+    let finalPath = outputPath;
+    if (musicUrl) {
+      try {
+        const musicPath = path.join(tmp, `st-music-${stamp}.mp3`);
+        const mixedPath = path.join(tmp, `st-mixed-${stamp}.mp4`);
+        scratch.push(musicPath, mixedPath);
+
+        const gotMusic = await fetch(musicUrl);
+        if (!gotMusic.ok) throw new Error(`music download failed (${gotMusic.status})`);
+        await streamPipeline(Readable.fromWeb(gotMusic.body), fs.createWriteStream(musicPath));
+
+        await run(
+          [
+            "-y",
+            "-i", outputPath,
+            // Looped so a short bed still covers a long episode; the mix ends
+            // with the picture, never after it.
+            "-stream_loop", "-1", "-i", musicPath,
+            "-filter_complex",
+            `[1:a]volume=${Number(musicVolume) > 0 ? Number(musicVolume) : 0.14}[bed];` +
+              `[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]`,
+            "-map", "0:v", "-map", "[a]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+            mixedPath,
+          ],
+          "music mix"
+        );
+        finalPath = mixedPath;
+      } catch (err) {
+        // Losing the score is not worth losing the episode.
+        console.error("[stitch-episode] music mix skipped:", err.message);
+      }
+    }
+
+    const bytes = fs.statSync(finalPath).size;
     await r2.send(new PutObjectCommand({
       Bucket: BUCKET,
       Key: outputR2Key,
-      Body: fs.createReadStream(outputPath),
+      Body: fs.createReadStream(finalPath),
       ContentLength: bytes,
       ContentType: "video/mp4",
     }));

@@ -833,17 +833,30 @@ app.post("/stitch-episode", auth, async (req, res) => {
 
       const subtitle = burnSubtitles === false ? "" : String(clip.subtitle || "").trim();
       if (subtitle) {
-        const subPath = path.join(tmp, `st-sub-${stamp}-${i}.txt`);
-        scratch.push(subPath);
-        // Written to a file rather than inlined: subtitle text contains
-        // apostrophes and colons, which are filter syntax.
-        fs.writeFileSync(subPath, wrap(subtitle, 34), "utf8");
-        filter +=
-          // Sized from the canvas rather than hard-coded, so the subtitle
-          // keeps its proportions if the resolution changes again.
-          `,drawtext=textfile='${subPath}':fontfile='${FONT}':fontsize=${Math.round(W * 0.043)}:fontcolor=white` +
-          `:borderw=3:bordercolor=black@0.85:line_spacing=8` +
-          `:x=(w-text_w)/2:y=h-text_h-${Math.round(H * 0.09)}`;
+        // One drawtext per line, never a newline inside the text.
+        //
+        // The server's ffmpeg shapes text with HarfBuzz, which turns a newline
+        // character into a visible box glyph — every two-line subtitle came
+        // out as "three trucks at□" with the second line below. A local build
+        // without shaping drew it cleanly, which is why this slipped through.
+        // Drawing each line on its own removes the character entirely, so it
+        // cannot render on any build.
+        const lines = wrap(subtitle, 34).split(String.fromCharCode(10)).filter(Boolean);
+        const size = Math.round(W * 0.043);
+        const gap = Math.round(size * 1.3);
+        const bottom = Math.round(H * 0.09);
+        lines.forEach((line, li) => {
+          const subPath = path.join(tmp, `st-sub-${stamp}-${i}-${li}.txt`);
+          scratch.push(subPath);
+          // Written to a file rather than inlined: subtitle text contains
+          // apostrophes and colons, which are filter syntax.
+          fs.writeFileSync(subPath, line, "utf8");
+          const fromBottom = bottom + (lines.length - 1 - li) * gap;
+          filter +=
+            `,drawtext=textfile='${subPath}':fontfile='${FONT}':fontsize=${size}:fontcolor=white` +
+            `:borderw=3:bordercolor=black@0.85` +
+            `:x=(w-text_w)/2:y=h-text_h-${fromBottom}`;
+        });
       }
 
       // A shared episode should say where it was made. Drawn in the same pass

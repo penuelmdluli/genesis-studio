@@ -142,7 +142,12 @@ const MOTION_BY_SHOT: Record<string, string> = {
  * animated too, so the audience cannot tell who is speaking — and stray
  * extras were turning up in shots that should have held one person.
  */
-const NEGATIVE = "no bystanders, no crowd, no extra people, no onlookers, no text, no watermark, no split screen";
+// "no text" alone did not stop the model printing words onto clothing: a
+// security guard came out wearing POLICE across her chest in shot after
+// shot, which changes who she is. Lettering on garments is named explicitly.
+const NEGATIVE =
+  "no bystanders, no crowd, no extra people, no onlookers, no text, no watermark, no split screen, " +
+  "no printed words, letters, badges, insignia or logos on any clothing or uniform";
 
 export interface RenderContext {
   language: SeriesLanguage;

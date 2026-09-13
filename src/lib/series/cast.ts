@@ -183,13 +183,26 @@ export async function ensureCast(
   language: string,
   fallbackGender: (speaker: string) => "female" | "male"
 ): Promise<void> {
-  const seen = new Set<string>();
+  // Cast the biggest parts first.
+  //
+  // Casting in order of appearance handed the local voice to whoever happened
+  // to speak first — in one episode a driver with a single line took the
+  // South African voice and the lead's own son was left with a borrowed
+  // accent. The pool's best voice should go to the person the audience hears
+  // most.
+  const lines = new Map<string, { speaker: string; gender: "female" | "male"; count: number }>();
   for (const shot of shots) {
     if (shot.kind !== "dialogue" || !shot.dialogue?.trim()) continue;
     const key = characterKey(shot.speaker);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const gender = shot.gender === "female" || shot.gender === "male" ? shot.gender : fallbackGender(shot.speaker);
-    await voiceForCharacter(seriesId, shot.speaker, gender, language);
+    const gender =
+      shot.gender === "female" || shot.gender === "male" ? shot.gender : fallbackGender(shot.speaker);
+    const seen = lines.get(key);
+    if (seen) seen.count += 1;
+    else lines.set(key, { speaker: shot.speaker, gender, count: 1 });
+  }
+
+  const order = [...lines.values()].sort((a, b) => b.count - a.count);
+  for (const part of order) {
+    await voiceForCharacter(seriesId, part.speaker, part.gender, language);
   }
 }

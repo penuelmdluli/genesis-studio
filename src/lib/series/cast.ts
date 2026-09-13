@@ -15,7 +15,7 @@
 
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db-driver";
-import { localeOrDefault } from "@/lib/series/locales";
+import { localeById, localeOrDefault } from "@/lib/series/locales";
 
 export interface CastVoice {
   voice: string;
@@ -31,6 +31,40 @@ export interface CastVoice {
  * pushed that far stops pronouncing cleanly. These are enough to separate two
  * speakers while leaving the delivery intact.
  */
+/**
+ * Sibling locales to borrow a voice from, in the order they should be used.
+ *
+ * Pitch-shifting one voice was not enough: two men separated by 5Hz read as
+ * the same man, and that was audible — the only pair that sounded properly
+ * distinct was a man against a woman. A different voice is a different
+ * person; a shifted one is the same person with a cold.
+ *
+ * African English first, so a Joburg drama does not suddenly acquire an
+ * American, and the rest only once those run out. Languages with a single
+ * locale (isiZulu among them) have nothing to borrow and fall back to the
+ * pitch variants below.
+ */
+const SIBLING_LOCALES: Record<string, string[]> = {
+  en: ["en-ZA", "en-NG", "en-KE", "en-TZ", "en-GB", "en-IE", "en-AU", "en-US"],
+};
+
+function voicePool(language: string, gender: "female" | "male"): string[] {
+  const own = localeOrDefault(language);
+  const first = gender === "female" ? own.female : own.male;
+
+  const family = language.split("-")[0];
+  const siblings = SIBLING_LOCALES[family] || [];
+
+  const pool = [first];
+  for (const id of siblings) {
+    const loc = localeById(id);
+    if (!loc) continue;
+    const voice = gender === "female" ? loc.female : loc.male;
+    if (voice && !pool.includes(voice)) pool.push(voice);
+  }
+  return pool;
+}
+
 const VARIANTS: Array<{ pitch: string; rate: string }> = [
   { pitch: "+0Hz", rate: "+0%" },
   { pitch: "-5Hz", rate: "-3%" },
@@ -89,11 +123,19 @@ export async function voiceForCharacter(
     return { voice: mine.voice, pitch: mine.pitch || "+0Hz", rate: mine.rate || "+0%" };
   }
 
-  // Position among the same-gender characters already cast decides which
-  // variant is still free.
+  // Position among the same-gender characters already cast decides what is
+  // still free. A genuinely different voice is used first, and the pitch
+  // variants only once the pool is exhausted.
   const sameGender = cast.filter((c) => c.gender === gender).length;
-  const variant = VARIANTS[Math.min(sameGender, VARIANTS.length - 1)];
-  const assigned: CastVoice = { voice: base, pitch: variant.pitch, rate: variant.rate };
+  const pool = voicePool(language, gender);
+
+  const assigned: CastVoice =
+    sameGender < pool.length
+      ? { voice: pool[sameGender], pitch: "+0Hz", rate: "+0%" }
+      : (() => {
+          const v = VARIANTS[Math.min(sameGender - pool.length + 1, VARIANTS.length - 1)];
+          return { voice: base, pitch: v.pitch, rate: v.rate };
+        })();
 
   // A duplicate insert means two shots of the same new character were
   // rendered at once; the row that won is the right answer either way.

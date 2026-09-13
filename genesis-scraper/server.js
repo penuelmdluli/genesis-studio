@@ -743,16 +743,16 @@ app.post("/stitch-episode", auth, async (req, res) => {
 
   const FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
-  // 720x1280, not 1080x1920.
+  // Height is chosen by the caller, defaulting to 720p.
   //
-  // This runs on a 512MB instance, and encoding the full-height episode killed
-  // it outright — Render reported "Ran out of memory (used over 512MB)" three
-  // times in a row. Pixel count is what x264 charges for, and 720x1280 is 44%
-  // of 1080x1920, which is the difference between an episode that exists and
-  // one that does not. Individual shots keep their full resolution; only the
-  // joined episode is encoded at this size. Raise it the day the instance has
-  // the memory to spare.
-  const W = 720, H = 1280, FPS = 30;
+  // This box has 512MB and once died encoding 1080x1920 — Render reported
+  // "Ran out of memory (used over 512MB)" three times. That was before clips
+  // streamed to disk and x264 was pinned to one thread, both of which cut the
+  // peak substantially, so 1080 may now fit. Making it a parameter means that
+  // can be measured rather than guessed, and rolled back in one request if
+  // the instance still cannot take it.
+  const wanted = Number(req.body?.height) === 1920 ? 1920 : 1280;
+  const H = wanted, W = wanted === 1920 ? 1080 : 720, FPS = 30;
 
   const run = (args, label) =>
     new Promise((resolve, reject) => {

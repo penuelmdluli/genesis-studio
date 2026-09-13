@@ -218,7 +218,49 @@ export async function ensureCast(
     lines.set(key, entry);
   }
 
-  const order = [...lines.values()].sort((a, b) => b.count - a.count);
+  // Weigh a part by the whole series, not just this episode.
+  //
+  // One episode can hand two characters a single line each — a driver and the
+  // lead's own son tied, and the tie went to whoever spoke first, so the
+  // driver took the local voice. Counting every line across every episode
+  // already written tells them apart: the son speaks throughout, the driver
+  // once. The series premise and the lead's name break any remaining tie.
+  const db = getDb();
+  const { data: episodes } = await db
+    .from("series_episodes")
+    .select("script")
+    .eq("series_id", seriesId)
+    .limit(200);
+  const { data: seriesRow } = await db
+    .from("series")
+    .select("logline, character_name, story_so_far")
+    .eq("id", seriesId)
+    .maybeSingle();
+
+  const seriesLines = new Map<string, number>();
+  for (const ep of (episodes || []) as Array<{ script: string | null }>) {
+    try {
+      const parsed = JSON.parse(ep.script || "{}") as {
+        shots?: Array<{ kind?: string; speaker?: string; dialogue?: string }>;
+      };
+      for (const sh of parsed.shots || []) {
+        if (sh.kind !== "dialogue" || !sh.dialogue?.trim() || !sh.speaker) continue;
+        const k = characterKey(sh.speaker);
+        seriesLines.set(k, (seriesLines.get(k) || 0) + 1);
+      }
+    } catch {
+      // An unreadable script contributes nothing rather than failing the cast.
+    }
+  }
+
+  const premise = `${seriesRow?.character_name || ""} ${seriesRow?.logline || ""} ${seriesRow?.story_so_far || ""}`.toLowerCase();
+  const weight = (speaker: string, localCount: number) => {
+    const k = characterKey(speaker);
+    const named = premise.includes(k) ? 1000 : 0;
+    return named + (seriesLines.get(k) || 0) * 10 + localCount;
+  };
+
+  const order = [...lines.values()].sort((a, b) => weight(b.speaker, b.count) - weight(a.speaker, a.count));
   for (const part of order) {
     const gender: "female" | "male" =
       part.female === part.male ? fallbackGender(part.speaker) : part.female > part.male ? "female" : "male";

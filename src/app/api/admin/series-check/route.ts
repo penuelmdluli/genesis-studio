@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     assembleEpisodeId?: string;
     retryEpisodeId?: string;
     advanceEpisodeId?: string;
+    height?: number;
     /** Redo every shot, not only the failed ones. */
     force?: boolean;
   };
@@ -208,7 +209,7 @@ export async function POST(req: NextRequest) {
           ser?.title || "Series",
           shots?.length || 0
         )
-      : await startAssembly(ep.id, ep.user_id, true);
+      : await startAssembly(ep.id, ep.user_id, true, body.height === 1920 ? 1920 : undefined);
 
     return NextResponse.json({ assembled: result });
   }

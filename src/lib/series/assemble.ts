@@ -54,6 +54,15 @@ export function isAssembled(r: AssemblyResult): r is AssembledEpisode {
   return !!r && "videoId" in r;
 }
 
+/**
+ * Height of the joined episode.
+ *
+ * 1280 while the video service runs on 512MB, where 1920 once exhausted the
+ * instance outright. One constant, so raising it is a one-line change the day
+ * that box has the memory.
+ */
+export const EPISODE_HEIGHT: 1280 | 1920 = 1280;
+
 function service(): { url: string; secret: string } | null {
   const url = envString("SCRAPER_SERVICE_URL");
   const secret = envString("SCRAPER_SERVICE_SECRET");
@@ -67,7 +76,8 @@ function service(): { url: string; secret: string } | null {
 export async function startAssembly(
   episodeId: string,
   userId: string,
-  burnSubtitles = true
+  burnSubtitles = true,
+  height: 1280 | 1920 = EPISODE_HEIGHT
 ): Promise<AssemblyResult> {
   const svc = service();
   if (!svc) return { reason: "the video service is not configured" };
@@ -102,6 +112,7 @@ export async function startAssembly(
         clips: usable.map((s) => ({ url: s.clip_url, subtitle: s.subtitle || "" })),
         outputR2Key: outputKey,
         burnSubtitles,
+        height,
       }),
     });
 
@@ -183,7 +194,7 @@ export async function collectAssembly(
       thumbnailUrl,
       modelId: "kling-2.6",
       prompt: `Series episode: ${episodeTitle}`,
-      resolution: "720p",
+      resolution: EPISODE_HEIGHT === 1920 ? "1080p" : "720p",
       duration: shotCount * 5,
       fps: 30,
       fileSize: 0,

@@ -36,13 +36,18 @@ function languageInstruction(id: string): string {
     case "af-ZA":
       return "Write ALL spoken dialogue in natural, conversational South African Afrikaans as spoken today, including the everyday code-switching into English that a real person would use.";
     case "en-ZA":
-      return "Write ALL spoken dialogue in South African English, using the rhythm, slang and expressions people actually use here.";
+      // "South African English" previously invited isiZulu words into the
+      // dialogue. Choosing English has to mean English, or the subtitles and
+      // the voice both end up fighting the script.
+      return "Write ALL spoken dialogue in ENGLISH ONLY. South African English rhythm, cadence and turns of phrase are welcome, but every single word must be English — no isiZulu, isiXhosa, Afrikaans or Sesotho words at all, not even common ones.";
+    case "en":
+      return "Write ALL spoken dialogue in plain conversational ENGLISH ONLY. Every word must be English.";
     default: {
       const label = localeOrDefault(id).label.replace(/ — .*$/, "");
       const place = localeOrDefault(id).label.includes(" — ")
         ? ` as it is actually spoken in ${localeOrDefault(id).label.split(" — ")[1]}`
         : "";
-      return `Write ALL spoken dialogue in natural, conversational ${label}${place}. Use the way people really talk, not formal written language.`;
+      return `Write ALL spoken dialogue in ${label}${place}, and in that language only. Use the way people really talk, not formal written language, and do not drift into English.`;
     }
   }
 }

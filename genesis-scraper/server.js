@@ -859,21 +859,52 @@ app.post("/stitch-episode", auth, async (req, res) => {
           `:x=w-text_w-${Math.round(W * 0.04)}:y=${Math.round(H * 0.035)}`;
       }
 
-      // A clip with no audio track would break the join, so one is supplied.
-      const hasAudio = await probe(rawPath, "a");
+      // The video model's own soundtrack is NEVER used.
+      //
+      // It invents audio to go with the picture, and that includes invented
+      // speech — in practice, Chinese, layered under our dialogue and filling
+      // every silent shot. So every clip's audio is replaced outright: a
+      // speaking shot carries exactly the line we synthesised, and a silent
+      // shot carries silence for the music to sit under. Nothing the model
+      // generated can reach the episode.
+      let voicePath = null;
+      if (clip.audioUrl) {
+        voicePath = path.join(tmp, `st-voice-${stamp}-${i}.mp3`);
+        scratch.push(voicePath);
+        const gotVoice = await fetch(clip.audioUrl);
+        if (!gotVoice.ok) throw new Error(`clip ${i} voice download failed (${gotVoice.status})`);
+        await streamPipeline(Readable.fromWeb(gotVoice.body), fs.createWriteStream(voicePath));
+      }
+
       const args = ["-y"];
-      if (trimTo) args.push("-t", String(trimTo));
-      args.push("-i", rawPath);
-      if (!hasAudio) args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+      if (voicePath) {
+        // A line longer than the footage used to be cut off mid-word, which
+        // is how a cliffhanger line went missing at the end of an episode.
+        // The last frame is held for as long as the line needs instead.
+        args.push("-i", rawPath, "-i", voicePath);
+        filter += ",tpad=stop_mode=clone:stop_duration=30";
+        args.push(
+          "-vf", filter,
+          // A beat of air after the line, so a short reply does not end the
+          // instant the last word does.
+          "-af", "apad=pad_dur=0.35",
+          "-map", "0:v:0", "-map", "1:a:0",
+          "-shortest"
+        );
+      } else {
+        if (trimTo) args.push("-t", String(trimTo));
+        args.push("-i", rawPath, "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+        args.push(
+          "-vf", filter,
+          "-map", "0:v:0", "-map", "1:a:0",
+          "-shortest"
+        );
+      }
       args.push(
-        "-vf", filter,
-        "-map", "0:v:0",
-        "-map", hasAudio ? "0:a:0" : "1:a:0",
         "-threads", "1",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"
       );
-      if (!hasAudio) args.push("-shortest");
       args.push(normPath);
 
       await run(args, `normalise clip ${i}`);

@@ -127,7 +127,19 @@ export async function GET(
       // paying creator's work stays clean — that is what they upgraded for,
       // and they can put their own brand on it instead.
       const ours = isOwnerClerkId(clerkId) || user.plan === "free";
-      await startAssembly(episodeId, user.id, true, undefined, ours ? "ivideostudio.ai" : null);
+      const { data: seriesForScore } = await db
+        .from("series")
+        .select("genre")
+        .eq("id", seriesId)
+        .maybeSingle();
+      await startAssembly(
+        episodeId,
+        user.id,
+        true,
+        undefined,
+        ours ? "ivideostudio.ai" : null,
+        seriesForScore?.genre || null
+      );
     }
   }
 

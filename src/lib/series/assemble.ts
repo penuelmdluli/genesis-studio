@@ -20,6 +20,7 @@ import { getDb } from "@/lib/db-driver";
 import { envString } from "@/lib/env";
 import { r2PublicUrl, videoStorageKey } from "@/lib/storage";
 import { extractAndUploadThumbnail } from "@/lib/thumbnails";
+import { generateScore } from "@/lib/series/score";
 
 interface ShotForAssembly {
   shot_index: number;
@@ -81,7 +82,8 @@ export async function startAssembly(
   userId: string,
   burnSubtitles = true,
   height: 1280 | 1920 = EPISODE_HEIGHT,
-  watermark: string | null = "ivideostudio.ai"
+  watermark: string | null = "ivideostudio.ai",
+  genre: string | null = null
 ): Promise<AssemblyResult> {
   const svc = service();
   if (!svc) return { reason: "the video service is not configured" };
@@ -108,6 +110,10 @@ export async function startAssembly(
   const videoId = randomUUID();
   const outputKey = videoStorageKey(userId, `episode-${videoId}`);
 
+  // Made before the join so it can be mixed in the same pass. A failure
+  // here returns null and the episode is assembled without it.
+  const musicUrl = await generateScore(genre, usable.length * 5);
+
   try {
     const res = await fetch(`${svc.url}/stitch-episode`, {
       method: "POST",
@@ -118,6 +124,8 @@ export async function startAssembly(
         burnSubtitles,
         height,
         watermark,
+        musicUrl,
+        musicVolume: 0.14,
       }),
     });
 

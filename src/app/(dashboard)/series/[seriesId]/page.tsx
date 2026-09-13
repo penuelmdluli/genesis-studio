@@ -343,7 +343,7 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                                 </a>
                               </div>
                               <p className="text-[11px] text-zinc-500 mt-2">
-                                All scenes joined, with English subtitles burned in. Also saved to your gallery.
+                                All scenes joined at 1080p, with English subtitles burned in. Also saved to your gallery.
                               </p>
                             </div>
                           )}

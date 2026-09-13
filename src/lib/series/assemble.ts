@@ -57,11 +57,14 @@ export function isAssembled(r: AssemblyResult): r is AssembledEpisode {
 /**
  * Height of the joined episode.
  *
- * 1280 while the video service runs on 512MB, where 1920 once exhausted the
- * instance outright. One constant, so raising it is a one-line change the day
- * that box has the memory.
+ * 1080p, measured rather than assumed. Joining at this size once exhausted
+ * the 512MB instance outright, which is why it was dropped to 720p — but that
+ * was before clips streamed to disk instead of being buffered and x264 was
+ * pinned to one thread. With those in place a full six-shot episode joins at
+ * 1080x1920 on the same free box with the service still healthy afterwards,
+ * so the resolution came back without anyone paying for a bigger machine.
  */
-export const EPISODE_HEIGHT: 1280 | 1920 = 1280;
+export const EPISODE_HEIGHT: 1280 | 1920 = 1920;
 
 function service(): { url: string; secret: string } | null {
   const url = envString("SCRAPER_SERVICE_URL");

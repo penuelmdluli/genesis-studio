@@ -36,3 +36,18 @@ CREATE TABLE IF NOT EXISTS series_cast (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cast_series_char ON series_cast(series_id, character_key);
+
+-- Throttle for operator alerts, so a low provider balance emails once per
+-- level rather than every time the check runs.
+--
+-- `id` is required even though `key` is the real primary key: the database
+-- helper silently adds an id to every insert, and without the column every
+-- write is rejected with no error — which is exactly how this throttle first
+-- failed and emailed on every run.
+CREATE TABLE IF NOT EXISTS ops_alerts (
+  id TEXT,
+  key TEXT PRIMARY KEY,
+  last_sent_at TEXT,
+  last_level TEXT,
+  last_value REAL
+);

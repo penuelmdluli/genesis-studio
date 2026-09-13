@@ -17,7 +17,10 @@ import { SERIES_LOCALES, localeOrDefault } from "@/lib/series/locales";
 
 // The three anyone here is most likely to want, one tap away. The other 137
 // are behind a search box, because a wall of 140 buttons is not a choice.
-const QUICK_LANGUAGES = ["zu-ZA", "af-ZA", "en-ZA"];
+// English first, and the default. It is what most creators here actually
+// pick, and it is the language the writing and the voices come out cleanest
+// in — a home-language drama is a deliberate choice, not the fallback.
+const QUICK_LANGUAGES = ["en-ZA", "zu-ZA", "af-ZA"];
 
 const GENRES = ["Drama", "Family", "Township comedy", "Crime", "Romance", "Thriller"];
 
@@ -39,7 +42,7 @@ export default function SeriesShelfPage() {
   const [error, setError] = useState("");
 
   const [title, setTitle] = useState("");
-  const [language, setLanguage] = useState("zu-ZA");
+  const [language, setLanguage] = useState("en-ZA");
   const [moreLanguages, setMoreLanguages] = useState(false);
   const [languageQuery, setLanguageQuery] = useState("");
   const [genre, setGenre] = useState("Drama");
@@ -90,8 +93,8 @@ export default function SeriesShelfPage() {
         </h1>
         <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
           Make a drama in your own language, episode after episode. Same characters, a story that
-          carries on, and English subtitles so everyone can follow it. isiZulu, Afrikaans, SA
-          English and 137 more.
+          carries on, and English subtitles so everyone can follow it. English, isiZulu,
+          Afrikaans and 137 more.
         </p>
       </div>
 

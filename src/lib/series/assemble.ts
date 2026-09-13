@@ -80,7 +80,8 @@ export async function startAssembly(
   episodeId: string,
   userId: string,
   burnSubtitles = true,
-  height: 1280 | 1920 = EPISODE_HEIGHT
+  height: 1280 | 1920 = EPISODE_HEIGHT,
+  watermark: string | null = "ivideostudio.ai"
 ): Promise<AssemblyResult> {
   const svc = service();
   if (!svc) return { reason: "the video service is not configured" };
@@ -116,6 +117,7 @@ export async function startAssembly(
         outputR2Key: outputKey,
         burnSubtitles,
         height,
+        watermark,
       }),
     });
 

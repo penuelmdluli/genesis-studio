@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
+import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
 import type { Shot } from "@/lib/series/writer";
@@ -120,7 +121,13 @@ export async function GET(
       }
     } else {
       // Nothing running: start one. It finishes on a later poll.
-      await startAssembly(episodeId, user.id, true);
+      //
+      // Our mark goes on free-tier episodes and on the operator's own, which
+      // is how anyone who sees a shared episode learns where it was made. A
+      // paying creator's work stays clean — that is what they upgraded for,
+      // and they can put their own brand on it instead.
+      const ours = isOwnerClerkId(clerkId) || user.plan === "free";
+      await startAssembly(episodeId, user.id, true, undefined, ours ? "ivideostudio.ai" : null);
     }
   }
 

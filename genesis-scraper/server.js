@@ -794,7 +794,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
   let jobId = null;
 
   try {
-    const { clips, outputR2Key, burnSubtitles } = req.body || {};
+    const { clips, outputR2Key, burnSubtitles, watermark } = req.body || {};
     if (!Array.isArray(clips) || clips.length === 0) {
       return res.status(400).json({ error: "clips array required" });
     }
@@ -824,6 +824,13 @@ app.post("/stitch-episode", auth, async (req, res) => {
 
       let filter = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS}`;
 
+      // Pace. A speaking shot is already the length of its line; a silent one
+      // arrives as a flat five seconds, which is an eternity in a format
+      // where the whole episode is a minute. Trimming those is free here,
+      // because the clip is being re-encoded anyway.
+      const silent = !String(clip.subtitle || "").trim();
+      const trimTo = clip.holdSeconds || (silent ? 3.2 : 0);
+
       const subtitle = burnSubtitles === false ? "" : String(clip.subtitle || "").trim();
       if (subtitle) {
         const subPath = path.join(tmp, `st-sub-${stamp}-${i}.txt`);
@@ -839,9 +846,24 @@ app.post("/stitch-episode", auth, async (req, res) => {
           `:x=(w-text_w)/2:y=h-text_h-${Math.round(H * 0.09)}`;
       }
 
+      // A shared episode should say where it was made. Drawn in the same pass
+      // as the subtitle, so it costs nothing extra, and kept small and high
+      // so it never fights the picture or the captions.
+      if (watermark) {
+        const markPath = path.join(tmp, `st-mark-${stamp}.txt`);
+        if (!fs.existsSync(markPath)) fs.writeFileSync(markPath, String(watermark).slice(0, 40), "utf8");
+        scratch.push(markPath);
+        filter +=
+          `,drawtext=textfile='${markPath}':fontfile='${FONT}':fontsize=${Math.round(W * 0.026)}` +
+          `:fontcolor=white@0.72:borderw=2:bordercolor=black@0.45` +
+          `:x=w-text_w-${Math.round(W * 0.04)}:y=${Math.round(H * 0.035)}`;
+      }
+
       // A clip with no audio track would break the join, so one is supplied.
       const hasAudio = await probe(rawPath, "a");
-      const args = ["-y", "-i", rawPath];
+      const args = ["-y"];
+      if (trimTo) args.push("-t", String(trimTo));
+      args.push("-i", rawPath);
       if (!hasAudio) args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
       args.push(
         "-vf", filter,
@@ -860,6 +882,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
     }
 
     const listPath = path.join(tmp, `st-list-${stamp}.txt`);
+
     scratch.push(listPath);
     fs.writeFileSync(listPath, normalised.map((f) => `file '${f}'`).join("\n"), "utf8");
 

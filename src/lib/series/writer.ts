@@ -75,6 +75,17 @@ export interface Shot {
    * the writer.
    */
   gender: "female" | "male";
+  /**
+   * How the beat is framed.
+   *
+   * Chosen per shot by the writer rather than derived from emotion, because
+   * deriving it produced a close-up on almost every beat — the single most
+   * common mistake in vertical drama, and why the episodes read as flat.
+   * Medium carries dialogue, close-up is saved for the line that has to land,
+   * wide is used sparingly because 9:16 wastes width, and an insert on a
+   * prop or a pair of hands is the cheapest variety there is.
+   */
+  shotSize: "wide" | "medium" | "close" | "insert";
   /** Drives both the performance and the camera. */
   emotion: "calm" | "angry" | "afraid" | "joyful" | "grieving" | "tense" | "shocked";
   /** Action shots get cinematic motion; dialogue shots get lip sync. */
@@ -103,6 +114,7 @@ export interface SeriesContext {
 }
 
 const EMOTIONS = ["calm", "angry", "afraid", "joyful", "grieving", "tense", "shocked"] as const;
+const SHOT_SIZES = ["wide", "medium", "close", "insert"] as const;
 
 function stripFence(raw: string): string {
   const t = raw.trim();
@@ -234,7 +246,30 @@ ${continuity}
 LANGUAGE: ${lang}
 Visual direction ("action") stays in ENGLISH. It is read by a camera system, never by the audience.
 
-Write exactly ${shotCount} shots. This is a drama, so most shots are people SPEAKING to each other, cut the way a real scene is shot — one speaker per shot, alternating. Mark those "dialogue". Use "action" shots (no speech) for arrivals, reveals, and the beats between lines, and make those genuinely physical: someone arrives, something is taken, someone walks out.
+Write exactly ${shotCount} shots, built the way a vertical micro-drama is built:
+
+STRUCTURE — hook, escalation, cliffhanger.
+- Shot 1 is the HOOK. Something must already be wrong in the first three seconds. No throat-clearing, no arriving-and-greeting, no scene-setting. Open in the middle of trouble.
+- The middle shots ESCALATE. Every shot raises the stakes on the one before it. Cut anything that is only information.
+- The last shot is the CLIFFHANGER.
+- There is no room for filler dialogue. If a line does not raise the stakes or reveal something, delete it.
+
+SHOTS — vary the framing, deliberately.
+Give every shot a "shotSize" of "wide", "medium", "close" or "insert":
+- "medium" (waist up) is the DEFAULT for dialogue. Most of your dialogue shots are medium.
+- "close" is for the ONE line in the scene that has to land emotionally. Do not put a close-up on every beat; that is the commonest mistake and it makes an episode feel flat.
+- "wide" establishes where we are. Use it sparingly, and only when the space itself matters.
+- "insert" is a detail with no face in it: a hand on a gate latch, cash on a table, a phone screen, a car door. Use at least one per episode. It is the cheapest way to make a scene feel filmed.
+Do not repeat the same shotSize more than twice in a row.
+
+ACTION — this is a drama, not an interview.
+- Use "action" shots (no speech) for arrivals, reveals, and the beats between lines, and make them genuinely physical: a car pulls up, a gate is shoved open, money is thrown down, somebody walks out.
+- Even in a dialogue shot the person must be DOING something, not standing still talking.
+
+CONTINUITY — the picture must match the words.
+- "action" must agree with the line. If a character says "come inside", the action shows them moving through the doorway — not standing outside facing the street. If they are leaving, they move away from what they are leaving.
+- Say which way the character faces or moves when it matters, and keep it consistent between consecutive shots.
+- One speaker per dialogue shot, and the "action" for that shot describes ONLY that person. Never put a second person in a dialogue frame.
 
 Rules that matter:
 - A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech.
@@ -252,7 +287,7 @@ Respond with ONLY this JSON, no markdown:
   "title": "episode title",
   "synopsis": "two sentences, English, for the creator",
   "shots": [
-    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction", "emotion": "calm" }
+    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "wide" | "medium" | "close" | "insert", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm" }
   ],
   "cliffhanger": "one line, English, what is left hanging",
   "storySoFar": "a rewritten recap covering everything from episode 1 through this one, under 250 words, English. This is the only memory the next episode gets, so carry forward every name, relationship and unresolved thread."
@@ -306,6 +341,7 @@ Respond with ONLY this JSON, no markdown:
       subtitle: String(s.subtitle || "").slice(0, 300).trim(),
       action: String(s.action || "").slice(0, 400),
       emotion: EMOTIONS.includes(s.emotion as never) ? s.emotion : "calm",
+      shotSize: SHOT_SIZES.includes(s.shotSize as never) ? s.shotSize : "medium",
       kind: dialogue ? ("dialogue" as const) : ("action" as const),
     };
   });

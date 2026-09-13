@@ -67,15 +67,35 @@ export async function submitUpscale(clipUrl: string): Promise<string> {
   return prediction.id;
 }
 
-/** How each beat is shot. Emotion drives the lens, not just the face. */
-const EMOTION_FRAMING: Record<string, string> = {
-  calm: "medium close-up, soft natural light, slow drifting handheld camera",
-  angry: "tight low-angle close-up, hard side light, restless handheld camera, jaw set",
-  afraid: "close-up, low key lighting, shallow focus, unsteady handheld camera, darting eyes",
-  joyful: "medium close-up, warm golden light, smooth push in, animated expression",
-  grieving: "close-up, muted desaturated light, slow creeping push in, glassy eyes",
-  tense: "tight close-up, high contrast, shallow depth of field, slow dolly in",
-  shocked: "sudden tight close-up, low angle, sharp focus on the eyes, stark light",
+/**
+ * Framing comes from the shot size the writer chose, not from the emotion.
+ *
+ * The old map put a close-up on nearly every beat, which is the single most
+ * common mistake in vertical drama and exactly why the episodes read as flat
+ * and fake. Medium carries dialogue, close-up is saved for the line that has
+ * to land, wide is rare because 9:16 wastes width on a phone, and an insert
+ * carries no face at all.
+ */
+const SHOT_FRAMING: Record<string, string> = {
+  wide:
+    "wide establishing shot, full environment visible, characters small in frame, deep focus, the place itself doing the work",
+  medium:
+    "medium shot framed from the waist up, subject slightly above centre, shallow depth of field, background falling away",
+  close:
+    "tight close-up on the face, eyes high in frame, very shallow depth of field, background completely soft",
+  insert:
+    "extreme close-up detail insert with no face in shot, shallow focus on the object and the hands",
+};
+
+/** Emotion colours the light and the performance, not the lens. */
+const EMOTION_TONE: Record<string, string> = {
+  calm: "soft natural light, relaxed posture",
+  angry: "hard side light, jaw set, shoulders squared",
+  afraid: "low key light, tense posture, eyes searching",
+  joyful: "warm golden light, open expression",
+  grieving: "muted desaturated light, shoulders low",
+  tense: "high contrast light, body rigid, held breath",
+  shocked: "stark light, body recoiling, eyes wide",
 };
 
 /**
@@ -86,7 +106,7 @@ const EMOTION_FRAMING: Record<string, string> = {
  * body separately is what gets both to move.
  */
 const MOTION_BY_EMOTION: Record<string, string> = {
-  calm: "the camera drifts slowly, the character shifts their weight and gestures lightly while talking",
+  calm: "the camera drifts slowly, the character shifts their weight and gestures while talking",
   angry: "the camera pushes in hard, the character leans forward, jabs a finger, shoulders rising",
   afraid: "the camera shakes subtly, the character backs away, glancing over their shoulder",
   joyful: "the camera rises gently, the character laughs, hands moving, head tilting back",
@@ -94,6 +114,21 @@ const MOTION_BY_EMOTION: Record<string, string> = {
   tense: "the camera circles slowly, the character stands rigid, fists tightening",
   shocked: "the camera snaps closer, the character recoils, eyes widening, a step backwards",
 };
+
+/** Movement for a shot with nobody speaking in it. */
+const MOTION_BY_SHOT: Record<string, string> = {
+  wide: "the camera cranes slowly across the space, traffic and people moving through the background",
+  insert: "the camera pushes in on the detail, hands entering frame and moving",
+};
+
+/**
+ * What must NOT be in the picture.
+ *
+ * A dialogue frame with a bystander in it gets that bystander's mouth
+ * animated too, so the audience cannot tell who is speaking — and stray
+ * extras were turning up in shots that should have held one person.
+ */
+const NEGATIVE = "no bystanders, no crowd, no extra people, no onlookers, no text, no watermark, no split screen";
 
 export interface RenderContext {
   language: SeriesLanguage;
@@ -108,26 +143,28 @@ export interface RenderContext {
  * model resolves the face before it resolves anything else.
  */
 export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
-  const framing = EMOTION_FRAMING[shot.emotion] || EMOTION_FRAMING.calm;
-  const character = ctx.characterDescription ? `${ctx.characterDescription}. ` : "";
+  const framing = SHOT_FRAMING[shot.shotSize] || SHOT_FRAMING.medium;
+  const tone = EMOTION_TONE[shot.emotion] || EMOTION_TONE.calm;
 
-  // A speaking shot holds ONE person.
-  //
-  // With two people in frame the lip-sync model animates both mouths, so the
-  // audience cannot tell who is talking and neither performance reads as
-  // real. One speaker per shot is also simply how dialogue has been filmed
-  // since sound: you cut, you do not sit on a wide two-shot.
+  // An insert has no face in it, so the locked character description would
+  // only confuse the model.
+  const character =
+    shot.shotSize === "insert" || !ctx.characterDescription ? "" : `${ctx.characterDescription}. `;
+
+  // A speaking shot holds ONE person. With two people in frame the lip-sync
+  // model animates both mouths, so the audience cannot tell who is talking.
   const solo =
-    shot.kind === "dialogue"
-      ? `Only ${shot.speaker} is visible, alone in frame, no other people. `
+    shot.kind === "dialogue" && shot.shotSize !== "insert"
+      ? `Only ${shot.speaker} is visible, completely alone in frame. `
       : "";
 
   return [
     character,
     solo,
     shot.action,
-    `${framing}.`,
+    `${framing}, ${tone}.`,
     "Cinematic South African drama, photoreal, film grain, natural skin texture, 35mm.",
+    NEGATIVE + ".",
   ]
     .filter(Boolean)
     .join(" ")
@@ -136,11 +173,16 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
 
 /** Motion direction. Every shot moves now, speaking ones included. */
 export function buildShotMotionPrompt(shot: Shot): string {
-  const motion = MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm;
+  const motion =
+    shot.kind === "dialogue"
+      ? MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm
+      : MOTION_BY_SHOT[shot.shotSize] || MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm;
+
   const speaking =
     shot.kind === "dialogue"
       ? "The character is talking to someone off camera, mouth moving, expressive. "
       : "";
+
   return `${shot.action}. ${speaking}${motion}. Cinematic handheld camera movement, dramatic, photoreal.`.slice(
     0,
     600

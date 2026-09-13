@@ -23,6 +23,7 @@ import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { guessGender } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
 import { voiceForCharacter } from "@/lib/series/cast";
+import { getDb } from "@/lib/db-driver";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 
 /** Cinematic i2v. Funded, and the strongest dramatic motion we have. */
@@ -47,6 +48,19 @@ const UPSCALE_MODEL = "bytedance/video-upscaler";
  * it afterwards. Verified to preserve 1080x1920 and the motion.
  */
 const LIPSYNC_VIDEO_MODEL = "sync/lipsync-2";
+
+/**
+ * Shots are built FROM a reference photograph of the character, not from a
+ * description of them.
+ *
+ * Describing a face in words and hoping the model draws the same one each
+ * time is why characters drifted between shots and why episodes read as
+ * fake. Handing the model a picture of the person and asking for a new shot
+ * of THEM keeps the face, the clothes and the build while framing, setting
+ * and action change freely — which is what finally allowed wide shots with
+ * real action instead of endless close-ups.
+ */
+const REFERENCE_SHOT_MODEL = "google/nano-banana-pro/edit";
 
 /** Submits the speech pass onto an already-moving shot. */
 export async function submitLipsync(videoUrl: string, audioUrl: string): Promise<string> {
@@ -148,8 +162,13 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
 
   // An insert has no face in it, so the locked character description would
   // only confuse the model.
+  // Kept for the fallback path. When a reference photograph is used the
+  // model is looking at the person, so leading with "the same person" beats
+  // re-describing them.
   const character =
-    shot.shotSize === "insert" || !ctx.characterDescription ? "" : `${ctx.characterDescription}. `;
+    shot.shotSize === "insert" || !ctx.characterDescription
+      ? ""
+      : `The same person from the reference photograph. ${ctx.characterDescription}. `;
 
   // A speaking shot holds ONE person. With two people in frame the lip-sync
   // model animates both mouths, so the audience cannot tell who is talking.
@@ -208,6 +227,45 @@ function nameHash(speaker: string): number {
   let hash = 0;
   for (const ch of speaker.toLowerCase().trim()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return hash;
+}
+
+/**
+ * The series' reference photograph, made once and reused for every shot of
+ * every episode. Stored on the series so it survives between renders.
+ */
+export async function ensureCharacterReference(
+  seriesId: string,
+  ctx: RenderContext
+): Promise<string | null> {
+  const db = getDb();
+  const { data: series } = await db
+    .from("series")
+    .select("character_image_url, character_description")
+    .eq("id", seriesId)
+    .maybeSingle();
+
+  if (series?.character_image_url) return series.character_image_url;
+
+  const description = series?.character_description || ctx.characterDescription;
+  if (!description) return null;
+
+  try {
+    const portrait = await runWsModelSync(WS_MODELS.textToImage, {
+      prompt:
+        `${description}. Full body portrait standing in a South African township street, ` +
+        `neutral expression, facing camera, even daylight. ` +
+        `Photoreal, 35mm, natural skin texture. ${NEGATIVE}.`,
+      size: "768*1344",
+    });
+    const url = Array.isArray(portrait?.outputs) ? String(portrait.outputs[0] || "") : "";
+    if (!url) return null;
+
+    await db.from("series").update({ character_image_url: url }).eq("id", seriesId);
+    return url;
+  } catch (err) {
+    console.error("[SERIES] could not make a character reference:", err);
+    return null;
+  }
 }
 
 /**
@@ -293,12 +351,33 @@ export async function submitShot(
   tag: string,
   seriesId?: string
 ): Promise<SubmittedShot> {
-  // 1. The still. Same character wording every time, one face for dialogue.
-  const image = await runWsModelSync(WS_MODELS.textToImage, {
-    prompt: buildShotImagePrompt(shot, ctx),
-    size: ctx.aspectRatio === "9:16" ? "768*1344" : "1344*768",
-  });
-  const imageUrl = Array.isArray(image?.outputs) ? String(image.outputs[0] || "") : "";
+  // 1. The still, built from a photograph of the character wherever we have
+  //    one. An insert has no face in it, so it needs no reference.
+  const prompt = buildShotImagePrompt(shot, ctx);
+  const reference = shot.shotSize === "insert" || !seriesId ? null : await ensureCharacterReference(seriesId, ctx);
+
+  let imageUrl = "";
+  if (reference) {
+    try {
+      const edited = await runWsModelSync(
+        REFERENCE_SHOT_MODEL,
+        { prompt, images: [reference], output_format: "png" },
+        { timeoutMs: 150_000 }
+      );
+      imageUrl = Array.isArray(edited?.outputs) ? String(edited.outputs[0] || "") : "";
+    } catch (err) {
+      // Falling back to a described shot is worse but still a shot.
+      console.error("[SERIES] reference shot failed, describing instead:", err);
+    }
+  }
+
+  if (!imageUrl) {
+    const image = await runWsModelSync(WS_MODELS.textToImage, {
+      prompt,
+      size: ctx.aspectRatio === "9:16" ? "768*1344" : "1344*768",
+    });
+    imageUrl = Array.isArray(image?.outputs) ? String(image.outputs[0] || "") : "";
+  }
   if (!imageUrl) throw new Error("Could not compose this shot");
 
   // 2. Speech, when there is any. The voice comes from the series cast, so a

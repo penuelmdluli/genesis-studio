@@ -19,6 +19,7 @@ import { synthesiseSpeech } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db-driver";
 import { startAssembly, collectAssembly } from "@/lib/series/assemble";
 import { submitShot } from "@/lib/series/render";
+import { writeEpisode } from "@/lib/series/writer";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import type { Shot as SeriesShot } from "@/lib/series/writer";
 
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest) {
     assembleEpisodeId?: string;
     retryEpisodeId?: string;
     advanceEpisodeId?: string;
+    writeForSeriesId?: string;
+    shotCount?: number;
     height?: number;
     /** Redo every shot, not only the failed ones. */
     force?: boolean;
@@ -147,6 +150,70 @@ export async function POST(req: NextRequest) {
 
     await db.from("series_episodes").update({ status: "rendering" }).eq("id", ep.id);
     return NextResponse.json({ retried: todo.length, submitted, errors });
+  }
+
+  // Write the next episode of a series, the same way the creator's button
+  // does. Exists so a pipeline change can be exercised end to end without a
+  // signed-in browser.
+  if (body.writeForSeriesId) {
+    const db = getDb();
+    const { data: series } = await db
+      .from("series")
+      .select("*")
+      .eq("id", body.writeForSeriesId)
+      .maybeSingle();
+    if (!series) return NextResponse.json({ error: "series not found" }, { status: 404 });
+
+    const episodeNumber = (series.episode_count || 0) + 1;
+    const draft = await writeEpisode(
+      {
+        title: series.title,
+        language: series.language || "en-ZA",
+        genre: series.genre,
+        logline: series.logline,
+        characterName: series.character_name,
+        characterDescription: series.character_description,
+        storySoFar: series.story_so_far,
+        episodeNumber,
+      },
+      Number(body.shotCount) || 6
+    );
+
+    const episodeId = crypto.randomUUID();
+    const { error } = await db.from("series_episodes").insert({
+      id: episodeId,
+      series_id: series.id,
+      user_id: series.user_id,
+      episode_number: episodeNumber,
+      title: draft.title,
+      synopsis: draft.synopsis,
+      script: JSON.stringify({ shots: draft.shots, cliffhanger: draft.cliffhanger }),
+      status: "written",
+    });
+    if (error) return NextResponse.json({ error: "could not save the episode" }, { status: 500 });
+
+    await db
+      .from("series")
+      .update({ story_so_far: draft.storySoFar, episode_count: episodeNumber })
+      .eq("id", series.id);
+
+    return NextResponse.json({
+      episodeId,
+      episodeNumber,
+      title: draft.title,
+      synopsis: draft.synopsis,
+      cliffhanger: draft.cliffhanger,
+      shots: draft.shots.map((sh) => ({
+        kind: sh.kind,
+        shotSize: sh.shotSize,
+        speaker: sh.speaker,
+        gender: sh.gender,
+        emotion: sh.emotion,
+        dialogue: sh.dialogue,
+        subtitle: sh.subtitle,
+        action: sh.action,
+      })),
+    });
   }
 
   // Advance the shots of an episode through their stages, the same way the

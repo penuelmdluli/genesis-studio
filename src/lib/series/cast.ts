@@ -123,19 +123,28 @@ export async function voiceForCharacter(
     return { voice: mine.voice, pitch: mine.pitch || "+0Hz", rate: mine.rate || "+0%" };
   }
 
-  // Position among the same-gender characters already cast decides what is
-  // still free. A genuinely different voice is used first, and the pitch
-  // variants only once the pool is exhausted.
-  const sameGender = cast.filter((c) => c.gender === gender).length;
+  // Every character in a series gets a voice nobody else in it has.
+  //
+  // This is checked against the cast as it actually stands rather than
+  // inferred from how many characters came before, so it holds even when
+  // characters are recast, removed or added out of order. Genuinely
+  // different voices are tried first; the gentle pitch variants of the base
+  // voice only once every real voice for that gender is taken.
+  const taken = new Set(cast.map((c) => `${c.voice}|${c.pitch || "+0Hz"}|${c.rate || "+0%"}`));
   const pool = voicePool(language, gender);
 
-  const assigned: CastVoice =
-    sameGender < pool.length
-      ? { voice: pool[sameGender], pitch: "+0Hz", rate: "+0%" }
-      : (() => {
-          const v = VARIANTS[Math.min(sameGender - pool.length + 1, VARIANTS.length - 1)];
-          return { voice: base, pitch: v.pitch, rate: v.rate };
-        })();
+  const candidates: CastVoice[] = [
+    ...pool.map((voice) => ({ voice, pitch: "+0Hz", rate: "+0%" })),
+    ...VARIANTS.slice(1).map((v) => ({ voice: base, pitch: v.pitch, rate: v.rate })),
+  ];
+
+  const free = candidates.find((c) => !taken.has(`${c.voice}|${c.pitch}|${c.rate}`));
+  if (!free) {
+    // More same-gender speaking parts than distinct voices exist. Say so
+    // loudly rather than silently doubling someone up.
+    console.error(`[SERIES] no unique voice left for ${speaker} (${gender}, ${language})`);
+  }
+  const assigned: CastVoice = free || candidates[candidates.length - 1];
 
   // A duplicate insert means two shots of the same new character were
   // rendered at once; the row that won is the right answer either way.
@@ -190,19 +199,34 @@ export async function ensureCast(
   // South African voice and the lead's own son was left with a borrowed
   // accent. The pool's best voice should go to the person the audience hears
   // most.
-  const lines = new Map<string, { speaker: string; gender: "female" | "male"; count: number }>();
+  // A character's gender is decided by a vote across every line they have,
+  // not by whichever line happens to come first. A writer that labels one
+  // line wrongly would otherwise lock that mistake into the cast for the life
+  // of the series.
+  const lines = new Map<
+    string,
+    { speaker: string; female: number; male: number; count: number }
+  >();
   for (const shot of shots) {
     if (shot.kind !== "dialogue" || !shot.dialogue?.trim()) continue;
     const key = characterKey(shot.speaker);
     const gender =
       shot.gender === "female" || shot.gender === "male" ? shot.gender : fallbackGender(shot.speaker);
-    const seen = lines.get(key);
-    if (seen) seen.count += 1;
-    else lines.set(key, { speaker: shot.speaker, gender, count: 1 });
+    const entry = lines.get(key) || { speaker: shot.speaker, female: 0, male: 0, count: 0 };
+    entry[gender] += 1;
+    entry.count += 1;
+    lines.set(key, entry);
   }
 
   const order = [...lines.values()].sort((a, b) => b.count - a.count);
   for (const part of order) {
-    await voiceForCharacter(seriesId, part.speaker, part.gender, language);
+    const gender: "female" | "male" =
+      part.female === part.male ? fallbackGender(part.speaker) : part.female > part.male ? "female" : "male";
+    if (part.female > 0 && part.male > 0) {
+      console.warn(
+        `[SERIES] ${part.speaker} was written as both genders (${part.female}F/${part.male}M); cast as ${gender}`
+      );
+    }
+    await voiceForCharacter(seriesId, part.speaker, gender, language);
   }
 }

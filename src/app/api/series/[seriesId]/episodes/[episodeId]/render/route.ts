@@ -12,7 +12,6 @@
 // one after another would hold a request open past any sane timeout.
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
@@ -26,6 +25,10 @@ import { toUserFacingProviderError } from "@/lib/user-errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+function sqlNow(): string {
+  return new Date().toISOString().slice(0, 19).replace("T", " ");
+}
 
 export async function POST(
   req: NextRequest,
@@ -72,7 +75,9 @@ export async function POST(
 
   const existing = (existingShots || []) as Array<{ id: string; shot_index: number; status: string }>;
 
-  if (existing.some((s) => s.status === "processing")) {
+  // "retrying" counts as in flight: it is the marker a request sets while it
+  // claims a scene, and a second press must not slip past it.
+  if (existing.some((s) => s.status === "processing" || s.status === "retrying")) {
     return NextResponse.json({ error: "This episode is being made right now." }, { status: 409 });
   }
 
@@ -112,14 +117,75 @@ export async function POST(
   };
 
   // Only the scenes that still need making.
-  const todo = shots
+  const candidates = shots
     .map((shot, index) => ({ shot, index }))
     .filter(({ index }) => !isRetry || retryIndexes.has(index));
 
-  if (todo.length === 0) {
+  if (candidates.length === 0) {
     return NextResponse.json({ error: "This episode is already made." }, { status: 409 });
   }
 
+  // Claim each scene in the database BEFORE spending anything.
+  //
+  // The old guard read the existing shots and then decided, which two presses
+  // of the button could both pass before either had written a row: one
+  // episode ended up with 24 rows for 12 scenes, every one of them rendered
+  // and paid for twice. A shot's id is now derived from the episode and its
+  // position, and a unique index backs it, so the database itself refuses the
+  // second claim. Whoever loses simply has nothing to do.
+  const todo: Array<{ shot: Shot; index: number; rowId: string }> = [];
+
+  for (const { shot, index } of candidates) {
+    const previous = existing.find((e) => e.shot_index === index);
+
+    if (previous) {
+      // A retry: take the existing row only if it is still the failed one we
+      // read a moment ago. If another request got there first, leave it be.
+      const { error } = await db
+        .from("series_shots")
+        .update({
+          status: "retrying",
+          stage: "render",
+          error: null,
+          raw_error: null,
+          clip_url: null,
+          raw_clip_url: null,
+          updated_at: sqlNow(),
+        })
+        .eq("id", previous.id)
+        .eq("status", "failed");
+      if (!error) todo.push({ shot, index, rowId: previous.id });
+      continue;
+    }
+
+    const rowId = `${episodeId}:${index}`;
+    const { error } = await db.from("series_shots").insert({
+      id: rowId,
+      episode_id: episodeId,
+      user_id: user.id,
+      shot_index: index,
+      kind: shot.kind,
+      speaker: shot.speaker,
+      dialogue: shot.dialogue,
+      subtitle: shot.subtitle,
+      action: shot.action,
+      emotion: shot.emotion,
+      status: "retrying",
+      stage: "render",
+      attempts: 1,
+      updated_at: sqlNow(),
+    });
+    // A rejected insert means the row already exists, so somebody else owns
+    // this scene. Nothing was charged for it and nothing will be.
+    if (!error) todo.push({ shot, index, rowId });
+  }
+
+  if (todo.length === 0) {
+    return NextResponse.json({ error: "This episode is already being made." }, { status: 409 });
+  }
+
+  // Charged for exactly what was claimed, never for what somebody else is
+  // already making.
   const cost = renderCost(todo.map(({ shot }) => shot));
   if (!ownerAccount) {
     const { success, newBalance } = await deductCredits(
@@ -131,6 +197,11 @@ export async function POST(
         : `Series: ${series.title} episode ${episode.episode_number}`
     );
     if (!success) {
+      // Release the claim so the scenes are not stranded behind a payment
+      // that never happened.
+      for (const { rowId } of todo) {
+        await db.from("series_shots").update({ status: "failed", error: "Not enough credits" }).eq("id", rowId);
+      }
       return NextResponse.json(
         { error: "Not enough credits to make this episode", required: cost, balance: newBalance },
         { status: 402 }
@@ -149,65 +220,41 @@ export async function POST(
 
   let submitted = 0;
   let refundDue = 0;
-  const rows: Record<string, unknown>[] = [];
 
-  results.forEach((result, position) => {
-    const { shot, index } = todo[position];
-    const previous = existing.find((s) => s.shot_index === index);
-    const base = {
-      // Reuse the row when retrying, so an episode never accumulates a pile
-      // of dead attempts next to the scene that finally worked.
-      id: previous?.id || randomUUID(),
-      episode_id: episodeId,
-      user_id: user.id,
-      shot_index: index,
-      kind: shot.kind,
-      speaker: shot.speaker,
-      dialogue: shot.dialogue,
-      subtitle: shot.subtitle,
-      action: shot.action,
-      emotion: shot.emotion,
-      stage: "render",
-      error: null,
-      raw_error: null,
-      clip_url: null,
-      raw_clip_url: null,
-    };
+  for (let i = 0; i < results.length; i++) {
+    const { shot, index, rowId } = todo[i];
+    const result = results[i];
 
     if (result.status === "fulfilled") {
       submitted++;
-      rows.push({
-        ...base,
-        image_url: result.value.imageUrl,
-        audio_url: result.value.audioUrl,
-        provider_ref: `ws:${result.value.providerRef}`,
-        status: "processing",
-      });
+      await db
+        .from("series_shots")
+        .update({
+          status: "processing",
+          stage: "render",
+          image_url: result.value.imageUrl,
+          audio_url: result.value.audioUrl,
+          provider_ref: `ws:${result.value.providerRef}`,
+          updated_at: sqlNow(),
+        })
+        .eq("id", rowId);
     } else {
       const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
       console.error(`[SERIES] shot ${index} failed to submit:`, message);
       refundDue += shot.kind === "dialogue" ? DIALOGUE_SHOT_CREDITS : ACTION_SHOT_CREDITS;
-      rows.push({
-        ...base,
-        status: "failed",
-        error: toUserFacingProviderError(message).slice(0, 300),
-        // The customer sees the friendly line above; this keeps the actual
-        // cause, because storing only the reassurance once left a real
-        // failure impossible to diagnose after the fact.
-        raw_error: message.slice(0, 500),
-      });
+      await db
+        .from("series_shots")
+        .update({
+          status: "failed",
+          error: toUserFacingProviderError(message).slice(0, 300),
+          // The customer sees the friendly line above; this keeps the actual
+          // cause, because storing only the reassurance once left a real
+          // failure impossible to diagnose after the fact.
+          raw_error: message.slice(0, 500),
+          updated_at: sqlNow(),
+        })
+        .eq("id", rowId);
     }
-  });
-
-  for (const row of rows) {
-    const replacing = existing.some((s) => s.id === row.id);
-    if (replacing) {
-      // Clear the old attempt first: the shim has no upsert, and a stale
-      // failed row left beside a running one would read as a failed episode.
-      await db.from("series_shots").delete().eq("id", row.id as string);
-    }
-    const { error } = await db.from("series_shots").insert(row);
-    if (error) console.error("[SERIES] could not record shot:", error);
   }
 
   if (!ownerAccount && refundDue > 0) {

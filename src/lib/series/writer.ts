@@ -217,7 +217,22 @@ ${JSON.stringify(needing.map(({ shot }) => shot.dialogue))}`,
  * Writes the next episode. Reads the recap, writes the scenes, and hands back
  * a rewritten recap so the following episode has somewhere to stand.
  */
-export async function writeEpisode(ctx: SeriesContext, shotCount = 6): Promise<EpisodeDraft> {
+export interface WriteOptions {
+  /**
+   * A short-form episode that doubles as an ad, capped at fifteen seconds
+   * including a 3.4-second branded end card. That leaves about eleven seconds
+   * of story, and spoken dialogue runs roughly three words a second — so
+   * lines are held to three to eight words, which is what makes the cap hold
+   * without cutting anyone off mid-word.
+   */
+  shortForm?: boolean;
+}
+
+export async function writeEpisode(
+  ctx: SeriesContext,
+  shotCount = 6,
+  options: WriteOptions = {}
+): Promise<EpisodeDraft> {
   const key = envString("ANTHROPIC_API_KEY");
   if (!key) throw new Error("The writer is not configured");
 
@@ -272,7 +287,9 @@ CONTINUITY — the picture must match the words.
 - One speaker per dialogue shot, and the "action" for that shot describes ONLY that person. Never put a second person in a dialogue frame.
 
 Rules that matter:
-- A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech.
+- ${options.shortForm
+    ? "A dialogue line is ONE person speaking, 3 to 8 words — never more. This is a fifteen-second episode; every line must land in under three seconds."
+    : "A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech."}
 - Alternate speakers where two people are talking.
 - "action" is a single clear visual sentence: who is in frame, what they do, where. Always name the character.
 - For a DIALOGUE shot, "action" must describe ONLY the speaker and what their body is doing — never two people in the same frame. Dialogue is filmed one person at a time, and a second face on screen makes it impossible to tell who is talking.
@@ -329,7 +346,11 @@ Respond with ONLY this JSON, no markdown:
   // Trust nothing about the shape. A wrong `kind` would silently route a
   // speaking shot away from lip sync, which is the one thing this sells.
   draft.shots = draft.shots.slice(0, 12).map((s) => {
-    const dialogue = String(s.dialogue || "").slice(0, 300).trim();
+    let dialogue = String(s.dialogue || "").slice(0, 300).trim();
+    if (options.shortForm && dialogue) {
+      const words = dialogue.split(/\s+/);
+      if (words.length > 8) dialogue = words.slice(0, 8).join(" ").replace(/[,;:]$/, "") + ".";
+    }
     return {
       speaker: String(s.speaker || ctx.characterName || "Lead").slice(0, 60),
       gender: s.gender === "female" ? "female" : s.gender === "male" ? "male" : guessGender(String(s.speaker || "")),

@@ -334,7 +334,9 @@ export async function tickCampaign(campaign: Campaign): Promise<TickResult> {
       storySoFar: series.story_so_far,
       episodeNumber,
     },
-    campaign.shot_count
+    campaign.shot_count,
+    // Every autopilot episode is an ad and must fit fifteen seconds.
+    { shortForm: true }
   );
 
   const episodeId = randomUUID();

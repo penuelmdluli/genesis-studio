@@ -1,4 +1,4 @@
-# Genesis Studio Architecture
+# iVideo Studio Architecture
 
 ## System Overview
 

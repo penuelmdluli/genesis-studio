@@ -39,7 +39,7 @@ export function CookieConsent() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-zinc-300">
-              We use essential cookies to keep Genesis Studio running and analytics cookies to improve your experience.{" "}
+              We use essential cookies to keep iVideo Studio running and analytics cookies to improve your experience.{" "}
               <Link href="/privacy" className="text-violet-400 hover:text-violet-300 underline underline-offset-2">
                 Privacy Policy
               </Link>

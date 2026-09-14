@@ -110,7 +110,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const video = await fetchVideo(id);
 
   if (!video) {
-    return { title: "Video Not Found — Genesis Studio" };
+    return { title: "Video Not Found — iVideo Studio" };
   }
 
   const promptPreview =
@@ -120,10 +120,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/api/og?id=${id}`;
 
   return {
-    title: `"${promptPreview}" — Genesis Studio`,
+    title: `"${promptPreview}" — iVideo Studio`,
     description: `AI-generated video with ${video.has_audio ? "native audio" : "stunning visuals"}. Create your own for free.`,
     openGraph: {
-      title: `"${promptPreview}" — Genesis Studio`,
+      title: `"${promptPreview}" — iVideo Studio`,
       description: "AI-generated video. Create your own for free.",
       type: "video.other",
       images: [{ url: ogImageUrl, width: 1200, height: 630 }],
@@ -133,7 +133,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "player",
-      title: `"${promptPreview}" — Genesis Studio`,
+      title: `"${promptPreview}" — iVideo Studio`,
       description: "AI-generated video. Create your own for free.",
       images: [ogImageUrl],
     },

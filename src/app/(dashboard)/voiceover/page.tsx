@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import { VOICE_OPTIONS } from "@/lib/constants";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
@@ -16,6 +17,8 @@ import { Mic, Play, Square, Download, Zap, AlertCircle, RefreshCw } from "lucide
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "\u{1F1FA}\u{1F1F8}",
   "en-ZA": "\u{1F1FF}\u{1F1E6}",
+  "zu-ZA": "\u{1F1FF}\u{1F1E6}",
+  "af-ZA": "\u{1F1FF}\u{1F1E6}",
   ja: "\u{1F1EF}\u{1F1F5}",
   es: "\u{1F1EA}\u{1F1F8}",
   fr: "\u{1F1EB}\u{1F1F7}",
@@ -42,6 +45,7 @@ function formatDuration(seconds: number): string {
 export default function VoiceoverPage() {
   const { user, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
 
   const [text, setText] = useState("");
   const [selectedVoiceId, setSelectedVoiceId] = useState(VOICE_OPTIONS[0]?.id ?? "");
@@ -149,10 +153,9 @@ export default function VoiceoverPage() {
       progress.setProgress(60);
 
       if (!res.ok) {
-        const msg = data.error || "Generation failed. Please try again.";
+        const msg = reportApiError(res, data, "Generation failed. Please try again.");
         setGenerationError(msg);
         progress.fail(msg);
-        toast(msg, "error");
         return;
       }
 

@@ -288,7 +288,7 @@ async function generateVideo(item: ShowcasePrompt, index: number, total: number)
       is_featured: true,
       is_published: true,
       tags: item.tags,
-      creator_name: "Genesis Studio",
+      creator_name: "iVideo Studio",
       creator_avatar_url: null,
       views: Math.floor(Math.random() * 500) + 100,
       likes: Math.floor(Math.random() * 100) + 20,

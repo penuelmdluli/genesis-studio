@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
+import { isOwnerClerkId } from "@/lib/credits";
 import { fal } from "@fal-ai/client";
 import { uploadToR2, uploadAudio, uploadThumbnail, r2PublicUrl, fileExists } from "@/lib/storage";
 
@@ -58,13 +59,15 @@ async function existsOnR2(key: string): Promise<boolean> {
   return fileExists(key);
 }
 
-async function generateAndStoreSong(song: typeof DEMO_SONGS[0]): Promise<string> {
+async function generateAndStoreSong(song: typeof DEMO_SONGS[0], mayGenerate: boolean): Promise<string> {
   const key = `demo/music-video/songs/${song.id}.mp3`;
 
   // Check if already exists
   if (await existsOnR2(key)) {
     return r2PublicUrl(key);
   }
+
+  if (!mayGenerate) throw new Error(`Demo song not seeded: ${song.id}`);
 
   // Generate via stable-audio
   const result = await fal.subscribe("fal-ai/stable-audio", {
@@ -92,13 +95,15 @@ async function generateAndStoreSong(song: typeof DEMO_SONGS[0]): Promise<string>
   return r2PublicUrl(key);
 }
 
-async function generateAndStoreCharacter(char: typeof DEMO_CHARACTERS[0]): Promise<string> {
+async function generateAndStoreCharacter(char: typeof DEMO_CHARACTERS[0], mayGenerate: boolean): Promise<string> {
   const key = `demo/music-video/characters/${char.id}.jpg`;
 
   // Check if already exists
   if (await existsOnR2(key)) {
     return r2PublicUrl(key);
   }
+
+  if (!mayGenerate) throw new Error(`Demo character not seeded: ${char.id}`);
 
   // Generate via FLUX Pro
   const result = await fal.subscribe("fal-ai/flux-pro/v1.1", {
@@ -139,10 +144,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Generate all assets in parallel
+    // This route is called from a useEffect on /music-video, so it fires on
+    // page load for every visitor. It used to generate three songs on
+    // fal-ai/stable-audio and a set of character portraits on
+    // fal-ai/flux-pro — billable provider work, triggered by simply opening a
+    // page, with no credit charged and nothing asked of the user.
+    //
+    // The R2 existence check meant it only cost money until the files existed,
+    // but "only the first visitor pays for everyone" is not a billing model,
+    // and any purge of the demo/ prefix silently re-armed it.
+    //
+    // Seeding is now an owner action. Everyone else is served whatever is
+    // already on R2 and generates nothing.
+    const mayGenerate = isOwnerClerkId(userId);
+
     const [songResults, charResults] = await Promise.all([
-      Promise.allSettled(DEMO_SONGS.map((song) => generateAndStoreSong(song))),
-      Promise.allSettled(DEMO_CHARACTERS.map((char) => generateAndStoreCharacter(char))),
+      Promise.allSettled(DEMO_SONGS.map((song) => generateAndStoreSong(song, mayGenerate))),
+      Promise.allSettled(DEMO_CHARACTERS.map((char) => generateAndStoreCharacter(char, mayGenerate))),
     ]);
 
     // Build response — include only successful ones

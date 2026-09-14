@@ -11,9 +11,12 @@ import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
 import { GenerateRequest, ModelId } from "@/types";
 import { checkRateLimit } from "@/lib/fraud";
+import { modelAvailability, durationProblem } from "@/lib/config";
+import { holdCredits, attachHoldToJob, releaseHold } from "@/lib/credit-escrow";
 import { enforceDistributedRateLimit } from "@/lib/rate-limit";
 import { recordProviderSuccess, recordProviderFailure } from "@/lib/vendor-failover";
 import { sendSlackAlert } from "@/lib/alerts";
+import { toUserFacingProviderError, isOperatorActionable } from "@/lib/user-errors";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,6 +50,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
     const body = parsed.data;
+
+    // Standard Idempotency-Key header. A client that sends one is protected
+    // from double-charging on retries; one that does not is no worse off than
+    // before.
+    const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 200) || "";
 
     // Validate model access (owners have access to all models)
     const ownerAccount = isOwnerClerkId(clerkId);
@@ -95,21 +103,67 @@ export async function POST(req: NextRequest) {
       body.isDraft || false
     );
 
-    if (!ownerAccount) {
-      // Deduct credits
-      const { success, newBalance } = await deductCredits(
-        user.id,
-        creditCost,
-        "", // job ID will be updated after job creation
-        `Video generation: ${model.name} ${resolution} ${duration}s`
+    // Refuse an unrunnable model BEFORE taking credits. Production has
+    // charged users and then discovered the config was missing — three
+    // cogvideo-x jobs died on "No GPU endpoint configured", one ai-singer job
+    // on "RUNPOD_ENDPOINT_ACE_STEP not configured". Both debited first.
+    const availability = modelAvailability(body.modelId, effectiveType);
+    if (!availability.runnable) {
+      console.warn(`[GENERATE] ${body.modelId} unavailable: ${availability.detail}`);
+      return NextResponse.json(
+        { error: availability.reason || "That model is unavailable right now.", code: "MODEL_UNAVAILABLE" },
+        { status: 503 }
       );
+    }
 
-      if (!success) {
+    // The provider rejects some durations outright. Catching it here means
+    // the user is told which lengths work instead of being charged and then
+    // shown an error naming a vendor their model does not use.
+    const durationIssue = durationProblem(body.modelId, duration);
+    if (durationIssue) {
+      return NextResponse.json(
+        { error: durationIssue, code: "INVALID_DURATION" },
+        { status: 400 }
+      );
+    }
+
+    // Reserve credits rather than spending them. The hold is settled only if
+    // the provider accepts the job, and released on any failure — so a job
+    // that never runs cannot leave the user charged. This replaces a debit
+    // that was written before the job row existed, with jobId "" and a
+    // comment promising to fill it in later that never happened.
+    let holdId: string | null = null;
+    if (!ownerAccount) {
+      const held = await holdCredits({
+        userId: user.id,
+        amount: creditCost,
+        description: `Video generation: ${model.name} ${resolution} ${duration}s`,
+        // A double-click, a retry or a flaky connection must not create two
+        // jobs and two charges. Callers that send no key get no protection,
+        // which is the previous behaviour rather than a regression.
+        idempotencyKey: idempotencyKey || undefined,
+      });
+
+      if (!held.ok) {
         return NextResponse.json(
-          { error: "Insufficient credits", required: creditCost, balance: newBalance },
+          { error: "Insufficient credits", required: creditCost, balance: held.balance },
           { status: 402 }
         );
       }
+
+      // A reused hold means this exact request already went through. Return
+      // the job it created instead of starting a second one.
+      if (held.reused && held.hold?.jobId) {
+        return NextResponse.json({
+          jobId: held.hold.jobId,
+          status: "queued",
+          estimatedTime: model.avgGenerationTime * (body.isDraft ? 0.3 : 1),
+          creditsCost: creditCost,
+          duplicate: true,
+        });
+      }
+
+      holdId = held.hold?.id ?? null;
     }
 
     // Log profitability metrics
@@ -145,46 +199,72 @@ export async function POST(req: NextRequest) {
       audioUrl: audioTrack?.url,
     });
 
-    // Route to the correct provider (FAL.AI or RunPod)
-    // FAL auto-fallback: if FAL fails (balance exhausted, forbidden), retry on RunPod Wan 2.2
-    let usedFallback = false;
-    let actualModelId: string = body.modelId;
+    // Bind the reservation to the job the moment the row exists. Until this
+    // runs the hold is orphaned, which is why releaseOrphanedHolds() exists —
+    // a crash in between must not strand a user's credits.
+    if (holdId) {
+      await attachHoldToJob(holdId, job.id);
+    }
+
+    // Every job gets a point past which it is not worth waiting for. Without
+    // one a job can sit in "queued" forever, which is what the 18 timeout
+    // failures were: nothing owned the decision to give up. Three times the
+    // model's own average, floored at fifteen minutes and capped at forty.
+    //
+    // The floor was five minutes. Seedance Pro and Kling routinely take six
+    // to ten under load, and the reaper killed a paid render at 5:01 that the
+    // provider finished (and billed) at 7:40. The reaper now also asks the
+    // provider before giving up, so this deadline is a checkpoint, not a kill.
+    const deadlineMs = Math.min(
+      Math.max(model.avgGenerationTime * 3 * 1000, 15 * 60 * 1000),
+      40 * 60 * 1000
+    );
+    await updateJobStatus(job.id, {
+      deadlineAt: new Date(Date.now() + deadlineMs).toISOString(),
+      creditHoldId: holdId ?? undefined,
+    });
+
+    // Route to the correct provider.
+    //
+    // This used to fall back to RunPod Wan 2.2 whenever a hosted provider
+    // answered with a billing or auth error. That failover was the single
+    // largest source of production failures: RUNPOD_ENDPOINT_WAN22 was deleted
+    // months ago, so every exhausted-balance error became an opaque
+    // "RunPod API error: 404" on a model the user never chose. 54 of the 55
+    // RunPod 404s in production history came through this branch, on
+    // seedance-1.5 — a model declared provider:"fal" that never intentionally
+    // touches RunPod. Audited 2026-09-09: all 8 configured RunPod video
+    // endpoints 404, and every endpoint on the account is scaled to
+    // workersMax=0, so there is nothing to fail over TO.
+    //
+    // A hosted provider being out of balance is now reported as itself. The
+    // catch below refunds either way; the difference is that the user gets a
+    // true reason instead of a 404 from an unrelated vendor.
+    const actualModelId: string = body.modelId;
     try {
       if (model.provider === "fal") {
-        // Premium models — route through provider router (WaveSpeed → FAL fallback)
-        try {
-          const routerResult = await submitVideoJob({
-            modelId: body.modelId,
-            type: effectiveType as "t2v" | "i2v",
-            prompt: body.prompt,
-            negativePrompt: body.negativePrompt,
-            imageUrl: body.inputImageUrl,
-            duration,
-            aspectRatio: body.aspectRatio,
-            enableAudio: body.enableAudio,
-            seed: body.seed,
-          });
+        // Premium models — route through provider router (WaveSpeed → FAL)
+        const routerResult = await submitVideoJob({
+          modelId: body.modelId,
+          type: effectiveType as "t2v" | "i2v",
+          prompt: body.prompt,
+          negativePrompt: body.negativePrompt,
+          imageUrl: body.inputImageUrl,
+          duration,
+          aspectRatio: body.aspectRatio,
+          enableAudio: body.enableAudio,
+          seed: body.seed,
+          isDraft: body.isDraft || false,
+        });
 
-          await updateJobStatus(job.id, {
-            runpodJobId: routerResult.request_id,
-            status: "queued",
-          });
-        } catch (falError) {
-          const falMsg = falError instanceof Error ? falError.message : String(falError);
-          // Auto-fallback to RunPod Wan 2.2 on billing/auth errors
-          if (falMsg.includes("Forbidden") || falMsg.includes("locked") || falMsg.includes("balance") || falMsg.includes("403")) {
-            console.warn(`[FAL_FALLBACK] ${body.modelId} failed (${falMsg}), falling back to wan-2.2`);
-            usedFallback = true;
-            actualModelId = "wan-2.2" as ModelId;
-            // Fall through to RunPod block below
-          } else {
-            throw falError; // Re-throw non-billing errors
-          }
-        }
+        await updateJobStatus(job.id, {
+          runpodJobId: routerResult.request_id,
+          status: "queued",
+        });
       }
 
-      if (model.provider !== "fal" || usedFallback) {
-        // RunPod — open-source models (or FAL fallback)
+      if (model.provider !== "fal") {
+        // RunPod — open-source models only. Never a fallback target.
         const runpodInput = buildRunPodInput({
           modelId: actualModelId as ModelId,
           type: effectiveType,
@@ -229,13 +309,11 @@ export async function POST(req: NextRequest) {
         message: `User: ${user.name} (${user.email})\nModel: ${model.name} | ${body.duration}s | ${creditCost} credits`,
       }).catch(() => {});
 
-      const fallbackModel = usedFallback ? AI_MODELS[actualModelId as ModelId] : null;
       return NextResponse.json({
         jobId: job.id,
         status: "queued",
-        estimatedTime: (fallbackModel || model).avgGenerationTime * (body.isDraft ? 0.3 : 1),
+        estimatedTime: model.avgGenerationTime * (body.isDraft ? 0.3 : 1),
         creditsCost: creditCost,
-        ...(usedFallback && { fallbackModel: fallbackModel?.name, fallbackNote: `${model.name} is temporarily unavailable. Routed to ${fallbackModel?.name} instead.` }),
       });
     } catch (gpuError) {
       console.error("GPU submission error:", gpuError);
@@ -245,28 +323,33 @@ export async function POST(req: NextRequest) {
       const errorMsg = gpuError instanceof Error ? gpuError.message : "Unknown GPU error";
       recordProviderFailure(provider as "fal" | "runpod", errorMsg);
 
+      // A provider out of balance is an operator emergency: every customer
+      // from now on fails the same way. Shout, don't whisper.
+      const operatorMustAct = isOperatorActionable(errorMsg);
       sendSlackAlert({
-        level: "warning",
-        title: "Video generation failed",
-        message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}`,
+        level: operatorMustAct ? "critical" : "warning",
+        title: operatorMustAct ? "GENERATION DOWN — provider balance/access" : "Video generation failed",
+        message: `User: ${user.name} (${user.email})\nModel: ${model.name}\nError: ${errorMsg}\nCredits refunded: ${creditCost}${operatorMustAct ? "\n\nTop up the provider now — all generations are failing." : ""}`,
       }).catch(() => {});
 
-      const { refundCredits } = await import("@/lib/credits");
-      await refundCredits(
-        user.id,
-        creditCost,
-        job.id,
-        "GPU submission failed — automatic refund"
-      );
+      // Release the reservation rather than refunding a debit. The hold is
+      // guarded, so this is safe even if the reaper reaches the same job
+      // first — exactly the race that produced double refunds before.
+      if (holdId) {
+        await releaseHold(holdId, "Provider submission failed");
+      }
 
+      // The raw error is in the log and the alert above. The customer gets
+      // plain language with no vendor names in it.
+      const userMessage = toUserFacingProviderError(errorMsg);
       await updateJobStatus(job.id, {
         status: "failed",
-        errorMessage: `Submission failed: ${errorMsg}. Credits refunded.`,
+        errorMessage: userMessage,
       });
 
       return NextResponse.json(
         {
-          error: `${model.name} submission failed. Credits refunded.`,
+          error: userMessage,
           jobId: job.id,
         },
         { status: 503 }

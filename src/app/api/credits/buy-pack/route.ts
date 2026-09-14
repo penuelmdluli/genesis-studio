@@ -4,7 +4,8 @@ import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { getDb } from "@/lib/db-driver";
 import { CREDIT_PACKS } from "@/lib/constants";
-import { getProvider, getDefaultProvider } from "@/lib/payments";
+import { resolveProvider, getProvider, getDefaultProvider } from "@/lib/payments";
+import { recordPendingCheckout } from "@/lib/payments/pending";
 
 const PACK_PRICE_IDS: Record<string, string | undefined> = {
   "pack-500": process.env.STRIPE_CREDIT_PACK_500_PRICE_ID,
@@ -36,9 +37,16 @@ export async function POST(req: NextRequest) {
 
     // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
-      const paymentProvider = getProvider(providerName);
+      // Resolve rather than demand — see the note in subscribe/route.ts.
+      const paymentProvider = resolveProvider(providerName);
+      if (!paymentProvider) {
+        return NextResponse.json(
+          { error: "Payments are temporarily unavailable. Please try again shortly." },
+          { status: 503 }
+        );
+      }
 
-      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      const useUSD = paymentProvider.name === "paystack" && requestCurrency !== "ZAR";
       const amount = useUSD ? pack.price * 100 : (pack.priceZAR || 0) * 100;
       const currency = useUSD ? "USD" : "ZAR";
 
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
         currency,
         email: user.email,
         userId: user.id,
-        description: `Genesis Studio ${pack.credits} Credit Pack`,
+        description: `iVideo Studio ${pack.credits} Credit Pack`,
         metadata: {
           type: "credit_pack",
           packId: pack.id,
@@ -64,6 +72,17 @@ export async function POST(req: NextRequest) {
         successUrl: `${appUrl}/dashboard?pack_success=true`,
         cancelUrl: `${appUrl}/pricing?cancelled=true`,
         notifyUrl: `${webhookBaseUrl}/api/webhooks/${paymentProvider.name}`,
+      });
+
+      await recordPendingCheckout({
+        checkoutId: checkout.checkoutId,
+        provider: paymentProvider.name,
+        userId: user.id,
+        type: "credit_pack",
+        productId: pack.id,
+        amount,
+        currency,
+        metadata: { type: "credit_pack", packId: pack.id, credits: String(pack.credits), userId: user.id },
       });
 
       return NextResponse.json({ url: checkout.redirectUrl });
@@ -87,7 +106,7 @@ export async function POST(req: NextRequest) {
           currency: "ZAR",
           email: user.email,
           userId: user.id,
-          description: `Genesis Studio ${pack.credits} Credit Pack`,
+          description: `iVideo Studio ${pack.credits} Credit Pack`,
           metadata: {
             type: "credit_pack",
             packId: pack.id,
@@ -97,6 +116,17 @@ export async function POST(req: NextRequest) {
           successUrl: `${appUrl}/dashboard?pack_success=true`,
           cancelUrl: `${appUrl}/pricing?cancelled=true`,
           notifyUrl: `${webhookBaseUrl}/api/webhooks/${defaultProvider.name}`,
+        });
+
+        await recordPendingCheckout({
+          checkoutId: checkout.checkoutId,
+          provider: defaultProvider.name,
+          userId: user.id,
+          type: "credit_pack",
+          productId: pack.id,
+          amount: priceZAR * 100,
+          currency: "ZAR",
+          metadata: { type: "credit_pack", packId: pack.id, credits: String(pack.credits), userId: user.id },
         });
 
         return NextResponse.json({ url: checkout.redirectUrl });

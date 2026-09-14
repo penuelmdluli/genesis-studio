@@ -5,7 +5,7 @@ vi.mock("@/lib/storage", () => ({
   getSignedDownloadUrl: vi.fn(async (key: string) => `https://r2.example/${key}?X-Amz-Signature=stub`),
 }));
 
-import { getMotionJobStatus, getMotionJobResult } from "./motion-control";
+import { getMotionJobStatus, getMotionJobResult, submitMotionControlJob, FUN_EFFECTS } from "./motion-control";
 
 /**
  * Motion jobs are persisted as "fal:<endpoint>:<requestId>" regardless of which
@@ -106,5 +106,65 @@ describe("RunPod motion polling", () => {
     // and must fail the job (and refund) rather than upload an empty file.
     mockRunpod({ status: "COMPLETED", output: {} });
     await expect(getMotionJobResult("rp:endpoint123", "r1")).rejects.toThrow(/no video/i);
+  });
+});
+
+describe("WaveSpeed effect routing", () => {
+  const originalFetch = global.fetch;
+  let calls: Array<{ url: string; body: Record<string, unknown> }>;
+
+  beforeEach(() => {
+    process.env.WAVESPEED_API_KEY = "test-key";
+    // Keep RunPod out of the chain so WaveSpeed is what gets exercised.
+    process.env.MOTION_RUNPOD_ENABLED = "false";
+    calls = [];
+    global.fetch = vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init.body)) });
+      return new Response(JSON.stringify({ data: { id: "ws-job-1", status: "created" } }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("sends a named effect to the effects model with no driving video", async () => {
+    // The bug this guards: effects used to go to motion-control, which demands
+    // a `video`, satisfied by a hardcoded stock URL that later 403'd — so every
+    // effect request failed.
+    await submitMotionControlJob({ characterImageUrl: "https://cdn/x.png", effect: "running_man" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain("kwaivgi/kling-effects");
+    expect(calls[0].body).toEqual({ image: "https://cdn/x.png", effect_scene: "running_man" });
+    expect(calls[0].body).not.toHaveProperty("video");
+  });
+
+  it("sends a reference video to the motion-control model instead", async () => {
+    await submitMotionControlJob({
+      characterImageUrl: "https://cdn/x.png",
+      referenceVideoUrl: "https://cdn/drive.mp4",
+    });
+
+    expect(calls[0].url).toContain("motion-control");
+    expect(calls[0].body.video).toBe("https://cdn/drive.mp4");
+    expect(calls[0].body).not.toHaveProperty("effect_scene");
+  });
+
+  it("offers no effect the provider would reject", () => {
+    // Verified against kwaivgi/kling-effects on 2026-08-31. An id the endpoint
+    // refuses costs the user a credit deduction and a refund.
+    const removed = ["hug", "kiss", "heart_gesture", "celebration", "birthday_star", "tiger_hug_pro"];
+    const offered = FUN_EFFECTS.map((e) => e.id);
+    for (const id of removed) expect(offered).not.toContain(id);
+    expect(offered).toContain("running_man");
+    // Curated to 12 on 2026-09-12: the list is a phone screen, not a
+    // catalogue. The count is pinned so a careless re-add is caught, and
+    // every id still has to be one the endpoint accepts.
+    expect(offered.length).toBe(12);
+    expect(new Set(offered).size).toBe(offered.length);
   });
 });

@@ -138,7 +138,11 @@ export async function submitVideoJob(params: {
   aspectRatio?: string;
   enableAudio?: boolean;
   seed?: number;
+  isDraft?: boolean;
 }): Promise<VideoSubmitResult> {
+  // Whatever WaveSpeed said, so it can be reported if FAL also fails.
+  let wavespeedError: string | null = null;
+
   // Try WaveSpeed first (cheaper for video gen)
   if (canUseWavespeed(params.modelId, params.type)) {
     try {
@@ -152,13 +156,30 @@ export async function submitVideoJob(params: {
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      wavespeedError = msg;
       console.warn(`[ROUTER] WaveSpeed failed for ${params.modelId}: ${msg}, falling back to FAL`);
       recordProviderFailure("wavespeed", msg);
     }
   }
 
-  // Fallback to FAL.AI (always available, full feature set)
-  const falResult = await submitFalJob(params);
+  // Fallback to FAL.AI.
+  //
+  // When FAL fails too, its error used to be the only one that survived — and
+  // for a model with no FAL id that error is "No FAL.AI model ID configured",
+  // which names a vendor the model never uses and hides the real cause. Five
+  // production jobs were diagnosed as a FAL misconfiguration when WaveSpeed
+  // had actually rejected a 10-second duration. Report both.
+  let falResult;
+  try {
+    falResult = await submitFalJob(params);
+  } catch (falErr) {
+    const falMsg = falErr instanceof Error ? falErr.message : String(falErr);
+    throw new Error(
+      wavespeedError
+        ? `Both providers refused this job. WaveSpeed: ${wavespeedError} | FAL: ${falMsg}`
+        : falMsg
+    );
+  }
   recordProviderSuccess("fal");
   console.log(`[ROUTER] ${params.modelId} routed to FAL.AI`);
   return {

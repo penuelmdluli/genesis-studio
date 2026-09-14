@@ -414,7 +414,7 @@ function validateAndSanitizePlan(plan: ScenePlan, input: BrainInput): ScenePlan 
 }
 
 /**
- * Append Genesis Studio marketing outro to the final scene voiceover.
+ * Append iVideo Studio marketing outro to the final scene voiceover.
  * Called by the orchestrator for owner accounts only.
  */
 export function appendOwnerBranding(plan: ScenePlan): void {
@@ -423,11 +423,11 @@ export function appendOwnerBranding(plan: ScenePlan): void {
 
   // Rotating outros — each video gets a different marketing close
   const outros = [
-    "This was created entirely by AI using Genesis Studio. No cameras. No crew. Just one prompt. Try it free at genesis studio dot app.",
-    "Every frame of this video was AI-generated in under 2 minutes. The future of content is here. Genesis Studio dot app.",
-    "What you just watched was made by artificial intelligence. Want to create your own? Genesis Studio. 100 free credits. No card needed.",
-    "This is the power of AI video. One idea becomes a full production with voiceover, music, and captions. Genesis Studio dot app. Start free.",
-    "Made with Genesis Studio — where African creators build the future of content. Try it free at genesis studio dot app.",
+    "This was created entirely by AI using iVideo Studio. No cameras. No crew. Just one prompt. Try it free at genesis studio dot app.",
+    "Every frame of this video was AI-generated in under 2 minutes. The future of content is here. iVideo Studio dot app.",
+    "What you just watched was made by artificial intelligence. Want to create your own? iVideo Studio. 100 free credits. No card needed.",
+    "This is the power of AI video. One idea becomes a full production with voiceover, music, and captions. iVideo Studio dot app. Start free.",
+    "Made with iVideo Studio — where African creators build the future of content. Try it free at genesis studio dot app.",
   ];
   const outro = outros[Math.floor(Math.random() * outros.length)];
 
@@ -444,7 +444,7 @@ export function appendOwnerBranding(plan: ScenePlan): void {
     plan.voiceoverScript = `${plan.voiceoverScript.trim()}${sep}${outro}`;
   }
 
-  console.log(`[BRAIN PLANNER] Appended Genesis Studio branding to final voiceover`);
+  console.log(`[BRAIN PLANNER] Appended iVideo Studio branding to final voiceover`);
 }
 
 // ────────────────────────────────────────────────────────────

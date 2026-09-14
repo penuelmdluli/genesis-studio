@@ -1,11 +1,11 @@
 /**
- * Genesis Studio — Retention & Dunning Emails
+ * iVideo Studio — Retention & Dunning Emails
  * Win-back campaigns, credit expiry warnings, weekly digests, dunning.
  */
 
 // Env reads deferred to function scope — module-level reads break Cloudflare Workers
 function getResendApiKey() { return process.env.RESEND_API_KEY; }
-function getFromEmail() { return process.env.RESEND_FROM_EMAIL || "Genesis Studio <onboarding@resend.dev>"; }
+function getFromEmail() { return process.env.RESEND_FROM_EMAIL || "iVideo Studio <onboarding@resend.dev>"; }
 function getAppUrl() { return process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"; }
 
 async function sendEmail(to: string, subject: string, html: string) {
@@ -51,7 +51,7 @@ export async function sendDunningEmail(to: string, name: string) {
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">Payment Update Needed</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, your recent payment for Genesis Studio failed.
+        Hi ${name}, your recent payment for iVideo Studio failed.
         Please update your payment method to keep your plan active and avoid losing access to premium features.
       </p>
       <p style="margin:24px 0;">
@@ -71,7 +71,7 @@ export async function sendDowngradeEmail(to: string, name: string) {
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">Plan Downgraded</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, due to an unresolved payment issue, your Genesis Studio plan has been downgraded to Free.
+        Hi ${name}, due to an unresolved payment issue, your iVideo Studio plan has been downgraded to Free.
         Your videos and data are safe — you can resubscribe anytime to get your credits and features back.
       </p>
       <p style="margin:24px 0;">
@@ -108,9 +108,9 @@ export async function sendWeeklyDigestEmail(to: string, name: string, stats: {
 }) {
   return sendEmail(
     to,
-    "Your Genesis Studio weekly recap",
+    "Your iVideo Studio weekly recap",
     `<div style="${baseStyle}"><div style="${card}">
-      <h2 style="margin:0 0 12px;color:#ededed;">Your Week in Genesis Studio</h2>
+      <h2 style="margin:0 0 12px;color:#ededed;">Your Week in iVideo Studio</h2>
       <p style="color:#a1a1aa;line-height:1.6;">Hi ${name}, here's your weekly recap:</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;">
         <div style="background:rgba(124,58,237,0.1);border-radius:12px;padding:16px;text-align:center;">
@@ -139,7 +139,7 @@ export async function sendWinBackEmail(to: string, name: string, bonusCredits: n
     `<div style="${baseStyle}"><div style="${card}">
       <h2 style="margin:0 0 12px;color:#ededed;">We Miss You!</h2>
       <p style="color:#a1a1aa;line-height:1.6;">
-        Hi ${name}, it's been a while since you created something on Genesis Studio.
+        Hi ${name}, it's been a while since you created something on iVideo Studio.
         We've added <strong style="color:#7c3aed;">${bonusCredits} bonus credits</strong> to your account.
         Come back and see what's new — we've added new models and features!
       </p>
@@ -148,6 +148,44 @@ export async function sendWinBackEmail(to: string, name: string, bonusCredits: n
       </p>
       <p style="color:#71717a;font-size:13px;">
         Credits expire in 14 days. One-time offer.
+      </p>
+    </div></div>`
+  );
+}
+
+// --- Campaigns ---
+
+/**
+ * "Come back and try the new tools" — sent by the owner through
+ * /api/admin/campaign. Mentions the credits they already hold so the ask is
+ * concrete rather than generic.
+ */
+export async function sendNewToolsEmail(to: string, name: string, creditBalance: number) {
+  const credits = Math.max(0, creditBalance || 0);
+  const creditLine =
+    credits > 0
+      ? `You still have <strong style="color:#7c3aed;">${credits.toLocaleString()} credits</strong> waiting in your account — enough for your next video today.`
+      : `Sign in and we'll make sure you have credits to try them.`;
+  return sendEmail(
+    to,
+    `${name}, new tools are live on iVideo Studio`,
+    `<div style="${baseStyle}"><div style="${card}">
+      <h2 style="margin:0 0 12px;color:#ededed;">New tools are live</h2>
+      <p style="color:#a1a1aa;line-height:1.6;">
+        Hi ${name}, since you last visited we've shipped a lot:
+      </p>
+      <ul style="color:#d4d4d8;line-height:1.8;padding-left:20px;">
+        <li><strong>Motion Control</strong> — paste a trending dance or move, apply it to your own character</li>
+        <li><strong>Lead Videos</strong> — drop a TikTok / Facebook link and reuse it as a reference</li>
+        <li><strong>Image-to-video</strong> — animate any photo into a cinematic clip</li>
+        <li><strong>AI Voiceover</strong> — 300+ voices, including South African English</li>
+      </ul>
+      <p style="color:#a1a1aa;line-height:1.6;">${creditLine}</p>
+      <p style="margin:24px 0;">
+        <a href="${getAppUrl()}/generate" style="${btn}">Try the new tools</a>
+      </p>
+      <p style="color:#71717a;font-size:13px;">
+        You're receiving this because you have an iVideo Studio account. Reply to this email if you'd rather not hear from us.
       </p>
     </div></div>`
   );

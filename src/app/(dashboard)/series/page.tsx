@@ -1,0 +1,311 @@
+"use client";
+
+// ============================================
+// SERIES STUDIO — the shelf
+// ============================================
+// A creator's series live here. Starting one is free and takes four fields,
+// because the moment somebody has to think about credits they stop thinking
+// about the story.
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageTransition } from "@/components/ui/motion";
+import { Clapperboard, Plus, ArrowRight, Loader2 } from "lucide-react";
+
+import { SERIES_LOCALES, localeOrDefault } from "@/lib/series/locales";
+
+// The three anyone here is most likely to want, one tap away. The other 137
+// are behind a search box, because a wall of 140 buttons is not a choice.
+// English first, and the default. It is what most creators here actually
+// pick, and it is the language the writing and the voices come out cleanest
+// in — a home-language drama is a deliberate choice, not the fallback.
+const QUICK_LANGUAGES = ["en-ZA", "zu-ZA", "af-ZA"];
+
+const GENRES = ["Drama", "Family", "Township comedy", "Crime", "Romance", "Thriller"];
+
+interface SeriesRow {
+  id: string;
+  title: string;
+  language: string;
+  genre: string | null;
+  character_name: string | null;
+  episode_count: number;
+}
+
+export default function SeriesShelfPage() {
+  const router = useRouter();
+  const [series, setSeries] = useState<SeriesRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+
+  const [title, setTitle] = useState("");
+  const [language, setLanguage] = useState("en-ZA");
+  const [moreLanguages, setMoreLanguages] = useState(false);
+  const [languageQuery, setLanguageQuery] = useState("");
+  const [genre, setGenre] = useState("Drama");
+  const [logline, setLogline] = useState("");
+  const [characterName, setCharacterName] = useState("");
+  const [characterDescription, setCharacterDescription] = useState("");
+
+  useEffect(() => {
+    fetch("/api/series")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.series && setSeries(d.series))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function create() {
+    if (!title.trim()) {
+      setError("Give your series a name");
+      return;
+    }
+    setCreating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, language, genre, logline, characterName, characterDescription }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not start your series");
+        return;
+      }
+      router.push(`/series/${data.id}`);
+    } catch {
+      setError("Could not start your series. Check your connection and try again.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <PageTransition className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2">
+          <Clapperboard className="w-6 h-6 text-violet-400" />
+          Series Studio
+        </h1>
+        <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+          Make a drama in your own language, episode after episode. Same characters, a story that
+          carries on, and English subtitles so everyone can follow it. English, isiZulu,
+          Afrikaans and 137 more.
+        </p>
+      </div>
+
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/60 via-[#12121a] to-cyan-950/30 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10"
+        >
+          <div className="flex items-center gap-2">
+            <Plus className="w-5 h-5 text-violet-300" />
+            <span className="text-lg font-bold text-white">Start a series</span>
+          </div>
+          <p className="text-sm text-zinc-300 mt-1">
+            Four questions, then we write your first episode. Free until you make the video.
+          </p>
+        </button>
+      )}
+
+      {open && (
+        <Card>
+          <CardContent className="p-5 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-zinc-400">What is it called?</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Umuzi Wethu"
+                className="mt-1 w-full rounded-xl bg-white/[0.04] border border-white/[0.10] px-3 py-2.5 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-zinc-400">Which language do they speak?</label>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {QUICK_LANGUAGES.map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => setLanguage(id)}
+                    className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                      language === id
+                        ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
+                        : "border-white/[0.10] bg-white/[0.03] text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {localeOrDefault(id).label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setMoreLanguages((v) => !v)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                    !QUICK_LANGUAGES.includes(language)
+                      ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
+                      : "border-white/[0.10] bg-white/[0.03] text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {QUICK_LANGUAGES.includes(language)
+                    ? `${SERIES_LOCALES.length - QUICK_LANGUAGES.length} more…`
+                    : localeOrDefault(language).label}
+                </button>
+              </div>
+
+              {moreLanguages && (
+                <div className="mt-2 rounded-xl border border-white/[0.10] bg-white/[0.02] p-2">
+                  <input
+                    value={languageQuery}
+                    onChange={(e) => setLanguageQuery(e.target.value)}
+                    placeholder="Search 140 languages…"
+                    className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                  />
+                  <div className="mt-2 max-h-56 overflow-y-auto">
+                    {SERIES_LOCALES.filter((l) =>
+                      l.label.toLowerCase().includes(languageQuery.trim().toLowerCase())
+                    )
+                      .slice(0, 60)
+                      .map((l) => (
+                        <button
+                          key={l.id}
+                          onClick={() => {
+                            setLanguage(l.id);
+                            setMoreLanguages(false);
+                            setLanguageQuery("");
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                            language === l.id
+                              ? "bg-violet-500/20 text-violet-200"
+                              : "text-zinc-300 hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          {l.label}
+                          <span className="text-[10px] text-zinc-600 ml-2">{l.group}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] text-zinc-500 mt-1.5">
+                Your characters speak this, with their mouths matched to it. English subtitles are
+                written either way.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-zinc-400">What kind of story?</label>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {GENRES.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGenre(g)}
+                    className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                      genre === g
+                        ? "border-cyan-500/60 bg-cyan-500/15 text-cyan-200"
+                        : "border-white/[0.10] bg-white/[0.03] text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-zinc-400">Who is it about?</label>
+                <input
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  placeholder="Nomsa"
+                  className="mt-1 w-full rounded-xl bg-white/[0.04] border border-white/[0.10] px-3 py-2.5 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-400">What do they look like?</label>
+                <input
+                  value={characterDescription}
+                  onChange={(e) => setCharacterDescription(e.target.value)}
+                  placeholder="28, short natural hair, red jacket"
+                  className="mt-1 w-full rounded-xl bg-white/[0.04] border border-white/[0.10] px-3 py-2.5 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-500 -mt-1">
+              Describe them once. We reuse these exact words in every episode so their face stays the same.
+            </p>
+
+            <div>
+              <label className="text-xs font-medium text-zinc-400">
+                What is going on? <span className="text-zinc-600">(optional)</span>
+              </label>
+              <textarea
+                value={logline}
+                onChange={(e) => setLogline(e.target.value)}
+                rows={2}
+                placeholder="A nurse in Soweto discovers her brother has been lying about where the money comes from."
+                className="mt-1 w-full rounded-xl bg-white/[0.04] border border-white/[0.10] px-3 py-2.5 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none resize-none"
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-400">{error}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={create}
+                disabled={creating}
+                className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-3 font-semibold text-white disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {creating ? "Starting…" : "Start the series"}
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-xl border border-white/[0.10] px-4 py-3 text-zinc-400 hover:text-zinc-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-zinc-500">Loading your series…</p>
+      ) : series.length > 0 ? (
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-300 mb-3">Your series</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {series.map((s) => (
+              <a
+                key={s.id}
+                href={`/series/${s.id}`}
+                className="group rounded-2xl border border-white/[0.10] bg-white/[0.03] p-4 transition-all hover:-translate-y-0.5 hover:border-violet-500/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-zinc-100">{s.title}</h3>
+                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-300 shrink-0 mt-0.5" />
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">
+                  {localeOrDefault(s.language).label}
+                  {s.genre ? ` · ${s.genre}` : ""}
+                  {s.character_name ? ` · ${s.character_name}` : ""}
+                </p>
+                <p className="text-xs text-violet-300 mt-2">
+                  {s.episode_count === 0
+                    ? "No episodes yet"
+                    : `${s.episode_count} episode${s.episode_count > 1 ? "s" : ""}`}
+                </p>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </PageTransition>
+  );
+}

@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sparkles, Film, Wand2, Share2, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStore } from "@/hooks/use-store";
 
 const TOUR_KEY = "genesis-onboarding-complete";
 
 const STEPS = [
   {
     icon: Sparkles,
-    title: "Welcome to Genesis Studio!",
-    description: "You have 100 free credits to start creating AI videos. Let's make your first one in 90 seconds.",
+    title: "Welcome to iVideo Studio!",
+    description: "Let's make your first AI video in 90 seconds.",
     action: "Let's Go!",
   },
   {
@@ -39,14 +40,20 @@ export function OnboardingTour() {
   const [visible, setVisible] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const user = useStore((s) => s.user);
+
+  // The tour is for a brand-new free account. Owners and paying customers
+  // already know the product; showing them "you have 100 free credits" is
+  // wrong on both counts.
+  const isNewFreeUser = !!user && user.plan === "free" && !user.isOwner;
 
   useEffect(() => {
     // Only show on dashboard, only if not completed
-    if (pathname === "/dashboard" && !localStorage.getItem(TOUR_KEY)) {
+    if (pathname === "/dashboard" && isNewFreeUser && !localStorage.getItem(TOUR_KEY)) {
       const timer = setTimeout(() => setVisible(true), 800);
       return () => clearTimeout(timer);
     }
-  }, [pathname]);
+  }, [pathname, isNewFreeUser]);
 
   const complete = () => {
     localStorage.setItem(TOUR_KEY, "true");
@@ -67,10 +74,14 @@ export function OnboardingTour() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  if (!visible || !isNewFreeUser) return null;
 
   const current = STEPS[step];
   const Icon = current.icon;
+  const description =
+    step === 0 && user
+      ? `You have ${user.creditBalance.toLocaleString()} credits to start creating AI videos. ${current.description}`
+      : current.description;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -106,7 +117,7 @@ export function OnboardingTour() {
 
         {/* Content */}
         <h2 className="text-xl font-bold text-zinc-100 mb-2">{current.title}</h2>
-        <p className="text-sm text-zinc-400 leading-relaxed mb-6">{current.description}</p>
+        <p className="text-sm text-zinc-400 leading-relaxed mb-6">{description}</p>
 
         {/* Actions */}
         <div className="flex items-center justify-between">

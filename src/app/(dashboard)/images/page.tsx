@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { GenerationOrb } from "@/components/ui/lazy-video";
 import {
@@ -109,6 +110,7 @@ function ImageCard({ url, index, onDownload }: { url: string; index: number; onD
 export default function ImagesPage() {
   const { user, updateCreditBalance, isInitialized } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
 
   const isLoading = !isInitialized;
   const [prompt, setPrompt] = useState("");
@@ -163,8 +165,7 @@ export default function ImagesPage() {
         setGenerationError("No images were generated. Your credits have been refunded.");
         toast("No images generated. Credits refunded.", "error");
       } else {
-        setGenerationError(data.error || "Generation failed. Please try again.");
-        toast(data.error || "Generation failed", "error");
+        setGenerationError(reportApiError(res, data, "Generation failed. Please try again."));
       }
     } catch {
       setGenerationError("Network error. Please check your connection and try again.");

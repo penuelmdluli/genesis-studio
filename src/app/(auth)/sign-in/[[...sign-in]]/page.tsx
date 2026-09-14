@@ -86,14 +86,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
             </div>
           )}
 
+          {/* SignInForm carries its own "Don't have an account?" line — a
+              second one here meant the page asked the same question twice. */}
           <SignInForm />
-
-          <p className="text-center text-xs text-zinc-400 mt-6">
-            Don&apos;t have an account?{" "}
-            <Link href="/sign-up" className="text-violet-400 hover:text-violet-300 font-medium">
-              Sign up free
-            </Link>
-          </p>
         </div>
       </div>
     </div>

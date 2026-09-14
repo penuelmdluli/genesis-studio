@@ -46,7 +46,7 @@ const PAGES: Record<string, FacebookPage> = {
 
 // ── Marketing Descriptions ──
 // Every post has: emotional hook → content → marketing CTA → link → hashtags
-// The goal: viewers engage with the content AND discover Genesis Studio
+// The goal: viewers engage with the content AND discover iVideo Studio
 
 const HOOKS = [
   "🚨 You won't believe this was made by AI",
@@ -253,10 +253,10 @@ ${cta}
 const VIDEO_TITLES = [
   "🚨 This was made by AI in 60 seconds",
   "🔥 AI just created this — ivideostudio.ai",
-  "⚡ Made with Genesis Studio — try it FREE",
+  "⚡ Made with iVideo Studio — try it FREE",
   "💥 AI Video Generation is HERE",
   "🤯 60 seconds. One prompt. This is the result.",
-  "🎬 Genesis Studio — AI videos for creators",
+  "🎬 iVideo Studio — AI videos for creators",
   "🚀 The future of content creation is African-made",
   "👀 This entire video is AI-generated",
 ];

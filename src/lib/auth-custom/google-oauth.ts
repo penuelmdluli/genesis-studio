@@ -11,7 +11,9 @@ const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 function getConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+  // Use runtime-only APP_URL first — NEXT_PUBLIC_APP_URL gets inlined at build
+  // time from .env.local (localhost) which breaks OAuth in production.
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
   const redirectUri = `${appUrl}/api/auth/google/callback`;
 
   if (!clientId || !clientSecret) {

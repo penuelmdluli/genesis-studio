@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Fraud Prevention & Rate Limiting
+ * iVideo Studio — Fraud Prevention & Rate Limiting
  * Detects and blocks: stolen cards, account farming, API abuse.
  */
 

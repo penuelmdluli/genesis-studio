@@ -8,6 +8,7 @@ import { getDb } from "@/lib/db-driver";
 
 const SESSION_COOKIE_NAME = "gs_session";
 const SESSION_DURATION_DAYS = 7;
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour of inactivity → session expires
 
 // HMAC key for signing session tokens
 let _signingKey: CryptoKey | null = null;
@@ -55,6 +56,7 @@ export async function createSession(user: {
     id: sessionId,
     user_id: user.id,
     expires_at: expiresAt.toISOString(),
+    last_active_at: new Date().toISOString(),
   });
 
   // Create signed token
@@ -71,7 +73,7 @@ export async function createSession(user: {
 
 /**
  * Validate a session token and return the payload.
- * Returns null if invalid or expired.
+ * Returns null if invalid, expired, or inactive too long.
  */
 export async function validateSession(
   token: string
@@ -79,22 +81,37 @@ export async function validateSession(
   const payload = await verifyToken(token);
   if (!payload) return null;
 
-  // Check expiry
+  // Check absolute expiry (7-day max lifetime)
   if (Date.now() > payload.exp) {
-    // Clean up expired session
     await destroySession(payload.sessionId);
     return null;
   }
 
-  // Verify session still exists in D1
+  // Verify session still exists in D1 and check inactivity
   const db = getDb();
   const { data: session } = await db
     .from("sessions")
-    .select("id")
+    .select("id, last_active_at")
     .eq("id", payload.sessionId)
     .single();
 
   if (!session) return null;
+
+  // Check inactivity timeout
+  const lastActive = session.last_active_at
+    ? new Date(session.last_active_at).getTime()
+    : 0;
+  if (Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
+    await destroySession(payload.sessionId);
+    return null;
+  }
+
+  // Touch session — update last_active_at (fire-and-forget)
+  db.from("sessions")
+    .update({ last_active_at: new Date().toISOString() })
+    .eq("id", payload.sessionId)
+    .then(() => {})
+    .catch(() => {});
 
   return payload;
 }

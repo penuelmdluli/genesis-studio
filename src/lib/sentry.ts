@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Error Monitoring
+ * iVideo Studio — Error Monitoring
  * Console-based error tracking. Cloudflare Logpush captures these logs.
  */
 

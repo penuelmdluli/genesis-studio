@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Auto Quality Scoring via Claude Vision.
+ * iVideo Studio — Auto Quality Scoring via Claude Vision.
  * Analyzes a generated video thumbnail to estimate quality.
  * If quality is below threshold, suggests a retry with a different seed.
  */

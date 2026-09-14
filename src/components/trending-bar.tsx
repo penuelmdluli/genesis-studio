@@ -20,6 +20,7 @@ interface TrendingBarProps {
 }
 
 const CATEGORY_ICONS: Record<string, typeof Flame> = {
+  story: Flame,
   music: Music,
   dance: Zap,
   challenge: Sparkles,
@@ -29,6 +30,7 @@ const CATEGORY_ICONS: Record<string, typeof Flame> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
+  facebook: "bg-blue-500/15 text-blue-300 border-blue-500/25",
   tiktok: "bg-pink-500/20 text-pink-400",
   twitter: "bg-blue-500/20 text-blue-400",
   news: "bg-amber-500/20 text-amber-400",

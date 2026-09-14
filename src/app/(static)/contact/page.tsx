@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "Contact — Genesis Studio",
-  description: "Get in touch with the Genesis Studio team.",
+  title: "Contact — iVideo Studio",
+  description: "Get in touch with the iVideo Studio team.",
 };
 
 export default function ContactPage() {
@@ -20,11 +20,16 @@ export default function ContactPage() {
                 hello@ivideostudio.ai
               </a>
             </div>
+            {/* The X account linked here (@genesisstudio) returns 404, so a
+                customer trying to reach us landed on nothing. Support email is
+                the channel that actually works — see the open tickets in
+                /admin/support. Restore this card when the account exists. */}
             <div className="p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">
-              <h3 className="text-lg font-semibold text-white mb-2">Social</h3>
-              <a href="https://twitter.com/genesisstudio" className="text-violet-400 hover:text-violet-300" target="_blank" rel="noopener noreferrer">
-                @genesisstudio on X
-              </a>
+              <h3 className="text-lg font-semibold text-white mb-2">Support</h3>
+              <p className="text-sm text-zinc-400">
+                Signed in? Use the chat bubble in the app — it reaches us directly
+                and we can see your account.
+              </p>
             </div>
           </div>
           <div className="mt-8 p-6 rounded-2xl bg-white/[0.05] border border-white/[0.10]">

@@ -32,7 +32,7 @@ docker push YOUR_REGISTRY/genesis-comfyui-wan22:latest
   - **Start Command**: `bash /download_models.sh && bash /start.sh`
 - Copy the Endpoint ID
 
-### 4. Configure Genesis Studio
+### 4. Configure iVideo Studio
 ```bash
 # .env.local
 RUNPOD_COMFYUI_ENDPOINT_ID=<endpoint-id>

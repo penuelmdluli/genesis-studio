@@ -128,6 +128,39 @@ export async function refundCredits(
   jobId: string,
   description: string
 ): Promise<number> {
+  // Escrow-backed jobs settle through their hold, which is guarded and can
+  // only resolve once. If that succeeds the credits are already back and a
+  // legacy refund on top would double-credit the user.
+  if (jobId) {
+    try {
+      const { releaseHoldForJob } = await import("./credit-escrow");
+      if (await releaseHoldForJob(jobId, description)) {
+        return await getCreditBalance(userId);
+      }
+    } catch (err) {
+      console.error(`[CREDITS] Hold release failed for job ${jobId}:`, err);
+    }
+  }
+
+  // Legacy path, for jobs created before escrow. It had no idempotency guard
+  // at all, and two actors refund on the same 30-minute timeout
+  // (cron/check-stuck-jobs and GET /api/jobs/[jobId]) — a user polling while
+  // the cron swept could be credited twice. Production shows 104 refunds
+  // against 117 failures. One refund per job, enforced here.
+  if (jobId) {
+    const { data: already } = await getSupabase()
+      .from("credit_transactions")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("type", "generation_refund")
+      .limit(1);
+
+    if (already && already.length > 0) {
+      console.warn(`[CREDITS] Job ${jobId} already refunded — ignoring duplicate`);
+      return await getCreditBalance(userId);
+    }
+  }
+
   const { data: user, error: userError } = await getSupabase()
     .from("users")
     .select("credit_balance")

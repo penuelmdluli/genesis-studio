@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FEATURES } from "@/lib/constants";
+import { envString } from "@/lib/env";
 
 /**
  * Returns which features have their RunPod endpoints configured.
@@ -15,7 +16,7 @@ export async function GET() {
       status[feature.id] = true;
       continue;
     }
-    const endpointValue = process.env[envKey];
+    const endpointValue = envString(envKey);
     status[feature.id] = !!endpointValue && endpointValue.length > 0;
   }
 
@@ -31,8 +32,21 @@ export async function GET() {
     console.warn("[features/status] Motion provider probe failed:", err);
   }
 
+  // Per-route availability that accounts for the hosted providers, not just
+  // RunPod endpoint variables. Without this the menu advertised every
+  // FAL-backed tool — thumbnails, upscaler, captions, product ads, music
+  // video, avatar — as working while FAL sat locked behind a 403.
+  let routes: Record<string, { available: boolean; reason?: string }> = {};
+  try {
+    const { getAllFeatureStatus } = await import("@/lib/feature-availability");
+    routes = await getAllFeatureStatus();
+  } catch (err) {
+    console.warn("[features/status] Route availability failed:", err);
+  }
+
   return NextResponse.json({
     features: status,
+    routes,
     motion: { effectsAvailable: motionEffectsAvailable },
   });
 }

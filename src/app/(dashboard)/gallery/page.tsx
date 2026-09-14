@@ -9,6 +9,7 @@ import { VideoPlayer } from "@/components/ui/video-player";
 import { PageTransition, StaggerGroup, StaggerItem, motion } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import { GenesisLoader } from "@/components/ui/genesis-loader";
 import {
   Film,
@@ -26,6 +27,8 @@ import {
   Sparkles,
   RefreshCw,
   Share2,
+  Type,
+  Globe,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 
@@ -33,8 +36,9 @@ type SortKey = "newest" | "oldest" | "name";
 type FormatFilter = "all" | "standard" | "reel" | "audio";
 
 export default function GalleryPage() {
-  const { user, videos, activeJobs, removeVideo, isInitialized } = useStore();
+  const { user, videos, activeJobs, removeVideo, setVideos, isInitialized } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -74,7 +78,32 @@ export default function GalleryPage() {
     e.stopPropagation();
     toast("Preparing download...", "info");
     try {
-      const res = await fetch(url);
+      const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}download=1`);
+
+      // A free account is offered the trade rather than a failure: take the
+      // copy with our logo on it, or upgrade and take it clean.
+      if (res.status === 402) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.brandedDownload) {
+          toast("Free downloads carry the iVideo Studio logo — adding it now.", "info");
+          const id = url.split("/").pop() || "";
+          const branded = await fetch(`/api/videos/${id}/brand`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "studio" }),
+          });
+          const bd = await branded.json().catch(() => ({}));
+          if (!branded.ok || !bd?.videoId) {
+            reportApiError(branded, bd, "Could not prepare that download.");
+            return;
+          }
+          window.location.href = `/api/videos/${bd.videoId}?download=1`;
+          return;
+        }
+        reportApiError(res, data, "Upgrade to download this.");
+        return;
+      }
+
       if (!res.ok) throw new Error(`Download failed: ${res.status}`);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -93,9 +122,53 @@ export default function GalleryPage() {
     }
   };
 
+  // Stamp the creator's own logo on a finished video. Saves a branded copy —
+
+  // the original stays untouched so a wrong corner is not destructive.
+
+  const [brandingId, setBrandingId] = useState<string | null>(null);
+
+  const handleBrand = async (videoId: string, mode: "own" | "studio" = "own") => {
+
+    if (brandingId) return;
+    setBrandingId(videoId);
+
+    try {
+      const res = await fetch(`/api/videos/${videoId}/brand`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+
+        reportApiError(res, data, "Could not add your branding.");
+        return;
+      }
+      toast("Branded copy saved to your gallery.", "success");
+      setSelectedVideo(null);
+
+      // Pull the gallery again so the branded copy appears without a reload.
+      try {
+        const r = await fetch("/api/videos");
+        if (r.ok) {
+          const j = await r.json();
+          if (Array.isArray(j.videos)) setVideos(j.videos);
+        }
+      } catch {
+        /* the copy is saved; it will appear on next load */
+      }
+    } catch {
+      toast("Network error. Please try again.", "error");
+    } finally {
+      setBrandingId(null);
+    }
+  };
+
+
   const handleShare = async (video: { id: string; title: string; prompt: string; url: string }) => {
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/explore/${video.id}`;
-    const shareText = `Check out this AI video: "${video.title}" — Made with Genesis Studio`;
+    const shareText = `Check out this AI video: "${video.title}" — Made with iVideo Studio`;
 
     // Native share on mobile (opens WhatsApp, IG, etc.)
     if (typeof navigator !== "undefined" && navigator.share) {
@@ -493,6 +566,52 @@ export default function GalleryPage() {
                   <Share2 className="w-4 h-4" />
                   Share
                 </button>
+                {/* Finish the job here. A clip usually needs sound and
+                    captions before it is postable, and making someone
+                    download it and upload it again to a different page is
+                    where creators gave up. */}
+                <a
+                  href={`/tools?tool=add-sound&videoId=${currentVideo.id}&title=${encodeURIComponent(currentVideo.title)}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  Add sound
+                </a>
+                <button
+                  onClick={() => handleBrand(currentVideo.id)}
+                  disabled={brandingId === currentVideo.id}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-50 text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {brandingId === currentVideo.id ? "Adding…" : "Add my logo"}
+                </button>
+                {/* Ours, not theirs. Only the operator sees this — it stamps
+                    iVideo Studio branding on a clip we are about to post as
+                    marketing, and never appears on a customer's account. */}
+                {user?.isOwner && (
+                  <button
+                    onClick={() => handleBrand(currentVideo.id, "studio")}
+                    disabled={brandingId === currentVideo.id}
+                    className="px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/30 hover:bg-violet-500/25 disabled:opacity-50 text-violet-200 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {brandingId === currentVideo.id ? "Adding…" : "Brand for marketing"}
+                  </button>
+                )}
+                <a
+                  href={`/captions?videoId=${currentVideo.id}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Type className="w-4 h-4" />
+                  Captions
+                </a>
+                <a
+                  href={`/tools?tool=dub&videoId=${currentVideo.id}&title=${encodeURIComponent(currentVideo.title)}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95"
+                >
+                  <Globe className="w-4 h-4" />
+                  Translate
+                </a>
                 <button
                   onClick={(e) => handlePostToPages(e, currentVideo.id)}
                   className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 active:scale-95 shadow-lg shadow-blue-600/20"
@@ -502,7 +621,7 @@ export default function GalleryPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with Genesis Studio 🎬\n\nhttps://ivideostudio.ai/explore/${currentVideo.id}`);
+                    const text = encodeURIComponent(`Check out this AI video: "${currentVideo.title}" — Made with iVideo Studio 🎬\n\nhttps://ivideostudio.ai/explore/${currentVideo.id}`);
                     window.open(`https://wa.me/?text=${text}`, "_blank");
                     toast("Opening WhatsApp...", "info");
                   }}
@@ -711,7 +830,7 @@ function VideoCard({
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/40 to-cyan-500/30 flex items-center justify-center mb-2 border border-white/[0.12]">
                 <span className="text-sm font-bold text-white/60">G</span>
               </div>
-              <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">Genesis Studio</span>
+              <span className="text-[10px] text-white/20 font-medium tracking-wider uppercase">iVideo Studio</span>
             </div>
             <div className="absolute inset-0 overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-[shimmer_3s_infinite]" />

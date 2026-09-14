@@ -50,7 +50,7 @@ export function SignInForm() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-white">Welcome back</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Sign in to your Genesis Studio account
+          Sign in to your iVideo Studio account
         </p>
       </div>
 

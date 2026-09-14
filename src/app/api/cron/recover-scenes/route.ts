@@ -86,7 +86,9 @@ export async function GET(req: Request) {
   const supabase = getDb();
 
   // Find stuck processing scenes — with a job_id, older than 3 min
-  const cutoff = new Date(Date.now() - MIN_AGE_MS).toISOString();
+  // SQL-formatted created_at vs ISO cutoff string-compares wrongly on the
+  // same day (" " < "T"); format the cutoff the way D1 stores the column.
+  const cutoff = new Date(Date.now() - MIN_AGE_MS).toISOString().replace("T", " ").slice(0, 19);
   const { data: scenes, error } = await supabase
     .from("production_scenes")
     .select("id, production_id, scene_number, status, runpod_job_id, provider, model_id, created_at")

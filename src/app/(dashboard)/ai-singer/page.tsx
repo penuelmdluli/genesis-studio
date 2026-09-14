@@ -72,6 +72,8 @@ const PROGRESS_STEPS = [
   "Finalizing & rendering",
 ];
 
+const SINGER_JOB_KEY = "ai_singer_active_job";
+
 const LYRICS_PLACEHOLDER = `[Verse 1]
 Walking through the city lights tonight
 Every shadow dancing, feeling right
@@ -124,7 +126,7 @@ export default function AiSingerPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const credits = user?.creditBalance ?? 0;
-  const creditCost = 30 + duration;
+  const creditCost = 30 + duration * 10;
   const hasEnoughCredits = user?.isOwner || credits >= creditCost;
   const hasFace = !!faceFile;
   const hasSong = songSource === "lyrics" || songSource === "ai-generate" ? lyrics.trim().length > 20 : !!(songFile || songUrl);
@@ -136,6 +138,53 @@ export default function AiSingerPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
+  }, []);
+
+  // ─── Restore in-flight job on mount (survives refresh) ───────────
+
+  useEffect(() => {
+    const savedJobId = localStorage.getItem(SINGER_JOB_KEY);
+    if (!savedJobId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/jobs/${savedJobId}`);
+        if (!res.ok) {
+          localStorage.removeItem(SINGER_JOB_KEY);
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+
+        setJobId(savedJobId);
+
+        if (data.status === "completed" && data.outputVideoUrl) {
+          setJobStatus("completed");
+          setOutputVideoUrl(data.outputVideoUrl);
+          setIsGenerating(false);
+          localStorage.removeItem(SINGER_JOB_KEY);
+        } else if (data.status === "failed") {
+          setJobStatus("failed");
+          setError(data.errorMessage || "Generation failed");
+          setIsGenerating(false);
+          localStorage.removeItem(SINGER_JOB_KEY);
+        } else {
+          // Still processing — restore UI and resume polling
+          const p = data.progress || 0;
+          if (p >= 50) setJobStatus("creating_lipsync");
+          else setJobStatus("generating_song");
+          setIsGenerating(true);
+          progress.start(PROGRESS_STEPS);
+          startPolling(savedJobId);
+        }
+      } catch {
+        // Network blip — leave key in place, next mount retries
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Sync progress with job status ────────────────────────────────
@@ -257,6 +306,7 @@ export default function AiSingerPage() {
           setJobStatus("completed");
           setOutputVideoUrl(data.outputVideoUrl);
           setIsGenerating(false);
+          localStorage.removeItem(SINGER_JOB_KEY);
           toast("Your AI Singer video is ready!", "success");
           addNotification({
             type: "success",
@@ -264,16 +314,32 @@ export default function AiSingerPage() {
             message: "Your music video with lip-sync is done. View it now.",
             link: "/ai-singer",
           });
+
+          // Browser notification (background tab)
+          if (typeof window !== "undefined" && Notification.permission === "granted") {
+            new Notification("iVideo Studio", {
+              body: "Your AI Singer video is ready!",
+              icon: "/icon-192.png",
+            });
+          }
         } else if (data.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
           setJobStatus("failed");
           setError(data.errorMessage || "Generation failed");
           setIsGenerating(false);
-          toast("Generation failed", "error");
+          localStorage.removeItem(SINGER_JOB_KEY);
+          toast("Generation failed. Credits refunded.", "error");
+          addNotification({
+            type: "error",
+            title: "AI Singer failed",
+            message: "Something went wrong. Your credits have been refunded.",
+            link: "/ai-singer",
+          });
         } else if (data.status === "processing") {
-          // Map intermediate statuses
-          if (data.stage === "lipsync") setJobStatus("creating_lipsync");
-          else if (data.stage === "finalizing") setJobStatus("finalizing");
+          // Map progress stages from the cron pipeline
+          const p = data.progress || 0;
+          if (p >= 50) setJobStatus("creating_lipsync");
+          else if (p >= 10) setJobStatus("generating_song");
         }
       } catch {
         // Network blip — keep polling
@@ -331,6 +397,7 @@ export default function AiSingerPage() {
       }
 
       setJobId(data.jobId);
+      localStorage.setItem(SINGER_JOB_KEY, data.jobId);
       updateCreditBalance(credits - creditCost);
       toast("AI Singer generation started!", "info");
       startPolling(data.jobId);
@@ -353,6 +420,7 @@ export default function AiSingerPage() {
     setIsGenerating(false);
     progress.reset();
     if (pollRef.current) clearInterval(pollRef.current);
+    localStorage.removeItem(SINGER_JOB_KEY);
   };
 
   const isActive = isGenerating && jobStatus !== "idle" && jobStatus !== "completed" && jobStatus !== "failed";

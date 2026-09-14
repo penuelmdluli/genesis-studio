@@ -146,8 +146,12 @@ describe("FPS_OPTIONS", () => {
 });
 
 describe("MODEL_ACCESS", () => {
-  it("free plan has wan-2.2, seedance-1.5, and mimic-motion", () => {
-    expect(MODEL_ACCESS.free).toEqual(["wan-2.2", "seedance-1.5", "mimic-motion"]);
+  // seedance-1.5 was removed from free on 2026-09-09: 59 failed / 7 completed
+  // in production, the worst path in the product, and it was what every new
+  // signup landed on first. It stays on the paid tiers.
+  it("free plan has wan-2.2 and mimic-motion, and never seedance", () => {
+    expect(MODEL_ACCESS.free).toEqual(["wan-2.2", "mimic-motion"]);
+    expect(MODEL_ACCESS.free).not.toContain("seedance-1.5");
   });
 
   it("creator has 8, pro has 10, studio has 10 models", () => {

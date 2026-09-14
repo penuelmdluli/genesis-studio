@@ -17,5 +17,5 @@
 
 ## Verification
 - Test post appears on the Facebook page
-- Page shows up in the Genesis Studio dashboard under connected pages
+- Page shows up in the iVideo Studio dashboard under connected pages
 - Token expiry is set to 60+ days (long-lived tokens)

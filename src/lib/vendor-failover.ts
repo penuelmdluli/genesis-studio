@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Vendor Failover System
+ * iVideo Studio — Vendor Failover System
  * Routes video generation across multiple providers with automatic fallback.
  * Priority: FAL.AI → RunPod → Replicate
  */

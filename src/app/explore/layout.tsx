@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata: Metadata = {
-  title: "Explore AI Videos — Genesis Studio",
+  title: "Explore AI Videos — iVideo Studio",
   description:
     "Watch stunning AI-generated videos from our community. Get inspired and create your own for free.",
   openGraph: {
-    title: "Explore AI Videos — Genesis Studio",
+    title: "Explore AI Videos — iVideo Studio",
     description: "Watch stunning AI-generated videos from our community.",
     type: "website",
   },

@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — API Budget Protection
+ * iVideo Studio — API Budget Protection
  *
  * Tracks daily spend per service and blocks requests when budgets are exceeded.
  * Uses in-memory counters (resets on deploy / restart) as a circuit breaker.

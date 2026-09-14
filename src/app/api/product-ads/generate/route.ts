@@ -1,3 +1,4 @@
+import { synthesiseSpeech } from "@/lib/edge-tts";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
@@ -428,9 +429,6 @@ export async function POST(req: NextRequest) {
       if (voiceoverScript) {
         console.log("[PRODUCT-ADS] Generating voiceover TTS...");
         try {
-          const { MsEdgeTTS, OUTPUT_FORMAT } = await import("msedge-tts");
-          const tts = new MsEdgeTTS();
-
           const voiceMap: Record<string, string> = {
             "voice-aria": "en-US-AriaNeural",
             "voice-james": "en-US-GuyNeural",
@@ -440,22 +438,13 @@ export async function POST(req: NextRequest) {
             "voice-marcus": "en-US-TonyNeural",
             "voice-naledi": "en-ZA-LeahNeural",
             "voice-thabo": "en-ZA-LukeNeural",
+            "voice-thando": "zu-ZA-ThandoNeural",
+              "voice-themba": "zu-ZA-ThembaNeural",
+              "voice-adri": "af-ZA-AdriNeural",
+              "voice-willem": "af-ZA-WillemNeural",
           };
           const ttsVoice = voiceMap[voiceId || ""] || "en-US-AriaNeural";
-          await tts.setMetadata(ttsVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-
-          const { audioStream } = tts.toStream(voiceoverScript);
-          const chunks: Buffer[] = [];
-          for await (const chunk of audioStream) {
-            if (Buffer.isBuffer(chunk)) {
-              chunks.push(chunk);
-            } else if (chunk instanceof Uint8Array) {
-              chunks.push(Buffer.from(chunk));
-            } else if (chunk) {
-              chunks.push(Buffer.from(chunk as ArrayBuffer));
-            }
-          }
-          const audioBuffer = Buffer.concat(chunks);
+          const audioBuffer = Buffer.from(await synthesiseSpeech(voiceoverScript, ttsVoice));
 
           if (audioBuffer.length > 0) {
             // Upload TTS audio to R2

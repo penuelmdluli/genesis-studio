@@ -29,11 +29,21 @@ export function UserButton() {
 
   return (
     <div className="relative" ref={ref}>
+      {/* A bare avatar gave no hint that it opened anything, which is why
+          people could not find Sign out. The ring and caret say "menu". */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-xs font-medium text-white transition hover:bg-violet-500"
-        title={user.name}
+        className="relative flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-xs font-medium text-white transition hover:bg-violet-500 ring-1 ring-white/20 hover:ring-white/40"
+        title={`${user.name} — account menu`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
       >
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-zinc-800 ring-1 ring-white/20">
+          <svg viewBox="0 0 8 8" className="h-2 w-2 text-zinc-300" aria-hidden="true">
+            <path d="M1 2.5L4 5.5L7 2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}

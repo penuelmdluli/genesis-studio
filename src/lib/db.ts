@@ -65,7 +65,7 @@ export async function updateUserPlan(
   stripeSubscriptionId?: string
 ) {
   const creditLimits: Record<PlanId, number> = {
-    free: 50,
+    free: 100,
     creator: 500,
     pro: 2000,
     studio: 8000,
@@ -149,6 +149,12 @@ export async function updateJobStatus(
     gpuTime?: number;
     startedAt?: string;
     completedAt?: string;
+    // --- job lifecycle (migration 0006) ---
+    deadlineAt?: string;
+    creditHoldId?: string;
+    provider?: string;
+    errorCode?: string;
+    costUsd?: number;
   }
 ) {
   const updateData: Record<string, unknown> = {};
@@ -162,6 +168,11 @@ export async function updateJobStatus(
   if (updates.gpuTime) updateData.gpu_time = updates.gpuTime;
   if (updates.startedAt) updateData.started_at = updates.startedAt;
   if (updates.completedAt) updateData.completed_at = updates.completedAt;
+  if (updates.deadlineAt) updateData.deadline_at = updates.deadlineAt;
+  if (updates.creditHoldId) updateData.credit_hold_id = updates.creditHoldId;
+  if (updates.provider) updateData.provider = updates.provider;
+  if (updates.errorCode) updateData.error_code = updates.errorCode;
+  if (updates.costUsd !== undefined) updateData.cost_usd = updates.costUsd;
 
   const { error } = await getSupabase()
     .from("generation_jobs")
@@ -169,6 +180,28 @@ export async function updateJobStatus(
     .eq("id", jobId);
 
   if (error) throw new Error(`Failed to update job: ${error.message}`);
+
+  // Settling here rather than at each call site is deliberate: nine different
+  // places mark a job completed and seven mark one failed, and any one of them
+  // forgetting to settle would strand a user's credits. Reaching a terminal
+  // status IS the settlement event, so it belongs with the status write.
+  //
+  // Both calls are guarded and no-op when the job has no hold, so legacy jobs
+  // created before escrow are unaffected and double-calls are harmless.
+  if (updates.status === "completed" || updates.status === "failed") {
+    try {
+      const escrow = await import("./credit-escrow");
+      if (updates.status === "completed") {
+        await escrow.captureHoldForJob(jobId);
+      } else {
+        await escrow.releaseHoldForJob(jobId, updates.errorMessage || "Generation failed");
+      }
+    } catch (err) {
+      // A settlement failure must not roll back the status write — the job
+      // really did finish. The reaper picks up any hold left behind.
+      console.error(`[JOBS] Hold settlement failed for ${jobId}:`, err);
+    }
+  }
 }
 
 export async function getJob(jobId: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useApiError } from "@/hooks/use-api-error";
 import {
   Sparkles,
   Upload,
@@ -27,6 +29,8 @@ import {
   Link as LinkIcon,
   Clock,
   Download,
+  Bookmark,
+  Star,
 } from "lucide-react";
 import {
   FUN_EFFECTS,
@@ -54,7 +58,21 @@ import {
   type DanceStyle,
 } from "@/lib/sa-family";
 
-type MotionTab = "effects" | "upload" | "url";
+type MotionTab = "upload" | "url" | "leads";
+
+/** A saved trending clip from /lead-videos, already downloaded to our CDN. */
+interface LeadVideo {
+  id: string;
+  sourceUrl: string;
+  platform: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  videoUrl: string | null;
+  durationSec: number;
+  status: string;
+  timesUsed: number;
+  starred: boolean;
+}
 type MotionQuality = "standard" | "pro";
 type MotionModel = "kling-v3" | "kling-v2.6";
 
@@ -64,6 +82,8 @@ const MOTION_DURATIONS = [5, 10, 15, 20];
 export default function MotionControlPage() {
   const { user, addJob, updateCreditBalance, isInitialized, videos, activeJobs } = useStore();
   const { toast } = useToast();
+  const reportApiError = useApiError();
+  const searchParams = useSearchParams();
 
   const isLoading = !isInitialized;
 
@@ -72,7 +92,7 @@ export default function MotionControlPage() {
   const [motionVideoPreview, setMotionVideoPreview] = useState<string | null>(null);
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterImagePreview, setCharacterImagePreview] = useState<string | null>(null);
-  const [motionTab, setMotionTab] = useState<MotionTab>("effects");
+  const [motionTab, setMotionTab] = useState<MotionTab>("upload");
   // Fun effects and prompt-only motion run on Kling, which is a paid hosted
   // service; reference-video motion runs on our own GPU. When the hosted
   // balance is dry the Kling modes cannot run at all, so the page hides them
@@ -81,6 +101,13 @@ export default function MotionControlPage() {
   const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
   const [effectCategoryFilter, setEffectCategoryFilter] = useState("All");
   const [referenceUrl, setReferenceUrl] = useState("");
+  // A lead is a trending clip already saved and downloaded on /lead-videos.
+  // Picking one skips the download step entirely — its videoUrl is on our own
+  // CDN, so it goes straight through as the reference video.
+  const [leads, setLeads] = useState<LeadVideo[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsLoaded, setLeadsLoaded] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<LeadVideo | null>(null);
   const [prompt, setPrompt] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -109,9 +136,13 @@ export default function MotionControlPage() {
   const [quality, setQuality] = useState<MotionQuality>("standard");
   const [duration, setDuration] = useState(10);
   const [enableAudio, setEnableAudio] = useState(false);
-  const [keepOriginalSound, setKeepOriginalSound] = useState(true);
+  // The reference reel's own soundtrack is no longer offered: lifting audio
+  // off someone else's post is a copyright problem, not a feature.
+  const [keepOriginalSound] = useState(false);
   const [seed, setSeed] = useState<number | undefined>(undefined);
-  const [orientation, setOrientation] = useState<"video" | "image">("video");
+  // Portrait by default: this is a phone-first audience posting to Reels
+  // and TikTok, and landscape was costing them a re-crop every time.
+  const [orientation, setOrientation] = useState<"video" | "image">("image");
 
   const motionVideoRef = useRef<HTMLInputElement>(null);
   const characterImageRef = useRef<HTMLInputElement>(null);
@@ -201,10 +232,7 @@ export default function MotionControlPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.motion) return;
-        const available = data.motion.effectsAvailable !== false;
-        setEffectsAvailable(available);
-        // Don't strand the user on a tab they cannot generate from.
-        if (!available) setMotionTab((tab) => (tab === "effects" ? "upload" : tab));
+        setEffectsAvailable(data.motion.effectsAvailable !== false);
       })
       .catch(() => {
         /* Availability is a hint — a failed probe shouldn't block the page. */
@@ -428,6 +456,7 @@ export default function MotionControlPage() {
       setMotionVideo(file);
       setSelectedEffect(null);
       setReferenceUrl("");
+      setSelectedLead(null);
       setMotionVideoPreview(url);
       setError(null);
     };
@@ -455,11 +484,71 @@ export default function MotionControlPage() {
     reader.readAsDataURL(file);
   };
 
+  const loadLeads = useCallback(async () => {
+    setLeadsLoading(true);
+    try {
+      const res = await fetch("/api/lead-videos");
+      const data = (await res.json()) as { leads?: LeadVideo[] };
+      setLeads((data.leads || []).filter((l) => l.status === "ready" && !!l.videoUrl));
+    } catch {
+      // A failed list is not worth an error toast here — the other three tabs
+      // still work, and the empty state says to go and save some links.
+      setLeads([]);
+    } finally {
+      setLeadsLoading(false);
+      setLeadsLoaded(true);
+    }
+  }, []);
+
+  const handleLeadSelect = (lead: LeadVideo) => {
+    setSelectedLead(lead);
+    setMotionVideo(null);
+    setMotionVideoPreview(null);
+    setSelectedEffect(null);
+    setReferenceUrl("");
+    // Match the generated clip to the reference so the motion is not cut off
+    // half way, or padded out past where the dance ends.
+    const d = Math.round(lead.durationSec);
+    if (d > 0) setDuration(d <= 7 ? 5 : d <= 12 ? 10 : d <= 17 ? 15 : 20);
+    setError(null);
+  };
+
+  // "Use this" on the Lead Videos list lands here with ?lead=<id>. Load the
+  // list once and preselect that clip, so the trip from spotting a trending
+  // reel to generating from it is two taps.
+  const leadDeepLinked = useRef(false);
+  useEffect(() => {
+    const leadId = searchParams.get("lead");
+    if (!leadId || leadDeepLinked.current) return;
+    leadDeepLinked.current = true;
+
+    (async () => {
+      setMotionTab("leads");
+      const res = await fetch("/api/lead-videos").catch(() => null);
+      if (!res?.ok) return;
+      const data = (await res.json()) as { leads?: LeadVideo[] };
+      const ready = (data.leads || []).filter((l) => l.status === "ready" && !!l.videoUrl);
+      setLeads(ready);
+      setLeadsLoaded(true);
+
+      const lead = ready.find((l) => l.id === leadId);
+      if (lead) {
+        handleLeadSelect(lead);
+        toast("Lead video loaded — now pick your character", "info");
+      } else {
+        toast("That lead is not ready yet", "warning");
+      }
+      window.history.replaceState({}, "", "/motion-control");
+    })();
+    // handleLeadSelect only calls setState, so it does not belong in the deps.
+  }, [searchParams, toast]);
+
   const handleEffectSelect = (effect: FunEffect) => {
     setSelectedEffect(effect.id);
     setMotionVideo(null);
     setMotionVideoPreview(null);
     setReferenceUrl("");
+    setSelectedLead(null);
   };
 
   const clearMotionVideo = () => {
@@ -467,6 +556,7 @@ export default function MotionControlPage() {
     setMotionVideoPreview(null);
     setSelectedEffect(null);
     setReferenceUrl("");
+    setSelectedLead(null);
     if (motionVideoRef.current) motionVideoRef.current.value = "";
   };
 
@@ -487,7 +577,11 @@ export default function MotionControlPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Full body photo of ${characterPrompt.trim()}, standing in a dance-ready pose, entire body from head to feet visible, sharp focus on main character, blurred crowd and people dancing in the background, vibrant party atmosphere, bokeh background figures, main subject centered and in focus, full length shot, 8K hyperrealistic`,
+          // The description is the user's. Only the framing is ours, and it
+          // is the framing motion control needs: a cropped subject cannot be
+          // animated, which is why generated characters kept losing their
+          // legs. Everything else — scene, mood, styling — comes from them.
+          prompt: `${characterPrompt.trim()}. Full-length portrait, entire body visible from head to feet with space above the head and below the feet, standing upright, feet fully in frame, sharp focus on the subject, photorealistic, high detail`,
           aspectRatio: "portrait",
           numImages: 4,
         }),
@@ -703,7 +797,7 @@ export default function MotionControlPage() {
   // Prompt-only needs a hosted Kling provider — Wan-Animate has no motion to
   // transfer without a driving video — so it follows the same availability flag
   // as the effects.
-  const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim());
+  const hasMotionSource = !!(motionVideo || selectedEffect || referenceUrl.trim() || selectedLead);
   const hasPromptOnly = !hasMotionSource && effectsAvailable && prompt.trim().length > 0;
   const canGenerate =
     (hasMotionSource || hasPromptOnly) &&
@@ -721,11 +815,11 @@ export default function MotionControlPage() {
     generateLockRef.current = true;
     setError(null);
 
-    if (!motionVideo && !selectedEffect && !referenceUrl.trim() && !prompt.trim()) {
+    if (!hasMotionSource && !prompt.trim()) {
       setError(
         effectsAvailable
-          ? "Upload a reference video, paste a URL, pick an effect, or describe the motion."
-          : "Upload a reference video or paste a URL to use as the motion."
+          ? "Pick a lead video, upload a reference, paste a URL, choose an effect, or describe the motion."
+          : "Pick a lead video, upload a reference, or paste a URL to use as the motion."
       );
       generateLockRef.current = false;
       return;
@@ -749,7 +843,7 @@ export default function MotionControlPage() {
     }
 
     setIsGenerating(true);
-    progress.start(["Uploading files", referenceUrl ? "Downloading video" : "Applying motion reference", "Generating video", "Saving to gallery"]);
+    progress.start(["Uploading files", referenceUrl && !selectedLead ? "Downloading video" : "Applying motion reference", "Generating video", "Saving to gallery"]);
     try {
       progress.setProgress(10, "Uploading character image...");
 
@@ -819,7 +913,9 @@ export default function MotionControlPage() {
       progress.advanceStep("Applying motion reference...");
 
       // Upload motion video if provided
-      let referenceVideoUrl: string | undefined;
+      // A lead is already downloaded and sitting on our CDN, so it skips both
+      // the upload and the server-side social-media download.
+      let referenceVideoUrl: string | undefined = selectedLead?.videoUrl || undefined;
       if (motionVideo) {
         try {
           referenceVideoUrl = await uploadFileToR2(motionVideo, "video");
@@ -877,12 +973,29 @@ export default function MotionControlPage() {
         progress.advanceStep("Generating video...");
         progress.setProgress(55, "Submitted to AI — generating your video...");
         startJobPolling(data.jobId, data.estimatedTime);
+
+        // Only count a lead as used once the job was actually accepted, so the
+        // "not used yet" filter stays true after a failed or refunded attempt.
+        if (selectedLead) {
+          const usedId = selectedLead.id;
+          fetch(`/api/lead-videos/${usedId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ markUsed: true }),
+          }).catch(() => {});
+          setLeads((prev) =>
+            prev.map((l) => (l.id === usedId ? { ...l, timesUsed: l.timesUsed + 1 } : l))
+          );
+        }
+
         toast(`Motion video submitted! Est. ~${Math.ceil((data.estimatedTime || 120) / 60)} min.`, "success");
         setError(null);
       } else {
-        progress.fail(data.error || "Generation failed.");
-        setError(data.error || "Generation failed.");
-        toast(data.error || "Generation failed", "error");
+        // 402 opens the top-up sheet, 403 points at Pricing — a failure the
+        // customer can fix should arrive with the fix.
+        const msg = reportApiError(res, data, "Generation failed.");
+        progress.fail(msg);
+        setError(msg);
       }
     } catch (err) {
       console.error("Motion control generation failed:", err);
@@ -922,7 +1035,7 @@ export default function MotionControlPage() {
         {/* Step indicator */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
           {[
-            { num: 1, label: "Motion", done: !!(motionVideo || selectedEffect || referenceUrl.trim() || prompt.trim()) },
+            { num: 1, label: "Motion", done: !!(hasMotionSource || prompt.trim()) },
             { num: 2, label: "Character", done: !!characterImage },
             { num: 3, label: "Generate", done: false },
           ].map((step, i) => (
@@ -947,206 +1060,6 @@ export default function MotionControlPage() {
         </div>
       </div>
 
-      {/* ── SA Family Quick Start ── */}
-      <Card className="border-amber-500/20 bg-gradient-to-r from-amber-950/20 via-zinc-900/50 to-orange-950/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <span className="text-lg">🇿🇦</span>
-            SA Family Studio
-            <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px]">
-              NEW
-            </Badge>
-            <button
-              onClick={() => setShowFamilyBuilder(!showFamilyBuilder)}
-              className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
-            >
-              {showFamilyBuilder ? "Hide" : "Build Your Own"}
-              {showFamilyBuilder ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-          </CardTitle>
-          <p className="text-[11px] text-zinc-500">Pick a family character + dance. We generate the image and animate them — one click.</p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Quick Presets */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
-            {SA_FAMILY_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => handleFamilyPreset(preset.id)}
-                disabled={familyImageGenerating || isGenerating}
-                className={`p-2.5 rounded-xl border text-left transition-all group ${
-                  isFamilyFlow && familyCharacter === SA_FAMILY_PRESETS.find(p => p.id === preset.id)?.characterId
-                    ? "border-amber-500/40 bg-amber-500/10 ring-1 ring-amber-500/20"
-                    : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30 hover:bg-amber-500/5"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <div className="text-lg mb-0.5">{preset.emoji}</div>
-                <div className="text-[11px] font-medium text-zinc-300 group-hover:text-amber-300 truncate">{preset.name}</div>
-                <div className="text-[9px] text-zinc-500 truncate">{preset.description}</div>
-              </button>
-            ))}
-          </div>
-
-          {familyImageGenerating && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 animate-pulse">
-              <Wand2 className="w-4 h-4 text-amber-400 animate-spin" />
-              <span className="text-xs text-amber-300">Creating your character... pick your favorite pose when ready</span>
-            </div>
-          )}
-
-          {/* Build Your Own */}
-          {showFamilyBuilder && (
-            <div className="space-y-3 pt-2 border-t border-white/[0.08]">
-              {/* Character picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Character</label>
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                  {SA_FAMILY_CHARACTERS.map((char) => (
-                    <button
-                      key={char.id}
-                      onClick={() => setFamilyCharacter(char.id)}
-                      className={`p-2 rounded-lg border text-center transition-all ${
-                        familyCharacter === char.id
-                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/20"
-                          : "border-white/[0.08] bg-white/[0.03] hover:border-amber-500/30"
-                      }`}
-                    >
-                      <div className="text-lg">{char.emoji}</div>
-                      <div className={`text-[10px] font-medium truncate ${familyCharacter === char.id ? "text-amber-300" : "text-zinc-400"}`}>
-                        {char.name}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scene picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Scene</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {SA_FAMILY_SCENES.map((scene) => (
-                    <button
-                      key={scene.id}
-                      onClick={() => setFamilyScene(scene.id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                        familyScene === scene.id
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
-                      }`}
-                    >
-                      {scene.emoji} {scene.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dance picker */}
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">Dance Style</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {SA_DANCE_STYLES.map((dance) => (
-                    <button
-                      key={dance.id}
-                      onClick={() => setFamilyDance(dance.id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                        familyDance === dance.id
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.08] hover:border-amber-500/20"
-                      }`}
-                    >
-                      {dance.emoji} {dance.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Build button */}
-              <Button
-                onClick={handleFamilyBuild}
-                disabled={!familyCharacter || !familyScene || !familyDance || familyImageGenerating}
-                loading={familyImageGenerating}
-                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium"
-                size="sm"
-              >
-                <Wand2 className="w-3.5 h-3.5" />
-                Generate Character Image
-              </Button>
-            </div>
-          )}
-
-          {/* Show generated options for SA Family (pick a pose) */}
-          {isFamilyFlow && generatedCharacters.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
-                Pick your favourite pose {brandedFamilyImages.length > 0 && <span className="text-amber-400">(branded + auto-downloaded)</span>}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {generatedCharacters.map((imgSrc, i) => {
-                  const cdnUrl = generatedCharacterUrls[i];
-                  const brandedSrc = brandedFamilyImages[i];
-                  const displaySrc = brandedSrc || imgSrc; // Show branded version if available
-                  const isSelected = characterImagePreview === (cdnUrl || imgSrc);
-                  return (
-                    <div key={i} className="relative group">
-                      <button
-                        onClick={() => {
-                          // Always use ORIGINAL unbranded URL for animation (AI needs clean image)
-                          setCharacterImagePreview(cdnUrl || imgSrc);
-                          setCharacterImage(new File([], "sa-family.jpg"));
-                        }}
-                        className={`relative w-full aspect-[3/4] rounded-lg border overflow-hidden transition-all ${
-                          isSelected
-                            ? "border-amber-500/50 ring-2 ring-amber-500/30"
-                            : "border-white/[0.10] hover:border-amber-500/40"
-                        }`}
-                      >
-                        <img src={displaySrc} alt={`Pose ${i + 1}`} className="w-full h-full object-cover" />
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        )}
-                        {brandedSrc && (
-                          <div className="absolute bottom-1 left-1">
-                            <span className="px-1.5 py-0.5 rounded bg-black/70 text-[8px] text-amber-300 font-medium">BRANDED</span>
-                          </div>
-                        )}
-                      </button>
-                      {/* Re-download branded version */}
-                      {brandedSrc && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const link = document.createElement("a");
-                            link.download = `genesis-studio-family-${Date.now()}.jpg`;
-                            link.href = brandedSrc;
-                            link.click();
-                            toast("Branded image downloaded!", "success");
-                          }}
-                          className="absolute top-1 left-1 p-1 rounded bg-black/70 hover:bg-amber-600 text-white opacity-0 group-hover:opacity-100 transition-all"
-                          title="Download branded"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-zinc-500 text-center">
-                {brandedFamilyImages.length > 0
-                  ? <>Branded images auto-downloaded. Animation uses the clean original for best quality.</>
-                  : <>Selected image will be animated with {SA_DANCE_STYLES.find(d => d.id === familyDance)?.name || "your chosen dance"}.</>
-                }
-                {" "}Hit <strong>Generate Motion</strong> below to bring them to life.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Inputs */}
         <div className="lg:col-span-2 space-y-4">
@@ -1155,22 +1068,21 @@ export default function MotionControlPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Video className="w-4 h-4 text-violet-400" />
-                Motion Source <HelpTip text="Choose a fun effect, upload your own video, or paste a TikTok/Instagram URL as motion reference." side="right" />
+                Motion Source <HelpTip text="Upload a video, or paste a TikTok/Instagram link — we transfer that motion onto your character." side="right" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Tabs: Fun Effects / Upload / History */}
+              {/* Tabs: Upload / Paste URL */}
               <div className="flex gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/[0.10]">
                 {([
-                  ...(effectsAvailable
-                    ? [{ key: "effects" as const, label: "Effects", icon: Sparkles }]
-                    : []),
                   { key: "upload" as const, label: "Upload", icon: Upload },
                   { key: "url" as const, label: "Paste URL", icon: LinkIcon },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setMotionTab(tab.key)}
+                    onClick={() => {
+                      setMotionTab(tab.key);
+                    }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all duration-200 ${
                       motionTab === tab.key
                         ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
@@ -1190,84 +1102,6 @@ export default function MotionControlPage() {
                     One-tap effects are taking a short break. Upload a reference video or paste a
                     link and we&apos;ll transfer that motion onto your character.
                   </p>
-                </div>
-              )}
-
-              {/* Fun Effects Tab */}
-              {motionTab === "effects" && effectsAvailable && (
-                <div className="space-y-3">
-                  {/* Category Filter */}
-                  <div className="flex gap-1.5 flex-wrap">
-                    {FUN_EFFECT_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => setEffectCategoryFilter(cat)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          effectCategoryFilter === cat
-                            ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
-                            : "bg-white/[0.05] text-zinc-400 hover:text-zinc-300 border border-white/[0.10]"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Effects Grid */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-2.5 max-h-[320px] sm:max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
-                    {filteredEffects.map((effect) => {
-                      const isSelected = selectedEffect === effect.id;
-                      return (
-                        <button
-                          key={effect.id}
-                          onClick={() => handleEffectSelect(effect)}
-                          className={`relative rounded-xl border p-3 text-center transition-all duration-200 group ${
-                            isSelected
-                              ? "border-violet-500/50 ring-2 ring-violet-500/30 bg-violet-500/10"
-                              : "border-white/[0.10] hover:border-violet-500/30 bg-white/[0.04] hover:bg-white/[0.04]"
-                          }`}
-                        >
-                          {/* Effect icon placeholder */}
-                          <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${
-                            isSelected ? "bg-violet-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
-                          }`}>
-                            <Sparkles className={`w-5 h-5 ${isSelected ? "text-violet-400" : "text-zinc-400 group-hover:text-zinc-400"}`} />
-                          </div>
-                          <div className={`text-[11px] font-medium truncate ${isSelected ? "text-violet-300" : "text-zinc-400"}`}>
-                            {effect.name}
-                          </div>
-                          <div className="text-[9px] text-zinc-400 mt-0.5 capitalize">
-                            {effect.category}
-                          </div>
-                          {/* Selected indicator */}
-                          {isSelected && (
-                            <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {selectedEffect && (
-                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                      <svg className="w-4 h-4 text-violet-400 shrink-0" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-xs text-violet-300">
-                        Effect: <strong>{selectedEffectObj?.name}</strong>
-                      </span>
-                      <button
-                        onClick={() => setSelectedEffect(null)}
-                        className="ml-auto text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1318,6 +1152,121 @@ export default function MotionControlPage() {
                 </div>
               )}
 
+              {/* Lead Videos Tab — trending clips saved earlier */}
+              {motionTab === "leads" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-zinc-400">
+                      Trending clips you saved earlier, already downloaded and ready.
+                    </p>
+                    <a
+                      href="/lead-videos"
+                      className="text-[11px] text-violet-300 hover:text-violet-200 shrink-0"
+                    >
+                      Manage list
+                    </a>
+                  </div>
+
+                  {leadsLoading ? (
+                    <div className="py-10 text-center text-xs text-zinc-500">Loading your leads…</div>
+                  ) : leads.length === 0 ? (
+                    <div className="py-8 px-4 text-center rounded-xl border border-dashed border-white/[0.12]">
+                      <Bookmark className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
+                      <p className="text-xs text-zinc-400 mb-3">
+                        No lead videos yet. Save a trending Facebook or TikTok link and it will be
+                        waiting here, downloaded and ready to use.
+                      </p>
+                      <a
+                        href="/lead-videos"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/25 transition-colors"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Add your first lead
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[22rem] overflow-y-auto pr-1">
+                      {leads.map((lead) => {
+                        const tooLong = lead.durationSec > 30;
+                        const active = selectedLead?.id === lead.id;
+                        return (
+                          <button
+                            key={lead.id}
+                            onClick={() => !tooLong && handleLeadSelect(lead)}
+                            disabled={tooLong}
+                            title={
+                              tooLong
+                                ? `${Math.round(lead.durationSec)}s is over the 30s motion limit`
+                                : lead.title || lead.sourceUrl
+                            }
+                            className={`relative rounded-lg overflow-hidden border text-left transition-all ${
+                              active
+                                ? "border-violet-500/60 ring-1 ring-violet-500/40"
+                                : "border-white/[0.10] hover:border-white/[0.25]"
+                            } ${tooLong ? "opacity-40 cursor-not-allowed" : ""}`}
+                          >
+                            <div className="aspect-video bg-black/40">
+                              {lead.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={lead.thumbnailUrl}
+                                  alt={lead.title || "Lead"}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <video
+                                  src={lead.videoUrl || undefined}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  preload="metadata"
+                                />
+                              )}
+                            </div>
+
+                            {lead.starred && (
+                              <Star
+                                className="absolute top-1 right-1 w-3 h-3 text-amber-400"
+                                fill="currentColor"
+                              />
+                            )}
+
+                            {lead.durationSec > 0 && (
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-zinc-300">
+                                {Math.round(lead.durationSec)}s
+                              </span>
+                            )}
+
+                            <div className="p-1.5">
+                              <p className="text-[10px] text-zinc-300 line-clamp-1">
+                                {lead.title || lead.sourceUrl.replace(/^https?:\/\/(www\.)?/, "")}
+                              </p>
+                              <p className="text-[9px] text-zinc-500">
+                                {lead.timesUsed === 0 ? "Unused" : `Used ${lead.timesUsed}×`}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {selectedLead && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                      <Bookmark className="w-4 h-4 text-violet-400 shrink-0" />
+                      <span className="text-xs text-violet-300 truncate flex-1">
+                        {selectedLead.title || selectedLead.sourceUrl}
+                      </span>
+                      <button
+                        onClick={() => setSelectedLead(null)}
+                        className="p-1 rounded text-zinc-400 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* URL Tab */}
               {motionTab === "url" && (
                 <div className="space-y-3">
@@ -1329,7 +1278,7 @@ export default function MotionControlPage() {
                       <input
                         type="url"
                         value={referenceUrl}
-                        onChange={(e) => { setReferenceUrl(e.target.value); setMotionVideo(null); setMotionVideoPreview(null); setSelectedEffect(null); }}
+                        onChange={(e) => { setReferenceUrl(e.target.value); setMotionVideo(null); setMotionVideoPreview(null); setSelectedEffect(null); setSelectedLead(null); }}
                         placeholder="https://www.tiktok.com/@user/video/..."
                         className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
                       />
@@ -1635,7 +1584,7 @@ export default function MotionControlPage() {
                         <div className="flex flex-col items-center justify-center h-36 text-center">
                           <Clock className="w-8 h-8 text-zinc-600 mb-2" />
                           <span className="text-xs text-zinc-500">No images yet</span>
-                          <span className="text-[10px] text-zinc-600 mt-1">Generate images and they'll appear here</span>
+                          <span className="text-[10px] text-zinc-600 mt-1">Generate images and they&apos;ll appear here</span>
                         </div>
                       )}
                     </div>
@@ -1727,14 +1676,14 @@ export default function MotionControlPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1.5">Orientation</label>
+                  <label className="block text-xs text-zinc-400 mb-1.5">Shape</label>
                   <select
                     value={orientation}
                     onChange={(e) => setOrientation(e.target.value as "video" | "image")}
                     className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
                   >
-                    <option value="video">Match Video</option>
-                    <option value="image">Match Image</option>
+                    <option value="image">Portrait — Reels, TikTok</option>
+                    <option value="video">Landscape — YouTube</option>
                   </select>
                 </div>
               </div>
@@ -1742,36 +1691,31 @@ export default function MotionControlPage() {
               {/* Audio */}
               <div>
                 <label className="block text-xs text-zinc-400 mb-1.5">Audio</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: "none", label: "No Audio", icon: VolumeX, desc: "Silent video" },
-                    { value: "generate", label: "AI Audio", icon: Volume2, desc: "Generate sounds" },
-                    { value: "keep", label: "Keep Original", icon: Volume2, desc: "From reference" },
+                    { value: "generate", label: "Add sound", icon: Volume2, desc: "Matched to the action" },
+                    { value: "none", label: "Silent", icon: VolumeX, desc: "Add your own later" },
                   ] as const).map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => {
                         setEnableAudio(opt.value === "generate");
-                        setKeepOriginalSound(opt.value === "keep");
                       }}
                       className={`p-2.5 rounded-xl border text-center transition-all ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20"
                           : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.12]"
                       }`}
                     >
                       <opt.icon className={`w-4 h-4 mx-auto mb-1 ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "text-violet-400" : "text-zinc-400"
                       }`} />
                       <div className={`text-[11px] font-medium ${
-                        (opt.value === "none" && !enableAudio && !keepOriginalSound) ||
-                        (opt.value === "generate" && enableAudio) ||
-                        (opt.value === "keep" && keepOriginalSound)
+                        (opt.value === "none" && !enableAudio) ||
+                        (opt.value === "generate" && enableAudio)
                           ? "text-violet-300" : "text-zinc-400"
                       }`}>{opt.label}</div>
                     </button>
@@ -1821,6 +1765,13 @@ export default function MotionControlPage() {
                         <Sparkles className="w-8 h-8 text-violet-400 mx-auto mb-1" />
                         <p className="text-[10px] text-violet-300 font-medium">{selectedEffectObj?.name}</p>
                       </div>
+                    ) : selectedLead ? (
+                      selectedLead.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={selectedLead.thumbnailUrl} alt="Lead" className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={selectedLead.videoUrl || undefined} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                      )
                     ) : referenceUrl.trim() ? (
                       <div className="text-center p-2">
                         <LinkIcon className="w-8 h-8 text-violet-400 mx-auto mb-1" />
@@ -1860,7 +1811,7 @@ export default function MotionControlPage() {
                   </div>
                 </div>
                 {/* Ready badge */}
-                {(motionVideo || selectedEffect || referenceUrl.trim()) && characterImagePreview && (
+                {hasMotionSource && characterImagePreview && (
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10">
                     <Badge className="bg-violet-500/90 text-white text-[10px] shadow-lg">
                       Ready to Generate
@@ -1898,6 +1849,8 @@ export default function MotionControlPage() {
                         ? selectedEffectObj?.name
                         : motionVideo
                         ? motionVideo.name
+                        : selectedLead
+                        ? selectedLead.title || "Lead video"
                         : referenceUrl.trim()
                         ? "URL Import"
                         : "—"}

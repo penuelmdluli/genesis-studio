@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — Scaling Thresholds & Cost Tracking
+ * iVideo Studio — Scaling Thresholds & Cost Tracking
  * Know exactly when you need to upgrade each service.
  */
 

@@ -289,7 +289,7 @@ const LANGUAGES = [
 ] as const;
 
 function computeCreditCost(duration: number): number {
-  return Math.ceil(duration / 10) * 15;
+  return Math.ceil(duration / 10) * 120;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -1238,7 +1238,7 @@ export default function TalkingAvatarPage() {
                   <Music className="w-3 h-3 inline mr-1" />
                   Background Music
                 </label>
-                <div className="grid grid-cols-4 sm:grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {MUSIC_MOODS.map((m) => (
                     <button
                       key={m.id}
@@ -1269,7 +1269,7 @@ export default function TalkingAvatarPage() {
                   <Captions className="w-3 h-3 inline mr-1" />
                   Auto-Captions
                 </label>
-                <div className="grid grid-cols-5 gap-1.5">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                   {SUBTITLE_STYLES.map((s) => (
                     <button
                       key={s.id}

@@ -1,4 +1,4 @@
-# Genesis Studio Launch Checklist
+# iVideo Studio Launch Checklist
 
 Target launch: **Thursday 14 May 2026**
 

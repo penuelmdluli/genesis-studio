@@ -2,7 +2,7 @@
 
 ## Overview
 
-Genesis Studio is operated from South Africa. This document covers VAT obligations for SA-based SaaS businesses selling to domestic and international customers.
+iVideo Studio is operated from South Africa. This document covers VAT obligations for SA-based SaaS businesses selling to domestic and international customers.
 
 ---
 
@@ -51,7 +51,7 @@ Genesis Studio is operated from South Africa. This document covers VAT obligatio
 ## Invoices
 
 - Once VAT-registered, all invoices **must** display:
-  - Genesis Studio VAT registration number
+  - iVideo Studio VAT registration number
   - The words "Tax Invoice"
   - Seller name, address, and VAT number
   - Buyer details

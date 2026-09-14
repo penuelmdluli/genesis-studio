@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -155,6 +156,19 @@ export default function CaptionsPage() {
       setVideoDuration(60);
     }
   };
+
+  // Arriving from "Captions" on a finished video — select it straight away
+  // rather than making the creator hunt for it in their own gallery.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("videoId");
+    if (!id || selectedVideoId || videos.length === 0) return;
+    const vid = videos.find((v) => v.id === id);
+    if (!vid) return;
+    setSelectedVideoId(id);
+    setVideoDuration(vid.duration);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videos, searchParams]);
 
   const handleGallerySelect = (videoId: string) => {
     setSelectedVideoId(videoId);
@@ -672,16 +686,7 @@ export default function CaptionsPage() {
                   <Button onClick={handleDownloadSrt} className="flex-1">
                     <Download className="w-4 h-4" /> Download SRT
                   </Button>
-                  <Button
-                    variant={captionStyle === "srt_only" ? "ghost" : "outline"}
-                    className="flex-1"
-                    disabled={captionStyle === "srt_only" || isBurning}
-                    loading={isBurning}
-                    onClick={handleBurnIntoVideo}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {isBurning ? "Burning..." : "Burn into Video"}
-                  </Button>
+                  {/* Burn-in needs a video re-encode step the current provider cannot run; the SRT downloads and drops straight into CapCut / Premiere / YouTube. */}
                 </div>
 
                 {/* Burn progress */}

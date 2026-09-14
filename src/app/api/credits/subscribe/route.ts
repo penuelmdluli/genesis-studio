@@ -4,7 +4,8 @@ import { getUserByClerkId } from "@/lib/db";
 import { createCheckoutSession, createStripeCustomer } from "@/lib/stripe";
 import { getDb } from "@/lib/db-driver";
 import { PLANS } from "@/lib/constants";
-import { getProvider, getDefaultProvider } from "@/lib/payments";
+import { resolveProvider, getProvider, getDefaultProvider } from "@/lib/payments";
+import { recordPendingCheckout } from "@/lib/payments/pending";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,10 +31,22 @@ export async function POST(req: NextRequest) {
 
     // --- Payment providers (Yoco=ZAR, Paystack=USD/ZAR, PayFast=ZAR) ---
     if (providerName && providerName !== "stripe") {
-      const paymentProvider = getProvider(providerName);
+      // Resolve rather than demand. PAYSTACK_SECRET_KEY has never been set in
+      // production and the pricing page sends every non-ZAR visitor to
+      // Paystack, so this used to throw and they saw "Failed to start
+      // checkout" with no way to pay at all.
+      const paymentProvider = resolveProvider(providerName);
+      if (!paymentProvider) {
+        return NextResponse.json(
+          { error: "Payments are temporarily unavailable. Please try again shortly." },
+          { status: 503 }
+        );
+      }
 
-      // Determine currency and amount based on provider
-      const useUSD = providerName === "paystack" && requestCurrency !== "ZAR";
+      // Currency follows the provider we actually resolved to, not the one
+      // that was asked for — billing a Yoco checkout in USD would fail at the
+      // gateway.
+      const useUSD = paymentProvider.name === "paystack" && requestCurrency !== "ZAR";
       const amount = useUSD ? plan.price * 100 : (plan.priceZAR || 0) * 100; // cents
       const currency = useUSD ? "USD" : "ZAR";
 
@@ -49,7 +62,7 @@ export async function POST(req: NextRequest) {
         currency,
         email: user.email,
         userId: user.id,
-        description: `Genesis Studio ${plan.name} Plan`,
+        description: `iVideo Studio ${plan.name} Plan`,
         metadata: {
           type: "subscription",
           planId: plan.id,
@@ -58,6 +71,17 @@ export async function POST(req: NextRequest) {
         successUrl: `${appUrl}/dashboard?success=true`,
         cancelUrl: `${appUrl}/pricing?cancelled=true`,
         notifyUrl: `${webhookBaseUrl}/api/webhooks/${paymentProvider.name}`,
+      });
+
+      await recordPendingCheckout({
+        checkoutId: checkout.checkoutId,
+        provider: paymentProvider.name,
+        userId: user.id,
+        type: "subscription",
+        productId: plan.id,
+        amount,
+        currency,
+        metadata: { type: "subscription", planId: plan.id, userId: user.id },
       });
 
       return NextResponse.json({ url: checkout.redirectUrl });
@@ -80,7 +104,7 @@ export async function POST(req: NextRequest) {
           currency: "ZAR",
           email: user.email,
           userId: user.id,
-          description: `Genesis Studio ${plan.name} Plan`,
+          description: `iVideo Studio ${plan.name} Plan`,
           metadata: {
             type: "subscription",
             planId: plan.id,
@@ -89,6 +113,17 @@ export async function POST(req: NextRequest) {
           successUrl: `${appUrl}/dashboard?success=true`,
           cancelUrl: `${appUrl}/pricing?cancelled=true`,
           notifyUrl: `${webhookBaseUrl}/api/webhooks/${defaultProvider.name}`,
+        });
+
+        await recordPendingCheckout({
+          checkoutId: checkout.checkoutId,
+          provider: defaultProvider.name,
+          userId: user.id,
+          type: "subscription",
+          productId: plan.id,
+          amount: priceZAR * 100,
+          currency: "ZAR",
+          metadata: { type: "subscription", planId: plan.id, userId: user.id },
         });
 
         return NextResponse.json({ url: checkout.redirectUrl });

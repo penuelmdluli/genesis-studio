@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { uploadFile } from "@/lib/upload-client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,14 +10,83 @@ import { Modal } from "@/components/ui/modal";
 import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/components/auth/auth-provider";
 import { STORAGE_LIMITS } from "@/lib/profitability";
 import { Switch } from "@/components/ui/switch";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
-import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History } from "lucide-react";
+import { User, CreditCard, Bell, Shield, Trash2, ExternalLink, HardDrive, ArrowUpRight, Download, History, Sparkles, LogOut } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, isInitialized } = useStore();
   const { toast } = useToast();
+  const { signOut } = useAuth();
+
+  // Brand Kit — a paid creator's own logo, loaded on mount so the card can
+  // show the upsell or the real thing rather than guessing from plan alone.
+  const [brandLoading, setBrandLoading] = useState(true);
+  const [brandAllowed, setBrandAllowed] = useState(false);
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState("");
+  const [brandPosition, setBrandPosition] = useState("bottom-right");
+  const [brandEnabled, setBrandEnabled] = useState(false);
+  const [brandSaving, setBrandSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/user/brand-kit")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setBrandAllowed(!!d.allowed);
+        setBrandLogo(d.brand?.logoUrl || null);
+        setBrandName(d.brand?.name || "");
+        setBrandPosition(d.brand?.position || "bottom-right");
+        setBrandEnabled(!!d.brand?.enabled);
+      })
+      .catch(() => {})
+      .finally(() => setBrandLoading(false));
+  }, []);
+
+  const handleBrandLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast("That logo is over 2 MB — try a smaller PNG.", "error");
+      return;
+    }
+    setBrandSaving(true);
+    try {
+      const url = await uploadFile(file, "image");
+      setBrandLogo(url);
+      toast("Logo uploaded — remember to save.", "success");
+    } catch {
+      toast("Could not upload that logo. Please try again.", "error");
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
+  const saveBrandKit = async () => {
+    setBrandSaving(true);
+    try {
+      const res = await fetch("/api/user/brand-kit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl: brandLogo, name: brandName, position: brandPosition, enabled: brandEnabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || "Could not save your branding.", "error");
+        return;
+      }
+      setBrandEnabled(!!data.brand?.enabled);
+      toast(data.note || "Branding saved.", data.note ? "info" : "success");
+    } catch {
+      toast("Network error. Please try again.", "error");
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -287,6 +357,120 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Brand Kit — your logo on your videos (paid plans) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+            </div>
+            Your branding
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {brandLoading ? (
+            <p className="text-sm text-zinc-500">Loading…</p>
+          ) : !brandAllowed ? (
+            <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.06] p-4">
+              <p className="text-sm text-zinc-200 font-medium">Put your own logo on your videos</p>
+              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                On the Creator plan and up you can stamp your own logo and handle onto everything you
+                make here — your brand on your work, not ours.
+              </p>
+              <a
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition-colors"
+              >
+                See plans <ArrowUpRight className="w-3 h-3" />
+              </a>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-xl border border-white/[0.12] bg-white/[0.04] flex items-center justify-center overflow-hidden shrink-0 relative">
+                  {/* With no logo of their own, videos carry ours — so show
+                      ours here rather than an empty box. "No logo yet" told a
+                      creator nothing about what ends up on their work. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={brandLogo || "/logo.svg"}
+                    alt={brandLogo ? "Your logo" : "iVideo Studio logo"}
+                    className={`max-w-full max-h-full object-contain ${brandLogo ? "" : "opacity-70 p-3"}`}
+                  />
+                  {!brandLogo && (
+                    <span className="absolute bottom-0 inset-x-0 text-[9px] text-zinc-400 bg-black/60 py-0.5 text-center">
+                      Default
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs font-medium text-zinc-200 cursor-pointer transition-colors">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={handleBrandLogo}
+                      disabled={brandSaving}
+                    />
+                    {brandSaving ? "Uploading…" : brandLogo ? "Replace logo" : "Upload logo"}
+                  </label>
+                  <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
+                    PNG with a transparent background works best. Keep it under 2&nbsp;MB.
+                  </p>
+                  {!brandLogo && (
+                    <p className="text-[11px] text-amber-300/80 mt-1.5 leading-relaxed">
+                      Until you add one, videos you share carry the iVideo Studio mark.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1.5">Brand name or handle</label>
+                <input
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  placeholder="@yourhandle"
+                  maxLength={60}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1.5">Where it sits</label>
+                <select
+                  value={brandPosition}
+                  onChange={(e) => setBrandPosition(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.12] text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                >
+                  <option value="bottom-right">Bottom right</option>
+                  <option value="bottom-left">Bottom left</option>
+                  <option value="top-right">Top right</option>
+                  <option value="top-left">Top left</option>
+                </select>
+              </div>
+
+              <div className="py-1">
+                <Switch
+                  checked={brandEnabled}
+                  onCheckedChange={() => setBrandEnabled(!brandEnabled)}
+                  label="Use my branding"
+                  description="Apply it when you add your logo to a video"
+                />
+              </div>
+
+              <button
+                onClick={saveBrandKit}
+                disabled={brandSaving}
+                className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+              >
+                {brandSaving ? "Saving…" : "Save branding"}
+              </button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Notifications */}
       <Card>
         <CardHeader>
@@ -338,6 +522,28 @@ export default function SettingsPage() {
               {isExporting ? "Exporting..." : "Export"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Signing out is the thing people look for every day. It was hidden
+          behind an unlabelled avatar while "Delete Account" got its own red
+          section — the reversible action should be easier to find than the
+          irreversible one. */}
+      <Card>
+        <CardContent className="p-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-200">Sign out</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              End this session on this device. Your videos and credits stay exactly as they are.
+            </p>
+          </div>
+          <button
+            onClick={() => signOut()}
+            className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-sm font-medium text-zinc-100 transition-colors flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
         </CardContent>
       </Card>
 

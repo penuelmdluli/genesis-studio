@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
+import { envString } from "@/lib/env";
+import { runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
+import { toUserFacingProviderError } from "@/lib/user-errors";
 
-const FAL_API_KEY = process.env.FAL_KEY || "";
+// Thumbnails render in a few seconds, so this answers synchronously with the
+// images inlined as data URIs — no job row, no polling, no expiring provider
+// URLs in the page.
 
-const SIZE_MAP: Record<string, { width: number; height: number }> = {
-  youtube: { width: 1280, height: 720 },
-  instagram: { width: 1088, height: 1088 },
-  tiktok: { width: 768, height: 1360 },
+const SIZE_MAP: Record<string, string> = {
+  youtube: "1280*720",
+  instagram: "1024*1024",
+  tiktok: "768*1360",
 };
 
 export async function POST(req: NextRequest) {
@@ -32,98 +37,56 @@ export async function POST(req: NextRequest) {
     };
 
     if (!prompt || typeof prompt !== "string") {
-      return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
     const trimmedPrompt = prompt.trim();
     if (trimmedPrompt.length < 5) {
-      return NextResponse.json(
-        { error: "Prompt must be at least 5 characters" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Prompt must be at least 5 characters" }, { status: 400 });
     }
     if (trimmedPrompt.length > 1000) {
-      return NextResponse.json(
-        { error: "Prompt must be at most 1000 characters" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Prompt must be at most 1000 characters" }, { status: 400 });
     }
 
-    const dimensions = SIZE_MAP[size || "youtube"];
-    if (!dimensions) {
-      return NextResponse.json(
-        { error: "Invalid size. Use: youtube, instagram, or tiktok" },
-        { status: 400 }
-      );
+    const wsSize = SIZE_MAP[size || "youtube"];
+    if (!wsSize) {
+      return NextResponse.json({ error: "Invalid size. Use: youtube, instagram, or tiktok" }, { status: 400 });
     }
 
     const numImages = count && [1, 2, 4].includes(count) ? count : 1;
-    // FLUX Pro costs ~$0.04/image → need ~7 credits ($0.17) for 4x markup per image
     const creditsCost = numImages <= 2 ? 5 : 10;
 
-    if (!FAL_API_KEY) {
-      return NextResponse.json(
-        { error: "AI Thumbnails is temporarily unavailable. Please try again later." },
-        { status: 503 }
-      );
+    if (!envString("WAVESPEED_API_KEY")) {
+      return NextResponse.json({ error: "AI Thumbnails is temporarily unavailable. Please try again later." }, { status: 503 });
     }
 
     const ownerAccount = isOwnerClerkId(clerkId);
     if (!ownerAccount) {
-      const { success, newBalance } = await deductCredits(
-        user.id,
-        creditsCost,
-        "",
-        `Thumbnail generation: ${size} ${numImages} image(s)`
-      );
-
+      const { success, newBalance } = await deductCredits(user.id, creditsCost, "", `Thumbnail generation: ${size} ${numImages} image(s)`);
       if (!success) {
-        return NextResponse.json(
-          {
-            error: "Insufficient credits",
-            required: creditsCost,
-            balance: newBalance,
-          },
-          { status: 402 }
-        );
+        return NextResponse.json({ error: "Insufficient credits", required: creditsCost, balance: newBalance }, { status: 402 });
       }
     }
 
-    const styledPrompt = style
-      ? `${style} style: ${trimmedPrompt}`
-      : trimmedPrompt;
+    const styledPrompt = `${style ? `${style} style: ` : ""}${trimmedPrompt}. Bold, high-contrast, eye-catching thumbnail composition, sharp focus.`;
 
     try {
-      const falRes = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
-        method: "POST",
-        headers: {
-          "Authorization": `Key ${FAL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: styledPrompt,
-          image_size: dimensions,
-          num_images: numImages,
-          enable_safety_checker: true,
-          output_format: "jpeg",
-          num_inference_steps: 28,
-          guidance_scale: 3.5,
-        }),
-      });
+      // One image per request; run them in parallel.
+      const results = await Promise.allSettled(
+        Array.from({ length: numImages }, () =>
+          runWsModelSync(WS_MODELS.textToImage, { prompt: styledPrompt, size: wsSize }, { timeoutMs: 60_000 })
+        )
+      );
+      const imageUrls = results
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof runWsModelSync>>> => r.status === "fulfilled")
+        .flatMap((r) => r.value.outputs || []);
 
-      if (!falRes.ok) {
-        const errText = await falRes.text();
-        throw new Error(`FAL request failed (${falRes.status}): ${errText}`);
+      if (imageUrls.length === 0) {
+        const firstErr = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+        throw new Error(firstErr?.reason instanceof Error ? firstErr.reason.message : "no images returned");
       }
 
-      const result = await falRes.json();
-      const imageUrls = result.images?.map((img: { url: string }) => img.url) || [];
-
-      // Convert FAL URLs to base64 data URIs server-side
       const base64Images = await Promise.all(
-        imageUrls.map(async (url: string) => {
+        imageUrls.map(async (url) => {
           try {
             const imgRes = await fetch(url);
             if (!imgRes.ok) return url;
@@ -142,27 +105,17 @@ export async function POST(req: NextRequest) {
         images: base64Images,
       });
     } catch (gpuError) {
-      console.error("Thumbnail generation error:", gpuError);
+      const raw = gpuError instanceof Error ? gpuError.message : String(gpuError);
+      console.error("Thumbnail generation error:", raw);
 
       if (!ownerAccount) {
-        await refundCredits(
-          user.id,
-          creditsCost,
-          "",
-          "Thumbnail generation failed — automatic refund"
-        );
+        await refundCredits(user.id, creditsCost, "", "Thumbnail generation failed — automatic refund");
       }
 
-      return NextResponse.json(
-        { error: "Thumbnail generation failed. Credits refunded." },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: toUserFacingProviderError(raw) }, { status: 503 });
     }
   } catch (error) {
     console.error("Thumbnails API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

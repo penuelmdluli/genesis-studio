@@ -1,6 +1,6 @@
 {
-  "name": "Genesis Studio",
-  "short_name": "Genesis",
+  "name": "iVideo Studio",
+  "short_name": "iVideo",
   "description": "AI Video Generation Platform — create videos in seconds",
   "start_url": "/dashboard",
   "display": "standalone",
@@ -28,6 +28,33 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "scope": "/",
+  "share_target": {
+    "action": "/lead-videos",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Save a Lead Video",
+      "url": "/lead-videos",
+      "description": "Paste a trending link to use later"
+    },
+    {
+      "name": "Generate Video",
+      "url": "/generate",
+      "description": "Create a new AI video"
+    },
+    {
+      "name": "Gallery",
+      "url": "/gallery",
+      "description": "View your generated videos"
     }
   ]
 }

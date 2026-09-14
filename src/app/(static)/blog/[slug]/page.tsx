@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!post) return {};
 
   return {
-    title: `${post.title} | Genesis Studio Blog`,
+    title: `${post.title} | iVideo Studio Blog`,
     description: post.description,
     keywords: post.tags,
     openGraph: {

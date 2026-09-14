@@ -136,6 +136,19 @@ export async function POST(req: NextRequest) {
       (wantsSubtitles ? 5 : 0);
     const ownerAccount = isOwnerClerkId(clerkId);
 
+    // Every enhancement step below runs on FAL. Refuse before charging when
+    // that account cannot take work — the page falls back to the plain
+    // avatar video, which is the right outcome. Charging first and failing
+    // second is how "AI model isn't working" tickets get written.
+    const { getProviderState } = await import("@/lib/feature-availability");
+    const providers = await getProviderState();
+    if (!providers.fal) {
+      return NextResponse.json(
+        { error: "Enhancements are temporarily unavailable — your video is ready without them." },
+        { status: 503 }
+      );
+    }
+
     if (!ownerAccount) {
       const { success, newBalance } = await deductCredits(
         user.id,

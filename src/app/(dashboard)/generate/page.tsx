@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, HelpTip } from "@/components/ui/tooltip";
 import { PageTransition } from "@/components/ui/motion";
 import { useStore } from "@/hooks/use-store";
+import { trackEvent } from "@/lib/analytics-events";
 import { useToast } from "@/components/ui/toast";
 import {
   AI_MODELS,
@@ -108,7 +109,11 @@ export default function GeneratePage() {
         .catch(() => {});
     }
   }, [searchParams, seedLoaded, setFormField, toast]);
+  // Two levels on purpose: "More options" reveals model, size and audio —
+  // things a creator might reasonably want. "Expert settings" holds seed,
+  // guidance and steps, which almost nobody should touch.
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showExpert, setShowExpert] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const generateLockRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -393,10 +398,12 @@ export default function GeneratePage() {
         progress.setProgress(60, "Generating on AI servers...");
         const estMin = Math.ceil((data.estimatedTime || 120) / 60);
         toast(`Video submitted! Est. ~${estMin} min. We'll notify you when it's ready.`, "success");
+        trackEvent("generate_submitted", { model: modelId, type: form.type, resolution: form.resolution, duration: form.duration, credits: creditCost });
       } else {
         setError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");
         progress.fail("Generation failed");
+        trackEvent("generate_failed", { model: modelId, type: form.type, status: res.status, reason: String(data.error || "").slice(0, 80) });
       }
     } catch (err) {
       console.error("Generation failed:", err);
@@ -498,6 +505,22 @@ export default function GeneratePage() {
           </Card>
 
           {/* Platform Presets */}
+          {/* Platform presets — behind More options: sensible defaults cover almost every video. */}
+          {/* One control for everything a first-time creator does not need to
+              decide. Defaults cover almost every video; the choices are one tap
+              away for anyone who wants them. */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+          >
+            <span className="text-sm font-medium text-zinc-300">
+              {showAdvanced ? "Hide options" : "More options"}
+              <span className="text-xs text-zinc-500 ml-2">model, size, audio</span>
+            </span>
+            {showAdvanced ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
+          </button>
+
+          {showAdvanced && (
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
@@ -548,6 +571,7 @@ export default function GeneratePage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Prompt */}
           <Card glow>
@@ -727,6 +751,8 @@ export default function GeneratePage() {
           )}
 
           {/* Model Selector */}
+          {/* Model choice — behind More options: sensible defaults cover almost every video. */}
+          {showAdvanced && (
           <Card>
             <CardContent className="p-4 space-y-3">
               <label className="text-sm font-medium text-zinc-300">AI Model</label>
@@ -780,8 +806,11 @@ export default function GeneratePage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Parameters */}
+          {/* Resolution, duration, frame rate and the expert sliders — behind More options: sensible defaults cover almost every video. */}
+          {showAdvanced && (
           <Card>
             <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -811,7 +840,8 @@ export default function GeneratePage() {
                 </div>
               </div>
 
-              {/* Draft Mode Toggle */}
+              {/* Draft Mode Toggle — only for models with a real draft engine; otherwise it would be full price with a "draft" label */}
+              {(currentModel?.wavespeedModelIdDraft || currentModel?.wavespeedModelIdDraftI2V) && (
               <div className="p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
                 <Switch
                   checked={form.isDraft}
@@ -820,18 +850,19 @@ export default function GeneratePage() {
                   description="Fast preview, 70% cheaper. Refine later."
                 />
               </div>
+              )}
 
               {/* Advanced Settings */}
               <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
+                onClick={() => setShowExpert(!showExpert)}
                 className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
               >
                 <Settings2 className="w-3.5 h-3.5" />
-                Advanced Settings
-                {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                Expert settings
+                {showExpert ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
 
-              {showAdvanced && (
+              {showExpert && (
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/[0.10]">
                   <div>
                     <label className="text-xs text-zinc-400 mb-1.5 font-medium flex items-center gap-1">Seed <HelpTip text="Same seed + prompt = same result. Leave empty for random." side="top" /></label>
@@ -869,6 +900,7 @@ export default function GeneratePage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Live Sound Toggle — only for models with native audio */}
           {modelSupportsAudio && (
@@ -903,6 +935,8 @@ export default function GeneratePage() {
           )}
 
           {/* Audio / Sound */}
+          {/* Background audio — behind More options: sensible defaults cover almost every video. */}
+          {showAdvanced && (
           <Card>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -999,8 +1033,11 @@ export default function GeneratePage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Negative Prompt */}
+          {/* Negative prompt — behind More options: sensible defaults cover almost every video. */}
+          {showAdvanced && (
           <Card>
             <CardContent className="p-4 space-y-2">
               <label className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
@@ -1015,6 +1052,7 @@ export default function GeneratePage() {
               />
             </CardContent>
           </Card>
+          )}
         </div>
 
         {/* Right Column: Summary & Generate — hidden on mobile, shown as sticky card on desktop */}

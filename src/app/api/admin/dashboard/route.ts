@@ -113,8 +113,9 @@ export async function GET() {
     ? { status: "ok", detail: "Page tokens set" }
     : { status: "error", detail: "No FB tokens" };
 
-  // Clerk webhook
-  health.clerk_webhook = { status: "ok", detail: "Route: /api/webhooks/clerk" };
+  // The Clerk webhook health row was removed with the route. It reported
+  // "ok" unconditionally — it checked that a file existed, not that anything
+  // worked, and Clerk itself was replaced by custom D1 sessions long ago.
 
   // Automation
   health.automation = process.env.AUTOMATION_PAUSED === "true"
@@ -127,8 +128,180 @@ export async function GET() {
     ? { status: "ok", detail: `${webhookCount} processed` }
     : { status: "warn", detail: "0 events — no payments yet" };
 
+  // ── Phase 4 metrics ──────────────────────────────────────────────────
+  // Raw SQL rather than the query builder: these are aggregations and
+  // cohort joins, and pulling every row into the Worker to count it in JS
+  // is what makes an admin page slow enough that nobody opens it.
+  const { getD1 } = await import("@/lib/d1");
+  const d1 = getD1();
+
+  const one = async <T,>(sql: string, ...binds: unknown[]) =>
+    (await d1.prepare(sql).bind(...binds).first<T>()) ?? null;
+  const many = async <T,>(sql: string, ...binds: unknown[]) =>
+    ((await d1.prepare(sql).bind(...binds).all<T>()).results ?? []) as T[];
+
+  const [reliability, byErrorCode, byProvider, funnel, firstFailed, liability, spendByModel] =
+    await Promise.all([
+      // Success rate over three windows.
+      one<{ d_t: number; d_c: number; w_t: number; w_c: number; m_t: number; m_c: number }>(
+        `SELECT
+           SUM(CASE WHEN created_at >= date('now') THEN 1 ELSE 0 END) d_t,
+           SUM(CASE WHEN created_at >= date('now') AND status='completed' THEN 1 ELSE 0 END) d_c,
+           SUM(CASE WHEN created_at >= datetime('now','-7 day') THEN 1 ELSE 0 END) w_t,
+           SUM(CASE WHEN created_at >= datetime('now','-7 day') AND status='completed' THEN 1 ELSE 0 END) w_c,
+           SUM(CASE WHEN created_at >= datetime('now','-30 day') THEN 1 ELSE 0 END) m_t,
+           SUM(CASE WHEN created_at >= datetime('now','-30 day') AND status='completed' THEN 1 ELSE 0 END) m_c
+         FROM generation_jobs`
+      ),
+
+      // Failures grouped by error_code, falling back to the message for jobs
+      // that predate the column.
+      many<{ code: string; n: number }>(
+        `SELECT COALESCE(error_code, substr(COALESCE(error_message,'unknown'),1,40)) code, COUNT(*) n
+           FROM generation_jobs WHERE status='failed'
+          GROUP BY code ORDER BY n DESC LIMIT 12`
+      ),
+
+      // Per-provider reliability and latency. provider is only populated for
+      // jobs submitted after migration 0006, so this fills in over time.
+      many<{ provider: string; total: number; completed: number; p50: number; p95: number }>(
+        `WITH t AS (
+           SELECT provider, status,
+                  (julianday(completed_at) - julianday(created_at)) * 86400 secs
+             FROM generation_jobs
+            WHERE provider IS NOT NULL AND created_at >= datetime('now','-30 day')
+         )
+         SELECT provider,
+                COUNT(*) total,
+                SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed,
+                CAST(AVG(CASE WHEN status='completed' THEN secs END) AS INT) p50,
+                CAST(MAX(CASE WHEN status='completed' THEN secs END) AS INT) p95
+           FROM t GROUP BY provider`
+      ),
+
+      // The funnel that matters: how far does a signup actually get?
+      one<{ signups: number; started: number; completed: number; purchased: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM users) signups,
+           (SELECT COUNT(DISTINCT user_id) FROM generation_jobs) started,
+           (SELECT COUNT(DISTINCT user_id) FROM generation_jobs WHERE status='completed') completed,
+           (SELECT COUNT(DISTINCT user_id) FROM credit_transactions WHERE type='pack_purchase') purchased`
+      ),
+
+      // Users whose FIRST generation failed — the churn cohort, and the list
+      // worth sending a recovery email to.
+      many<{ email: string; plan: string; created_at: string }>(
+        `SELECT u.email, u.plan, j.created_at
+           FROM users u
+           JOIN generation_jobs j ON j.id = (
+             SELECT id FROM generation_jobs WHERE user_id = u.id
+              ORDER BY created_at ASC LIMIT 1
+           )
+          WHERE j.status = 'failed'
+          ORDER BY j.created_at DESC LIMIT 50`
+      ),
+
+      // Outstanding credit liability — credits reserved but not yet settled.
+      one<{ held_n: number; held_amt: number; captured_amt: number; released_amt: number }>(
+        `SELECT
+           SUM(CASE WHEN status='held' THEN 1 ELSE 0 END) held_n,
+           COALESCE(SUM(CASE WHEN status='held' THEN amount END),0) held_amt,
+           COALESCE(SUM(CASE WHEN status='captured' THEN amount END),0) captured_amt,
+           COALESCE(SUM(CASE WHEN status='released' THEN amount END),0) released_amt
+         FROM credit_holds`
+      ),
+
+      // What we actually spent, where the provider reported it.
+      many<{ model_id: string; completed: number; credits: number; usd: number }>(
+        `SELECT model_id,
+                COUNT(*) completed,
+                COALESCE(SUM(credits_cost),0) credits,
+                COALESCE(SUM(cost_usd),0) usd
+           FROM generation_jobs
+          WHERE status='completed' AND created_at >= datetime('now','-30 day')
+          GROUP BY model_id ORDER BY completed DESC`
+      ),
+    ]);
+
+  // ── Traffic (first-party, migration 0007) ──────────────────────────
+  const [traffic, topReferrers, topLanding, byDevice] = await Promise.all([
+    one<{ v_today: number; v_week: number; v_month: number; visitors_week: number }>(
+      `SELECT
+         SUM(CASE WHEN created_at >= date('now') THEN 1 ELSE 0 END) v_today,
+         SUM(CASE WHEN created_at >= datetime('now','-7 day') THEN 1 ELSE 0 END) v_week,
+         SUM(CASE WHEN created_at >= datetime('now','-30 day') THEN 1 ELSE 0 END) v_month,
+         COUNT(DISTINCT CASE WHEN created_at >= datetime('now','-7 day') THEN visitor_id END) visitors_week
+       FROM page_views`
+    ),
+
+    // Where people come from. Rows with no referrer are direct traffic, which
+    // is worth seeing rather than hiding.
+    many<{ source: string; n: number }>(
+      `SELECT COALESCE(referrer_host, '(direct)') source, COUNT(*) n
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY source ORDER BY n DESC LIMIT 10`
+    ),
+
+    // The pages people actually land on, and how many of those visits belong
+    // to someone signed in — a page with traffic but no signed-in share is
+    // where anonymous visitors stop.
+    many<{ path: string; views: number; signed_in: number }>(
+      `SELECT path,
+              COUNT(*) views,
+              SUM(CASE WHEN user_id IS NOT NULL THEN 1 ELSE 0 END) signed_in
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY path ORDER BY views DESC LIMIT 12`
+    ),
+
+    many<{ device: string; n: number }>(
+      `SELECT COALESCE(device,'unknown') device, COUNT(*) n
+         FROM page_views
+        WHERE created_at >= datetime('now','-30 day')
+        GROUP BY device ORDER BY n DESC`
+    ),
+  ]);
+
+  const rate = (c?: number, t?: number) => (t && t > 0 ? Math.round(((c ?? 0) / t) * 100) : null);
+
   return NextResponse.json({
     health,
+    reliability: {
+      today: { total: reliability?.d_t ?? 0, completed: reliability?.d_c ?? 0, successRate: rate(reliability?.d_c, reliability?.d_t) },
+      week: { total: reliability?.w_t ?? 0, completed: reliability?.w_c ?? 0, successRate: rate(reliability?.w_c, reliability?.w_t) },
+      month: { total: reliability?.m_t ?? 0, completed: reliability?.m_c ?? 0, successRate: rate(reliability?.m_c, reliability?.m_t) },
+      byErrorCode,
+      byProvider: byProvider.map((p) => ({ ...p, successRate: rate(p.completed, p.total) })),
+    },
+    traffic: {
+      viewsToday: traffic?.v_today ?? 0,
+      viewsWeek: traffic?.v_week ?? 0,
+      viewsMonth: traffic?.v_month ?? 0,
+      // Only visitors who accepted analytics cookies carry an id, so this is a
+      // floor on unique visitors, never the true number. Labelled as such in
+      // the UI rather than passed off as exact.
+      identifiedVisitorsWeek: traffic?.visitors_week ?? 0,
+      topReferrers,
+      topLanding,
+      byDevice,
+    },
+    funnel: {
+      signups: funnel?.signups ?? 0,
+      startedGeneration: funnel?.started ?? 0,
+      completedGeneration: funnel?.completed ?? 0,
+      purchased: funnel?.purchased ?? 0,
+      activationRate: rate(funnel?.completed, funnel?.signups),
+    },
+    // Everyone whose first impression of the product was a failure.
+    firstGenerationFailed: firstFailed,
+    creditLiability: {
+      outstandingHolds: liability?.held_n ?? 0,
+      outstandingCredits: liability?.held_amt ?? 0,
+      capturedAllTime: liability?.captured_amt ?? 0,
+      releasedAllTime: liability?.released_amt ?? 0,
+    },
+    spendByModel,
     users: {
       total: usersR.count || 0,
       newThisWeek: newUsersWeek,

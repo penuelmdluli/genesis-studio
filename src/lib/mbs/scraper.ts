@@ -66,12 +66,26 @@ export async function listCreatorPosts(
  * Uses Facebook Graph API for facebook.com URLs, yt-dlp for everything else.
  */
 export async function downloadAndPersist(
-  sourceUrl: string
-): Promise<{ r2Key: string; durationSec: number }> {
+  sourceUrl: string,
+  targetKey?: string
+): Promise<{
+  r2Key: string;
+  durationSec: number;
+  thumbnailUrl: string;
+  fileSizeBytes: number;
+}> {
   // Always use yt-dlp generic download — works for all platforms including Facebook
   // The Facebook Graph API path is unreliable (needs specific page tokens)
-  const data = await scraperFetch("/download", { url: sourceUrl });
-  return { r2Key: data.r2Key, durationSec: data.durationSec ?? 0 };
+  const data = await scraperFetch("/download", {
+    url: sourceUrl,
+    ...(targetKey ? { targetKey } : {}),
+  });
+  return {
+    r2Key: data.r2Key,
+    durationSec: data.durationSec ?? 0,
+    thumbnailUrl: data.thumbnailUrl ?? "",
+    fileSizeBytes: data.fileSizeBytes ?? 0,
+  };
 }
 
 /**

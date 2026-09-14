@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/layout/navbar";
 
 export const metadata = {
-  title: "Privacy Policy — Genesis Studio",
-  description: "Genesis Studio privacy policy — how we collect, use, and protect your data.",
+  title: "Privacy Policy — iVideo Studio",
+  description: "iVideo Studio privacy policy — how we collect, use, and protect your data.",
 };
 
 export default function PrivacyPage() {
@@ -63,8 +63,41 @@ export default function PrivacyPage() {
             <p className="mt-2">We do not use advertising or tracking cookies. You can manage cookie preferences in your browser settings.</p>
           </section>
 
+          {/* Meta requires a policy that states plainly what Page data is
+              taken, why, and how someone removes it. This section is what the
+              App Review reads. */}
+          <section id="facebook">
+            <h2 className="text-lg font-semibold text-white mb-3">6. Connecting a Facebook Page</h2>
+            <p className="mb-2">
+              Connecting a Facebook Page is entirely optional. If you choose to connect one, we ask
+              Facebook only for what publishing requires:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-zinc-400">
+              <li><strong className="text-zinc-200">pages_show_list:</strong> to show you which Pages you manage, so you can pick one</li>
+              <li><strong className="text-zinc-200">pages_manage_posts:</strong> to publish the videos you ask us to publish</li>
+              <li><strong className="text-zinc-200">pages_read_engagement:</strong> to show you views and reactions on those posts</li>
+            </ul>
+            <p className="mt-2">
+              We store the Page&apos;s name, its Facebook Page ID and an access token for that Page. We do
+              not read your personal profile, your friends, your messages, or any Page content you did
+              not publish through us. We never post anything you have not asked us to post, and we never
+              share or sell this data.
+            </p>
+            <p className="mt-2">
+              <strong className="text-zinc-200">Removing it:</strong> disconnect the Page in{" "}
+              <a href="/settings" className="text-violet-400 hover:text-violet-300">Settings</a> and its
+              token is deleted immediately. You can also remove iVideo Studio from{" "}
+              <a href="https://www.facebook.com/settings?tab=business_tools" className="text-violet-400 hover:text-violet-300" rel="noopener noreferrer" target="_blank">
+                Facebook Settings → Business Integrations
+              </a>
+              , which tells us to delete it. To request deletion of everything we hold, email{" "}
+              <a href="mailto:support@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">support@ivideostudio.ai</a>{" "}
+              and we will confirm within 30 days.
+            </p>
+          </section>
+
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">6. Third-Party Services</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">7. Third-Party Services</h2>
             <p className="mb-2">We share data with the following third-party processors:</p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li><strong className="text-zinc-200">Clerk:</strong> Authentication and user management</li>
@@ -79,7 +112,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">7. Your Rights (POPIA &amp; GDPR)</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">8. Your Rights (POPIA &amp; GDPR)</h2>
             <p className="mb-2">Under the Protection of Personal Information Act (POPIA) of South Africa and the General Data Protection Regulation (GDPR), you have the right to:</p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li><strong className="text-zinc-200">Access:</strong> Request a copy of your personal data</li>
@@ -94,27 +127,27 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">8. International Data Transfers</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">9. International Data Transfers</h2>
             <p>Your data may be processed in countries outside South Africa, including the United States and European Union, where our service providers operate. We ensure adequate safeguards are in place through contractual arrangements with our processors.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">9. Children&apos;s Privacy</h2>
-            <p>Genesis Studio is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover such data has been collected, we will delete it promptly.</p>
+            <h2 className="text-lg font-semibold text-white mb-3">10. Children&apos;s Privacy</h2>
+            <p>iVideo Studio is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover such data has been collected, we will delete it promptly.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">10. Changes to This Policy</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">11. Changes to This Policy</h2>
             <p>We may update this Privacy Policy periodically. Material changes will be communicated via email or in-app notification. Continued use after changes constitutes acceptance of the updated policy.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">11. Information Officer</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">12. Information Officer</h2>
             <p>In accordance with POPIA, our Information Officer can be contacted at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>. Complaints may also be lodged with the Information Regulator of South Africa.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">12. Contact</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">13. Contact</h2>
             <p>For privacy concerns or data requests, contact us at <a href="mailto:hello@ivideostudio.ai" className="text-violet-400 hover:text-violet-300">hello@ivideostudio.ai</a>.</p>
           </section>
         </div>

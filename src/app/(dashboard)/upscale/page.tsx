@@ -23,11 +23,7 @@ const RESOLUTION_OPTIONS = [
   { value: "4k", label: "4K (Ultra HD)", minPlan: "pro" },
 ] as const;
 
-const INTERPOLATION_OPTIONS = [
-  { value: "none", label: "None", minPlan: "free" },
-  { value: "24-30", label: "24 \u2192 30 fps", minPlan: "studio" },
-  { value: "24-60", label: "24 \u2192 60 fps", minPlan: "studio", badge: "Pro+" },
-] as { value: string; label: string; minPlan: string; badge?: string }[];
+
 
 export default function UpscalePage() {
   const { user, updateCreditBalance, videos, setCreditPurchaseOpen, isInitialized } = useStore();
@@ -44,7 +40,6 @@ export default function UpscalePage() {
 
   // Settings
   const [targetResolution, setTargetResolution] = useState<"1080p" | "4k">("1080p");
-  const [frameInterpolation, setFrameInterpolation] = useState<string>("none");
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -65,7 +60,6 @@ export default function UpscalePage() {
   const hasVideo = !!videoFile || !!selectedGalleryVideoId;
   const canUpscale1080 = user?.isOwner || planAtLeast(userPlan, "creator");
   const canUpscale4k = user?.isOwner || planAtLeast(userPlan, "pro");
-  const canInterpolate = user?.isOwner || planAtLeast(userPlan, "studio");
 
   const selectedGalleryVideo = videos.find((v) => v.id === selectedGalleryVideoId);
 
@@ -149,11 +143,6 @@ export default function UpscalePage() {
       return;
     }
 
-    if (frameInterpolation !== "none" && !canInterpolate) {
-      setError("Frame interpolation requires a Studio plan.");
-      upscaleLockRef.current = false;
-      return;
-    }
 
     if (!hasEnoughCredits) {
       setError(
@@ -193,7 +182,6 @@ export default function UpscalePage() {
         body: JSON.stringify({
           videoUrl,
           targetResolution,
-          frameInterpolation: frameInterpolation !== "none" ? frameInterpolation : undefined,
           videoDuration,
         }),
       });
@@ -422,52 +410,6 @@ export default function UpscalePage() {
             </CardContent>
           </Card>
 
-          {/* Frame Interpolation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Frame Interpolation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                {INTERPOLATION_OPTIONS.map((opt) => {
-                  const isActive = frameInterpolation === opt.value;
-                  const isLocked = opt.value !== "none" && !canInterpolate;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => !isLocked && setFrameInterpolation(opt.value)}
-                      disabled={isLocked}
-                      className={`p-3 rounded-xl border text-center transition-all duration-200 ${
-                        isLocked
-                          ? "opacity-40 cursor-not-allowed border-white/[0.04]"
-                          : isActive
-                          ? "border-violet-500/40 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                          : "border-white/[0.10] bg-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span
-                          className={`text-sm font-medium ${
-                            isActive ? "text-violet-300" : "text-zinc-300"
-                          }`}
-                        >
-                          {opt.label}
-                        </span>
-                        {opt.badge && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                            {opt.badge}
-                          </span>
-                        )}
-                      </div>
-                      {isLocked && opt.value !== "none" && (
-                        <div className="text-[10px] text-zinc-400 mt-1">Studio plan</div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Result Preview */}
           {resultUrl && (
@@ -524,16 +466,6 @@ export default function UpscalePage() {
                   <span className="text-zinc-400">Target</span>
                   <span className="text-zinc-200">
                     {targetResolution === "4k" ? "4K Ultra HD" : "1080p HD"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Interpolation</span>
-                  <span className="text-zinc-200">
-                    {frameInterpolation === "none"
-                      ? "None"
-                      : frameInterpolation === "24-30"
-                      ? "24 \u2192 30 fps"
-                      : "24 \u2192 60 fps"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

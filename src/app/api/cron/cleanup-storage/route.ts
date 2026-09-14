@@ -99,9 +99,25 @@ export async function GET(req: Request) {
 
   console.log(`[cleanup] Done: checked=${results.checked}, deleted=${results.deleted}, errors=${results.errors}`);
 
+  // Page views are only useful as recent trend data, and they are the one
+  // table that grows with traffic rather than with customers. Twelve months is
+  // well past any question the admin dashboard asks (its widest window is 30
+  // days) and keeps year-on-year comparison possible.
+  let prunedPageViews = 0;
+  try {
+    const { getD1 } = await import("@/lib/d1");
+    const res = await getD1()
+      .prepare("DELETE FROM page_views WHERE created_at < datetime('now','-365 day')")
+      .run();
+    prunedPageViews = (res.meta as { changes?: number })?.changes ?? 0;
+  } catch (err) {
+    console.error("[CLEANUP] Page view prune failed:", err);
+  }
+
   return NextResponse.json({
     success: true,
     ...results,
+    prunedPageViews,
     timestamp: new Date().toISOString(),
   });
 }

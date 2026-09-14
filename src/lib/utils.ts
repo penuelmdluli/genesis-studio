@@ -86,7 +86,11 @@ export function estimateCreditCost(
     || 50;
 
   const durationMultiplier = duration / 5; // normalized to 5s base
-  const draftDiscount = isDraft ? 0.3 : 1;
+  // Draft pricing is only real when the model has a cheaper draft slug to
+  // run on. Without one the provider bills the full render, so a 70%
+  // discount was a 70% loss on every "draft" Seedance/Kling job.
+  const hasDraftSlug = !!(model.wavespeedModelIdDraft || model.wavespeedModelIdDraftI2V);
+  const draftDiscount = isDraft && hasDraftSlug ? 0.3 : 1;
   const audioSurcharge = enableAudio ? 1.3 : 1; // +30% for live sound
 
   return Math.ceil(baseCost * durationMultiplier * draftDiscount * audioSurcharge);

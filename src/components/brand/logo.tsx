@@ -41,7 +41,7 @@ function LogoMark({ size = 32, className = "" }: { size?: number; className?: st
 function LogoText({ className = "" }: { className?: string }) {
   return (
     <span className={`font-bold gradient-text ${className}`}>
-      Genesis Studio
+      iVideo Studio
     </span>
   );
 }
@@ -65,7 +65,7 @@ export function Logo({
 }) {
   const config = {
     sm: { icon: 28, text: "text-base", gap: "gap-2" },
-    md: { icon: 32, text: "text-lg", gap: "gap-2.5" },
+    md: { icon: 32, text: "text-lg whitespace-nowrap", gap: "gap-2.5" },
     lg: { icon: 44, text: "text-2xl", gap: "gap-2.5" },
   }[size];
 

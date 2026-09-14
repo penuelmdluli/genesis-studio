@@ -8,6 +8,8 @@ import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import { EmailCapture } from "@/components/email-capture";
 import { WebSiteSchema } from "@/components/structured-data";
 import Script from "next/script";
+import { Suspense } from "react";
+import { PageViewTracker } from "@/components/page-view-tracker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -23,18 +25,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://ivideostudio.ai"),
   title: {
-    default: "Genesis Studio | AI Video Generation Platform",
-    template: "%s | Genesis Studio",
+    default: "iVideo Studio | AI Video Generation Platform",
+    template: "%s | iVideo Studio",
   },
   description:
-    "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ AI models, 100 free credits. Made in South Africa.",
+    "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
   keywords: [
     "AI video generator",
     "AI video maker",
     "text to video",
     "image to video",
     "AI dance video",
-    "Genesis Studio",
+    "iVideo Studio",
     "Motion Control",
     "Brain Studio",
     "AI video South Africa",
@@ -45,18 +47,18 @@ export const metadata: Metadata = {
     "AI short film maker",
   ],
   openGraph: {
-    title: "Genesis Studio — AI Video Creation Platform",
+    title: "iVideo Studio — AI Video Creation Platform",
     description:
-      "Create AI videos in seconds. Text to video, dance transfer, short films with audio. 10+ models. 100 free credits. Made in South Africa.",
+      "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
     type: "website",
-    siteName: "Genesis Studio",
+    siteName: "iVideo Studio",
     locale: "en_ZA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Genesis Studio — Create AI Videos in Seconds",
+    title: "iVideo Studio — Create AI Videos in Seconds",
     description:
-      "Text to video, dance transfer, short films with audio. 10+ AI models. 100 free credits.",
+      "Text to video, dance transfer, short films with audio. 100 free credits.",
   },
   robots: {
     index: true,
@@ -71,7 +73,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Genesis Studio",
+    title: "iVideo Studio",
   },
   icons: {
     icon: [
@@ -102,6 +104,12 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-[#0A0A0F] text-white" suppressHydrationWarning>
           <ToastProvider>{children}</ToastProvider>
           <ChatBot />
+          {/* First-party page views. Wrapped in Suspense because it reads
+              searchParams for UTM tags, and without a boundary that would
+              client-render every prerendered page above it. */}
+          <Suspense fallback={null}>
+            <PageViewTracker />
+          </Suspense>
           <CookieConsent />
           <RegisterServiceWorker />
           <EmailCapture />

@@ -28,10 +28,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // The old fallback was https://genesis-studio.vercel.app, a host this
+  // product has not been served from since it moved to Cloudflare Workers. If
+  // APP_URL were ever unset this cron would have posted links to a dead
+  // domain, publicly, with nothing to indicate anything was wrong.
   const appUrl =
     process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://genesis-studio.vercel.app";
+    "https://ivideostudio.ai";
 
   console.log("[CRON] Content pipeline starting...");
 

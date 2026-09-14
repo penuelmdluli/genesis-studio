@@ -29,6 +29,7 @@ export const MODEL_GPU_MAP: Record<string, string> = {
   "kling-3.0": "FAL_API",
   "veo-3.1": "FAL_API",
   "seedance-1.5": "FAL_API",
+  "seedance-2.5": "FAL_API",
 };
 
 // FAL.AI per-second API costs (USD) — these are what FAL charges us
@@ -37,6 +38,8 @@ export const FAL_API_COSTS: Record<string, number> = {
   "kling-3.0": 0.050,    // ~$0.50 per 10s video
   "veo-3.1": 0.100,      // ~$0.80 per 8s video
   "seedance-1.5": 0.020, // ~$0.20 per 10s video
+  // Measured 2026-09-14: $1.62 for 5s at 720p. The catalogue says $0.90.
+  "seedance-2.5": 0.324,
 };
 
 // Claude API cost per Brain Studio generation (USD)

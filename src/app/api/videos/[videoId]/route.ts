@@ -3,12 +3,25 @@ import { getAuthUserId } from "@/lib/auth";
 import { getDb } from "@/lib/db-driver";
 import { getUserByClerkId, deleteVideo } from "@/lib/db";
 import { r2PublicUrl, deleteFile, verifyR2Upload } from "@/lib/storage";
+import { isOwnerClerkId } from "@/lib/credits";
 
 async function findVideoKeyInR2(
   userId: string,
-  jobId: string
+  jobId: string,
+  videoId?: string
 ): Promise<string | null> {
+  // Derived files are stored under their OWN id with a prefix, never under
+  // the job they came from. Those are tried first: a joined episode and a
+  // branded copy both share a job id with something else, so falling through
+  // to the job-based names would serve the wrong video — an assembled
+  // episode returned 404, and a branded copy played the unbranded original.
+  const derived = videoId
+    ? [`videos/${userId}/episode-${videoId}.mp4`, `videos/${userId}/branded-${videoId}.mp4`]
+    : [];
+
   const candidates = [
+    ...derived,
+    `mimic-final/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}.mp4`,
     `videos/${userId}/${jobId}`,
     `videos/${userId}/${jobId}.webm`,
@@ -37,7 +50,7 @@ export async function GET(
     const supabase = getDb();
     const { data: video } = await supabase
       .from("videos")
-      .select("user_id, job_id, is_public")
+      .select("user_id, job_id, is_public, title")
       .eq("id", videoId)
       .single();
 
@@ -64,7 +77,7 @@ export async function GET(
 
     // Find the video file in R2 (tries multiple key formats)
     const r2LookupId = video.job_id || videoId;
-    const key = await findVideoKeyInR2(video.user_id, r2LookupId);
+    const key = await findVideoKeyInR2(video.user_id, r2LookupId, videoId);
     if (!key) {
       return NextResponse.json(
         { error: "Video file not found in storage" },
@@ -75,6 +88,46 @@ export async function GET(
     // Redirect to the public R2 URL (custom domain).
     // Bytes flow R2 → browser directly, never through the Worker.
     const publicUrl = r2PublicUrl(key);
+
+    // A plain redirect sends the browser to another origin, where the
+    // download attribute on a link is ignored and the file simply plays.
+    // `?download=1` streams it back with a filename attached so Save works.
+    // A free account downloads with our mark on it, or upgrades to download
+    // clean. Refused here rather than quietly handing over an unbranded file,
+    // because the watermark is the whole trade for a free plan.
+    if (req.nextUrl.searchParams.get("download") === "1") {
+      const { data: owner } = await supabase
+        .from("users")
+        .select("plan, clerk_id")
+        .eq("id", video.user_id)
+        .maybeSingle();
+      const isBrandedCopy = key.includes("/branded-") || key.includes("/episode-");
+      if (owner?.plan === "free" && !isBrandedCopy && !isOwnerClerkId(owner?.clerk_id || "")) {
+        return NextResponse.json(
+          {
+            error: "Free downloads carry the iVideo Studio logo. Upgrade to download without it.",
+            upgrade: true,
+            brandedDownload: true,
+          },
+          { status: 402 }
+        );
+      }
+    }
+
+    if (req.nextUrl.searchParams.get("download") === "1") {
+      const upstream = await fetch(publicUrl);
+      if (!upstream.ok || !upstream.body) {
+        return NextResponse.json({ error: "Could not fetch that video" }, { status: 502 });
+      }
+      const safeName = (video.title || "video").replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "video";
+      return new NextResponse(upstream.body, {
+        headers: {
+          "Content-Type": "video/mp4",
+          "Content-Disposition": `attachment; filename="${safeName}.mp4"`,
+          "Cache-Control": "private, max-age=3540",
+        },
+      });
+    }
 
     return NextResponse.redirect(publicUrl, {
       status: 302,

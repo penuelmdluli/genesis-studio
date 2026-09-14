@@ -14,6 +14,7 @@ export type ModelId =
   | "kling-3.0"
   | "veo-3.1"
   | "seedance-1.5"
+  | "seedance-2.5"
   | "ai-singer";
 
 export type ModelTier =
@@ -105,7 +106,18 @@ export interface AIModel {
   falModelIdI2V?: string;   // FAL.AI model ID for i2v
   wavespeedModelId?: string;    // WaveSpeed model ID for t2v
   wavespeedModelIdI2V?: string; // WaveSpeed model ID for i2v
+  // Cheaper/faster slugs used when the caller asks for a draft. Optional — a
+  // model without them ignores the draft flag and uses the ones above, so
+  // adding a draft tier can never break an existing model.
+  wavespeedModelIdDraft?: string;    // WaveSpeed draft model ID for t2v
+  wavespeedModelIdDraftI2V?: string; // WaveSpeed draft model ID for i2v
   maxDuration?: number;     // max duration in seconds
+  /**
+   * Exact durations the provider accepts, when it accepts a fixed set rather
+   * than a range. WaveSpeed's wan-2.2 tiers take 5 or 8 only and reject
+   * anything else with a 400 — maxDuration alone cannot express that.
+   */
+  supportedDurations?: number[];
   launchAvailable?: boolean; // visible in model selector at launch
 }
 

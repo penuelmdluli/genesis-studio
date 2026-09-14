@@ -39,6 +39,7 @@ import {
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 import { trackEvent } from "@/lib/analytics-events";
 import { AppSchema, FAQSchema } from "@/components/structured-data";
+import { useAuth } from "@/components/auth/auth-provider";
 
 // No hardcoded videos — everything pulled from API/database
 
@@ -69,7 +70,7 @@ const howItWorksSteps = [
     num: "2",
     icon: Film,
     title: "AI brings it to life",
-    description: "10+ models compete to render the best result in seconds",
+    description: "Your prompt is rendered by the model best suited to it",
   },
   {
     num: "3",
@@ -87,7 +88,7 @@ const capabilities = [
   {
     icon: Zap,
     title: "Motion Control",
-    description: "Upload a character photo + dance video, paste a TikTok URL, or pick from 40+ fun effects. AI makes your character perform the moves.",
+    description: "Upload a character photo + dance video, paste a TikTok URL, or pick from 20+ fun effects. AI makes your character perform the moves.",
     models: [],
     badge: "HOT",
   },
@@ -106,7 +107,7 @@ const capabilities = [
   },
   {
     icon: Film,
-    title: "10+ AI Models",
+    title: "Multiple AI Models",
     description: "From lightning-fast drafts to Hollywood-grade output. Pick the right model for your content, all in one place.",
     models: [],
   },
@@ -117,6 +118,11 @@ const capabilities = [
 // ============================================
 
 export default function LandingPage() {
+  // A signed-in visitor (owner, paying customer, or free user) is not a
+  // prospect. Every "Get 100 Free Credits" call to action becomes a way back
+  // into the product instead, and plan cards reflect what they already have.
+  const { isSignedIn, user: authUser } = useAuth();
+  const currentPlan = isSignedIn ? authUser?.plan ?? "free" : null;
   // Real platform stats
   const [stats, setStats] = useState<{ totalVideos: number; totalUsers: number; videosToday: number } | null>(null);
 
@@ -201,16 +207,16 @@ export default function LandingPage() {
             <p className="text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto mb-6 sm:mb-8 leading-relaxed">
               Text to video. Image to video. Dance transfer. Full short films.
               <br className="hidden sm:block" />
-              10+ AI models. One platform. Made in South Africa.
+              One platform. Made in South Africa.
             </p>
           </MotionSection>
 
           <MotionSection delay={0.2}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 w-full sm:w-auto px-4 sm:px-0">
-              <Link href="/sign-up" className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
+              <Link href={isSignedIn ? "/generate" : "/sign-up"} className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
-                  Get 100 Free Credits
+                  {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
                 </Button>
               </Link>
               <Link href="#community" className="w-full sm:w-auto">
@@ -221,7 +227,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="text-xs sm:text-sm text-zinc-400">
-              No credit card required &bull; First video in 60 seconds
+              No credit card required &bull; Most videos render in a few minutes
             </p>
           </MotionSection>
 
@@ -244,7 +250,7 @@ export default function LandingPage() {
                 </>
               )}
               <span className="hidden sm:block text-zinc-400">
-                Powered by 12 AI models
+                Powered by best-in-class AI models
               </span>
             </div>
           </MotionSection>
@@ -462,15 +468,24 @@ export default function LandingPage() {
                       ))}
                     </ul>
 
-                    <Link href={plan.price === 0 ? "/sign-up" : "/pricing"}>
-                      <Button
-                        variant={isPopular ? "primary" : "secondary"}
-                        className="w-full"
-                      >
-                        {plan.price === 0 ? "Get 100 Free Credits" : "Subscribe"}
-                        <ArrowRight className="w-4 h-4" />
+                    {currentPlan === plan.id ? (
+                      <Button variant="secondary" className="w-full" disabled>
+                        <Check className="w-4 h-4" />
+                        Your current plan
                       </Button>
-                    </Link>
+                    ) : (
+                      <Link href={plan.price === 0 ? (isSignedIn ? "/dashboard" : "/sign-up") : "/pricing"}>
+                        <Button
+                          variant={isPopular ? "primary" : "secondary"}
+                          className="w-full"
+                        >
+                          {plan.price === 0
+                            ? isSignedIn ? "Open Studio" : "Get 100 Free Credits"
+                            : isSignedIn ? "Upgrade" : "Subscribe"}
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </StaggerItem>
               );
@@ -536,13 +551,13 @@ export default function LandingPage() {
                 Create your first AI video now.
               </h2>
               <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
-                100 free credits. No credit card. Your first video renders in under 60 seconds.
+                100 free credits. No credit card. Start creating in minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href="/sign-up" onClick={() => trackEvent("cta_click", { location: "footer" })}>
+                <Link href={isSignedIn ? "/generate" : "/sign-up"} onClick={() => trackEvent("cta_click", { location: "footer" })}>
                   <Button size="lg" className="text-base px-10 py-4">
                     <Sparkles className="w-5 h-5" />
-                    Get 100 Free Credits
+                    {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
                   </Button>
                 </Link>
                 <Link href="/motion-control">
@@ -569,7 +584,7 @@ export default function LandingPage() {
                 <Logo size="sm" />
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                AI video creation platform built in South Africa. 10+ models, Hollywood quality.
+                AI video creation platform built in South Africa.
               </p>
             </div>
 
@@ -640,33 +655,17 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            {/* Social */}
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-200 mb-4">Social</h4>
-              <ul className="space-y-2.5">
-                {[
-                  { href: "https://twitter.com/genesisstudio", label: "Twitter" },
-                  { href: "https://github.com/genesisstudio", label: "GitHub" },
-                ].map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Social links removed 2026-09-09: twitter.com/genesisstudio
+                returns 404 and the GitHub account is empty (0 repos, no
+                profile). A dead social link on a commercial homepage costs
+                more trust than an absent one. Restore this block when the
+                accounts actually exist. */}
           </div>
 
           {/* Copyright */}
           <div className="pt-8 border-t border-white/[0.10] text-center">
             <p className="text-sm text-zinc-400">
-              &copy; 2026 Genesis Studio. All rights reserved.
+              &copy; 2026 iVideo Studio. All rights reserved.
             </p>
           </div>
         </div>

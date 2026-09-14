@@ -11,9 +11,13 @@ import { PlanId } from "@/types";
 import { PLANS, CREDIT_PACKS } from "@/lib/constants";
 import { WebhookResult } from "./types";
 import { sendSlackAlert } from "@/lib/alerts";
+import { getPendingCheckout, markCheckout } from "./pending";
+import { nextPeriodEnd } from "@/lib/billing";
+import { sendPlanUpgradeEmail, sendCreditPackReceiptEmail } from "@/lib/email";
+import { notifyOwner } from "@/lib/owner-notify";
 
 const PLAN_CREDITS: Record<PlanId, number> = {
-  free: 50,
+  free: 100,
   creator: 500,
   pro: 2000,
   studio: 8000,
@@ -121,6 +125,13 @@ export async function processWebhookPayment(
       `[${providerName.toUpperCase()}] Non-success event: ${result.event} (ref: ${result.reference})`
     );
     if (result.event === "payment.failed") {
+      notifyOwner({
+        subject: "A customer payment failed",
+        title: "Payment failed",
+        body: `A ${providerName} payment did not go through. If this repeats across customers, the payment rail itself may be down.`,
+        severity: "warning",
+        details: [["Provider", providerName], ["Reference", result.reference || "—"], ["User", result.metadata?.userId || "unknown"]],
+      }).catch(() => {});
       sendSlackAlert({
         level: "warning",
         title: "Payment failed",
@@ -136,6 +147,20 @@ export async function processWebhookPayment(
       `[${providerName.toUpperCase()}] Duplicate webhook skipped (ref: ${result.reference})`
     );
     return { success: true, message: "Duplicate webhook — already processed" };
+  }
+
+  // Second guard, keyed on the checkout rather than the event reference. The
+  // post-checkout verify path and the webhook both settle the same checkout;
+  // whichever runs second must find it already completed.
+  const checkoutId = result.metadata?.checkoutId || "";
+  if (checkoutId) {
+    const pending = await getPendingCheckout(checkoutId);
+    if (pending?.status === "completed") {
+      console.log(
+        `[${providerName.toUpperCase()}] Checkout ${checkoutId} already settled — skipping`
+      );
+      return { success: true, message: "Duplicate webhook — checkout already settled" };
+    }
   }
 
   // --- Amount verification ---
@@ -181,12 +206,51 @@ export async function processWebhookPayment(
     await updateUserPlan(user.id, planId);
     await grantSubscriptionCredits(user.id, PLAN_CREDITS[planId]);
 
+    // A one-off card payment buys 31 days. Renewing early extends from the
+    // current end, so nobody loses days by paying before the reminder.
+    const currentEnd = user.plan_expires_at ? new Date(user.plan_expires_at) : null;
+    const extendFrom = currentEnd && currentEnd > new Date() && user.plan === planId ? currentEnd : new Date();
+    const periodEnd = nextPeriodEnd(extendFrom);
+    await supabase
+      .from("users")
+      .update({ plan_expires_at: periodEnd })
+      .eq("id", user.id);
+
     // Record successful processing for idempotency
     await recordWebhookEvent(result.reference, providerName, "subscription", user.id, metadata);
+    await markCheckout(checkoutId, "completed");
 
     console.log(
       `[${providerName.toUpperCase()}] Subscription activated: user ${user.id}, plan ${planId}, ${PLAN_CREDITS[planId]} credits`
     );
+
+    const planLabel = planId.charAt(0).toUpperCase() + planId.slice(1);
+
+    if (user.email) {
+      sendPlanUpgradeEmail(
+        user.email,
+        user.name || "Creator",
+        planLabel,
+        { amountCents: result.amount, currency: "ZAR", reference: result.reference, provider: providerName },
+        periodEnd
+      ).catch((err) => console.error(`[${providerName.toUpperCase()}] Upgrade email failed:`, err));
+    }
+
+    notifyOwner({
+      subject: `New ${planLabel} subscriber — ${user.email}`,
+      title: "You have a new subscriber",
+      body: `<strong>${user.name || "A customer"}</strong> (${user.email}) just subscribed to the <strong>${planLabel}</strong> plan.`,
+      severity: "info",
+      details: [
+        ["Plan", planLabel],
+        ["Amount", result.amount ? `R${(result.amount / 100).toFixed(2)}` : "—"],
+        ["Credits granted", PLAN_CREDITS[planId].toLocaleString()],
+        ["Paid via", providerName],
+        ["Reference", result.reference],
+      ],
+      ctaLabel: "View customers",
+      ctaHref: `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/customers`,
+    }).catch(() => {});
 
     sendSlackAlert({
       level: "info",
@@ -211,7 +275,7 @@ export async function processWebhookPayment(
       return { success: false, message: "Invalid credit amount" };
     }
 
-    await addCreditPackCredits(
+    const newBalance = await addCreditPackCredits(
       user.id,
       credits,
       `${credits} credit pack (${providerName})`
@@ -219,6 +283,32 @@ export async function processWebhookPayment(
 
     // Record successful processing for idempotency
     await recordWebhookEvent(result.reference, providerName, "credit_pack", user.id, metadata);
+    await markCheckout(checkoutId, "completed");
+
+    if (user.email) {
+      sendCreditPackReceiptEmail(user.email, user.name || "Creator", credits, newBalance, {
+        amountCents: result.amount,
+        currency: "ZAR",
+        reference: result.reference,
+        provider: providerName,
+      }).catch((err) => console.error(`[${providerName.toUpperCase()}] Receipt email failed:`, err));
+    }
+
+    notifyOwner({
+      subject: `Credit pack sold — ${user.email}`,
+      title: "Credit pack purchased",
+      body: `<strong>${user.name || "A customer"}</strong> (${user.email}) bought <strong>${credits.toLocaleString()} credits</strong>.`,
+      severity: "info",
+      details: [
+        ["Credits", credits.toLocaleString()],
+        ["Amount", result.amount ? `R${(result.amount / 100).toFixed(2)}` : "—"],
+        ["New balance", newBalance.toLocaleString()],
+        ["Paid via", providerName],
+        ["Reference", result.reference],
+      ],
+      ctaLabel: "View customers",
+      ctaHref: `${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/customers`,
+    }).catch(() => {});
 
     console.log(
       `[${providerName.toUpperCase()}] Credit pack purchased: user ${user.id}, ${credits} credits (pack ${packId})`

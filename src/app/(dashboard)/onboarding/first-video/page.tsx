@@ -173,25 +173,112 @@ export default function FirstVideoPage() {
     <PageTransition className="max-w-3xl mx-auto py-8 px-4">
       {/* Welcome */}
       {step === "welcome" && (
-        <MotionSection className="text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center mx-auto shadow-lg shadow-violet-600/30">
-            <Sparkles className="w-8 h-8 text-white" />
+        <MotionSection className="space-y-8">
+          {/* A first screen that shows the product rather than describing it.
+              The old one was a title, a line of text and two buttons — a new
+              creator could not tell what this thing made or where anything
+              lived. */}
+          <div className="relative overflow-hidden rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-950/70 via-[#12121a] to-cyan-950/40 p-7 sm:p-10">
+            <div className="absolute -top-20 -right-16 w-72 h-72 rounded-full bg-violet-600/20 blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-cyan-500/15 blur-3xl" />
+            <div className="relative">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.08] border border-white/[0.12] text-[11px] font-semibold text-violet-200 uppercase tracking-wider">
+                <Sparkles className="w-3 h-3" /> {user?.creditBalance ?? 100} free credits
+              </span>
+              <h1 className="mt-4 text-3xl sm:text-4xl font-bold text-white leading-tight">
+                Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}.
+                <br />
+                <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+                  Let&apos;s make something today.
+                </span>
+              </h1>
+              <p className="mt-3 text-zinc-300 max-w-lg leading-relaxed">
+                Everything here is built for creators growing a page — reels with sound,
+                your face speaking any script, beats in your own genre. Start with a scene
+                and you&apos;ll have a video in about 90 seconds.
+              </p>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <Button size="lg" onClick={() => setStep("pick")} className="shadow-lg shadow-violet-600/30">
+                  <Play className="w-5 h-5" /> Make my first video
+                </Button>
+                <Button variant="ghost" size="lg" onClick={handleSkip}>
+                  Explore on my own
+                </Button>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-zinc-100">
-            Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!
-          </h1>
-          <p className="text-zinc-400 text-lg max-w-md mx-auto">
-            Let&apos;s make your first AI video in under 90 seconds. Pick a scene below and watch the magic happen.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" onClick={() => setStep("pick")}>
-              <Play className="w-5 h-5" /> Pick a scene
-            </Button>
-            <Button variant="ghost" size="lg" onClick={handleSkip}>
-              Skip for now
-            </Button>
+
+          {/* Where things live. A new account otherwise has to guess what the
+              sidebar words mean, so each one says what it is FOR. */}
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-300 mb-3 px-1">What you can make here</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                {
+                  href: "/generate",
+                  icon: "🎬",
+                  title: "Generate a video",
+                  desc: "Describe a scene, get a cinematic clip with sound.",
+                  tint: "from-violet-600/20 to-violet-600/5 border-violet-500/25",
+                },
+                {
+                  href: "/tools",
+                  icon: "🧰",
+                  title: "Creator Tools",
+                  badge: "NEW",
+                  desc: "Add sound, dub into another language, remove a background, make a beat.",
+                  tint: "from-cyan-600/20 to-cyan-600/5 border-cyan-500/25",
+                },
+                {
+                  href: "/talking-avatar",
+                  icon: "🗣️",
+                  title: "AI Avatar",
+                  desc: "Upload a face, paste a script — it speaks, in SA English if you like.",
+                  tint: "from-fuchsia-600/20 to-fuchsia-600/5 border-fuchsia-500/25",
+                },
+                {
+                  href: "/ai-singer",
+                  icon: "🎤",
+                  title: "AI Singer",
+                  badge: "NEW",
+                  desc: "Amapiano, gqom, gospel — your face singing your lyrics.",
+                  tint: "from-amber-600/20 to-amber-600/5 border-amber-500/25",
+                },
+              ].map((c) => (
+                <a
+                  key={c.href}
+                  href={c.href}
+                  className={`group rounded-2xl border bg-gradient-to-br ${c.tint} p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl leading-none">{c.icon}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-zinc-100">{c.title}</span>
+                        {c.badge && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/25 text-violet-200 border border-violet-400/30">
+                            {c.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[13px] text-zinc-400 leading-snug mt-1">{c.desc}</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-zinc-500 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
-          <p className="text-xs text-zinc-400">You have {user?.creditBalance ?? 50} credits to start</p>
+
+          {/* The one thing people miss: finished videos are not the end of the
+              road, they are the input to everything else. */}
+          <div className="rounded-2xl border border-white/[0.10] bg-white/[0.03] p-4">
+            <p className="text-sm text-zinc-300">
+              <strong className="text-white">Tip:</strong> every finished video lands in your{" "}
+              <a href="/gallery" className="text-violet-400 hover:text-violet-300 underline underline-offset-2">Gallery</a>,
+              where one tap adds sound, captions or another language before you post it.
+            </p>
+          </div>
         </MotionSection>
       )}
 

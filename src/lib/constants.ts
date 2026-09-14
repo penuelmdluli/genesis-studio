@@ -16,11 +16,29 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
       "MoE architecture. Best cinematic quality. Complex motion & camera movements.",
     maxResolution: "1080p",
     avgGenerationTime: 300,
-    creditCost: { "480p": 20, "720p": 40, "1080p": 80 },
+    creditCost: { "480p": 30, "720p": 40, "1080p": 80 },
     gpuRequirement: "48GB+ (A6000/H100)",
     license: "Apache 2.0",
-    provider: "runpod-hub",
+    // Was provider:"runpod-hub" against RUNPOD_ENDPOINT_WAN22, which has
+    // answered 404 since the endpoint was deleted; every RunPod endpoint on
+    // the account is also scaled to workersMax=0. "fal" here means "the
+    // hosted router" (WaveSpeed, then FAL) rather than FAL specifically —
+    // see lib/provider-router.ts. Slugs verified live on WaveSpeed
+    // 2026-09-09: a bogus slug answers "Model not found", these answer with
+    // a field-validation error, and t2v-480p-ultra-fast completed a real
+    // generation.
+    provider: "fal",
+    wavespeedModelId: "wavespeed-ai/wan-2.2/t2v-480p",
+    wavespeedModelIdI2V: "wavespeed-ai/wan-2.2/i2v-480p",
+    wavespeedModelIdDraft: "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
+    wavespeedModelIdDraftI2V: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
     maxDuration: 8,
+    // Probed against every wan-2.2 tier on 2026-09-09: all six answer
+    // 'field "duration" must be one of [5, 8]'. A request for 10s was
+    // rejected by WaveSpeed, fell through to FAL, and surfaced to the user as
+    // "No FAL.AI model ID configured for wan-2.2" — an error naming a vendor
+    // the model never uses.
+    supportedDurations: [5, 8],
   },
   "hunyuan-video": {
     id: "hunyuan-video",
@@ -169,6 +187,33 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     wavespeedModelId: "bytedance/seedance-v1.5-pro/text-to-video",
     wavespeedModelIdI2V: "bytedance/seedance-v1.5-pro/image-to-video",
     maxDuration: 10,
+  },
+  "seedance-2.5": {
+    id: "seedance-2.5",
+    name: "Seedance 2.5",
+    tier: "hollywood",
+    types: ["t2v", "i2v"],
+    description:
+      "ByteDance's newest cinematic model. Hollywood-grade motion, camera work and lighting — the best picture on the platform.",
+    maxResolution: "720p",
+    avgGenerationTime: 120,
+    // Measured, not taken from the catalogue: a 5-second 720p render charged
+    // $1.62 against a listed $0.90. 324 credits per 5 seconds is 2x cost at
+    // the cheapest credit value and about 4.8x on the Creator plan. Renders
+    // are always 720p (see buildRequestBody), so a 1080p request falls back
+    // to this same price rather than being undercharged.
+    creditCost: { "720p": 324 },
+    gpuRequirement: "Managed (WaveSpeed)",
+    license: "Commercial",
+    provider: "wavespeed",
+    // Native audio is left off. Left to make its own soundtrack, this family
+    // of models invents speech — in practice Chinese — and its cost with audio
+    // on has not been measured.
+    hasAudio: false,
+    wavespeedModelId: "bytedance/seedance-2.5/text-to-video",
+    wavespeedModelIdI2V: "bytedance/seedance-2.5/image-to-video",
+    maxDuration: 10,
+    supportedDurations: [5, 10],
   },
   "ai-singer": {
     id: "ai-singer",
@@ -608,7 +653,14 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
   // All generation routes through FAL.AI (always warm, managed infrastructure).
   // RunPod models kept in AI_MODELS registry for historical job lookups but
   // not offered to users for new generations.
-  free: ["seedance-1.5", "mimic-motion"],
+  // seedance-1.5 was the free default and was the single worst path in the
+  // product: 59 failed / 7 completed (89%) across production history, which
+  // is ~46% of every failure ever recorded. Its failures were RunPod 404s
+  // inherited from the old fallback branch, so new users' first impression
+  // was an error from a vendor their model never used. Free now gets wan-2.2,
+  // which routes to WaveSpeed 480p — the cheapest path we have verified end
+  // to end. seedance stays available on paid tiers.
+  free: ["wan-2.2", "mimic-motion"],
   creator: [
     "seedance-1.5",
     "kling-2.6",
@@ -619,6 +671,9 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    // The best picture on the platform and the most expensive to run, so it
+    // sits with Veo on the upper tiers — a reason to move up from Creator.
+    "seedance-2.5",
     "mimic-motion",
   ],
   studio: [
@@ -626,6 +681,7 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    "seedance-2.5",
     "mimic-motion",
   ],
 };
@@ -638,8 +694,8 @@ export const FEATURES: FeatureConfig[] = [
     description: "Upload a photo + audio/text to create a talking video with lip sync",
     category: "create",
     creditCost: "120 credits / 10s",
-    minPlan: "pro",
-    endpointEnvKey: "RUNPOD_ENDPOINT_TALKING_AVATAR",
+    minPlan: "creator",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "avatar-generator",
@@ -665,9 +721,9 @@ export const FEATURES: FeatureConfig[] = [
     name: "Auto Captions",
     description: "Transcribe and add subtitles to any video in 75+ languages",
     category: "audio",
-    creditCost: "10 credits / min",
+    creditCost: "2 credits / video",
     minPlan: "free",
-    endpointEnvKey: "RUNPOD_ENDPOINT_CAPTIONS",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "voice-clone",
@@ -696,7 +752,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "enhance",
     creditCost: "20 credits / 5s",
     minPlan: "creator",
-    endpointEnvKey: "RUNPOD_ENDPOINT_UPSCALE",
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "face-swap",
@@ -715,7 +771,7 @@ export const FEATURES: FeatureConfig[] = [
     category: "image",
     creditCost: "10 credits / 4 images",
     minPlan: "free",
-    endpointEnvKey: "FAL_KEY", // Switched from RunPod SDXL to FAL.AI FLUX Pro
+    endpointEnvKey: "WAVESPEED_API_KEY",
   },
   {
     id: "character-designer",
@@ -767,6 +823,12 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { id: "voice-marcus", name: "Marcus", gender: "male", language: "en" },
   { id: "voice-naledi", name: "Naledi", gender: "female", language: "en-ZA" },
   { id: "voice-thabo", name: "Thabo", gender: "male", language: "en-ZA" },
+  // isiZulu and Afrikaans cost us nothing — the speech engine has had these
+  // voices all along and we were only ever offering English with a SA accent.
+  { id: "voice-thando", name: "Thando", gender: "female", language: "zu-ZA" },
+  { id: "voice-themba", name: "Themba", gender: "male", language: "zu-ZA" },
+  { id: "voice-adri", name: "Adri", gender: "female", language: "af-ZA" },
+  { id: "voice-willem", name: "Willem", gender: "male", language: "af-ZA" },
   { id: "voice-sakura", name: "Sakura", gender: "female", language: "ja" },
   { id: "voice-carlos", name: "Carlos", gender: "male", language: "es" },
   { id: "voice-amelie", name: "Amelie", gender: "female", language: "fr" },

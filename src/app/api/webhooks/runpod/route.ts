@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
         audioTrackId: job.audio_track_id,
       });
 
-      // TODO: Add "Made with Genesis Studio" watermark for free-tier outputs
+      // TODO: Add "Made with iVideo Studio" watermark for free-tier outputs
 
       await updateJobStatus(job.id, {
         status: "completed",
@@ -180,63 +180,13 @@ export async function POST(req: NextRequest) {
         }
       }
     } else if (status === "FAILED") {
-      // Auto-retry: attempt with a fallback model before refunding
-      const retryCount = job.retry_count || 0;
-      const MAX_RETRIES = 1;
-
-      if (retryCount < MAX_RETRIES) {
-        // Find a fallback model of the same type
-        const { AI_MODELS } = await import("@/lib/constants");
-        const currentModel = AI_MODELS[job.model_id as keyof typeof AI_MODELS];
-        const fallbackModels = Object.values(AI_MODELS).filter(
-          (m) => m.id !== job.model_id && m.types.includes(job.type) && !m.comingSoon && m.provider !== "fal"
-        );
-
-        if (fallbackModels.length > 0) {
-          const fallback = fallbackModels[0];
-          console.log(`[RETRY] Job ${job.id} failed on ${job.model_id}, retrying with ${fallback.id}`);
-
-          try {
-            const { submitRunPodJob, buildRunPodInput } = await import("@/lib/runpod");
-            const runpodInput = buildRunPodInput({
-              modelId: fallback.id,
-              type: job.type,
-              prompt: job.prompt,
-              negativePrompt: job.negative_prompt,
-              inputImageUrl: job.input_image_url,
-              inputVideoUrl: job.input_video_url,
-              resolution: job.resolution,
-              duration: job.duration,
-              fps: job.fps,
-              seed: job.seed ? job.seed + 1 : undefined,
-              guidanceScale: job.guidance_scale,
-              numInferenceSteps: job.num_inference_steps,
-              isDraft: job.is_draft,
-              aspectRatio: job.aspect_ratio,
-            });
-
-            const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-            const webhookUrl = `${appUrl}/api/webhooks/runpod`;
-            const retryJob = await submitRunPodJob(fallback.id, runpodInput, webhookUrl, job.type);
-
-            await supabase
-              .from("generation_jobs")
-              .update({
-                model_id: fallback.id,
-                runpod_job_id: retryJob.id,
-                status: "queued",
-                retry_count: retryCount + 1,
-                error_message: `Retrying with ${fallback.name} (original: ${job.model_id} failed)`,
-              })
-              .eq("id", job.id);
-
-            return NextResponse.json({ received: true, retried: true });
-          } catch (retryErr) {
-            console.error("[RETRY] Fallback submission failed:", retryErr);
-            // Fall through to refund
-          }
-        }
-      }
+      // A failed RunPod job used to be resubmitted once to a different
+      // RunPod model. Every RunPod endpoint on the account 404s or is scaled
+      // to workersMax=0 (audited 2026-09-09), so that retry could only ever
+      // fail a second time — it delayed the user's refund and doubled the
+      // failure without a single recovery to show for it. Refund immediately
+      // instead. Restore a retry here only once it can target a provider that
+      // is verified live at submit time.
 
       // No retry possible or retry exhausted — refund
       await updateJobStatus(job.id, {

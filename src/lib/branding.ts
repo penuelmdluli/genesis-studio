@@ -1,5 +1,5 @@
 // ============================================
-// Video Branding Pipeline — Genesis Studio
+// Video Branding Pipeline — iVideo Studio
 //
 // ALL videos get branded with:
 // 1. "ivideostudio.ai" watermark (subtle, top-right)
@@ -18,7 +18,7 @@ interface BrandingOptions {
 }
 
 /**
- * Brand a video with Genesis Studio identity.
+ * Brand a video with iVideo Studio identity.
  * Uses the Render scraper service (ffmpeg) for processing.
  *
  * Free tier: watermark + outro clip

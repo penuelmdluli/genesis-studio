@@ -1,5 +1,5 @@
 /**
- * Genesis Studio — WhatsApp notifications via WATI.
+ * iVideo Studio — WhatsApp notifications via WATI.
  * Sends template messages for video completions and low credits.
  */
 

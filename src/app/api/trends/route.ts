@@ -4,8 +4,8 @@ export interface Trend {
   id: string;
   title: string;
   description: string;
-  platform: "tiktok" | "twitter" | "news" | "general";
-  category: "music" | "dance" | "challenge" | "news" | "meme" | "topic";
+  platform: "tiktok" | "twitter" | "news" | "general" | "facebook";
+  category: "music" | "dance" | "challenge" | "news" | "meme" | "topic" | "story";
   suggestedPrompt: string;
   suggestedLyrics?: string;
   trendScore: number;
@@ -14,6 +14,49 @@ export interface Trend {
 // Curated trending topics — updated regularly
 // In production, these would be fetched from APIs and cached in KV
 const TRENDING_NOW: Trend[] = [
+  // What actually travels on South African feeds: drama told in the language
+  // people speak. English-only trends left the biggest local format off the
+  // list entirely.
+  {
+    id: "trend-zu-1",
+    title: "Ukwazisa \u2014 isiZulu Drama",
+    description: "Short isiZulu drama: the family secret that comes out",
+    platform: "facebook",
+    category: "story",
+    suggestedPrompt:
+      "Township family living room at dusk, two relatives facing each other mid-argument, one holding a letter, warm lamp light, emotional close-up, cinematic South African drama, 4K",
+    trendScore: 96,
+  },
+  {
+    id: "trend-zu-2",
+    title: "Isibindi \u2014 The Comeback Story",
+    description: "From nothing to something: the story everyone shares",
+    platform: "facebook",
+    category: "story",
+    suggestedPrompt:
+      "A young South African entrepreneur walking through a busy township street at sunrise, determined expression, then the same person stepping out of a car in business clothes, triumphant, cinematic before-and-after, golden hour",
+    trendScore: 94,
+  },
+  {
+    id: "trend-zu-3",
+    title: "Umakoti \u2014 Wedding Drama",
+    description: "Lobola negotiations and the family tension behind them",
+    platform: "tiktok",
+    category: "story",
+    suggestedPrompt:
+      "Traditional South African wedding negotiation scene, elders seated in a circle in a homestead, bride waiting nervously in the next room, rich traditional attire, warm natural light, emotional storytelling, cinematic",
+    trendScore: 92,
+  },
+  {
+    id: "trend-za-4",
+    title: "Gogo's Wisdom",
+    description: "A grandmother's advice that hits home \u2014 the format that always lands",
+    platform: "facebook",
+    category: "story",
+    suggestedPrompt:
+      "An elderly South African grandmother seated in her kitchen speaking directly to camera, warm afternoon light through the window, gentle knowing expression, documentary style close-up, deeply emotional",
+    trendScore: 90,
+  },
   {
     id: "trend-1",
     title: "AI Cover Songs",

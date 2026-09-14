@@ -109,10 +109,13 @@ export async function POST(req: NextRequest) {
         const pg = PAGES[pageKey];
         const token = pg ? process.env[pg.tokenEnv] : undefined;
         if (!token) return { pageKey, videoId, error: "no token" };
+        // The finish phase returns a post id, which Facebook will not read as
+        // a video. Listing the page's own reels gives the real state.
         const res = await fetch(
-          `${GRAPH}/${encodeURIComponent(videoId)}?fields=status,published,scheduled_publish_time,permalink_url&access_token=${encodeURIComponent(token)}`
+          `${GRAPH}/me/video_reels?fields=id,description,status,created_time,permalink_url&limit=5&access_token=${encodeURIComponent(token)}`
         );
-        return { pageKey, videoId, ...(await res.json()) };
+        const json = (await res.json()) as { data?: Array<Record<string, unknown>>; error?: unknown };
+        return { pageKey, videoId, reels: json.data || [], error: json.error };
       })
     );
     return NextResponse.json({ results });

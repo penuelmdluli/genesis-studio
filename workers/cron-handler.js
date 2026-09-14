@@ -7,17 +7,25 @@
 // APP_URL and CRON_SECRET are set via wrangler.toml [vars] and `wrangler secret put`
 
 // Map cron schedules to endpoints (arrays for multiple per schedule)
+// Owner-side automation that spends provider credit with no customer paying for
+// it is OFF (2026-09-14, owner's instruction: only customer spending uses
+// credit). Removed from the schedule, not just paused, so a stray env flag
+// cannot turn them back on:
+//   /api/cron/content-pipeline   auto-produces page videos (twice daily)
+//   /api/cron/process-mbs-queue  Kling videos for the Facebook pages
+//   /api/cron/discover-content   scraping + Claude
+//   /api/cron/vet-candidates     Claude brand-safety vetting
+//   /api/cron/series-autopilot   Series Studio marketing episodes
+// Everything left only finishes, refunds or bills work customers started.
 const CRON_MAP = {
-  "0 5 * * *": ["/api/cron/content-pipeline"],
-  "0 13 * * *": ["/api/cron/content-pipeline"],
   "0 3 * * *": ["/api/cron/cleanup-storage"],
   "0 9 * * *": ["/api/cron/dunning"],
-  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments", "/api/cron/series-autopilot"],
+  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments"],
   "0 */6 * * *": ["/api/cron/purge-stale"],
   "*/1 * * * *": ["/api/cron/process-fallbacks", "/api/cron/check-singer", "/api/cron/reap-jobs"],
-  "*/2 * * * *": ["/api/cron/process-mbs-queue", "/api/cron/check-mimic"],
-  "*/30 * * * *": ["/api/cron/discover-content", "/api/cron/provider-balance"],
-  "*/15 * * * *": ["/api/cron/vet-candidates", "/api/cron/fetch-lead-videos"],
+  "*/2 * * * *": ["/api/cron/check-mimic"],
+  "*/30 * * * *": ["/api/cron/provider-balance"],
+  "*/15 * * * *": ["/api/cron/fetch-lead-videos"],
 };
 
 export default {

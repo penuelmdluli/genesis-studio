@@ -23,6 +23,7 @@ import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { guessGender } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
 import { voiceForCharacter } from "@/lib/series/cast";
+import { speakOmnivoice } from "@/lib/series/omnivoice";
 import { getDb } from "@/lib/db-driver";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 
@@ -388,7 +389,11 @@ export async function submitShot(
   // 2. Speech, when there is any. The voice comes from the series cast, so a
   //    character sounds the same in every episode they appear in.
   let audioUrl: string | null = null;
-  if (shot.kind === "dialogue" && shot.dialogue.trim()) {
+  if (shot.kind === "dialogue" && shot.dialogue.trim() && seriesId && localeOrDefault(ctx.language).provider === "omnivoice") {
+    // Languages with no named voice are spoken by cloning the character's own
+    // sample, made during casting — see src/lib/series/omnivoice.ts.
+    audioUrl = await speakOmnivoice(seriesId, shot.speaker, shot.dialogue, userId, tag);
+  } else if (shot.kind === "dialogue" && shot.dialogue.trim()) {
     const gender = shot.gender === "female" || shot.gender === "male" ? shot.gender : guessGender(shot.speaker);
     const cast = seriesId
       ? await voiceForCharacter(seriesId, shot.speaker, gender, ctx.language)

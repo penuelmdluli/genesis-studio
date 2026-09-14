@@ -9,10 +9,10 @@
 // here gets dialogue written in it, performed in it, and lip-synced to it.
 // Nothing in this list is aspirational.
 //
-// Worth knowing: isiXhosa, Sesotho, Setswana, Sepedi, Xitsonga, siSwati,
-// Tshivenda and isiNdebele have no synthetic voice from any provider we can
-// reach, so they are deliberately absent rather than listed and broken. When
-// a voice exists, adding it here is a one-line change.
+// All eleven official South African languages are here. Eight of them —
+// isiXhosa, Sesotho, Setswana, Sepedi, Xitsonga, siSwati, Tshivenda and
+// isiNdebele — have no named neural voice anywhere, and were deliberately
+// left out until OmniVoice, a 600-language model, passed a native listen.
 
 export interface SeriesLocale {
   id: string;
@@ -21,12 +21,31 @@ export interface SeriesLocale {
   /** Full voice names, used directly by the speech engine. */
   female: string;
   male: string;
+  /**
+   * Which engine speaks this language. "edge" uses the named neural voices
+   * above; "omnivoice" synthesises from a description and then clones each
+   * character's first line, so it has no fixed voice names at all.
+   */
+  provider?: "edge" | "omnivoice";
 }
 
 export const SERIES_LOCALES: SeriesLocale[] = [
   { id: "af-ZA", label: "Afrikaans", group: "South Africa", female: "af-ZA-AdriNeural", male: "af-ZA-WillemNeural" },
   { id: "en-ZA", label: "South African English", group: "South Africa", female: "en-ZA-LeahNeural", male: "en-ZA-LukeNeural" },
-  { id: "zu-ZA", label: "isiZulu", group: "South Africa", female: "zu-ZA-ThandoNeural", male: "zu-ZA-ThembaNeural" },
+  // isiZulu moved to OmniVoice: it was the language creators said sounded
+  // unclear on the neural voice, and OmniVoice passed a native listen.
+  { id: "zu-ZA", label: "isiZulu", group: "South Africa", female: "zu-ZA-ThandoNeural", male: "zu-ZA-ThembaNeural", provider: "omnivoice" },
+  // The eight official languages no named neural voice covers. OmniVoice
+  // speaks them; confirmed by a native listen on isiXhosa and Sesotho samples
+  // on 2026-09-14 before any of this was switched on.
+  { id: "xh-ZA", label: "isiXhosa", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "st-ZA", label: "Sesotho", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "tn-ZA", label: "Setswana", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "nso-ZA", label: "Sepedi", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "ts-ZA", label: "Xitsonga", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "ss-ZA", label: "siSwati", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "ve-ZA", label: "Tshivenda", group: "South Africa", female: "", male: "", provider: "omnivoice" },
+  { id: "nr-ZA", label: "isiNdebele", group: "South Africa", female: "", male: "", provider: "omnivoice" },
   { id: "am-ET", label: "Amharic — Ethiopia", group: "Africa", female: "am-ET-MekdesNeural", male: "am-ET-AmehaNeural" },
   { id: "ar-DZ", label: "Arabic — Algeria", group: "Africa", female: "ar-DZ-AminaNeural", male: "ar-DZ-IsmaelNeural" },
   { id: "ar-EG", label: "Arabic — Egypt", group: "Africa", female: "ar-EG-SalmaNeural", male: "ar-EG-ShakirNeural" },

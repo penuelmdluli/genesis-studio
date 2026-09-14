@@ -213,7 +213,7 @@ export async function POST(
 
   // Cast everyone before anything renders, so two characters cannot claim
   // the same voice at the same instant.
-  await ensureCast(seriesId, shots, ctx.language, guessGender);
+  await ensureCast(seriesId, shots, ctx.language, guessGender, user.id);
 
   await db.from("series_episodes").update({ status: "rendering" }).eq("id", episodeId);
 

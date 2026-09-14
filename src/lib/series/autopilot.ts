@@ -156,7 +156,7 @@ export async function tickCampaign(campaign: Campaign): Promise<TickResult> {
 
     // Written but never filmed.
     if (shotRows.length === 0) {
-      await ensureCast(campaign.series_id, shots, ctx.language, guessGender);
+      await ensureCast(campaign.series_id, shots, ctx.language, guessGender, series.user_id);
       let submitted = 0;
       for (let index = 0; index < shots.length; index++) {
         const shot = shots[index];

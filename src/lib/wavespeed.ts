@@ -96,6 +96,25 @@ function buildRequestBody(params: {
     };
   }
 
+  if (params.modelId === "seedance-2.5") {
+    // Seedance 2.5 has its own, narrower schema: no camera_fixed and no seed,
+    // and image-to-video takes no aspect_ratio (the image sets the shape).
+    // Sent exactly, because an unexpected field can get a job rejected after
+    // credits were taken.
+    const body: Record<string, unknown> = {
+      prompt: params.prompt,
+      duration: Math.min(Math.max(params.duration || 5, 4), 10),
+      resolution: "720p",
+      generate_audio: false,
+    };
+    if (params.type === "i2v" && params.imageUrl) {
+      body.image = params.imageUrl;
+    } else {
+      body.aspect_ratio = toWavespeedAspectRatio(params.aspectRatio);
+    }
+    return body;
+  }
+
   if (isSeedance) {
     // Seedance uses "generate_audio", "resolution", "camera_fixed"
     const body: Record<string, unknown> = {

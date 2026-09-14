@@ -249,6 +249,211 @@ export const TOOLS: ToolDef[] = [
     model: WS_MODELS.lipsyncFromVideo,
     buildInput: (i) => ({ video: i.video, audio: i.audio, sync_mode: "cut_off" }),
   },
+
+  // ── Added 2026-09-14. Every price below is set from a measured charge, not
+  // the catalogue figure: each model was run once and the balance read before
+  // and after. (Seedance 2.5 was listed at $0.90 and actually charged $1.62.)
+  // Credits are worth $0.010–0.024, so each tool is at least twice cost even
+  // at the cheapest rate.
+  {
+    id: "face-swap-image",
+    name: "Face Swap (Photo)",
+    tagline: "Put your face on any photo — a movie poster, a magazine cover, a scene you dreamed up.",
+    emoji: "🎭",
+    inputs: [
+      { kind: "image", key: "image", label: "The photo to change", required: true },
+      { kind: "image", key: "face_image", label: "Your face", required: true },
+    ],
+    fields: [
+      {
+        key: "consent",
+        label: "Whose face is this?",
+        kind: "select",
+        required: true,
+        options: [
+          { value: "mine", label: "It's my own face" },
+          { value: "permission", label: "I have this person's permission" },
+        ],
+        help: "Only use your own face, or someone who has agreed. Swapping in a person without their consent is not allowed.",
+      },
+    ],
+    // Measured $0.01 per image.
+    credits: 5,
+    minPlan: "free",
+    mode: "sync",
+    outputKind: "image",
+    estimatedSeconds: 15,
+    model: "wavespeed-ai/image-face-swap",
+    buildInput: (i) => ({ image: i.image, face_image: i.face_image, output_format: "jpeg", enable_sync_mode: true }),
+  },
+  {
+    id: "face-swap-video",
+    name: "Star In Any Video",
+    tagline: "Swap your face into any clip. The most shareable thing a creator can post.",
+    emoji: "🌟",
+    inputs: [
+      { kind: "video", key: "video", label: "The video", required: true },
+      { kind: "image", key: "face_image", label: "Your face", required: true },
+    ],
+    fields: [
+      {
+        key: "consent",
+        label: "Whose face is this?",
+        kind: "select",
+        required: true,
+        options: [
+          { value: "mine", label: "It's my own face" },
+          { value: "permission", label: "I have this person's permission" },
+        ],
+        help: "Only use your own face, or someone who has agreed. Swapping in a person without their consent is not allowed.",
+      },
+      {
+        key: "target_gender",
+        label: "Swap which face?",
+        kind: "select",
+        default: "all",
+        options: [
+          { value: "all", label: "The main face" },
+          { value: "female", label: "Only a woman's face" },
+          { value: "male", label: "Only a man's face" },
+        ],
+      },
+    ],
+    // Measured $0.05 for a 4.2s clip; billed per second so long clips stay covered.
+    credits: 10,
+    creditsPerSecond: 3,
+    minPlan: "creator",
+    mode: "job",
+    outputKind: "video",
+    estimatedSeconds: 90,
+    model: "wavespeed-ai/video-face-swap",
+    buildInput: (i) => ({ video: i.video, face_image: i.face_image, target_gender: i.target_gender || "all" }),
+  },
+  {
+    id: "two-person-talk",
+    name: "Two People Talking",
+    tagline: "One photo of two people, two voices — both speak, each with their own lip sync.",
+    emoji: "👥",
+    inputs: [
+      { kind: "image", key: "image", label: "Photo with two people", required: true },
+      { kind: "audio", key: "left_audio", label: "Voice of the person on the LEFT", required: true },
+      { kind: "audio", key: "right_audio", label: "Voice of the person on the RIGHT", required: true },
+    ],
+    fields: [
+      {
+        key: "order",
+        label: "How do they talk?",
+        kind: "select",
+        default: "left_right",
+        options: [
+          { value: "left_right", label: "Left speaks, then right" },
+          { value: "right_left", label: "Right speaks, then left" },
+          { value: "meanwhile", label: "Both at the same time" },
+        ],
+      },
+    ],
+    // Measured $0.30 for 9.2s at 480p (~$0.033/s), billed on both voices together.
+    credits: 10,
+    creditsPerSecond: 7,
+    minPlan: "creator",
+    mode: "job",
+    outputKind: "video",
+    estimatedSeconds: 180,
+    model: "wavespeed-ai/infinitetalk/multi",
+    buildInput: (i) => ({
+      image: i.image,
+      left_audio: i.left_audio,
+      right_audio: i.right_audio,
+      order: i.order || "left_right",
+      resolution: "480p",
+      prompt: "Two people in conversation, natural head movement and expressions, accurate lip sync.",
+    }),
+  },
+  {
+    id: "music-video",
+    name: "Music Video From Your Song",
+    tagline: "Upload a track and a photo. Get a full music video — made for amapiano, gqom and gospel.",
+    emoji: "🎬",
+    inputs: [
+      { kind: "audio", key: "audio", label: "Your song (MP3)", required: true },
+      { kind: "image", key: "image", label: "Photo of the artist", required: true },
+    ],
+    fields: [
+      {
+        key: "prompt",
+        label: "The look",
+        kind: "textarea",
+        placeholder: "Performing on a Soweto rooftop at sunset, crowd dancing below",
+        help: "Where it happens and the mood. The person in your photo stays the star.",
+      },
+      {
+        key: "aspect_ratio",
+        label: "Shape",
+        kind: "select",
+        default: "9:16",
+        options: [
+          { value: "9:16", label: "Vertical — Reels, TikTok, Shorts" },
+          { value: "16:9", label: "Wide — YouTube" },
+        ],
+      },
+    ],
+    // Measured $0.33 for a 10s song at 480p (~$0.033/s). The song's length is
+    // read on the server, so a long track is billed for its real length.
+    credits: 15,
+    creditsPerSecond: 7,
+    minPlan: "creator",
+    mode: "job",
+    outputKind: "video",
+    estimatedSeconds: 240,
+    model: "wavespeed-ai/music-video-generator",
+    buildInput: (i) => ({
+      audio: i.audio,
+      images: [i.image],
+      prompt: i.prompt || "A music performance video, cinematic lighting, energetic",
+      aspect_ratio: i.aspect_ratio || "9:16",
+      resolution: "480p",
+    }),
+  },
+  {
+    id: "video-extend",
+    name: "Make It Longer",
+    tagline: "Add seconds to the end of any clip — the story carries on from the last frame.",
+    emoji: "➕",
+    inputs: [{ kind: "video", key: "video", label: "The clip to extend", required: true }],
+    fields: [
+      {
+        key: "prompt",
+        label: "What happens next",
+        kind: "textarea",
+        required: true,
+        placeholder: "He turns and walks out through the gate into the busy street",
+      },
+      {
+        key: "duration",
+        label: "How much longer",
+        kind: "select",
+        default: "5",
+        options: [
+          { value: "5", label: "5 more seconds" },
+          { value: "10", label: "10 more seconds" },
+        ],
+      },
+    ],
+    // Measured $0.20 per 5s added at 768p. Priced flat at the 10-second cost,
+    // because the charge depends on the length added, not the clip supplied.
+    credits: 80,
+    minPlan: "creator",
+    mode: "job",
+    outputKind: "video",
+    estimatedSeconds: 150,
+    model: "wavespeed-ai/minimax-h3/video-extend",
+    buildInput: (i) => ({
+      video: i.video,
+      prompt: i.prompt,
+      duration: i.duration === "10" ? 10 : 5,
+      resolution: "768p",
+    }),
+  },
 ];
 
 /** Credits for a run, given the input media length in seconds (0 when unknown). */

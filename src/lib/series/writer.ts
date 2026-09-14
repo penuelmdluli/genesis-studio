@@ -42,6 +42,20 @@ function languageInstruction(id: string): string {
       return "Write ALL spoken dialogue in ENGLISH ONLY. South African English rhythm, cadence and turns of phrase are welcome, but every single word must be English — no isiZulu, isiXhosa, Afrikaans or Sesotho words at all, not even common ones.";
     case "en":
       return "Write ALL spoken dialogue in plain conversational ENGLISH ONLY. Every word must be English.";
+    // The eight languages OmniVoice added. Written as they are spoken now,
+    // which in South Africa means a word or two of English slipping in is
+    // normal — a strictly "pure" line reads as a textbook, not a person.
+    case "xh-ZA":
+    case "st-ZA":
+    case "tn-ZA":
+    case "nso-ZA":
+    case "ts-ZA":
+    case "ss-ZA":
+    case "ve-ZA":
+    case "nr-ZA": {
+      const label = localeOrDefault(id).label;
+      return `Write ALL spoken dialogue in natural, conversational ${label} as it is actually spoken in South Africa today, not formal or textbook ${label}. Code-switching into English for a word or two is normal and welcome, exactly how people really talk. Use correct ${label} spelling and grammar so it is pronounced properly when spoken aloud.`;
+    }
     default: {
       const label = localeOrDefault(id).label.replace(/ — .*$/, "");
       const place = localeOrDefault(id).label.includes(" — ")

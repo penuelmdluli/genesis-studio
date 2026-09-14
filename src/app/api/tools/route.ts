@@ -10,6 +10,7 @@
 // /api/tools/[jobId], which finishes the job (persists the output to R2).
 
 import { NextRequest, NextResponse } from "next/server";
+import { envString } from "@/lib/env";
 import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId, createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
@@ -28,6 +29,30 @@ export async function GET() {
 }
 
 const URL_RE = /^https:\/\/[^\s]+$/;
+
+/**
+ * Total length in seconds of the given media files, read by ffprobe on the
+ * video service. Returns 0 when it cannot be measured, in which case the
+ * price falls back to the conservative full-minute default.
+ */
+async function measureMedia(urls: string[]): Promise<number> {
+  if (urls.length === 0) return 0;
+  const base = envString("SCRAPER_SERVICE_URL");
+  const secret = envString("SCRAPER_SERVICE_SECRET");
+  if (!base || !secret) return 0;
+  try {
+    const res = await fetch(`${base}/media-duration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-scraper-secret": secret },
+      body: JSON.stringify({ urls }),
+    });
+    if (!res.ok) return 0;
+    const json = (await res.json()) as { total?: number };
+    return Number(json.total) || 0;
+  } catch {
+    return 0;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,9 +107,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${tool.name} needs the ${planName} plan or higher.`, upgrade: true }, { status: 403 });
     }
 
-    // Media length comes from the browser's metadata probe; the server clamps
-    // it and bills a full minute when it is missing.
-    const mediaSeconds = Number(inputs.duration_seconds) || 0;
+    // Length for per-second tools is read from the files themselves.
+    //
+    // It used to come only from the browser, which measured video inputs but
+    // never audio — so an audio-driven tool billed a flat minute, a three-
+    // minute song was charged as one, and a client could send a fake short
+    // length to pay less. The server's reading wins; the browser's is kept
+    // only as a floor, so neither can pull the price under the real length.
+    const clientSeconds = Number(inputs.duration_seconds) || 0;
+    let mediaSeconds = clientSeconds;
+    if (tool.creditsPerSecond) {
+      const mediaUrls = tool.inputs
+        .filter((spec) => spec.kind === "video" || spec.kind === "audio")
+        .map((spec) => inputs[spec.key])
+        .filter((u): u is string => typeof u === "string" && u.startsWith("https://"));
+      const measured = await measureMedia(mediaUrls);
+      if (measured > 0) mediaSeconds = Math.max(measured, clientSeconds);
+    }
     const credits = toolPrice(tool, mediaSeconds);
 
     if (!ownerAccount) {

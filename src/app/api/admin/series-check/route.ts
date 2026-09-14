@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       .map((shot, index) => ({ shot, index }))
       .filter(({ index }) => retryIndexes.has(index));
 
-    await ensureCast(ep.series_id, shots, ctx.language, guessGender);
+    await ensureCast(ep.series_id, shots, ctx.language, guessGender, ep.user_id);
 
     const results = await Promise.allSettled(
       todo.map(({ shot, index }) => submitShot(shot, ctx, ep.user_id, `${ep.id}-${index}-${Date.now()}`, ep.series_id))

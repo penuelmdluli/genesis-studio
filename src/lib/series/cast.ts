@@ -16,6 +16,7 @@
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db-driver";
 import { localeById, localeOrDefault } from "@/lib/series/locales";
+import { ensureOmnivoiceCharacter } from "@/lib/series/omnivoice";
 
 export interface CastVoice {
   voice: string;
@@ -190,8 +191,12 @@ export async function ensureCast(
   seriesId: string,
   shots: Array<{ kind: string; speaker: string; gender?: "female" | "male"; dialogue?: string }>,
   language: string,
-  fallbackGender: (speaker: string) => "female" | "male"
+  fallbackGender: (speaker: string) => "female" | "male",
+  /** Needed for OmniVoice languages, whose voice samples are stored per user. */
+  userId?: string
 ): Promise<void> {
+  const omnivoice = localeOrDefault(language).provider === "omnivoice";
+
   // Cast the biggest parts first.
   //
   // Casting in order of appearance handed the local voice to whoever happened
@@ -205,14 +210,20 @@ export async function ensureCast(
   // of the series.
   const lines = new Map<
     string,
-    { speaker: string; female: number; male: number; count: number }
+    { speaker: string; female: number; male: number; count: number; firstLine: string }
   >();
   for (const shot of shots) {
     if (shot.kind !== "dialogue" || !shot.dialogue?.trim()) continue;
     const key = characterKey(shot.speaker);
     const gender =
       shot.gender === "female" || shot.gender === "male" ? shot.gender : fallbackGender(shot.speaker);
-    const entry = lines.get(key) || { speaker: shot.speaker, female: 0, male: 0, count: 0 };
+    const entry = lines.get(key) || {
+      speaker: shot.speaker,
+      female: 0,
+      male: 0,
+      count: 0,
+      firstLine: shot.dialogue || "",
+    };
     entry[gender] += 1;
     entry.count += 1;
     lines.set(key, entry);
@@ -269,6 +280,12 @@ export async function ensureCast(
         `[SERIES] ${part.speaker} was written as both genders (${part.female}F/${part.male}M); cast as ${gender}`
       );
     }
-    await voiceForCharacter(seriesId, part.speaker, gender, language);
+    if (omnivoice) {
+      // OmniVoice languages have no named voices to choose between; each
+      // character is anchored to a sample made from their own first line.
+      if (userId) await ensureOmnivoiceCharacter(seriesId, part.speaker, gender, part.firstLine, userId);
+    } else {
+      await voiceForCharacter(seriesId, part.speaker, gender, language);
+    }
   }
 }

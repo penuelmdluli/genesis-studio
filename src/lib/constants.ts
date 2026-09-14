@@ -188,6 +188,33 @@ export const AI_MODELS: Record<ModelId, AIModel> = {
     wavespeedModelIdI2V: "bytedance/seedance-v1.5-pro/image-to-video",
     maxDuration: 10,
   },
+  "seedance-2.5": {
+    id: "seedance-2.5",
+    name: "Seedance 2.5",
+    tier: "hollywood",
+    types: ["t2v", "i2v"],
+    description:
+      "ByteDance's newest cinematic model. Hollywood-grade motion, camera work and lighting — the best picture on the platform.",
+    maxResolution: "720p",
+    avgGenerationTime: 120,
+    // Measured, not taken from the catalogue: a 5-second 720p render charged
+    // $1.62 against a listed $0.90. 324 credits per 5 seconds is 2x cost at
+    // the cheapest credit value and about 4.8x on the Creator plan. Renders
+    // are always 720p (see buildRequestBody), so a 1080p request falls back
+    // to this same price rather than being undercharged.
+    creditCost: { "720p": 324 },
+    gpuRequirement: "Managed (WaveSpeed)",
+    license: "Commercial",
+    provider: "wavespeed",
+    // Native audio is left off. Left to make its own soundtrack, this family
+    // of models invents speech — in practice Chinese — and its cost with audio
+    // on has not been measured.
+    hasAudio: false,
+    wavespeedModelId: "bytedance/seedance-2.5/text-to-video",
+    wavespeedModelIdI2V: "bytedance/seedance-2.5/image-to-video",
+    maxDuration: 10,
+    supportedDurations: [5, 10],
+  },
   "ai-singer": {
     id: "ai-singer",
     name: "AI Singer",
@@ -644,6 +671,9 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    // The best picture on the platform and the most expensive to run, so it
+    // sits with Veo on the upper tiers — a reason to move up from Creator.
+    "seedance-2.5",
     "mimic-motion",
   ],
   studio: [
@@ -651,6 +681,7 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
+    "seedance-2.5",
     "mimic-motion",
   ],
 };

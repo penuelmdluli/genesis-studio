@@ -111,7 +111,7 @@ export async function retryFailedShots(
 
   if (claimed.length === 0) return { attempted: 0, submitted: 0, exhausted };
 
-  await ensureCast(seriesId, shots, ctx.language, guessGender);
+  await ensureCast(seriesId, shots, ctx.language, guessGender, userId);
 
   const results = await Promise.allSettled(
     claimed.map(({ row, shot }) =>

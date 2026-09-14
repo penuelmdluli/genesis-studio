@@ -275,7 +275,10 @@ Continue DIRECTLY from that. Do not reset, do not re-introduce characters the au
     style === "action"
       ? `
 ACTION MOVIE RULES — these override anything softer below.
-- At least half the shots are "action" set pieces: vehicle chases, rooftop jumps, fights, explosions, escapes, crashes. Make each one specific and physical, with the camera moving.
+- At least HALF the shots are "action" set pieces (round up): vehicle chases, rooftop jumps, fights, explosions, escapes, crashes. Make each one specific and physical, with the camera moving. The final shot is a spectacular set piece or a line shouted in the middle of one.
+- Speaking shots happen INSIDE the action: shouting from a speeding bike, yelling over an explosion, a warning while running. Never a phone call, never a quiet room.
+- A speaking shot's "action" names ONLY the speaker. No henchmen, no crowd, nobody "visible behind" them.
+- No guns or firearms: danger comes from chases, crashes, explosions, fists, falls and fire.
 - Dialogue is SHOUTED under pressure: warnings, orders, threats, one-liners. "Get down!", "Go, go, go!", "You're too late." Short, punchy, never a speech.
 - Emotions are mostly "tense", "angry", "shocked" and "afraid". Save "calm" for a villain's cold threat.
 - "wide" is allowed more often here: action needs space to read.
@@ -287,6 +290,8 @@ CARTOON RULES — these override anything softer below.
 - Big expressive performances: shock takes, joyful jumps, comic panic. Emotions are mostly "joyful", "shocked", "afraid" and "tense".
 - Mix comedy with adventure: a chase, a daring escape, a silly mishap, a triumphant moment.
 - Dialogue is funny and warm, sometimes shouted in excitement or panic. Family-friendly always: no swearing, no gore, no weapons.
+- At least half the shots are "action": flying, chasing, tumbling, escaping, celebrating.
+- A speaking shot's "action" names ONLY the speaker, nobody else in frame.
 - Action shots may show groups: cheering villages, rival characters, animal crowds.`
         : "";
 

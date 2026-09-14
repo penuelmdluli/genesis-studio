@@ -7,11 +7,11 @@
 // because the moment somebody has to think about credits they stop thinking
 // about the story.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageTransition } from "@/components/ui/motion";
-import { Clapperboard, Plus, ArrowRight, Loader2 } from "lucide-react";
+import { Clapperboard, Plus, ArrowRight, Loader2, Play, Volume2, VolumeX } from "lucide-react";
 
 import { SERIES_LOCALES, localeOrDefault } from "@/lib/series/locales";
 
@@ -35,6 +35,7 @@ const SHOWCASE = [
     key: "action",
     label: "AI Action Movie",
     video: "https://cdn.ivideostudio.ai/marketing/ads/ai-action-movie-9x16.mp4?v=2",
+    poster: "https://cdn.ivideostudio.ai/marketing/ads/poster-ai-action-movie.jpg",
     preset: {
       title: "Last Run",
       genre: "Action movie",
@@ -47,6 +48,7 @@ const SHOWCASE = [
     key: "cartoon",
     label: "AI Cartoon Movie",
     video: "https://cdn.ivideostudio.ai/marketing/ads/ai-cartoon-9x16.mp4?v=2",
+    poster: "https://cdn.ivideostudio.ai/marketing/ads/poster-ai-cartoon.jpg",
     preset: {
       title: "Sky Scout Sipho",
       genre: "3D cartoon",
@@ -59,6 +61,7 @@ const SHOWCASE = [
     key: "beasts",
     label: "AI Beast Wars",
     video: "https://cdn.ivideostudio.ai/marketing/ads/ai-beast-wars-9x16.mp4?v=2",
+    poster: "https://cdn.ivideostudio.ai/marketing/ads/poster-ai-beast-wars.jpg",
     preset: {
       title: "Beast Wars",
       genre: "Action movie",
@@ -68,6 +71,81 @@ const SHOWCASE = [
     },
   },
 ];
+
+/**
+ * A showcase film that plays itself: on hover with a mouse, and when scrolled
+ * into view on a phone (touch screens have no hover). Muted so the browser
+ * allows autoplay; one tap brings the sound in.
+ */
+function ShowcaseVideo({ src, poster, label }: { src: string; poster: string; label: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+
+  const play = () => {
+    const v = ref.current;
+    if (!v) return;
+    v.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  };
+  const pause = () => {
+    const v = ref.current;
+    if (!v) return;
+    v.pause();
+    setPlaying(false);
+  };
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || typeof window === "undefined") return;
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    if (canHover) return; // desktop: hover drives playback
+    const io = new IntersectionObserver(
+      ([entry]) => (entry.isIntersecting && entry.intersectionRatio > 0.6 ? play() : pause()),
+      { threshold: [0, 0.6, 1] }
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div
+      className="relative group cursor-pointer"
+      onMouseEnter={play}
+      onMouseLeave={pause}
+      onClick={() => (playing ? pause() : play())}
+    >
+      <video
+        ref={ref}
+        src={src}
+        poster={poster}
+        muted={muted}
+        loop
+        playsInline
+        preload="metadata"
+        aria-label={label}
+        className="w-full aspect-[9/16] object-cover bg-black"
+      />
+      {!playing && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="rounded-full bg-black/55 p-4 backdrop-blur-sm transition-transform group-hover:scale-110">
+            <Play className="w-7 h-7 text-white fill-white" />
+          </div>
+        </div>
+      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setMuted((m) => !m);
+          if (!playing) play();
+        }}
+        className="absolute right-2 bottom-2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+        aria-label={muted ? "Turn sound on" : "Turn sound off"}
+      >
+        {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
 
 interface SeriesRow {
   id: string;
@@ -160,13 +238,7 @@ export default function SeriesShelfPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {SHOWCASE.map((item) => (
             <div key={item.key} className="rounded-2xl border border-white/[0.10] bg-white/[0.03] overflow-hidden">
-              <video
-                src={item.video}
-                className="w-full aspect-[9/16] object-cover bg-black"
-                controls
-                playsInline
-                preload="metadata"
-              />
+              <ShowcaseVideo src={item.video} poster={item.poster} label={item.label} />
               <div className="p-3 flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{item.label}</span>
                 <button

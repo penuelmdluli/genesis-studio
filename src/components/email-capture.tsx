@@ -5,6 +5,7 @@ import Link from "next/link";
 import { X, Sparkles } from "lucide-react";
 import { trackEvent } from "@/lib/analytics-events";
 import { useAuth } from "@/components/auth/auth-provider";
+import { isInAppBrowser } from "@/lib/in-app-browser";
 
 export function EmailCapture() {
   const [visible, setVisible] = useState(false);
@@ -19,8 +20,18 @@ export function EmailCapture() {
     // sees it.
     if (!isLoaded || isSignedIn) return;
 
+    // Phones and in-app browsers (Facebook/Instagram ad traffic) never get the
+    // interruption: the hero already carries the same offer, and a full-screen
+    // overlay over the autoplaying hero video froze the Facebook browser.
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches;
+    if (coarse || window.innerWidth < 768 || isInAppBrowser()) return;
+
     // Only show once per session
-    if (sessionStorage.getItem("gs_email_shown")) return;
+    try {
+      if (sessionStorage.getItem("gs_email_shown")) return;
+    } catch {
+      return;
+    }
 
     let shown = false;
 
@@ -28,7 +39,9 @@ export function EmailCapture() {
       if (shown) return;
       shown = true;
       setVisible(true);
-      sessionStorage.setItem("gs_email_shown", "1");
+      try {
+        sessionStorage.setItem("gs_email_shown", "1");
+      } catch {}
       trackEvent("email_popup_shown");
     };
 
@@ -52,15 +65,22 @@ export function EmailCapture() {
     };
   }, [isLoaded, isSignedIn]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setVisible(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible]);
+
   if (!visible || isSignedIn) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-[#111118] p-8 text-center shadow-2xl shadow-violet-600/10">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setVisible(false)}>
+      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-[#111118] p-8 text-center shadow-2xl shadow-violet-600/10">
         {/* Dismiss button */}
         <button
           onClick={() => setVisible(false)}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+          className="absolute top-2 right-2 p-2 text-zinc-400 hover:text-white transition-colors"
           aria-label="Close"
         >
           <X className="w-5 h-5" />

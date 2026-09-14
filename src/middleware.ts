@@ -22,6 +22,7 @@ const PUBLIC_PATHS = new Set([
   "/refund",
   "/acceptable-use",
   "/delete-account",
+  "/android-beta",
 ]);
 
 const PUBLIC_PREFIXES = [

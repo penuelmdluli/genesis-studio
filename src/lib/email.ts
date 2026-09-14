@@ -785,3 +785,27 @@ export async function sendFeatureSpotlightEmail(
     }),
   });
 }
+
+// ============================================
+// MARKETING — Android beta testers
+// ============================================
+
+export function androidBetaUpdate(appUrl: string, whatsappShareUrl: string): ProductUpdate {
+  const join = `${appUrl}/android-beta?utm_source=ivs&utm_medium=email&utm_campaign=android-beta`;
+  return {
+    subject: "📱 Be one of the first to test our Android app (+50 free credits)",
+    preheader: "iVideo Studio is coming to Google Play. We need Android testers, and it takes 1 minute to join.",
+    headline: "iVideo Studio is coming to Google Play",
+    intro:
+      "our Android app is ready and Google needs a small group of real testers before it goes public. Would you help? It takes a minute, it's free, and as a thank-you we add 50 credits to your account when you join.",
+    items: [
+      { icon: "✍️", title: "1. Leave your Google Play email", text: "The Gmail you use on your Android phone. We add it to the tester list.", href: join },
+      { icon: "📩", title: "2. Get your install link", text: "We email it as soon as Google approves the test, usually within a few days.", href: join },
+      { icon: "📱", title: "3. Keep the app for 14 days", text: "Make movies, cartoons and dance reels whenever you like. Google counts testers who stay 14 days.", href: join },
+      { icon: "💬", title: "Know someone with Android? Share on WhatsApp", text: "Send the beta to your family and friends groups. The more testers, the sooner everyone gets the app.", href: whatsappShareUrl },
+    ],
+    ctaLabel: "Join the Android beta",
+    ctaHref: join,
+    outro: "iPhone user? Nothing to do yet, the website works on every phone. Thank you for building iVideo Studio with us.",
+  };
+}

@@ -13,9 +13,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
-import { actionCartoonUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
+import { actionCartoonUpdate, androidBetaUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
 import { getOrCreateReferralCode, shareUrl, whatsappUrl } from "@/lib/referrals";
 import { unsubscribeUrl } from "@/lib/unsubscribe";
+import { betaWhatsappUrl } from "@/lib/android-beta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -41,6 +42,7 @@ const CAMPAIGNS: Record<string, Campaign> = {
   "2026-09-series-studio": (appUrl) => seriesStudioUpdate(appUrl),
   "2026-09-action-cartoon": (appUrl) => actionCartoonUpdate(appUrl),
   "2026-09-invite-friends": inviteFor,
+  "2026-09-android-beta": (appUrl) => androidBetaUpdate(appUrl, betaWhatsappUrl(appUrl)),
 };
 
 type CampaignId = string;

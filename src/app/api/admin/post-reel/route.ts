@@ -31,7 +31,13 @@ const PAGES: Record<string, { pageId: string; tokenEnv: string; name: string }> 
   penuel: { pageId: "", tokenEnv: "FB_PAGE_TOKEN_penuel", name: "Penuel" },
 };
 
-async function postReel(videoUrl: string, pageId: string, token: string, caption: string) {
+async function postReel(
+  videoUrl: string,
+  pageId: string,
+  token: string,
+  caption: string,
+  scheduledAt?: number
+) {
   const video = await fetch(videoUrl);
   if (!video.ok) throw new Error(`could not fetch the video (${video.status})`);
   const bytes = await video.arrayBuffer();
@@ -65,7 +71,12 @@ async function postReel(videoUrl: string, pageId: string, token: string, caption
       video_id,
       access_token: token,
       description: caption,
-      video_state: "PUBLISHED",
+      // Scheduled on Facebook itself, so a staggered campaign publishes on
+      // its own days without anybody — or any machine of ours — having to be
+      // awake to send it.
+      ...(scheduledAt
+        ? { video_state: "SCHEDULED", scheduled_publish_time: scheduledAt }
+        : { video_state: "PUBLISHED" }),
     }),
   });
   if (!finish.ok) throw new Error(`publish failed: ${finish.status} ${(await finish.text()).slice(0, 200)}`);
@@ -84,6 +95,8 @@ export async function POST(req: NextRequest) {
     pageKey?: string;
     videoUrl?: string;
     caption?: string;
+    /** Unix seconds. Facebook requires 10 minutes to 29 days ahead. */
+    scheduledAt?: number;
   };
 
   if (body.check) {
@@ -137,8 +150,18 @@ export async function POST(req: NextRequest) {
       name?: string;
     };
     const pageId = me.id || page.pageId;
-    const postId = await postReel(body.videoUrl, pageId, token, (body.caption || "").slice(0, 2000));
-    return NextResponse.json({ ok: true, page: me.name || page.name, postId });
+    const now = Math.floor(Date.now() / 1000);
+    const at = Number(body.scheduledAt) || 0;
+    if (at && (at < now + 600 || at > now + 29 * 24 * 3600)) {
+      return NextResponse.json({ error: "scheduledAt must be 10 minutes to 29 days ahead" }, { status: 400 });
+    }
+    const postId = await postReel(body.videoUrl, pageId, token, (body.caption || "").slice(0, 2000), at || undefined);
+    return NextResponse.json({
+      ok: true,
+      page: me.name || page.name,
+      postId,
+      scheduledFor: at ? new Date(at * 1000).toISOString() : null,
+    });
   } catch (err) {
     return NextResponse.json({ ok: false, page: page.name, error: String(err).slice(0, 400) }, { status: 502 });
   }

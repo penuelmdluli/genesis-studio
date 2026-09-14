@@ -30,6 +30,9 @@ export const GUEST_BROWSABLE_PATHS = new Set([
   "/studio",
   "/react-studio",
   "/edit",
+  "/pricing",
+  "/grow",
+  "/brain/templates",
 ]);
 
 export function isGuestBrowsable(pathname: string): boolean {

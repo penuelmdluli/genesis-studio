@@ -21,6 +21,7 @@ const PUBLIC_PATHS = new Set([
   "/explore",
   "/refund",
   "/acceptable-use",
+  "/delete-account",
 ]);
 
 const PUBLIC_PREFIXES = [

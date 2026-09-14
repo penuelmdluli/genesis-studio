@@ -219,15 +219,21 @@ export default function LandingPage() {
                   {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
                 </Button>
               </Link>
-              <Link href="#community" className="w-full sm:w-auto">
+              {/* Look before signing up: the studio is open to visitors, and the
+                  account is asked for only when they press create. */}
+              <Link
+                href="/dashboard"
+                className="w-full sm:w-auto"
+                onClick={() => trackEvent("cta_click", { location: "hero_explore" })}
+              >
                 <Button variant="outline" size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Play className="w-5 h-5" />
-                  Watch Demo
+                  {isSignedIn ? "Open the studio" : "Look around the studio"}
                 </Button>
               </Link>
             </div>
             <p className="text-xs sm:text-sm text-zinc-400">
-              No credit card required &bull; Most videos render in a few minutes
+              No credit card required &bull; Look around without an account &bull; Invite 5 friends, get 50 more credits
             </p>
           </MotionSection>
 

@@ -11,7 +11,8 @@ import { Logo } from "@/components/brand/logo";
 const navLinks = [
   { href: "/explore", label: "Explore" },
   { href: "#features", label: "Features" },
-  { href: "#models", label: "Models" },
+  { href: "/dashboard", label: "Studio" },
+  { href: "/series", label: "Series" },
   { href: "/pricing", label: "Pricing" },
 ];
 

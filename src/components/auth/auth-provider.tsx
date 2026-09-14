@@ -1,5 +1,6 @@
 "use client";
 
+import { isGuestBrowsable } from "@/lib/guest-routes";
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 
 const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour — must match backend
@@ -46,13 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (res.status === 401) {
         // Session expired — redirect to sign-in
         setUser(null);
-        if (window.location.pathname.startsWith("/dashboard") ||
-            window.location.pathname.startsWith("/generate") ||
-            window.location.pathname.startsWith("/brain") ||
-            window.location.pathname.startsWith("/motion-control") ||
-            window.location.pathname.startsWith("/react-studio") ||
-            window.location.pathname.startsWith("/gallery") ||
-            window.location.pathname.startsWith("/settings")) {
+        // Creative pages are open to visitors (src/lib/guest-routes.ts); only
+        // personal pages send a signed-out visitor to sign in.
+        const path = window.location.pathname;
+        const personal = ["/gallery", "/settings", "/invite", "/api-keys", "/collections", "/admin"]
+          .some((p) => path.startsWith(p)) || path.startsWith("/series/");
+        if (personal && !isGuestBrowsable(path)) {
           window.location.href = "/sign-in?expired=1";
         }
       } else {

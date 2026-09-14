@@ -11,6 +11,7 @@
 // behind sign-in.
 
 export const GUEST_BROWSABLE_PATHS = new Set([
+  "/dashboard",
   "/series",
   "/generate",
   "/tools",

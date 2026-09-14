@@ -236,6 +236,31 @@ export function Sidebar() {
             );
           }
 
+          // A visitor without an account has no balance to show. Tell them what
+          // signing up gives them instead of a red "0 credits".
+          if (isGuest) {
+            return (
+              <div className={cn(
+                "mx-3 mt-3 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 via-violet-500/10 to-cyan-500/5",
+                expanded ? "p-3" : "p-2"
+              )}>
+                {expanded ? (
+                  <>
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Free to start</p>
+                    <p className="text-lg font-extrabold text-white leading-tight">🎁 100 free credits</p>
+                    <p className="text-[11px] text-zinc-300 mt-0.5">when you sign up. No card needed.</p>
+                    <a href="/sign-up" className="mt-2.5 flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 px-2 py-2 text-xs font-bold text-white hover:brightness-110">
+                      Sign up free
+                    </a>
+                    <p className="text-[10px] text-zinc-400 mt-2 text-center">Then invite friends: every 5 who join = +50 credits</p>
+                  </>
+                ) : (
+                  <a href="/sign-up" aria-label="Sign up free for 100 credits" className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center mx-auto text-sm">🎁</a>
+                )}
+              </div>
+            );
+          }
+
           const credits = user?.creditBalance ?? 0;
           const limit = user?.monthlyCreditsLimit ?? 100;
           const isLow = credits < 100 && credits > 0;
@@ -326,11 +351,10 @@ export function Sidebar() {
               )}
 
               {/* Warning text */}
-              {expanded && isLow && !isEmpty && (
-                <p className="text-[10px] text-amber-400/60 mt-1.5 text-center">Running low — top up to keep creating</p>
-              )}
-              {expanded && isEmpty && (
-                <p className="text-[10px] text-red-400/60 mt-1.5 text-center">No credits left — buy more to continue</p>
+              {expanded && (isLow || isEmpty) && (
+                <Link href="/invite" className="block text-[10px] text-emerald-300 hover:text-emerald-200 mt-1.5 text-center">
+                  🎁 Or invite 5 friends and get 50 free credits
+                </Link>
               )}
             </div>
           );

@@ -71,7 +71,7 @@ const TOOL_GROUPS: Array<{
 ];
 
 export default function DashboardPage() {
-  const { user, activeJobs, videos, isInitialized, setUser } = useStore();
+  const { user, activeJobs, videos, isInitialized, setUser, isGuest } = useStore();
   const { toast } = useToast();
   const isLoading = !isInitialized;
 
@@ -240,7 +240,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+                {isGuest ? "Welcome to iVideo Studio" : `Welcome back${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
               </h1>
               <motion.span
                 animate={{ rotate: [0, 14, -8, 14, -4, 10, 0] }}
@@ -251,15 +251,17 @@ export default function DashboardPage() {
               </motion.span>
             </div>
             <p className="text-sm text-zinc-400">
-              {(videos || []).length > 0
+              {isGuest
+                ? "Sign up free and get 100 credits to make AI movies, cartoons, dance reels and ads. Invite friends and every 5 who join gives you 50 more."
+                : (videos || []).length > 0
                 ? `You've created ${(videos || []).length} videos (${totalDuration}s of footage). Keep creating!`
                 : "Ready to create something amazing? Let's get started."}
             </p>
           </div>
-          <Link href="/generate">
+          <Link href={isGuest ? "/sign-up" : "/generate"}>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button className="shadow-lg shadow-violet-600/30 text-base px-6 py-3">
-                <Sparkles className="w-5 h-5" /> Generate Video
+                <Sparkles className="w-5 h-5" /> {isGuest ? "Get 100 free credits" : "Generate Video"}
               </Button>
             </motion.div>
           </Link>
@@ -269,6 +271,19 @@ export default function DashboardPage() {
       {/* ====== AT A GLANCE ======
           Four large cards for numbers the sidebar already shows pushed the
           actual product below the fold. Same information, one line. */}
+      {isGuest ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { text: "🎁 100 free credits when you sign up", tone: "text-emerald-200 bg-emerald-500/10 border-emerald-500/30" },
+            { text: "👥 +50 credits for every 5 friends you invite", tone: "text-violet-200 bg-violet-500/10 border-violet-500/30" },
+            { text: "💳 No card needed", tone: "text-cyan-200 bg-cyan-500/10 border-cyan-500/30" },
+          ].map((c) => (
+            <a key={c.text} href="/sign-up" className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-medium ${c.tone}`}>
+              {c.text}
+            </a>
+          ))}
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center gap-2">
         {[
           { label: "credits", value: (user?.creditBalance ?? 0).toLocaleString(), icon: Zap, tone: "text-violet-300 bg-violet-500/10 border-violet-500/25" },
@@ -288,6 +303,7 @@ export default function DashboardPage() {
           </span>
         ))}
       </div>
+      )}
 
       {/* ====== QUICK ACTIONS ====== */}
       <MotionSection delay={0.1}>
@@ -463,6 +479,7 @@ export default function DashboardPage() {
       </MotionSection>
 
       {/* ====== CREDIT USAGE ====== */}
+      {!isGuest && (
       <MotionSection delay={0.25}>
         <div className="rounded-xl border border-white/[0.10] bg-[#111118]/60 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -497,6 +514,7 @@ export default function DashboardPage() {
           </p>
         </div>
       </MotionSection>
+      )}
 
       {/* ====== CREATOR STATS ====== */}
       <MotionSection delay={0.25}>
@@ -563,10 +581,10 @@ export default function DashboardPage() {
               <p className="text-xs text-zinc-400">Every 5 friends who join earns you 50 more. No limit.</p>
             </div>
             <Link
-              href="/invite"
+              href={isGuest ? "/sign-up" : "/invite"}
               className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors shrink-0"
             >
-              Invite on WhatsApp
+              {isGuest ? "Sign up, then invite" : "Invite on WhatsApp"}
             </Link>
           </div>
         </MotionSection>

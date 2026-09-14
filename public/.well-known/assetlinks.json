@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "ai.ivideostudio.app",
       "sha256_cert_fingerprints": [
-        "8C:8B:E4:46:94:7A:83:A7:E0:7C:73:97:94:0F:81:4F:FA:F4:93:BD:A9:CF:27:BC:40:F5:6A:0F:56:D3:8B:F0"
+        "8C:8B:E4:46:94:7A:83:A7:E0:7C:73:97:94:0F:81:4F:FA:F4:93:BD:A9:CF:27:BC:40:F5:6A:0F:56:D3:8B:F0",
+        "A1:4E:A9:B7:B9:F7:1F:51:2D:D3:6A:98:30:76:D7:CC:19:D4:A3:15:07:5E:53:EE:EE:7A:93:DB:65:B5:2B:44"
       ]
     }
   }

@@ -82,6 +82,10 @@ interface StoreState {
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
 
+  // Browsing without an account (see src/lib/guest-routes.ts)
+  isGuest: boolean;
+  setGuest: (val: boolean) => void;
+
   // Data loading
   isInitialized: boolean;
   setInitialized: (val: boolean) => void;
@@ -175,6 +179,8 @@ export const useStore = create<StoreState>((set) => ({
   clearNotifications: () => set({ notifications: [] }),
 
   // Data loading
+  isGuest: false,
+  setGuest: (val) => set({ isGuest: val }),
   isInitialized: false,
   setInitialized: (val) => set({ isInitialized: val }),
 

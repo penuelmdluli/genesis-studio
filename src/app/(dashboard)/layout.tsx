@@ -13,6 +13,8 @@ import { NotificationCenter } from "@/components/ui/notification-center";
 import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
+import { GuestGate } from "@/components/auth/guest-gate";
+import { isGuestBrowsable } from "@/lib/guest-routes";
 
 function mapVideo(v: Record<string, unknown>) {
   return {
@@ -75,7 +77,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification, setInitialized } = useStore();
+  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification, setInitialized, setGuest } = useStore();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completedJobsRef = useRef<Set<string>>(new Set());
 
@@ -170,8 +172,15 @@ export default function DashboardLayout({
           fetch("/api/jobs?status=processing&limit=50"),
         ]);
 
-        // Session expired — redirect to sign-in immediately
+        // No session. On a guest-browsable page the visitor looks around and
+        // is asked to sign up only when they try to create; anywhere else
+        // it's the sign-in page as before.
         if (userRes.status === 401) {
+          if (isGuestBrowsable(window.location.pathname)) {
+            setGuest(true);
+            setInitialized(true);
+            return;
+          }
           window.location.href = "/sign-in?expired=1";
           return;
         }
@@ -247,6 +256,7 @@ export default function DashboardLayout({
           sidebarOpen && "md:ml-64"
         )}
       >
+        <GuestGate />
         <OnboardingTour />
         <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}

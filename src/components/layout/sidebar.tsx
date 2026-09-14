@@ -103,7 +103,7 @@ const baseNavItems: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen, isInitialized } = useStore();
+  const { user, sidebarOpen, toggleSidebar, mobileMenuOpen, setMobileMenuOpen, isInitialized, isGuest } = useStore();
 
   // Which features can actually serve a request right now. A tool whose
   // provider is down used to look identical to one that works — users clicked
@@ -409,12 +409,20 @@ export function Sidebar() {
             <UserButton />
             {(sidebarOpen || mobileMenuOpen) && (
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-zinc-200 truncate">
-                  {user?.name || "User"}
-                </div>
-                <div className="text-xs text-zinc-400 truncate capitalize">
-                  {user?.plan || "free"} plan
-                </div>
+                {isGuest ? (
+                  <a href="/sign-up" className="text-sm font-semibold text-violet-300 hover:text-violet-200">
+                    Sign up free
+                  </a>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium text-zinc-200 truncate">
+                      {user?.name || "User"}
+                    </div>
+                    <div className="text-xs text-zinc-400 truncate capitalize">
+                      {user?.plan || "free"} plan
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {/* Desktop-only collapse toggle */}

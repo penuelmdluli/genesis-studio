@@ -6,6 +6,7 @@
 // Runs on Edge runtime for Cloudflare Pages compatibility.
 
 import { NextRequest, NextResponse } from "next/server";
+import { isGuestBrowsable } from "@/lib/guest-routes";
 
 const SESSION_COOKIE = "gs_session";
 
@@ -77,6 +78,8 @@ function getCacheControl(pathname: string): string | null {
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // Creative tools are browsable as a guest; creating still needs an account.
+  if (isGuestBrowsable(pathname)) return true;
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 

@@ -261,7 +261,11 @@ ${continuity}
 LANGUAGE: ${lang}
 Visual direction ("action") stays in ENGLISH. It is read by a camera system, never by the audience.
 
-Write exactly ${shotCount} shots, built the way a vertical micro-drama is built:
+Write exactly ${shotCount} shots — not one more. ${options.shortForm
+  ? `This is a fifteen-second episode, so the ${shotCount} shots are: 1) the HOOK, trouble already happening; 2) the TURN, one reveal that changes everything; 3) the CLIFFHANGER, a line or image that demands the next episode. Ignore any rule below about minimum inserts or shot variety if it would need more than ${shotCount} shots.`
+  : ""}
+
+Build it the way a vertical micro-drama is built:
 
 STRUCTURE — hook, escalation, cliffhanger.
 - Shot 1 is the HOOK. Something must already be wrong in the first three seconds. No throat-clearing, no arriving-and-greeting, no scene-setting. Open in the middle of trouble.
@@ -345,7 +349,11 @@ Respond with ONLY this JSON, no markdown:
 
   // Trust nothing about the shape. A wrong `kind` would silently route a
   // speaking shot away from lip sync, which is the one thing this sells.
-  draft.shots = draft.shots.slice(0, 12).map((s) => {
+  // The count is enforced here, not trusted from the model. Asked for three
+  // shots, it once returned twelve — which would have filmed a thirty-five
+  // second "fifteen-second" ad at four times the budget. The first N shots
+  // are kept, and the last kept shot is where the cliffhanger was asked for.
+  draft.shots = draft.shots.slice(0, Math.min(Math.max(shotCount, 1), 12)).map((s) => {
     let dialogue = String(s.dialogue || "").slice(0, 300).trim();
     if (options.shortForm && dialogue) {
       const words = dialogue.split(/\s+/);

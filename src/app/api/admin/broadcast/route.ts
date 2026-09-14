@@ -15,6 +15,7 @@ import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
 import { actionCartoonUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
 import { getOrCreateReferralCode, shareUrl, whatsappUrl } from "@/lib/referrals";
+import { unsubscribeUrl } from "@/lib/unsubscribe";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -108,10 +109,11 @@ export async function POST(req: NextRequest) {
     if (sent > 0) await new Promise((r) => setTimeout(r, 600));
 
     const update = await build(appUrl, u.id);
-    let r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+    const unsub = await unsubscribeUrl(appUrl, u.id);
+    let r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, unsub);
     if (!r.ok && /429|rate/i.test(r.error || "")) {
       await new Promise((res) => setTimeout(res, 1500));
-      r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
+      r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, unsub);
     }
 
     if (r.ok) {

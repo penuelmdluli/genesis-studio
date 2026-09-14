@@ -142,7 +142,7 @@ export function Celebrations() {
   return (
     <>
       <Rain count={big ? 56 : 34} />
-      <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/70 p-4" onClick={close}>
+      <div data-celebration-open className="fixed inset-0 z-[125] flex items-center justify-center bg-black/70 p-4" onClick={close}>
         <div
           role="dialog"
           aria-modal="true"

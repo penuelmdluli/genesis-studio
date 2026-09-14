@@ -28,6 +28,8 @@ interface SendEmailParams {
   preheader?: string;
   replyTo?: string;
   tags?: Array<{ name: string; value: string }>;
+  /** Extra headers, e.g. List-Unsubscribe for marketing email. */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -41,6 +43,7 @@ export async function sendEmailDetailed({
   html,
   replyTo,
   tags,
+  headers,
 }: SendEmailParams): Promise<{ ok: boolean; error?: string; id?: string }> {
   const { RESEND_API_KEY, FROM_EMAIL, SUPPORT_EMAIL } = getEmailConfig();
   if (!RESEND_API_KEY) {
@@ -63,6 +66,7 @@ export async function sendEmailDetailed({
         html,
         reply_to: replyTo || SUPPORT_EMAIL,
         tags,
+        ...(headers ? { headers } : {}),
       }),
     });
 
@@ -688,6 +692,7 @@ export async function sendProductUpdateEmail(
     to: email,
     subject: update.subject,
     tags: [{ name: "type", value: "product_update" }],
+    headers: listUnsubscribeHeaders(unsubscribeUrl),
     html: layout({
       marketing: true,
       unsubscribeUrl,
@@ -699,6 +704,83 @@ export async function sendProductUpdateEmail(
         ${featureList(update.items)}
         ${button(update.ctaLabel, update.ctaHref)}
         ${update.outro ? p(`<br>${update.outro}`, { muted: true, size: 13 }) : ""}
+      `,
+    }),
+  });
+}
+
+/** RFC 8058 one-click unsubscribe, so mail apps show their own Unsubscribe button. */
+function listUnsubscribeHeaders(url?: string): Record<string, string> | undefined {
+  if (!url || !url.includes("/api/email/unsubscribe")) return undefined;
+  return { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+}
+
+// ============================================
+// MARKETING — Feature of the Week
+// ============================================
+
+export interface SpotlightEmail {
+  subject: string;
+  preheader: string;
+  emoji: string;
+  title: string;
+  hook: string;
+  benefits: string[];
+  idea: string;
+  cta: string;
+  ctaHref: string;
+  cost: string;
+  poster: string;
+  hasVideo: boolean;
+  /** Who we're talking to changes the opening line. */
+  segment: "new" | "inactive" | "active";
+  inviteHref: string;
+}
+
+export async function sendFeatureSpotlightEmail(
+  email: string,
+  name: string,
+  s: SpotlightEmail,
+  unsubscribeUrl: string
+): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const first = esc((name || "there").split(" ")[0]);
+  const opener =
+    s.segment === "new"
+      ? `Hi ${first}, your free credits are still waiting. Here's one of the easiest ways to use them.`
+      : s.segment === "inactive"
+        ? `Hi ${first}, it's been a while. Here's something worth coming back for.`
+        : `Hi ${first}, here's this week's feature. Most creators haven't tried it yet.`;
+  const benefits = s.benefits
+    .map(
+      (b) =>
+        `<tr><td style="padding:4px 10px 4px 0;vertical-align:top;font-family:${FONT};font-size:15px;color:${C.success};">✓</td><td style="padding:4px 0;font-family:${FONT};font-size:15px;line-height:1.5;color:${C.body};">${esc(b)}</td></tr>`
+    )
+    .join("");
+  return sendEmailDetailed({
+    to: email,
+    subject: s.subject,
+    tags: [{ name: "type", value: "feature_spotlight" }],
+    headers: listUnsubscribeHeaders(unsubscribeUrl),
+    html: layout({
+      marketing: true,
+      unsubscribeUrl,
+      preheader: s.preheader,
+      content: `
+        <div style="font-family:${FONT};font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${C.brandDark};font-weight:700;margin-bottom:8px;">Feature of the week</div>
+        ${h1(`${s.emoji} ${esc(s.title)}`)}
+        ${p(opener)}
+        <a href="${s.ctaHref}" style="display:block;margin:6px 0 18px;text-decoration:none;">
+          <img src="${s.poster}" width="536" alt="${esc(s.title)}" style="display:block;width:100%;max-width:536px;height:auto;border-radius:12px;border:0;">
+        </a>
+        ${p(`<strong style="color:${C.ink};">${esc(s.hook)}</strong>`)}
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px;">${benefits}</table>
+        <div style="background:${C.accentBg};border-radius:12px;padding:16px 18px;margin:0 0 22px;">
+          <div style="font-family:${FONT};font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.brandDark};margin-bottom:6px;">💡 Try this idea</div>
+          <div style="font-family:${FONT};font-size:15px;line-height:1.55;color:${C.ink};">${esc(s.idea)}</div>
+        </div>
+        ${button(s.cta, s.ctaHref)}
+        ${p(`${esc(s.cost)}. Credits only come off when it works.`, { muted: true, size: 13 })}
+        ${p(`<br>🎁 Invite 5 friends and get 50 free credits. <a href="${s.inviteHref}" style="color:${C.brand};font-weight:600;">Get your WhatsApp link</a>`, { muted: true, size: 13 })}
       `,
     }),
   });

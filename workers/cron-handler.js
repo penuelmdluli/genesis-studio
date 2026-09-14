@@ -28,7 +28,9 @@ const CRON_MAP = {
   "*/1 * * * *": ["/api/cron/process-fallbacks", "/api/cron/check-singer", "/api/cron/reap-jobs"],
   "*/2 * * * *": ["/api/cron/check-mimic"],
   "*/30 * * * *": ["/api/cron/provider-balance"],
-  "*/15 * * * *": ["/api/cron/fetch-lead-videos"],
+  // Feature of the Week email: the route only sends Tue-Thu 10:00-14:00 SAST,
+  // one email per user per week. Sends email, spends no generation credit.
+  "*/15 * * * *": ["/api/cron/fetch-lead-videos", "/api/cron/weekly-spotlight"],
 };
 
 export default {

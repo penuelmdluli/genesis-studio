@@ -7,6 +7,7 @@ import { CreditPurchaseModal } from "@/components/credit-purchase-modal";
 import { LowCreditBanner } from "@/components/low-credit-banner";
 import { OnboardingTour } from "@/components/onboarding/tour";
 import { WhatsNewBell } from "@/components/ui/whats-new-bell";
+import { FeatureSpotlight } from "@/components/feature-spotlight";
 import { LoadSheddingBanner } from "@/components/ui/load-shedding-banner";
 import { DataSaverToggle } from "@/components/ui/data-saver-toggle";
 import { NotificationCenter } from "@/components/ui/notification-center";
@@ -261,6 +262,7 @@ export default function DashboardLayout({
       >
         <GuestGate />
         <Celebrations />
+        <FeatureSpotlight />
         <Suspense fallback={null}>
           <AdsConversions />
         </Suspense>

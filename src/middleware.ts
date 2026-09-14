@@ -24,6 +24,7 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 const PUBLIC_PREFIXES = [
+  "/.well-known/",
   "/sign-in",
   "/sign-up",
   "/blog",

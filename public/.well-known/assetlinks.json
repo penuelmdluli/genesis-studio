@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ai.ivideostudio.app",
+      "sha256_cert_fingerprints": [
+        "8C:8B:E4:46:94:7A:83:A7:E0:7C:73:97:94:0F:81:4F:FA:F4:93:BD:A9:CF:27:BC:40:F5:6A:0F:56:D3:8B:F0"
+      ]
+    }
+  }
+]

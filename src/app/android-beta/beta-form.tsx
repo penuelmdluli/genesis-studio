@@ -91,7 +91,7 @@ export function AndroidBetaForm() {
               </a>
             </>
           ) : (
-            <p className="mt-3 text-sm text-zinc-300">We'll email your install link as soon as Google approves the test. Usually within a few days.</p>
+            <p className="mt-3 text-sm text-zinc-300">We&apos;ll email your install link as soon as Google approves the test. Usually within a few days.</p>
           )}
           <p className="mt-6 text-sm text-zinc-400">Know someone with an Android phone? We need a few more testers.</p>
           <a
@@ -124,7 +124,7 @@ export function AndroidBetaForm() {
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
               placeholder="you@gmail.com"
             />
-            <span className="mt-1 block text-xs text-zinc-500">Open the Play Store, tap your profile picture: it's the email shown there.</span>
+            <span className="mt-1 block text-xs text-zinc-500">Open the Play Store, tap your profile picture: it&apos;s the email shown there.</span>
           </label>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button disabled={busy} className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-3 font-semibold text-white disabled:opacity-60">

@@ -89,7 +89,9 @@ export async function POST(req: NextRequest) {
     .from("users")
     .select("id, email, name")
     .not("email", "is", null)
-    .limit(limit * 3);
+    // All of them: already-sent and opted-out users are skipped below, so a
+    // short page could hold nobody still owed the campaign.
+    .limit(20000);
 
   const { data: already } = await db.from("email_sends").select("user_id").eq("campaign", CAMPAIGN_ID);
   const done = new Set((already || []).map((r: { user_id: string }) => r.user_id));

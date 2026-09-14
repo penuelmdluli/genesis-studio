@@ -43,6 +43,7 @@ import {
   Flame,
   Clapperboard,
   Gift,
+  Smartphone,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -70,6 +71,7 @@ const baseNavItems: NavItem[] = [
   { href: "/grow", label: "Grow", icon: Flame, badge: "NEW" },
   { href: "/series", label: "Series Studio", icon: Clapperboard, badge: "NEW" },
   { href: "/invite", label: "Invite friends +50", icon: Gift, badge: "FREE" },
+  { href: "/android-beta", label: "Android app beta", icon: Smartphone, badge: "TEST" },
 
   // --- CREATE: makes a new video ---
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },

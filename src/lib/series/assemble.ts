@@ -85,7 +85,13 @@ export async function startAssembly(
   burnSubtitles = true,
   height: 1280 | 1920 = EPISODE_HEIGHT,
   watermark: string | null = "ivideostudio.ai",
-  genre: string | null = null
+  genre: string | null = null,
+  /**
+   * Clips placed after the episode — the branded end card on marketing
+   * episodes. They carry no dialogue and are joined like any silent shot, so
+   * the score runs straight through them.
+   */
+  appendClips: Array<{ url: string }> = []
 ): Promise<AssemblyResult> {
   const svc = service();
   if (!svc) return { reason: "the video service is not configured" };
@@ -124,11 +130,14 @@ export async function startAssembly(
         // Each clip carries the voice we synthesised for it. The video
         // model's own soundtrack is discarded during the join — it invents
         // speech, in Chinese, under every shot.
-        clips: usable.map((s) => ({
-          url: s.clip_url,
-          subtitle: s.subtitle || "",
-          audioUrl: s.kind === "dialogue" ? s.audio_url || null : null,
-        })),
+        clips: [
+          ...usable.map((s) => ({
+            url: s.clip_url,
+            subtitle: s.subtitle || "",
+            audioUrl: s.kind === "dialogue" ? s.audio_url || null : null,
+          })),
+          ...appendClips.map((c) => ({ url: c.url, subtitle: "", audioUrl: null, holdSeconds: 3.4 })),
+        ],
         outputR2Key: outputKey,
         burnSubtitles,
         height,

@@ -21,7 +21,8 @@ import { envString } from "@/lib/env";
 import { submitShot, type RenderContext } from "@/lib/series/render";
 import { ensureCast } from "@/lib/series/cast";
 import { guessGender } from "@/lib/series/writer";
-import { renderCost, DIALOGUE_SHOT_CREDITS, ACTION_SHOT_CREDITS } from "@/lib/series/pricing";
+import { renderCost, shotCredits } from "@/lib/series/pricing";
+import { styleForGenre, styleSpec } from "@/lib/series/style";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { toUserFacingProviderError } from "@/lib/user-errors";
 
@@ -116,7 +117,9 @@ export async function POST(
     characterDescription: series.character_description || null,
     characterName: series.character_name || null,
     aspectRatio: body.aspectRatio === "16:9" ? "16:9" : "9:16",
+    style: styleForGenre(series.genre),
   };
+  const blockbuster = styleSpec(ctx.style).blockbuster;
 
   // Only the scenes that still need making.
   const candidates = shots
@@ -188,7 +191,7 @@ export async function POST(
 
   // Charged for exactly what was claimed, never for what somebody else is
   // already making.
-  const cost = renderCost(todo.map(({ shot }) => shot));
+  const cost = renderCost(todo.map(({ shot }) => shot), blockbuster);
   if (!ownerAccount) {
     const { success, newBalance } = await deductCredits(
       user.id,
@@ -247,7 +250,7 @@ export async function POST(
     } else {
       const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
       console.error(`[SERIES] shot ${index} failed to submit:`, message);
-      refundDue += shot.kind === "dialogue" ? DIALOGUE_SHOT_CREDITS : ACTION_SHOT_CREDITS;
+      refundDue += shotCredits(shot.kind, blockbuster);
       await db
         .from("series_shots")
         .update({

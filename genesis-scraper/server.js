@@ -889,8 +889,46 @@ app.post("/stitch-episode", auth, async (req, res) => {
         await streamPipeline(Readable.fromWeb(gotVoice.body), fs.createWriteStream(voicePath));
       }
 
+      // The shot's sound effects (engines, footsteps, impacts), made from the
+      // finished picture. Mixed under the voice, or carried alone when nobody
+      // speaks. A failed download only costs the effects, never the shot.
+      let sfxPath = null;
+      if (clip.sfxUrl) {
+        try {
+          const candidate = path.join(tmp, `st-sfx-${stamp}-${i}.mp4`);
+          scratch.push(candidate);
+          const gotSfx = await fetch(clip.sfxUrl);
+          if (!gotSfx.ok) throw new Error(`status ${gotSfx.status}`);
+          await streamPipeline(Readable.fromWeb(gotSfx.body), fs.createWriteStream(candidate));
+          sfxPath = candidate;
+        } catch (err) {
+          console.error(`[stitch-episode] clip ${i} sound effects skipped:`, err.message);
+        }
+      }
+
       const args = ["-y"];
-      if (voicePath) {
+      if (voicePath && sfxPath) {
+        args.push("-i", rawPath, "-i", voicePath, "-i", sfxPath);
+        filter += ",tpad=stop_mode=clone:stop_duration=30";
+        args.push(
+          "-filter_complex",
+          `[0:v]${filter}[v];` +
+            `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,apad=pad_dur=0.35[vo];` +
+            `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.42,apad[fx];` +
+            `[vo][fx]amix=inputs=2:duration=first:normalize=0[a]`,
+          "-map", "[v]", "-map", "[a]",
+          "-shortest"
+        );
+      } else if (sfxPath) {
+        if (trimTo) args.push("-t", String(trimTo));
+        args.push("-i", rawPath, "-i", sfxPath);
+        args.push(
+          "-filter_complex",
+          `[0:v]${filter}[v];[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.9,apad[a]`,
+          "-map", "[v]", "-map", "[a]",
+          "-shortest"
+        );
+      } else if (voicePath) {
         // A line longer than the footage used to be cut off mid-word, which
         // is how a cliffhanger line went missing at the end of an episode.
         // The last frame is held for as long as the line needs instead.

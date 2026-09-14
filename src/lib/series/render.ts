@@ -26,9 +26,10 @@ import { voiceForCharacter } from "@/lib/series/cast";
 import { speakOmnivoice } from "@/lib/series/omnivoice";
 import { getDb } from "@/lib/db-driver";
 import { synthesiseSpeech } from "@/lib/edge-tts";
+import { styleSpec, type VisualStyle } from "@/lib/series/style";
 
-/** Cinematic i2v. Funded, and the strongest dramatic motion we have. */
-const SCENE_VIDEO_MODEL = "bytedance/seedance-v1.5-pro/image-to-video";
+// The video model now comes from the series style (src/lib/series/style.ts):
+// drama films on Seedance 1.5 Pro, action and cartoon on Seedance 2.5.
 
 /**
  * Every shot is finished at 1080p.
@@ -69,6 +70,23 @@ export async function submitLipsync(videoUrl: string, audioUrl: string): Promise
     video: videoUrl,
     audio: audioUrl,
     sync_mode: "loop",
+  });
+  return prediction.id;
+}
+
+/**
+ * Natural sound for a finished shot. Measured 2026-09-14 on the marketing
+ * films: $0.05 a shot, and it is the difference between a clip that feels
+ * alive and one that feels dead. Speech and music are excluded here — the
+ * voices are ours and the score is laid in at assembly.
+ */
+const FOLEY_MODEL = "wavespeed-ai/hunyuan-video-foley";
+
+export async function submitFoley(clipUrl: string, action: string): Promise<string> {
+  const prediction = await submitWsModel(FOLEY_MODEL, {
+    video: clipUrl,
+    prompt: `${action}`.slice(0, 300) + ". Realistic sound effects and ambience only, no music, no speech, no singing.",
+    seed: -1,
   });
   return prediction.id;
 }
@@ -150,12 +168,16 @@ const NEGATIVE =
   "no bystanders, no crowd, no extra people, no onlookers, no text, no watermark, no split screen, " +
   "no printed words, letters, badges, insignia or logos on any clothing or uniform";
 
+const NEGATIVE_LIGHT = "no text, no watermark, no split screen, no printed words, letters or logos on clothing";
+
 export interface RenderContext {
   language: SeriesLanguage;
   /** Locked, reused verbatim in every shot of every episode. */
   characterDescription: string | null;
   characterName: string | null;
   aspectRatio: "9:16" | "16:9";
+  /** The look of the series, from its genre. Drama when absent. */
+  style?: VisualStyle;
 }
 
 /**
@@ -188,8 +210,10 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
     solo,
     shot.action,
     `${framing}, ${tone}.`,
-    "Cinematic South African drama, photoreal, film grain, natural skin texture, 35mm.",
-    NEGATIVE + ".",
+    styleSpec(ctx.style).look,
+    // An action or cartoon set piece is allowed its crowd, its villain and its
+    // cheering village; only a speaking frame must hold one person.
+    (shot.kind === "action" && styleSpec(ctx.style).blockbuster ? NEGATIVE_LIGHT : NEGATIVE) + ".",
   ]
     .filter(Boolean)
     .join(" ")
@@ -197,7 +221,7 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
 }
 
 /** Motion direction. Every shot moves now, speaking ones included. */
-export function buildShotMotionPrompt(shot: Shot): string {
+export function buildShotMotionPrompt(shot: Shot, style?: VisualStyle): string {
   const motion =
     shot.kind === "dialogue"
       ? MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm
@@ -208,7 +232,7 @@ export function buildShotMotionPrompt(shot: Shot): string {
       ? "The character is talking to someone off camera, mouth moving, expressive. "
       : "";
 
-  return `${shot.action}. ${speaking}${motion}. Cinematic handheld camera movement, dramatic, photoreal.`.slice(
+  return `${shot.action}. ${speaking}${motion}. ${styleSpec(style).motion}`.slice(
     0,
     600
   );
@@ -258,9 +282,7 @@ export async function ensureCharacterReference(
   try {
     const portrait = await runWsModelSync(WS_MODELS.textToImage, {
       prompt:
-        `${description}. Full body portrait standing in a South African township street, ` +
-        `neutral expression, facing camera, even daylight. ` +
-        `Photoreal, 35mm, natural skin texture. ${NEGATIVE}.`,
+        `${description}. ${styleSpec(ctx.style).portrait} ${NEGATIVE}.`,
       size: "768*1344",
     });
     const url = Array.isArray(portrait?.outputs) ? String(portrait.outputs[0] || "") : "";
@@ -318,7 +340,7 @@ export async function synthesiseLine(
   voiceName: string,
   userId: string,
   tag: string,
-  character?: { pitch: string; rate: string }
+  character?: { pitch: string; rate: string; volume?: string }
 ): Promise<string> {
   // The format is deliberately left at the default. Probed on 2026-09-12:
   // of every documented variant the speech service accepts only
@@ -329,6 +351,7 @@ export async function synthesiseLine(
   const audio = await synthesiseSpeech(text, voiceName || "en-ZA-LeahNeural", {
     pitch: character?.pitch,
     rate: character?.rate,
+    volume: character?.volume,
   });
   const buf = Buffer.from(audio);
   if (buf.length === 0) throw new Error("No audio was produced for this line");
@@ -337,6 +360,39 @@ export async function synthesiseLine(
   const key = audioStorageKey(userId, `series-${tag}`);
   await uploadAudio(key, buf);
   return r2PublicUrl(key);
+}
+
+/**
+ * How hard a line is delivered. A warning shouted across a burning street
+ * cannot be read in the same voice as a line across a kitchen table, so the
+ * loud emotions lift pace, pitch and volume on top of the character's own
+ * fixed voice. The shift is added to the cast offsets, so the character is
+ * still recognisably themselves, just under pressure.
+ */
+const DELIVERY: Record<string, { pitch: number; rate: number; volume: number }> = {
+  angry: { pitch: 6, rate: 8, volume: 35 },
+  shocked: { pitch: 10, rate: 10, volume: 30 },
+  afraid: { pitch: 8, rate: 12, volume: 20 },
+  tense: { pitch: 2, rate: 6, volume: 15 },
+  joyful: { pitch: 6, rate: 5, volume: 15 },
+};
+
+function shift(value: string | undefined, by: number, unit: string): string {
+  const n = parseFloat(String(value || "0").replace(unit, "")) || 0;
+  const total = Math.round(n + by);
+  return `${total >= 0 ? "+" : ""}${total}${unit}`;
+}
+
+export function deliver(
+  cast: { pitch: string; rate: string },
+  emotion: string
+): { pitch: string; rate: string; volume: string } {
+  const d = DELIVERY[emotion] || { pitch: 0, rate: 0, volume: 0 };
+  return {
+    pitch: shift(cast.pitch, d.pitch, "Hz"),
+    rate: shift(cast.rate, d.rate, "%"),
+    volume: `+${d.volume}%`,
+  };
 }
 
 export interface SubmittedShot {
@@ -398,20 +454,28 @@ export async function submitShot(
     const cast = seriesId
       ? await voiceForCharacter(seriesId, shot.speaker, gender, ctx.language)
       : { voice: voiceForSpeaker(shot.speaker, ctx, gender), ...voiceCharacter(shot.speaker) };
-    audioUrl = await synthesiseLine(shot.dialogue, cast.voice, userId, tag, {
-      pitch: cast.pitch,
-      rate: cast.rate,
-    });
+    audioUrl = await synthesiseLine(shot.dialogue, cast.voice, userId, tag, deliver(cast, shot.emotion));
   }
 
   // 3. Film it. EVERY shot is filmed, speaking ones included — that is the
   //    difference between a scene and a slideshow. Speech is matched onto the
   //    moving footage afterwards, in the polling stage.
-  const prediction = await submitWsModel(SCENE_VIDEO_MODEL, {
-    image: imageUrl,
-    prompt: buildShotMotionPrompt(shot),
-    duration: 5,
-  });
+  const spec = styleSpec(ctx.style);
+  const prediction = await submitWsModel(
+    spec.videoModel,
+    spec.blockbuster
+      ? {
+          // Seedance 2.5 takes a narrower schema: no aspect ratio (the still
+          // sets the shape), no seed. Its own audio is off — our voices, sound
+          // effects and score are laid in afterwards.
+          image: imageUrl,
+          prompt: buildShotMotionPrompt(shot, ctx.style),
+          duration: 5,
+          resolution: "720p",
+          generate_audio: false,
+        }
+      : { image: imageUrl, prompt: buildShotMotionPrompt(shot, ctx.style), duration: 5 }
+  );
 
   return { imageUrl, audioUrl, providerRef: prediction.id };
 }

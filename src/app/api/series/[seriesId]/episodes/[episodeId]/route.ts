@@ -13,6 +13,7 @@ import { getUserByClerkId } from "@/lib/db";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
+import { styleForGenre, styleSpec } from "@/lib/series/style";
 import type { Shot } from "@/lib/series/writer";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import { retryFailedShots } from "@/lib/series/retry";
@@ -43,6 +44,10 @@ export async function GET(
     return NextResponse.json({ error: "Episode not found" }, { status: 404 });
   }
 
+  // The genre sets the look, and with it the price quoted for the scenes.
+  const { data: seriesMeta } = await db.from("series").select("genre").eq("id", seriesId).maybeSingle();
+  const seriesGenre: string | null = seriesMeta?.genre || null;
+
   let shots: Shot[] = [];
   let cliffhanger = "";
   try {
@@ -69,7 +74,7 @@ export async function GET(
   if (shotRows.some((s) => s.status === "failed")) {
     const { data: seriesRow } = await db
       .from("series")
-      .select("language, character_description, character_name")
+      .select("language, character_description, character_name, genre")
       .eq("id", seriesId)
       .maybeSingle();
     if (seriesRow) {
@@ -155,7 +160,7 @@ export async function GET(
       videoUrl: episode.video_url || null,
     },
     shots,
-    cost: renderCost(shots),
+    cost: renderCost(shots, styleSpec(styleForGenre(seriesGenre)).blockbuster),
     progress: shotRows.length ? { total: shotRows.length, done, failed } : null,
     rendered: shotRows,
   });

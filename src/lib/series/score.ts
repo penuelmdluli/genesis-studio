@@ -10,6 +10,7 @@
 // felt rather than listened to.
 
 import { runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
+import { styleForGenre } from "@/lib/series/style";
 
 /** What the music should sound like, taken from the genre the creator chose. */
 const SCORE_BY_GENRE: Record<string, string> = {
@@ -22,6 +23,14 @@ const SCORE_BY_GENRE: Record<string, string> = {
 };
 
 function tagsFor(genre: string | null | undefined): string {
+  // The scores behind iVideo Studio's own action and cartoon films.
+  const style = styleForGenre(genre);
+  if (style === "action") {
+    return "hybrid orchestral action movie score, pounding drums, pulsing synth bass, huge brass hits, fast tempo, rising tension, instrumental, no vocals";
+  }
+  if (style === "cartoon") {
+    return "whimsical adventurous orchestral animated film score, playful woodwinds, soaring strings, joyful brass fanfare, instrumental, no vocals";
+  }
   const key = (genre || "drama").toLowerCase().trim();
   const base = SCORE_BY_GENRE[key] || SCORE_BY_GENRE.drama;
   return `${base}, south african drama score, instrumental, no vocals`;

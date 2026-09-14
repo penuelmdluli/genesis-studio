@@ -17,6 +17,7 @@
 // South African English). Visual direction stays in English because that is
 // what the video models were trained to read — the creator never sees it.
 
+import { styleForGenre } from "@/lib/series/style";
 import { envString } from "@/lib/env";
 import { localeOrDefault } from "@/lib/series/locales";
 
@@ -263,7 +264,33 @@ ${ctx.storySoFar || "(nothing recorded)"}
 
 Continue DIRECTLY from that. Do not reset, do not re-introduce characters the audience already knows, do not repeat earlier scenes. Pay off at least one thread that was left open, and open a new one.`;
 
-  const prompt = `You are the head writer of a South African drama series. You write the kind of episodic drama people actually finish and share: real stakes, real families, money, loyalty, betrayal. Not an advert, not a lesson.
+  const style = styleForGenre(ctx.genre);
+  const opening =
+    style === "action"
+      ? "You are the head writer of an ACTION MOVIE series. You write the kind of episodic action people binge and share: chases, fights, stunts, escapes, explosions, and heroes who talk under fire. Every episode plays like the best ten minutes of a blockbuster."
+      : style === "cartoon"
+        ? "You are the head writer of a 3D ANIMATED cartoon series for the whole family, at the level of the best animated feature films. You write big-hearted adventure and comedy with expressive characters (people, kids or talking animals), physical gags, danger that is thrilling but never gory, and moments that make families laugh and cheer."
+        : "You are the head writer of a South African drama series. You write the kind of episodic drama people actually finish and share: real stakes, real families, money, loyalty, betrayal. Not an advert, not a lesson.";
+  const styleRules =
+    style === "action"
+      ? `
+ACTION MOVIE RULES — these override anything softer below.
+- At least half the shots are "action" set pieces: vehicle chases, rooftop jumps, fights, explosions, escapes, crashes. Make each one specific and physical, with the camera moving.
+- Dialogue is SHOUTED under pressure: warnings, orders, threats, one-liners. "Get down!", "Go, go, go!", "You're too late." Short, punchy, never a speech.
+- Emotions are mostly "tense", "angry", "shocked" and "afraid". Save "calm" for a villain's cold threat.
+- "wide" is allowed more often here: action needs space to read.
+- Speaking frames still hold one person, but action shots may show the hero, the villain, vehicles and crowds.`
+      : style === "cartoon"
+        ? `
+CARTOON RULES — these override anything softer below.
+- Characters are animated: say what they look like in "action" (a meerkat pilot in goggles, a kid inventor with a backpack). Talking animals are welcome.
+- Big expressive performances: shock takes, joyful jumps, comic panic. Emotions are mostly "joyful", "shocked", "afraid" and "tense".
+- Mix comedy with adventure: a chase, a daring escape, a silly mishap, a triumphant moment.
+- Dialogue is funny and warm, sometimes shouted in excitement or panic. Family-friendly always: no swearing, no gore, no weapons.
+- Action shots may show groups: cheering villages, rival characters, animal crowds.`
+        : "";
+
+  const prompt = `${opening}
 
 SERIES: ${ctx.title}
 GENRE: ${ctx.genre || "drama"}
@@ -271,6 +298,8 @@ ${ctx.logline ? `PREMISE: ${ctx.logline}` : ""}
 LEAD CHARACTER: ${ctx.characterName || "the lead"}${ctx.characterDescription ? ` — ${ctx.characterDescription}` : ""}
 
 ${continuity}
+
+${styleRules}
 
 LANGUAGE: ${lang}
 Visual direction ("action") stays in ENGLISH. It is read by a camera system, never by the audience.

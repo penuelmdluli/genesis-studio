@@ -10,6 +10,7 @@
 //
 // Nothing here is customer-facing and nothing is charged.
 
+import { styleForGenre } from "@/lib/series/style";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
       characterDescription: series.character_description || null,
       characterName: series.character_name || null,
       aspectRatio: "9:16" as const,
+      style: styleForGenre(series.genre),
     };
 
     const todo = shots

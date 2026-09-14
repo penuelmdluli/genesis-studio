@@ -12,6 +12,7 @@
 // recap the previous one produced. That is what makes it a season rather
 // than ten unrelated clips.
 
+import { styleForGenre, styleSpec } from "@/lib/series/style";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getAuthUserId } from "@/lib/auth";
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
         title: draft.title,
         synopsis: draft.synopsis,
         shots: draft.shots.length,
-        renderCost: renderCost(draft.shots),
+        renderCost: renderCost(draft.shots, styleSpec(styleForGenre(series.genre)).blockbuster),
       });
       episodeNumber++;
     }

@@ -22,7 +22,52 @@ import { SERIES_LOCALES, localeOrDefault } from "@/lib/series/locales";
 // in — a home-language drama is a deliberate choice, not the fallback.
 const QUICK_LANGUAGES = ["en-ZA", "zu-ZA", "af-ZA"];
 
-const GENRES = ["Drama", "Family", "Township comedy", "Crime", "Romance", "Thriller"];
+const GENRES = ["Action movie", "3D cartoon", "Drama", "Family", "Township comedy", "Crime", "Romance", "Thriller"];
+
+/** Genres that film at blockbuster level — see src/lib/series/style.ts. */
+const BLOCKBUSTER_GENRES = ["Action movie", "3D cartoon"];
+
+// Films iVideo Studio made to market itself. Each one fills the form with a
+// series built the same way, so a creator who likes what they see can make
+// their own version in one tap.
+const SHOWCASE = [
+  {
+    key: "action",
+    label: "AI Action Movie",
+    video: "https://cdn.ivideostudio.ai/marketing/ads/ai-action-movie-9x16.mp4?v=2",
+    preset: {
+      title: "Last Run",
+      genre: "Action movie",
+      characterName: "Zara",
+      characterDescription: "30, athletic woman, short braids, black leather jacket, thin scar above her left eyebrow",
+      logline: "A getaway rider in Johannesburg is framed for a heist and has one night to outrun the crew hunting her and clear her name.",
+    },
+  },
+  {
+    key: "cartoon",
+    label: "AI Cartoon Movie",
+    video: "https://cdn.ivideostudio.ai/marketing/ads/ai-cartoon-9x16.mp4?v=2",
+    preset: {
+      title: "Sky Scout Sipho",
+      genre: "3D cartoon",
+      characterName: "Sipho",
+      characterDescription: "a brave little meerkat with aviator goggles, a red scarf and a big grin",
+      logline: "A small meerkat who dreams of flying builds a wooden plane and must save his savanna village from a grumpy giant eagle.",
+    },
+  },
+  {
+    key: "beasts",
+    label: "AI Beast Wars",
+    video: "https://cdn.ivideostudio.ai/marketing/ads/ai-beast-wars-9x16.mp4?v=2",
+    preset: {
+      title: "Beast Wars",
+      genre: "Action movie",
+      characterName: "Captain Lindiwe",
+      characterDescription: "35, commander in a battle-worn armoured exosuit with glowing blue lines, short natural hair",
+      logline: "Giant machine beasts rise across Africa, and Captain Lindiwe must pilot the last chrome war-rhino against a molten iron lion before it reaches Johannesburg.",
+    },
+  },
+];
 
 interface SeriesRow {
   id: string;
@@ -49,6 +94,18 @@ export default function SeriesShelfPage() {
   const [logline, setLogline] = useState("");
   const [characterName, setCharacterName] = useState("");
   const [characterDescription, setCharacterDescription] = useState("");
+
+  function createSimilar(preset: (typeof SHOWCASE)[number]["preset"]) {
+    setTitle(preset.title);
+    setGenre(preset.genre);
+    setCharacterName(preset.characterName);
+    setCharacterDescription(preset.characterDescription);
+    setLogline(preset.logline);
+    setLanguage("en-ZA");
+    setError("");
+    setOpen(true);
+    setTimeout(() => document.getElementById("series-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   useEffect(() => {
     fetch("/api/series")
@@ -92,10 +149,36 @@ export default function SeriesShelfPage() {
           Series Studio
         </h1>
         <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-          Make a drama in your own language, episode after episode. Same characters, a story that
-          carries on, and English subtitles so everyone can follow it. English, isiZulu,
-          Afrikaans and 137 more.
+          Make action movies, 3D cartoons and dramas, episode after episode. Same characters, a
+          story that carries on, voices with real lip sync, sound effects and music, and English
+          subtitles so everyone can follow it. English, isiZulu, Afrikaans and 137 more.
         </p>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-300 mb-3">Made with iVideo Studio: make one like it</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {SHOWCASE.map((item) => (
+            <div key={item.key} className="rounded-2xl border border-white/[0.10] bg-white/[0.03] overflow-hidden">
+              <video
+                src={item.video}
+                className="w-full aspect-[9/16] object-cover bg-black"
+                controls
+                playsInline
+                preload="metadata"
+              />
+              <div className="p-3 flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-zinc-100">{item.label}</span>
+                <button
+                  onClick={() => createSimilar(item.preset)}
+                  className="rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Create similar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {!open && (
@@ -114,7 +197,7 @@ export default function SeriesShelfPage() {
       )}
 
       {open && (
-        <Card>
+        <Card id="series-form">
           <CardContent className="p-5 space-y-4">
             <div>
               <label className="text-xs font-medium text-zinc-400">What is it called?</label>
@@ -214,6 +297,12 @@ export default function SeriesShelfPage() {
                   </button>
                 ))}
               </div>
+              {BLOCKBUSTER_GENRES.includes(genre) && (
+                <p className="text-[11px] text-cyan-300/80 mt-1.5">
+                  Blockbuster quality: big set pieces, characters that talk and shout with lip sync,
+                  full sound effects and a movie score. 240 to 280 credits a scene.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

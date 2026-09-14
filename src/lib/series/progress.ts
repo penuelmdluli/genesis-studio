@@ -11,24 +11,26 @@
 
 import { getDb } from "@/lib/db-driver";
 import { getWsPrediction } from "@/lib/wavespeed-tools";
-import { submitUpscale, submitLipsync } from "@/lib/series/render";
+import { submitUpscale, submitLipsync, submitFoley } from "@/lib/series/render";
 
 export interface ShotRow {
   id: string;
   shot_index: number;
   status: string;
-  /** "render" while filming, "lipsync" during speech, "upscale" at the end. */
+  /** "render" while filming, "lipsync" during speech, "upscale", then "foley" for sound. */
   stage: string | null;
   kind: string | null;
   audio_url: string | null;
   provider_ref: string | null;
   clip_url: string | null;
   raw_clip_url: string | null;
+  action?: string | null;
+  sfx_url?: string | null;
   created_at: string;
 }
 
 export const SHOT_SELECT =
-  "id, shot_index, status, stage, kind, audio_url, clip_url, raw_clip_url, image_url, provider_ref, error, created_at";
+  "id, shot_index, status, stage, kind, action, audio_url, clip_url, raw_clip_url, sfx_url, image_url, provider_ref, error, created_at";
 
 /**
  * A shot that has been rendering for longer than this is not coming back.
@@ -60,6 +62,19 @@ export async function refreshShots(
         if (prediction.status === "completed") {
           const url = prediction.outputs?.[0];
           if (!url) throw new Error("finished with no video");
+
+          // The sound pass has finished: the shot is done. Checked first, so
+          // its output is never mistaken for a picture to upscale.
+          if (row.stage === "foley") {
+            row.status = "completed";
+            row.sfx_url = url;
+            await db
+              .from("series_shots")
+              .update({ status: "completed", stage: "done", sfx_url: url, updated_at: now })
+              .eq("id", row.id);
+            return;
+          }
+
 
           // The shot has been filmed. A speaking shot now gets the voice
           // matched onto the moving footage — this is the step that replaced
@@ -104,6 +119,24 @@ export async function refreshShots(
             }
           }
 
+          // Sound. The finished clip is listened to by a foley model that
+          // makes the engines, footsteps, wind and impacts that belong to the
+          // picture. Its output is only ever used as an audio track: the clip
+          // the creator sees stays the upscaled one.
+          try {
+            const foleyRef = await submitFoley(url, row.action || "");
+            row.stage = "foley";
+            row.clip_url = url;
+            await db
+              .from("series_shots")
+              .update({ stage: "foley", clip_url: url, provider_ref: `ws:${foleyRef}`, updated_at: now })
+              .eq("id", row.id);
+            return;
+          } catch (err) {
+            // A shot without sound effects still cuts into the episode.
+            console.error(`[SERIES] foley could not start for shot ${row.shot_index}:`, err);
+          }
+
           row.status = "completed";
           row.clip_url = url;
           await db
@@ -116,6 +149,15 @@ export async function refreshShots(
         if (prediction.status === "failed") {
           // Same rule: if only the finishing pass failed, the creator still
           // gets the scene they paid for.
+          // Losing only the sound pass keeps the finished picture.
+          if (row.stage === "foley" && row.clip_url) {
+            row.status = "completed";
+            await db
+              .from("series_shots")
+              .update({ status: "completed", stage: "done", updated_at: now })
+              .eq("id", row.id);
+            return;
+          }
           if (row.stage === "upscale" && row.raw_clip_url) {
             row.status = "completed";
             row.clip_url = row.raw_clip_url;

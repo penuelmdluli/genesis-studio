@@ -11,6 +11,7 @@
 // fails for a real reason — a prompt the model refuses, a broken input —
 // would otherwise retry forever and bill every time.
 
+import { styleForGenre } from "@/lib/series/style";
 import { getDb } from "@/lib/db-driver";
 import { submitShot, type RenderContext } from "@/lib/series/render";
 import { toUserFacingProviderError } from "@/lib/user-errors";
@@ -47,6 +48,7 @@ export async function retryFailedShots(
     language?: string | null;
     character_description?: string | null;
     character_name?: string | null;
+    genre?: string | null;
   },
   aspectRatio: "9:16" | "16:9" = "9:16"
 ): Promise<RetryOutcome> {
@@ -89,6 +91,7 @@ export async function retryFailedShots(
     characterDescription: series.character_description || null,
     characterName: series.character_name || null,
     aspectRatio,
+    style: styleForGenre(series.genre),
   };
 
   // Claim the shots first. Two polls arriving together would otherwise both

@@ -21,6 +21,7 @@ import { envString } from "@/lib/env";
 import { r2PublicUrl, videoStorageKey } from "@/lib/storage";
 import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { generateScore } from "@/lib/series/score";
+import { styleForGenre, styleSpec } from "@/lib/series/style";
 
 interface ShotForAssembly {
   shot_index: number;
@@ -28,6 +29,7 @@ interface ShotForAssembly {
   kind: string | null;
   clip_url: string | null;
   audio_url: string | null;
+  sfx_url: string | null;
   subtitle: string | null;
 }
 
@@ -99,7 +101,7 @@ export async function startAssembly(
   const db = getDb();
   const { data: shotRows } = await db
     .from("series_shots")
-    .select("shot_index, status, kind, clip_url, audio_url, subtitle")
+    .select("shot_index, status, kind, clip_url, audio_url, sfx_url, subtitle")
     .eq("episode_id", episodeId)
     .order("shot_index", { ascending: true })
     .limit(20);
@@ -121,6 +123,7 @@ export async function startAssembly(
   // Made before the join so it can be mixed in the same pass. A failure
   // here returns null and the episode is assembled without it.
   const musicUrl = await generateScore(genre, usable.length * 5);
+  const spec = styleSpec(styleForGenre(genre));
 
   try {
     const res = await fetch(`${svc.url}/stitch-episode`, {
@@ -135,6 +138,12 @@ export async function startAssembly(
             url: s.clip_url,
             subtitle: s.subtitle || "",
             audioUrl: s.kind === "dialogue" ? s.audio_url || null : null,
+            // The shot's own sound effects, mixed under the voice. The clip's
+            // original soundtrack is still never used.
+            sfxUrl: s.sfx_url || null,
+            // Action and cartoon set pieces are the point of those series,
+            // so a silent shot is held longer than in a talky drama.
+            ...(s.kind === "dialogue" && s.audio_url ? {} : { holdSeconds: spec.silentHold }),
           })),
           ...appendClips.map((c) => ({ url: c.url, subtitle: "", audioUrl: null, holdSeconds: 3.4 })),
         ],
@@ -143,7 +152,7 @@ export async function startAssembly(
         height,
         watermark,
         musicUrl,
-        musicVolume: 0.14,
+        musicVolume: spec.musicVolume,
       }),
     });
 

@@ -39,17 +39,28 @@ export async function usageByUser(userIds?: string[]): Promise<Map<string, Set<U
   return out;
 }
 
+// Broadcasts sent before Feature of the Week existed already announced these,
+// so nobody is re-sold something they were just emailed about.
+const LEGACY_CAMPAIGNS: Record<string, string[]> = {
+  "2026-09-new-tools": ["add-sound", "translate-dub", "remove-background", "ai-singer"],
+  "2026-09-series-studio": ["series-languages"],
+  "2026-09-action-cartoon": ["action-movie", "cartoon"],
+  "2026-09-invite-friends": ["invite-friends"],
+};
+
 /** Feature ids already emailed, per user, oldest first. */
 export async function sentByUser(userId?: string): Promise<Map<string, string[]>> {
-  let q = getDb().from("email_sends").select("user_id, campaign, sent_at").like("campaign", "spotlight:%").order("sent_at", { ascending: true }).limit(50000);
+  let q = getDb().from("email_sends").select("user_id, campaign, sent_at").order("sent_at", { ascending: true }).limit(50000);
   if (userId) q = q.eq("user_id", userId);
   const { data } = await q;
   const out = new Map<string, string[]>();
   for (const r of (data || []) as Array<{ user_id: string; campaign: string }>) {
-    const id = r.campaign.split(":")[2];
-    if (!id) continue;
-    if (!out.has(r.user_id)) out.set(r.user_id, []);
-    out.get(r.user_id)!.push(id);
+    const ids = r.campaign.startsWith("spotlight:") ? [r.campaign.split(":")[2]] : LEGACY_CAMPAIGNS[r.campaign] || [];
+    for (const id of ids) {
+      if (!id) continue;
+      if (!out.has(r.user_id)) out.set(r.user_id, []);
+      out.get(r.user_id)!.push(id);
+    }
   }
   return out;
 }

@@ -640,6 +640,43 @@ export function inviteFriendsUpdate(appUrl: string, invite: { shareUrl: string; 
   };
 }
 
+/** Tell an inviter a friend joined (and celebrate a reward when one is earned). */
+export async function sendInviteCelebrationEmail(opts: {
+  email: string;
+  name: string;
+  friends: number;
+  rewardCredits: number;   // 0 when this join did not complete a set of 5
+  toNext: number;
+  whatsappUrl: string;
+}): Promise<boolean> {
+  const { APP_URL } = getEmailConfig();
+  const first = (opts.name || "there").split(" ")[0];
+  const reward = opts.rewardCredits > 0;
+  const subject = reward
+    ? `⭐🌸 You earned ${opts.rewardCredits} credits, ${first}! ${opts.friends} friends joined`
+    : `🌸 A friend just joined with your link (${opts.friends} so far)`;
+  return sendEmail({
+    to: opts.email,
+    subject,
+    tags: [{ name: "type", value: "invite_celebration" }],
+    html: layout({
+      preheader: reward
+        ? `${opts.rewardCredits} free credits are already in your account. Keep sharing for more.`
+        : `${opts.toNext} more friend${opts.toNext === 1 ? "" : "s"} and you earn 50 free credits.`,
+      content: `
+        <div style="text-align:center;font-size:34px;line-height:1.2;margin:0 0 8px;">${reward ? "⭐ 🌸 🎉 🌸 ⭐" : "🌸 ✨ 🌸"}</div>
+        ${h1(reward ? `Congratulations, ${esc(first)}! You did a great job.` : `Well done, ${esc(first)}! Your invite worked.`)}
+        ${p(reward
+          ? `<strong>${opts.friends} friends</strong> have joined iVideo Studio with your link, and <strong>${opts.rewardCredits} free credits</strong> are already in your account. Thank you for sharing!`
+          : `A friend just joined iVideo Studio with your link. That makes <strong>${opts.friends}</strong>. Just <strong>${opts.toNext} more</strong> and you earn 50 free credits.`)}
+        ${callout(reward ? "Added to your balance" : "Next reward", reward ? `+${opts.rewardCredits} credits` : `${opts.toNext} friend${opts.toNext === 1 ? "" : "s"} away`, "Every 5 friends who join earns you another 50 credits. No limit.")}
+        ${button("Share again on WhatsApp", opts.whatsappUrl)}
+        ${p(`<br><a href="${APP_URL}/invite" style="color:#7c3aed;">See everyone who joined</a>`, { muted: true, size: 13 })}
+      `,
+    }),
+  });
+}
+
 export async function sendProductUpdateEmail(
   email: string,
   name: string,

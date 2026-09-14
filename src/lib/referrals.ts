@@ -61,3 +61,22 @@ export function friendsToNextReward(count: number): number {
   const r = count % step;
   return r === 0 ? step : step - r;
 }
+
+export interface Celebration {
+  id: string;
+  kind: "friend_joined" | "reward" | "welcome_bonus";
+  title: string;
+  message: string;
+  credits: number;
+  friends: number;
+  created_at: string;
+}
+
+/** Queue an on-screen celebration for a user. Never throws. */
+export async function celebrate(userId: string, c: Omit<Celebration, "id" | "created_at">): Promise<void> {
+  try {
+    await getDb().from("user_celebrations").insert({ user_id: userId, ...c, seen: 0 });
+  } catch (err) {
+    console.error("[referrals] celebration not saved:", err);
+  }
+}

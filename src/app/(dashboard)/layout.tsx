@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
 import { GuestGate } from "@/components/auth/guest-gate";
 import { AdsConversions } from "@/components/ads-conversions";
+import { Celebrations } from "@/components/celebrations";
 import { Suspense } from "react";
 import { isGuestBrowsable } from "@/lib/guest-routes";
 
@@ -259,6 +260,7 @@ export default function DashboardLayout({
         )}
       >
         <GuestGate />
+        <Celebrations />
         <Suspense fallback={null}>
           <AdsConversions />
         </Suspense>

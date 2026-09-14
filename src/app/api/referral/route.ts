@@ -4,6 +4,7 @@ import { getUserByClerkId } from "@/lib/db";
 import { getDb } from "@/lib/db-driver";
 import { REFERRAL_REWARDS } from "@/lib/constants";
 import {
+  celebrate,
   friendsToNextReward,
   getOrCreateReferralCode,
   shareMessage,
@@ -112,6 +113,51 @@ export async function POST(req: NextRequest) {
         credits_earned: (referralCode.credits_earned || 0) + (milestone ? REFERRAL_REWARDS.rewardCredits : 0),
       })
       .eq("id", referralCode.id);
+
+    // Celebrate on both sides: the inviter (stars and flowers, and credits on
+    // a milestone) and the friend who just joined.
+    const toNext = friendsToNextReward(count);
+    const reward = milestone ? REFERRAL_REWARDS.rewardCredits : 0;
+    const friendName = String(user.name || user.email || "A friend").split(/[ @]/)[0];
+    await celebrate(referralCode.user_id, milestone
+      ? {
+          kind: "reward",
+          title: `You earned ${reward} credits!`,
+          message: `${count} friends have joined with your link. You did a great job! Keep sharing: every 5 more friends earns you another ${REFERRAL_REWARDS.rewardCredits} credits.`,
+          credits: reward,
+          friends: count,
+        }
+      : {
+          kind: "friend_joined",
+          title: `${friendName} joined with your link!`,
+          message: `That's ${count} friend${count === 1 ? "" : "s"} so far. Just ${toNext} more and you earn ${REFERRAL_REWARDS.rewardCredits} free credits.`,
+          credits: 0,
+          friends: count,
+        });
+    await celebrate(user.id, {
+      kind: "welcome_bonus",
+      title: `Welcome! ${REFERRAL_REWARDS.refereeCredits} bonus credits`,
+      message: "Your friend invited you, so we added bonus credits to your account. Make something amazing, then invite your own friends.",
+      credits: REFERRAL_REWARDS.refereeCredits,
+      friends: 0,
+    });
+
+    try {
+      const { data: inviter } = await db.from("users").select("email, name").eq("id", referralCode.user_id).maybeSingle();
+      if (inviter?.email) {
+        const { sendInviteCelebrationEmail } = await import("@/lib/email");
+        await sendInviteCelebrationEmail({
+          email: inviter.email,
+          name: inviter.name || "",
+          friends: count,
+          rewardCredits: reward,
+          toNext,
+          whatsappUrl: whatsappUrl(referralCode.code),
+        });
+      }
+    } catch (err) {
+      console.error("[referral] celebration email failed:", err);
+    }
 
     return NextResponse.json({
       success: true,

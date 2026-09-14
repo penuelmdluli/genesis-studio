@@ -14,6 +14,8 @@ import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 import { GenerationJob } from "@/types";
 import { GuestGate } from "@/components/auth/guest-gate";
+import { AdsConversions } from "@/components/ads-conversions";
+import { Suspense } from "react";
 import { isGuestBrowsable } from "@/lib/guest-routes";
 
 function mapVideo(v: Record<string, unknown>) {
@@ -257,6 +259,9 @@ export default function DashboardLayout({
         )}
       >
         <GuestGate />
+        <Suspense fallback={null}>
+          <AdsConversions />
+        </Suspense>
         <OnboardingTour />
         <LowCreditBanner />
         {/* Mobile: smaller padding + top padding for hamburger, Desktop: normal padding */}

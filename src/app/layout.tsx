@@ -132,7 +132,7 @@ export default function RootLayout({
               storage. */}
           <Script
             id="google-ads-tag"
-            src="https://www.googletagmanager.com/gtag/js?id=AW-705715272"
+            src="https://www.googletagmanager.com/gtag/js?id=AW-17992284399"
             strategy="afterInteractive"
           />
           <Script id="google-ads-init" strategy="afterInteractive">
@@ -142,7 +142,7 @@ var c = null; try { c = localStorage.getItem('genesis-cookie-consent'); } catch 
 var g = c === 'declined' ? 'denied' : 'granted';
 gtag('consent', 'default', { ad_storage: g, ad_user_data: g, ad_personalization: g, analytics_storage: g });
 gtag('js', new Date());
-gtag('config', 'AW-705715272');`}
+gtag('config', 'AW-17992284399');`}
           </Script>
         </body>
       </html>

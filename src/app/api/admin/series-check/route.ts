@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
     if (!ep) return NextResponse.json({ error: "episode not found" }, { status: 404 });
     if (ep.video_id) return NextResponse.json({ alreadyAssembled: true, videoId: ep.video_id });
 
-    const { data: ser } = await db.from("series").select("title").eq("id", ep.series_id).maybeSingle();
+    const { data: ser } = await db.from("series").select("title, genre").eq("id", ep.series_id).maybeSingle();
     const { data: shots } = await db
       .from("series_shots")
       .select("id")
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
           ser?.title || "Series",
           shots?.length || 0
         )
-      : await startAssembly(ep.id, ep.user_id, true, body.height === 1920 ? 1920 : undefined);
+      : await startAssembly(ep.id, ep.user_id, true, body.height === 1920 ? 1920 : undefined, "ivideostudio.ai", ser?.genre || null);
 
     return NextResponse.json({ assembled: result });
   }

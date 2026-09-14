@@ -6,6 +6,21 @@ import { Cookie, X } from "lucide-react";
 
 const COOKIE_KEY = "genesis-cookie-consent";
 
+/** Tells the Google tag what the visitor chose (Consent Mode v2). */
+function setAdsConsent(state: "granted" | "denied") {
+  const w = window as unknown as { gtag?: (...args: unknown[]) => void };
+  try {
+    w.gtag?.("consent", "update", {
+      ad_storage: state,
+      ad_user_data: state,
+      ad_personalization: state,
+      analytics_storage: state,
+    });
+  } catch {
+    // Third-party; never break the banner.
+  }
+}
+
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
@@ -20,11 +35,13 @@ export function CookieConsent() {
 
   const accept = () => {
     localStorage.setItem(COOKIE_KEY, "accepted");
+    setAdsConsent("granted");
     setVisible(false);
   };
 
   const decline = () => {
     localStorage.setItem(COOKIE_KEY, "declined");
+    setAdsConsent("denied");
     setVisible(false);
   };
 

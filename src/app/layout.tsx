@@ -126,6 +126,24 @@ export default function RootLayout({
             src="https://plausible.io/js/script.js"
             strategy="afterInteractive"
           />
+          {/* Google Ads tag, so ad clicks that become sign-ups are counted and
+              campaigns optimise for customers rather than clicks. Consent
+              mode follows the cookie banner: "Essential Only" denies ad
+              storage. */}
+          <Script
+            id="google-ads-tag"
+            src="https://www.googletagmanager.com/gtag/js?id=AW-705715272"
+            strategy="afterInteractive"
+          />
+          <Script id="google-ads-init" strategy="afterInteractive">
+            {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+var c = null; try { c = localStorage.getItem('genesis-cookie-consent'); } catch (e) {}
+var g = c === 'declined' ? 'denied' : 'granted';
+gtag('consent', 'default', { ad_storage: g, ad_user_data: g, ad_personalization: g, analytics_storage: g });
+gtag('js', new Date());
+gtag('config', 'AW-705715272');`}
+          </Script>
         </body>
       </html>
     </AuthProvider>

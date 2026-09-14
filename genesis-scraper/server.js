@@ -1008,6 +1008,34 @@ app.post("/stitch-episode", auth, async (req, res) => {
 });
 
 
+// ─── POST /media-duration ───
+// The true length of one or more media files, read by ffprobe on the server.
+//
+// Per-second tools used to be priced from a length the browser reported —
+// and only for video inputs, so an audio-driven tool was billed as a flat
+// minute. A three-minute song for a music video cost three minutes and was
+// charged for one, and anyone could send a fake short length to pay less.
+// Reading the length here, from the file itself, removes both.
+app.post("/media-duration", auth, async (req, res) => {
+  const { execFile } = require("child_process");
+  const urls = Array.isArray(req.body?.urls) ? req.body.urls.slice(0, 6) : [];
+  const probe = (url) =>
+    new Promise((resolve) => {
+      if (typeof url !== "string" || !/^https:\/\//.test(url)) return resolve(0);
+      execFile(
+        "ffprobe",
+        ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", url],
+        { timeout: 25000 },
+        (err, out) => {
+          const n = parseFloat(String(out || "").trim());
+          resolve(!err && Number.isFinite(n) ? n : 0);
+        }
+      );
+    });
+  const durations = await Promise.all(urls.map(probe));
+  res.json({ durations, total: durations.reduce((a, b) => a + b, 0) });
+});
+
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);
 });

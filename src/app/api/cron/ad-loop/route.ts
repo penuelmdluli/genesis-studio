@@ -29,7 +29,7 @@ const TAGS = "#AI #AIVideo #iVideoStudio #MadeWithAI #SouthAfrica #Mzansi";
 const ADS: Array<{ key: string; video: string; captions: string[] }> = [
   {
     key: "beast-wars",
-    video: `${CDN}/ai-beast-wars-9x16.mp4`,
+    video: `${CDN}/ai-beast-wars-9x16.mp4?v=2`, // ?v busts the CDN cache when a file is replaced
     captions: [
       `AI BEAST WARS 🦏⚡🦁\n\nA chrome rhino. A molten iron lion. One collision.\nNo camera. No crew. No studio. Every frame was made with AI from a single prompt.\n\n👉 Create yours free at ${LINK}`,
       `Who wins? 🦏 vs 🦁\n\nThis whole fight was made with AI. No 3D artists, no render farm, just a prompt.\n\nMake your own epic scenes 👉 ${LINK}`,
@@ -38,7 +38,7 @@ const ADS: Array<{ key: string; video: string; captions: string[] }> = [
   },
   {
     key: "action-movie",
-    video: `${CDN}/ai-action-movie-9x16.mp4`,
+    video: `${CDN}/ai-action-movie-9x16.mp4?v=2`, // ?v busts the CDN cache when a file is replaced
     captions: [
       `AI ACTION MOVIE 🎬🔥\n\nNo actors. No stunt team. No explosions were harmed. 😅\nEvery shot here was made with AI from a text prompt.\n\n👉 Make your own movie scenes free at ${LINK}`,
       `Bike chase. Rooftop jump. Tunnel explosion. 💥\n\nNone of it was filmed. It was all generated with AI.\n\nYour movie idea deserves to be seen 👉 ${LINK}`,
@@ -47,7 +47,7 @@ const ADS: Array<{ key: string; video: string; captions: string[] }> = [
   },
   {
     key: "cartoon",
-    video: `${CDN}/ai-cartoon-9x16.mp4`,
+    video: `${CDN}/ai-cartoon-9x16.mp4?v=2`, // ?v busts the CDN cache when a file is replaced
     captions: [
       `AI CARTOON MOVIE ✈️🦦\n\nA brave little meerkat, a grumpy eagle and a whole village cheering.\nStudio-quality animation, made with AI in minutes.\n\n👉 Create your own cartoon free at ${LINK}`,
       `Kids' cartoons, made by AI. 🎨\n\nNo animators, no months of rendering. Just your story.\n\nStart creating 👉 ${LINK}`,

@@ -406,7 +406,7 @@ export default function PricingPage() {
                 <h3 className="text-lg font-bold text-zinc-100">Referral Program</h3>
               </div>
               <p className="text-sm text-zinc-400">
-                Earn {REFERRAL_REWARDS.referrerCredits} credits for every friend who joins. They get {REFERRAL_REWARDS.refereeCredits} bonus credits too.
+                Earn {REFERRAL_REWARDS.rewardCredits} credits for every {REFERRAL_REWARDS.friendsPerReward} friends who join, with no limit. They get {REFERRAL_REWARDS.refereeCredits} bonus credits too.
               </p>
             </div>
             {!referralData && (

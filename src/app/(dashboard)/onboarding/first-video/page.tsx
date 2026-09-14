@@ -362,15 +362,15 @@ export default function FirstVideoPage() {
 
           {/* Referral CTA — highest emotional moment */}
           <div className="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/8 p-4 text-center">
-            <p className="text-sm font-medium text-zinc-200 mb-1">🎁 Love it? Share with a friend</p>
-            <p className="text-xs text-zinc-400 mb-3">You both get bonus credits when they sign up</p>
+            <p className="text-sm font-medium text-zinc-200 mb-1">🎁 Love it? Invite 5 friends, get 50 credits</p>
+            <p className="text-xs text-zinc-400 mb-3">Every 5 friends who join earns you 50 more, and they get bonus credits too</p>
             <div className="flex gap-2 justify-center">
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  const text = encodeURIComponent("I just made an AI video in 60 seconds — you need to try this! 🎬\n\nhttps://ivideostudio.ai/sign-up");
-                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                onClick={async () => {
+                  const d = await fetch("/api/referral").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+                  window.open(d?.whatsappUrl || "https://wa.me/?text=" + encodeURIComponent("Try iVideo Studio free: https://ivideostudio.ai/sign-up"), "_blank");
                 }}
               >
                 Share on WhatsApp
@@ -378,9 +378,10 @@ export default function FirstVideoPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText("https://ivideostudio.ai/sign-up");
-                  toast("Link copied!", "success");
+                onClick={async () => {
+                  const d = await fetch("/api/referral").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+                  navigator.clipboard.writeText(d?.shareUrl || "https://ivideostudio.ai/sign-up");
+                  toast("Your invite link is copied!", "success");
                 }}
               >
                 Copy Link

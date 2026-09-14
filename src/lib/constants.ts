@@ -349,10 +349,14 @@ export const ANNUAL_PLANS: Record<string, { monthlyPrice: number; annualPrice: n
 };
 
 // --- Referral Program ---
+// Owner call 2026-09-14: "share with 5 friends and gain 50 credits".
 export const REFERRAL_REWARDS = {
-  referrerCredits: 100,    // Credits the referrer gets
-  refereeCredits: 50,      // Credits the new user gets (bonus on signup)
-  maxReferrals: 50,        // Max referrals per user
+  friendsPerReward: 5,     // Every 5 friends who join...
+  rewardCredits: 50,       // ...earn the inviter this many credits
+  referrerCredits: 50,     // (kept for older callers: the milestone reward)
+  refereeCredits: 50,      // Welcome bonus for the friend who joins
+  maxReferrals: 1000,      // Rewards keep stacking: every 5 friends = +50 ("the more users the more credits")
+  newAccountDays: 3,       // Only accounts this new can redeem a code
   minPlanRequired: "free" as const, // Any plan can refer
 };
 

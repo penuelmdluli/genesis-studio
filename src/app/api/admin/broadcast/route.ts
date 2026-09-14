@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
-import { actionCartoonUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail } from "@/lib/email";
+import { actionCartoonUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
+import { getOrCreateReferralCode, shareUrl, whatsappUrl } from "@/lib/referrals";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,15 +22,29 @@ export const maxDuration = 60;
 // Each campaign tracks its own sends, so announcing Series Studio never
 // re-mails the people who already got the tools announcement — and running
 // either one twice is still harmless.
-const CAMPAIGNS = {
-  "2026-09-new-tools": newToolsUpdate,
-  "2026-09-series-studio": seriesStudioUpdate,
-  "2026-09-action-cartoon": actionCartoonUpdate,
-} as const;
+// A campaign builds the email for one recipient, so a campaign can be
+// personal (the invite campaign carries each user's own link).
+type Campaign = (appUrl: string, userId: string) => ProductUpdate | Promise<ProductUpdate>;
 
-type CampaignId = keyof typeof CAMPAIGNS;
+async function inviteFor(appUrl: string, userId: string): Promise<ProductUpdate> {
+  const code = await getOrCreateReferralCode(userId);
+  const c = code?.code || "";
+  return inviteFriendsUpdate(appUrl, {
+    shareUrl: c ? shareUrl(c) : `${appUrl}/invite`,
+    whatsappUrl: c ? whatsappUrl(c) : `${appUrl}/invite`,
+  });
+}
 
-const DEFAULT_CAMPAIGN: CampaignId = "2026-09-action-cartoon";
+const CAMPAIGNS: Record<string, Campaign> = {
+  "2026-09-new-tools": (appUrl) => newToolsUpdate(appUrl),
+  "2026-09-series-studio": (appUrl) => seriesStudioUpdate(appUrl),
+  "2026-09-action-cartoon": (appUrl) => actionCartoonUpdate(appUrl),
+  "2026-09-invite-friends": inviteFor,
+};
+
+type CampaignId = string;
+
+const DEFAULT_CAMPAIGN: CampaignId = "2026-09-invite-friends";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
@@ -49,11 +64,14 @@ export async function POST(req: NextRequest) {
 
   const CAMPAIGN_ID: CampaignId =
     body.campaign && body.campaign in CAMPAIGNS ? (body.campaign as CampaignId) : DEFAULT_CAMPAIGN;
-  const update = CAMPAIGNS[CAMPAIGN_ID](appUrl);
+  const build = CAMPAIGNS[CAMPAIGN_ID];
 
   if (body.test) {
     const to = body.to || process.env.OWNER_EMAIL || "";
     if (!to) return NextResponse.json({ error: "to required for a test send" }, { status: 400 });
+    // A test goes out exactly as that address's owner would receive it.
+    const { data: tester } = await getDb().from("users").select("id").eq("email", to).maybeSingle();
+    const update = await build(appUrl, tester?.id || "test");
     const r = await sendProductUpdateEmail(to, "Creator", update, `${appUrl}/settings`);
     return NextResponse.json({ ...r, test: true, to, subject: update.subject });
   }
@@ -89,6 +107,7 @@ export async function POST(req: NextRequest) {
     // send one more chance before writing the recipient off.
     if (sent > 0) await new Promise((r) => setTimeout(r, 600));
 
+    const update = await build(appUrl, u.id);
     let r = await sendProductUpdateEmail(u.email, u.name || "Creator", update, `${appUrl}/settings`);
     if (!r.ok && /429|rate/i.test(r.error || "")) {
       await new Promise((res) => setTimeout(res, 1500));

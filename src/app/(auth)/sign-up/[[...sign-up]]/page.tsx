@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { SaveReferral } from "@/components/auth/save-referral";
+import { SaveReferral, InviteBanner } from "@/components/auth/save-referral";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
@@ -20,7 +20,7 @@ export default function SignUpPage() {
         <div className="max-w-md relative z-10">
           <div className="mb-12">
             <Logo size="lg" />
-            <Suspense><SaveReferral /></Suspense>
+
           </div>
 
           <h1 className="text-4xl font-bold text-zinc-100 mb-4 leading-[1.15]">
@@ -40,16 +40,16 @@ export default function SignUpPage() {
               { value: "60s", label: "First video", sub: "that fast" },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-4 text-center">
-                <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}    <Suspense><SaveReferral /></Suspense>
+                <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}
     </div>
-                <div className="text-[11px] text-zinc-400 font-medium">{stat.label}    <Suspense><SaveReferral /></Suspense>
+                <div className="text-[11px] text-zinc-400 font-medium">{stat.label}
     </div>
-                <div className="text-[10px] text-zinc-400">{stat.sub}    <Suspense><SaveReferral /></Suspense>
+                <div className="text-[10px] text-zinc-400">{stat.sub}
     </div>
-                  <Suspense><SaveReferral /></Suspense>
+
     </div>
             ))}
-              <Suspense><SaveReferral /></Suspense>
+
     </div>
 
           {/* What you get */}
@@ -67,13 +67,13 @@ export default function SignUpPage() {
                   <svg className={`w-3 h-3 ${item.highlight ? "text-violet-400" : "text-zinc-400"}`} viewBox="0 0 12 12" fill="none">
                     <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                    <Suspense><SaveReferral /></Suspense>
+
     </div>
                 <span className={item.highlight ? "text-zinc-300" : "text-zinc-400"}>{item.text}</span>
-                  <Suspense><SaveReferral /></Suspense>
+
     </div>
             ))}
-              <Suspense><SaveReferral /></Suspense>
+
     </div>
 
           {/* Trust badges */}
@@ -85,13 +85,13 @@ export default function SignUpPage() {
                   {country}
                 </span>
               ))}
-                <Suspense><SaveReferral /></Suspense>
+
     </div>
-              <Suspense><SaveReferral /></Suspense>
+
     </div>
-            <Suspense><SaveReferral /></Suspense>
+
     </div>
-          <Suspense><SaveReferral /></Suspense>
+
     </div>
 
       {/* Right panel - auth */}
@@ -100,12 +100,16 @@ export default function SignUpPage() {
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex mb-3">
               <Logo size="md" />
-              <Suspense><SaveReferral /></Suspense>
+
             </div>
             <p className="text-sm text-zinc-400 font-medium">100 free credits. No card needed.</p>
-              <Suspense><SaveReferral /></Suspense>
+
     </div>
 
+          <Suspense>
+            <SaveReferral />
+            <InviteBanner />
+          </Suspense>
           <SignUpForm />
 
           <p className="text-center text-xs text-zinc-400 mt-6">
@@ -114,11 +118,11 @@ export default function SignUpPage() {
               Sign in
             </Link>
           </p>
-            <Suspense><SaveReferral /></Suspense>
+
     </div>
-          <Suspense><SaveReferral /></Suspense>
+
     </div>
-        <Suspense><SaveReferral /></Suspense>
+
     </div>
   );
 }

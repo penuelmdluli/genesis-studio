@@ -603,6 +603,43 @@ export function actionCartoonUpdate(appUrl: string): ProductUpdate {
   };
 }
 
+/**
+ * Invite friends campaign (2026-09-14). Personal: the WhatsApp button and the
+ * link carry this user's own referral code.
+ */
+export function inviteFriendsUpdate(appUrl: string, invite: { shareUrl: string; whatsappUrl: string }): ProductUpdate {
+  return {
+    subject: "Invite 5 friends, get 50 free credits 🎁",
+    preheader: "Share your link on WhatsApp. Every 5 friends who join earns you 50 credits, with no limit.",
+    headline: "Share iVideo Studio, earn free credits",
+    intro:
+      "Your friends can make AI movies, cartoons, dance reels and ads too. Share your personal link on WhatsApp, in your groups or on your status. Every 5 friends who join earns you 50 free credits, again and again: the more friends, the more credits. Each friend also gets 50 bonus credits when they join.",
+    items: [
+      {
+        icon: "💬",
+        title: "Share on WhatsApp in one tap",
+        text: "Opens WhatsApp with a ready-made message and your link. Pick friends, family or a whole group.",
+        href: invite.whatsappUrl,
+      },
+      {
+        icon: "🔗",
+        title: "Your personal invite link",
+        text: invite.shareUrl,
+        href: invite.shareUrl,
+      },
+      {
+        icon: "🎁",
+        title: "5 friends = 50 credits, no limit",
+        text: "10 friends is 100 credits, 50 friends is 500. Track who joined on your Invite page.",
+        href: `${appUrl}/invite`,
+      },
+    ],
+    ctaLabel: "Share on WhatsApp",
+    ctaHref: invite.whatsappUrl,
+    outro: "Tip: post your link on your WhatsApp status. Everyone who opens it and joins counts towards your next 50 credits.",
+  };
+}
+
 export async function sendProductUpdateEmail(
   email: string,
   name: string,

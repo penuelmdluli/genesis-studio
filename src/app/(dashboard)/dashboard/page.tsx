@@ -551,26 +551,23 @@ export default function DashboardPage() {
         </MotionSection>
       )}
 
-      {/* ====== REFERRAL BANNER (free plan only) ====== */}
-      {!user?.isOwner && user?.plan === "free" && (
+      {/* ====== REFERRAL BANNER ====== */}
+      {!user?.isOwner && (
         <MotionSection delay={0.28}>
           <div className="rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-500/10 to-cyan-500/5 p-4 flex items-center gap-4 mb-4">
             <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shrink-0">
               <span className="text-lg">🎁</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-200">Earn bonus credits</p>
-              <p className="text-xs text-zinc-400">Invite a friend → you both get bonus credits</p>
+              <p className="text-sm font-medium text-zinc-200">Invite 5 friends, get 50 credits</p>
+              <p className="text-xs text-zinc-400">Every 5 friends who join earns you 50 more. No limit.</p>
             </div>
-            <button
-              onClick={() => {
-                const text = encodeURIComponent("I've been using iVideo Studio to create AI videos — it's insane! Try it free:\n\nhttps://ivideostudio.ai/sign-up");
-                window.open(`https://wa.me/?text=${text}`, "_blank");
-              }}
+            <Link
+              href="/invite"
               className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors shrink-0"
             >
-              Share on WhatsApp
-            </button>
+              Invite on WhatsApp
+            </Link>
           </div>
         </MotionSection>
       )}

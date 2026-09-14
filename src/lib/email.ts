@@ -555,6 +555,54 @@ export function seriesStudioUpdate(appUrl: string): ProductUpdate {
   };
 }
 
+/** Action movie and 3D cartoon series, announced with the films that show them. */
+export function actionCartoonUpdate(appUrl: string): ProductUpdate {
+  const cdn = "https://cdn.ivideostudio.ai/marketing/ads";
+  return {
+    subject: "Make your own AI action movie or cartoon series 🎬",
+    preheader: "Chases, explosions, talking cartoon heroes: characters who speak, full sound, a movie score. Watch what it makes.",
+    headline: "Blockbuster action and 3D cartoons, made by you",
+    intro:
+      "We made three short films to show what iVideo Studio can do: a rooftop-and-motorbike action movie, a 3D cartoon adventure and a battle between giant machine beasts. No camera, no crew, no animators. Now Series Studio makes them at the same level, episode after episode, with your characters talking, shouting and reacting, lip-synced, over full sound effects and a movie score.",
+    items: [
+      {
+        icon: "🎬",
+        title: "Watch: AI Action Movie",
+        text: "A night motorbike chase, a rooftop leap and a tunnel explosion, all from a prompt. Then press Create similar and make your own action series.",
+        href: `${cdn}/ai-action-movie-9x16.mp4?v=2`,
+      },
+      {
+        icon: "✈️",
+        title: "Watch: AI Cartoon Movie",
+        text: "A brave little meerkat pilot, a grumpy eagle and a cheering village, in feature-film 3D animation. Kids' stories, adventures and comedies, made by you.",
+        href: `${cdn}/ai-cartoon-9x16.mp4?v=2`,
+      },
+      {
+        icon: "🦏",
+        title: "Watch: AI Beast Wars",
+        text: "A chrome war-rhino against a molten iron lion. Turn your sound on.",
+        href: `${cdn}/ai-beast-wars-9x16.mp4?v=2`,
+      },
+      {
+        icon: "🗣️",
+        title: "Characters who talk, shout and react",
+        text: "People and cartoon characters speak with real lip sync, in English or 139 other languages, and the same voice follows them into every episode.",
+        href: `${appUrl}/series`,
+      },
+      {
+        icon: "🔊",
+        title: "Full sound, not silent clips",
+        text: "Every scene gets its own sound effects (engines, footsteps, wind, crowds) under the dialogue, plus a score made for the genre.",
+        href: `${appUrl}/series`,
+      },
+    ],
+    ctaLabel: "Make your action or cartoon series",
+    ctaHref: `${appUrl}/series`,
+    outro:
+      "Open Series Studio, pick Action movie or 3D cartoon, or tap Create similar under any of our films. Writing your episodes is almost free, and the price is on the button before you make the video.",
+  };
+}
+
 export async function sendProductUpdateEmail(
   email: string,
   name: string,

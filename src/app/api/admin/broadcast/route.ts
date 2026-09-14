@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
-import { newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail } from "@/lib/email";
+import { actionCartoonUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,11 +24,12 @@ export const maxDuration = 60;
 const CAMPAIGNS = {
   "2026-09-new-tools": newToolsUpdate,
   "2026-09-series-studio": seriesStudioUpdate,
+  "2026-09-action-cartoon": actionCartoonUpdate,
 } as const;
 
 type CampaignId = keyof typeof CAMPAIGNS;
 
-const DEFAULT_CAMPAIGN: CampaignId = "2026-09-series-studio";
+const DEFAULT_CAMPAIGN: CampaignId = "2026-09-action-cartoon";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");

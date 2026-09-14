@@ -99,6 +99,25 @@ export async function POST(req: NextRequest) {
     scheduledAt?: number;
   };
 
+  // Confirms what Facebook actually did with a post. A reel sent as
+  // "scheduled" can publish at once instead, which would quietly undo a
+  // staggered campaign — so it is checked, not assumed.
+  if (Array.isArray((body as { statusOf?: unknown }).statusOf)) {
+    const items = (body as { statusOf: Array<{ pageKey: string; videoId: string }> }).statusOf;
+    const results = await Promise.all(
+      items.map(async ({ pageKey, videoId }) => {
+        const pg = PAGES[pageKey];
+        const token = pg ? process.env[pg.tokenEnv] : undefined;
+        if (!token) return { pageKey, videoId, error: "no token" };
+        const res = await fetch(
+          `${GRAPH}/${encodeURIComponent(videoId)}?fields=status,published,scheduled_publish_time,permalink_url&access_token=${encodeURIComponent(token)}`
+        );
+        return { pageKey, videoId, ...(await res.json()) };
+      })
+    );
+    return NextResponse.json({ results });
+  }
+
   if (body.check) {
     const pages = await Promise.all(
       Object.entries(PAGES).map(async ([key, page]) => {

@@ -54,6 +54,32 @@ const ADS: Array<{ key: string; video: string; captions: string[] }> = [
       `Your story, animated like the big studios. 🌍✨\n\nCartoons, music videos, drama series and ads, all with AI.\n\nTry iVideo Studio free 👉 ${LINK}`,
     ],
   },
+  {
+    // A real Series Studio episode, made through the customer pipeline.
+    key: "last-run-ep1",
+    video: `${CDN}/last-run-ep1-9x16.mp4?v=1`,
+    captions: [
+      `LAST RUN 🏍️💥 Episode 1: Night Drop
+
+"Two minutes or I leave you behind!"
+Zara thought it was a routine getaway. Then her partner sold her out.
+
+Every shot, voice and explosion was made with AI in Series Studio.
+🔊 Sound ON
+
+👉 Make your own action series free at ${LINK}`,
+      `She has one night to outrun them. 🏍️🔥
+
+This action episode has talking characters, lip sync, sound effects and a movie score, all made with AI.
+
+Create your own series 👉 ${LINK}`,
+      `Your own action movie series, episode after episode. 🎬
+
+Same characters, a story that continues, voices that shout and explosions that hit. Made with iVideo Studio.
+
+Start free 👉 ${LINK}`,
+    ],
+  },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -138,6 +138,7 @@ export function Sidebar() {
       items.push({ href: "/admin/mbs-config", label: "MBS Config", icon: Users, section: "Automate", badge: "NEW" });
       items.push({ href: "/admin/support", label: "Support Inbox", icon: MessageCircle, section: "Admin", badge: "NEW" });
       items.push({ href: "/admin/customers", label: "Customers", icon: Users, section: "Admin", badge: "NEW" });
+      items.push({ href: "/admin/test-accounts", label: "Test accounts", icon: Key, section: "Admin" });
       items.push({ href: "/admin", label: "Admin", icon: Shield, section: "Admin" });
     }
     return items;

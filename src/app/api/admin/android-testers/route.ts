@@ -5,15 +5,15 @@
 //   GET                      → testers (JSON)
 //   GET ?format=csv          → one email per line, for Play Console's tester list upload
 //   POST {action:"mark-added", emails?}     → mark as added to the Play tester list
-//   POST {action:"send-install-links"}      → email the opt-in link to testers on the
-//                                             list who haven't had it (needs PLAY_TESTING_OPEN)
+//   POST {action:"send-install-links"}      → email the group + opt-in links to testers who
+//                                             haven't had them (needs PLAY_TESTING_OPEN)
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
 import { sendProductUpdateEmail } from "@/lib/email";
-import { PLAY_OPT_IN_URL, betaWhatsappUrl, testingOpen } from "@/lib/android-beta";
+import { BETA_GROUP_URL, PLAY_OPT_IN_URL, betaWhatsappUrl, testingOpen } from "@/lib/android-beta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
     const { data } = await db
       .from("android_testers")
       .select("id, email, name")
-      .eq("added_to_play", 1)
       .eq("install_link_sent", 0)
       .limit(40);
     let sent = 0;
@@ -77,15 +76,16 @@ export async function POST(req: NextRequest) {
         subject: "📱 Your iVideo Studio Android app is ready to install",
         preheader: "Tap the link with your Google account, then install from Google Play.",
         headline: "You're in. Install the app",
-        intro: "thank you for testing! Google has approved the beta. Two taps and it's on your phone:",
+        intro: "thank you for testing! Google has approved the beta. Three taps and it's on your phone:",
         items: [
-          { icon: "1️⃣", title: "Accept the invite", text: "Open this link on your Android phone, signed in with this email, and tap Become a tester.", href: PLAY_OPT_IN_URL },
-          { icon: "2️⃣", title: "Install from Google Play", text: "Then tap Download it on Google Play and install iVideo Studio.", href: PLAY_OPT_IN_URL },
+          { icon: "1️⃣", title: "Join the tester group", text: "Open this with the Google account on your Android phone and tap Join group.", href: BETA_GROUP_URL },
+          { icon: "2️⃣", title: "Become a tester", text: "Then open this link on your phone and tap Become a tester.", href: PLAY_OPT_IN_URL },
+          { icon: "3️⃣", title: "Install from Google Play", text: "Tap Download it on Google Play and install iVideo Studio.", href: PLAY_OPT_IN_URL },
           { icon: "📅", title: "Keep it for 14 days", text: "Google counts testers who stay 14 days. Use it whenever you like, and tell us what you think by replying to this email.", href: PLAY_OPT_IN_URL },
           { icon: "💬", title: "Invite an Android friend", text: "Share the beta on WhatsApp so they can join too.", href: betaWhatsappUrl(appUrl) },
         ],
-        ctaLabel: "Become a tester on Google Play",
-        ctaHref: PLAY_OPT_IN_URL,
+        ctaLabel: "Start: join the tester group",
+        ctaHref: BETA_GROUP_URL,
       });
       if (r.ok) {
         sent++;

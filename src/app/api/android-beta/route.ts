@@ -12,6 +12,7 @@ import {
   TESTERS_NEEDED,
   betaWhatsappUrl,
   testingOpen,
+  BETA_GROUP_URL,
 } from "@/lib/android-beta";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function GET() {
     testers: await count(),
     needed: TESTERS_NEEDED,
     open: testingOpen(),
-    optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null,
+    optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null, groupUrl: testingOpen() ? BETA_GROUP_URL : null,
     whatsappUrl: betaWhatsappUrl(appUrl),
     bonusCredits: TESTER_BONUS_CREDITS,
     signedIn: !!user,
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await db.from("android_testers").select("id").eq("email", email).maybeSingle();
   if (existing) {
-    return NextResponse.json({ ok: true, already: true, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null });
+    return NextResponse.json({ ok: true, already: true, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null, groupUrl: testingOpen() ? BETA_GROUP_URL : null });
   }
 
   const { error } = await db.from("android_testers").insert({
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
   // A second row for the same signed-in account fails on the unique index:
   // they already joined (with another address) and already got the bonus.
   if (error) {
-    return NextResponse.json({ ok: true, already: true, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null });
+    return NextResponse.json({ ok: true, already: true, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null, groupUrl: testingOpen() ? BETA_GROUP_URL : null });
   }
 
   let bonus = 0;
@@ -87,5 +88,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: true, bonus, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null });
+  return NextResponse.json({ ok: true, bonus, testers: await count(), open: testingOpen(), optInUrl: testingOpen() ? PLAY_OPT_IN_URL : null, groupUrl: testingOpen() ? BETA_GROUP_URL : null });
 }

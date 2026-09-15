@@ -3,6 +3,8 @@
 export const ANDROID_PACKAGE = "ai.ivideostudio.app";
 /** Google Play's closed-test opt-in page. Only works for accounts on the tester list. */
 export const PLAY_OPT_IN_URL = `https://play.google.com/apps/testing/${ANDROID_PACKAGE}`;
+/** Anyone can join this Google Group; the closed test admits every member, so no manual tester list. */
+export const BETA_GROUP_URL = "https://groups.google.com/g/ivideostudio-android-beta";
 export const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
 /** Google needs this many testers opted in for 14 days before production. */
 export const TESTERS_NEEDED = 12;

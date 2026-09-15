@@ -9,6 +9,7 @@ interface Status {
   needed: number;
   open: boolean;
   optInUrl: string | null;
+  groupUrl: string | null;
   whatsappUrl: string;
   bonusCredits: number;
   signedIn: boolean;
@@ -85,9 +86,14 @@ export function AndroidBetaForm() {
           {done.bonus > 0 && <p className="mt-2 font-semibold text-emerald-300">+{done.bonus} credits added to your account</p>}
           {status?.open && status.optInUrl ? (
             <>
-              <p className="mt-3 text-sm text-zinc-300">The test is open. Tap below with the same Google account, then install from Google Play.</p>
-              <a href={status.optInUrl} className="mt-4 block rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-black">
-                Join the test on Google Play
+              <p className="mt-3 text-sm text-zinc-300">The app is ready. Use the same Google account for both steps:</p>
+              {status.groupUrl && (
+                <a href={status.groupUrl} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 font-semibold text-white">
+                  1. Join the tester group (tap &quot;Join group&quot;)
+                </a>
+              )}
+              <a href={status.optInUrl} className="mt-3 block rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-black">
+                {status.groupUrl ? "2. " : ""}Become a tester and install from Google Play
               </a>
             </>
           ) : (

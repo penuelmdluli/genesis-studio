@@ -157,6 +157,7 @@ export async function POST(req: NextRequest) {
           ...base,
           image_url: r.value.imageUrl,
           audio_url: r.value.audioUrl,
+          native_audio: r.value.nativeAudio ? 1 : 0,
           provider_ref: `ws:${r.value.providerRef}`,
           status: "processing",
         });

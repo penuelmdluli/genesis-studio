@@ -30,6 +30,8 @@ interface ShotForAssembly {
   clip_url: string | null;
   audio_url: string | null;
   sfx_url: string | null;
+  raw_clip_url: string | null;
+  native_audio: number | null;
   subtitle: string | null;
 }
 
@@ -101,7 +103,7 @@ export async function startAssembly(
   const db = getDb();
   const { data: shotRows } = await db
     .from("series_shots")
-    .select("shot_index, status, kind, clip_url, audio_url, sfx_url, subtitle")
+    .select("shot_index, status, kind, clip_url, raw_clip_url, audio_url, sfx_url, native_audio, subtitle")
     .eq("episode_id", episodeId)
     .order("shot_index", { ascending: true })
     .limit(20);
@@ -137,13 +139,16 @@ export async function startAssembly(
           ...usable.map((s) => ({
             url: s.clip_url,
             subtitle: s.subtitle || "",
-            audioUrl: s.kind === "dialogue" ? s.audio_url || null : null,
+            // English dialogue: the speech is the filmed clip's own track,
+            // taken from the clip as filmed (the upscaled copy has no audio).
+            audioUrl:
+              s.kind !== "dialogue" ? null : s.native_audio ? s.raw_clip_url || s.clip_url : s.audio_url || null,
             // The shot's own sound effects, mixed under the voice. The clip's
             // original soundtrack is still never used.
             sfxUrl: s.sfx_url || null,
             // Action and cartoon set pieces are the point of those series,
             // so a silent shot is held longer than in a talky drama.
-            ...(s.kind === "dialogue" && s.audio_url ? {} : { holdSeconds: spec.silentHold }),
+            ...(s.kind === "dialogue" && (s.audio_url || s.native_audio) ? {} : { holdSeconds: spec.silentHold }),
           })),
           ...appendClips.map((c) => ({ url: c.url, subtitle: "", audioUrl: null, holdSeconds: 3.4 })),
         ],

@@ -872,17 +872,23 @@ app.post("/stitch-episode", auth, async (req, res) => {
           `:x=w-text_w-${Math.round(W * 0.04)}:y=${Math.round(H * 0.035)}`;
       }
 
-      // The video model's own soundtrack is NEVER used.
+      // The video model's own soundtrack is never taken by accident.
       //
-      // It invents audio to go with the picture, and that includes invented
-      // speech — in practice, Chinese, layered under our dialogue and filling
-      // every silent shot. So every clip's audio is replaced outright: a
-      // speaking shot carries exactly the line we synthesised, and a silent
-      // shot carries silence for the music to sit under. Nothing the model
-      // generated can reach the episode.
+      // Left to itself it invents audio, including invented speech (in
+      // practice, Chinese) under every shot. So every clip's audio is replaced
+      // outright: a speaking shot carries exactly the line it was given, and a
+      // silent shot carries silence for the music to sit under. The one
+      // deliberate exception is English dialogue, where the model was told
+      // the exact line and its own track IS that line: the caller then passes
+      // the filmed clip as the audio source below.
+      // Usually our synthesised line (mp3). For English dialogue it is the
+      // filmed clip itself (mp4): the video model spoke the line, and its
+      // track is the speech. The extension follows the source so ffmpeg reads
+      // the container it actually is.
       let voicePath = null;
       if (clip.audioUrl) {
-        voicePath = path.join(tmp, `st-voice-${stamp}-${i}.mp3`);
+        const voiceExt = /\.mp4(\?|$)/i.test(clip.audioUrl) ? "mp4" : "mp3";
+        voicePath = path.join(tmp, `st-voice-${stamp}-${i}.${voiceExt}`);
         scratch.push(voicePath);
         const gotVoice = await fetch(clip.audioUrl);
         if (!gotVoice.ok) throw new Error(`clip ${i} voice download failed (${gotVoice.status})`);

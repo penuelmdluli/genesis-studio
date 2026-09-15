@@ -24,6 +24,9 @@ export const ACTION_SHOT_CREDITS = 80;
 // sound-effects pass ($0.05) and, for speech, lip sync (~$0.375). About $2.20
 // for a speaking shot and $1.85 for an action one: 280 and 240 credits keep
 // the same healthy multiple the drama shots carry.
+// English dialogue shots (since 2026-09-15) are spoken by the video model
+// itself: no voice or lip-sync pass, so they cost us less than this assumes.
+// Prices are left unchanged; the saving is margin.
 export const BLOCKBUSTER_DIALOGUE_SHOT_CREDITS = 280;
 export const BLOCKBUSTER_ACTION_SHOT_CREDITS = 240;
 export const EPISODE_SCRIPT_CREDITS = 10;

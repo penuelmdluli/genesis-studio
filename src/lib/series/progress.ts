@@ -26,11 +26,13 @@ export interface ShotRow {
   raw_clip_url: string | null;
   action?: string | null;
   sfx_url?: string | null;
+  /** 1 when the video model spoke the line itself (English dialogue). */
+  native_audio?: number | null;
   created_at: string;
 }
 
 export const SHOT_SELECT =
-  "id, shot_index, status, stage, kind, action, audio_url, clip_url, raw_clip_url, sfx_url, image_url, provider_ref, error, created_at";
+  "id, shot_index, status, stage, kind, action, audio_url, clip_url, raw_clip_url, sfx_url, native_audio, image_url, provider_ref, error, created_at";
 
 /**
  * A shot that has been rendering for longer than this is not coming back.
@@ -117,6 +119,18 @@ export async function refreshShots(
               // paid scene over — keep what we have and call it done.
               console.error(`[SERIES] upscale could not start for shot ${row.shot_index}:`, err);
             }
+          }
+
+          // A shot the video model spoke itself already carries its room sound
+          // and the line; a foley pass would only double it. Done.
+          if (row.native_audio) {
+            row.status = "completed";
+            row.clip_url = url;
+            await db
+              .from("series_shots")
+              .update({ status: "completed", stage: "done", clip_url: url, updated_at: now })
+              .eq("id", row.id);
+            return;
           }
 
           // Sound. The finished clip is listened to by a foley model that

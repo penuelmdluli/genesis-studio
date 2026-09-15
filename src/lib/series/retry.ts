@@ -138,6 +138,7 @@ export async function retryFailedShots(
           attempts,
           image_url: result.value.imageUrl,
           audio_url: result.value.audioUrl,
+          native_audio: result.value.nativeAudio ? 1 : 0,
           provider_ref: `ws:${result.value.providerRef}`,
           clip_url: null,
           raw_clip_url: null,

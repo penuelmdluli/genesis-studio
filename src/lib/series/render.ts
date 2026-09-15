@@ -238,6 +238,59 @@ export function buildShotMotionPrompt(shot: Shot, style?: VisualStyle): string {
   );
 }
 
+/**
+ * English dialogue is spoken by the video model itself.
+ *
+ * Tested side by side on 2026-09-15 (same still, same line): the model's own
+ * voice delivered the line with real intonation and kept the face, while our
+ * synthesised voice plus lip sync read flat and let the face drift. So a
+ * speaking shot in any English locale is filmed WITH its audio and needs no
+ * voice or lip-sync pass. Other languages keep the voice + lip-sync chain —
+ * the models only speak the big languages well, and isiZulu is the point.
+ */
+export function speaksNatively(shot: Shot, language: string | null | undefined): boolean {
+  if (shot.kind !== "dialogue" || !shot.dialogue.trim()) return false;
+  const locale = localeOrDefault(language);
+  return locale.id.startsWith("en-") && locale.provider !== "omnivoice";
+}
+
+const ACCENT: Record<string, string> = {
+  "en-ZA": "a South African English accent",
+  "en-NG": "a Nigerian English accent",
+  "en-KE": "a Kenyan English accent",
+  "en-TZ": "a Tanzanian English accent",
+  "en-GB": "a British accent",
+  "en-US": "an American accent",
+  "en-AU": "an Australian accent",
+  "en-IE": "an Irish accent",
+  "en-IN": "an Indian English accent",
+};
+
+const SAY_BY_EMOTION: Record<string, string> = {
+  calm: "calmly",
+  angry: "angrily, voice raised",
+  afraid: "fearfully, voice shaking",
+  joyful: "happily, smiling",
+  grieving: "quietly, voice breaking",
+  tense: "in a low, guarded voice",
+  shocked: "in disbelief",
+};
+
+/** Motion prompt for a shot whose line is spoken by the video model. */
+export function buildNativeDialoguePrompt(shot: Shot, style: VisualStyle | undefined, language: string | null | undefined): string {
+  const motion = MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm;
+  const who = shot.gender === "male" ? "man" : "woman";
+  const accent = ACCENT[localeOrDefault(language).id] || "a natural English accent";
+  const line = shot.dialogue.replace(/["“”]/g, "'").replace(/\s+/g, " ").trim().slice(0, 220);
+  const say = SAY_BY_EMOTION[shot.emotion] || SAY_BY_EMOTION.calm;
+  // The line goes first so it survives the length cap; the look closes it.
+  return (
+    `The ${who} on screen says ${say}, in ${accent}: "${line}" ` +
+    `Only this ${who} speaks, clear dialogue, lips matching every word, natural room sound, no music, no other voices. ` +
+    `${shot.action}. ${motion}. ${styleSpec(style).motion}`
+  ).slice(0, 900);
+}
+
 /** Performance direction for a speaking shot — what the lip-sync model reads. */
 export function buildPerformancePrompt(shot: Shot): string {
   const performance: Record<string, string> = {
@@ -399,6 +452,8 @@ export interface SubmittedShot {
   imageUrl: string;
   audioUrl: string | null;
   providerRef: string;
+  /** The clip carries its own spoken line (English dialogue). */
+  nativeAudio: boolean;
 }
 
 /**
@@ -445,7 +500,10 @@ export async function submitShot(
   // 2. Speech, when there is any. The voice comes from the series cast, so a
   //    character sounds the same in every episode they appear in.
   let audioUrl: string | null = null;
-  if (shot.kind === "dialogue" && shot.dialogue.trim() && seriesId && localeOrDefault(ctx.language).provider === "omnivoice") {
+  const native = speaksNatively(shot, ctx.language);
+  if (native) {
+    // Spoken by the video model while it films — see speaksNatively.
+  } else if (shot.kind === "dialogue" && shot.dialogue.trim() && seriesId && localeOrDefault(ctx.language).provider === "omnivoice") {
     // Languages with no named voice are spoken by cloning the character's own
     // sample, made during casting — see src/lib/series/omnivoice.ts.
     audioUrl = await speakOmnivoice(seriesId, shot.speaker, shot.dialogue, userId, tag);
@@ -461,21 +519,23 @@ export async function submitShot(
   //    difference between a scene and a slideshow. Speech is matched onto the
   //    moving footage afterwards, in the polling stage.
   const spec = styleSpec(ctx.style);
+  const motionPrompt = native ? buildNativeDialoguePrompt(shot, ctx.style, ctx.language) : buildShotMotionPrompt(shot, ctx.style);
   const prediction = await submitWsModel(
     spec.videoModel,
     spec.blockbuster
       ? {
           // Seedance 2.5 takes a narrower schema: no aspect ratio (the still
-          // sets the shape), no seed. Its own audio is off — our voices, sound
-          // effects and score are laid in afterwards.
+          // sets the shape), no seed. Audio is generated only when the model
+          // speaks the line itself; otherwise our voices, sound effects and
+          // score are laid in afterwards.
           image: imageUrl,
-          prompt: buildShotMotionPrompt(shot, ctx.style),
+          prompt: motionPrompt,
           duration: 5,
           resolution: "720p",
-          generate_audio: false,
+          generate_audio: native,
         }
-      : { image: imageUrl, prompt: buildShotMotionPrompt(shot, ctx.style), duration: 5 }
+      : { image: imageUrl, prompt: motionPrompt, duration: 5, generate_audio: native }
   );
 
-  return { imageUrl, audioUrl, providerRef: prediction.id };
+  return { imageUrl, audioUrl, providerRef: prediction.id, nativeAudio: native };
 }

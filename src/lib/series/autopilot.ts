@@ -187,6 +187,7 @@ export async function tickCampaign(campaign: Campaign): Promise<TickResult> {
               status: "processing",
               image_url: r.imageUrl,
               audio_url: r.audioUrl,
+              native_audio: r.nativeAudio ? 1 : 0,
               provider_ref: `ws:${r.providerRef}`,
               updated_at: sqlNow(),
             })

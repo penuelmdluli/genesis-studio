@@ -61,6 +61,9 @@ export async function GET(req: NextRequest) {
 
       for (const row of rows) {
         if (!row.metadata.userId || !row.metadata.type) continue;
+        // The merchant account is shared with other apps (TradeRadar uses
+        // "tr_" ids). Only iVideo Studio's own checkouts are settled here.
+        if (row.mPaymentId && !row.mPaymentId.startsWith("pf_")) continue;
 
         // Keyed on PayFast's payment id: a renewal is a new payment for the
         // same checkout, so it must settle again — but never twice.

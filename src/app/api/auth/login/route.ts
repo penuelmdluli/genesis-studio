@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth-custom/session";
 import { getDb } from "@/lib/db-driver";
 import { initCloudflareEnv } from "@/lib/cf-env";
-import { deviceCookie, recordSignals, signalsFrom } from "@/lib/signup-signals";
+import { blockedBy, deviceCookie, recordSignals, signalsFrom } from "@/lib/signup-signals";
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,13 +52,23 @@ export async function POST(req: NextRequest) {
 
     // Record the device this account signs in from: accounts made in the same
     // browser keep linking to each other even after the sign-up itself.
+    let blockedDevice = false;
     try {
       initCloudflareEnv();
       const { deviceId, setCookie } = deviceCookie(req);
       loginDeviceCookie = setCookie;
-      await recordSignals(user.id as string, "login", await signalsFrom(req, deviceId));
+      const signals = await signalsFrom(req, deviceId);
+      blockedDevice = !!(await blockedBy(signals));
+      await recordSignals(user.id as string, "login", signals);
     } catch (err) {
       console.error("[ABUSE] login signal failed:", err);
+    }
+
+    if (blockedDevice) {
+      return NextResponse.json(
+        { error: "This device is blocked. Contact support@ivideostudio.ai." },
+        { status: 403 }
+      );
     }
 
     // Create session

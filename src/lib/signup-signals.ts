@@ -214,3 +214,58 @@ export async function recordSignals(
     console.error("[ABUSE] recordSignals failed:", err);
   }
 }
+
+// ============================================
+// Hard blocklist
+// ============================================
+// Suspending accounts deals with what was farmed. Blocking the device stops
+// the next attempt from the same browser or network: no account is created at
+// all, so there is nothing to clean up afterwards.
+
+export interface BlockHit {
+  kind: string;
+  value: string;
+  reason: string | null;
+}
+
+/** Is this device, network or browser refused entry? */
+export async function blockedBy(s: Signals): Promise<BlockHit | null> {
+  const candidates: Array<[string, string]> = [
+    ["device", s.deviceId],
+    ["ip_prefix", s.ipPrefix],
+    ["fingerprint", s.fingerprint],
+  ];
+  const d1 = getD1();
+  for (const [kind, value] of candidates) {
+    if (!value) continue;
+    const row = await d1
+      .prepare(`SELECT kind, value, reason FROM blocked_devices WHERE kind = ? AND value = ? LIMIT 1`)
+      .bind(kind, value)
+      .first<BlockHit>();
+    if (row) {
+      // Count the attempt, so the admin page shows which blocks are doing work.
+      await d1
+        .prepare(`UPDATE blocked_devices SET hits = COALESCE(hits,0) + 1 WHERE kind = ? AND value = ?`)
+        .bind(kind, value)
+        .run()
+        .catch(() => null);
+      return row;
+    }
+  }
+  return null;
+}
+
+/** Add a device/network/fingerprint to the blocklist. Ignores duplicates. */
+export async function blockValue(kind: "device" | "ip_prefix" | "fingerprint", value: string, reason: string): Promise<void> {
+  if (!value) return;
+  try {
+    await getD1()
+      .prepare(
+        `INSERT OR IGNORE INTO blocked_devices (id, kind, value, reason) VALUES (?, ?, ?, ?)`
+      )
+      .bind(crypto.randomUUID(), kind, value, reason.slice(0, 200))
+      .run();
+  } catch (err) {
+    console.error("[ABUSE] blockValue failed:", err);
+  }
+}

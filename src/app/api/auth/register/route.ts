@@ -9,6 +9,8 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { sendSlackAlert } from "@/lib/alerts";
 import { initCloudflareEnv } from "@/lib/cf-env";
 import {
+  blockValue,
+  blockedBy,
   deviceCookie,
   recordSignals,
   relatedAccounts,
@@ -56,6 +58,20 @@ export async function POST(req: NextRequest) {
     initCloudflareEnv();
     const { deviceId, setCookie: deviceSetCookie } = deviceCookie(req);
     const signals = await signalsFrom(req, deviceId);
+
+    // A device or network we have already banned never gets to create another
+    // account, so there is nothing to clean up afterwards.
+    const block = await blockedBy(signals);
+    if (block) {
+      return NextResponse.json(
+        {
+          error:
+            "We could not open an account from this device. If you think this is a mistake, email support@ivideostudio.ai.",
+        },
+        { status: 403 }
+      );
+    }
+
     const related = await relatedAccounts(signals);
     const risk = scoreRisk(signals, email.toLowerCase().trim(), related);
     const freeCredits = risk.denyFreeCredits ? 0 : 100;
@@ -123,6 +139,9 @@ export async function POST(req: NextRequest) {
     ).catch(() => {});
 
     if (risk.autoBlock) {
+      // Ban the browser itself, not only this account: the next attempt from it
+      // is refused before any record is created.
+      await blockValue("device", signals.deviceId, `auto: ${risk.reasons.join("; ")}`);
       // The account exists (so the evidence is kept and one click restores it),
       // but no session is issued and sign-in is refused.
       sendSlackAlert({

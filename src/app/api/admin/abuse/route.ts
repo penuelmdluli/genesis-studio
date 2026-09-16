@@ -15,7 +15,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { initCloudflareEnv } from "@/lib/cf-env";
 import { getD1 } from "@/lib/d1";
-import { emailLooksGenerated } from "@/lib/signup-signals";
+import { blockValue, emailLooksGenerated } from "@/lib/signup-signals";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -140,14 +140,18 @@ export async function GET(req: NextRequest) {
   const rank = { device: 0, fingerprint: 1, network: 2 };
   clusters.sort((a, b) => rank[a.kind] - rank[b.kind] || b.accounts - a.accounts || b.lastSeen.localeCompare(a.lastSeen));
 
-  return NextResponse.json({ days, clusters: clusters.slice(0, 100) });
+  const { results: blocks } = await d1
+    .prepare(`SELECT kind, value, reason, hits, created_at FROM blocked_devices ORDER BY created_at DESC LIMIT 100`)
+    .all<{ kind: string; value: string; reason: string; hits: number; created_at: string }>();
+
+  return NextResponse.json({ days, clusters: clusters.slice(0, 100), blocks: blocks || [] });
 }
 
 export async function POST(req: NextRequest) {
   if (!(await allowed(req))) return new NextResponse("Not found", { status: 404 });
   initCloudflareEnv();
   const d1 = getD1();
-  const body = (await req.json().catch(() => ({}))) as { action?: string; userIds?: string[]; reason?: string };
+  const body = (await req.json().catch(() => ({}))) as { action?: string; userIds?: string[]; reason?: string; kind?: string; key?: string };
 
   if (body.action === "backfill") {
     // Older accounts have no signals, but analytics recorded the browser id
@@ -177,6 +181,24 @@ export async function POST(req: NextRequest) {
       added++;
     }
     return NextResponse.json({ ok: true, added });
+  }
+
+  if (body.action === "block") {
+    // Ban the device/network itself: no new account can be opened from it.
+    await blockValue(
+      (body.kind || "device") as "device" | "ip_prefix" | "fingerprint",
+      body.key || "",
+      body.reason || "blocked by owner"
+    );
+    return NextResponse.json({ ok: true, blocked: body.key });
+  }
+
+  if (body.action === "unblock") {
+    await d1
+      .prepare(`DELETE FROM blocked_devices WHERE kind = ? AND value = ?`)
+      .bind(body.kind || "device", body.key || "")
+      .run();
+    return NextResponse.json({ ok: true, unblocked: body.key });
   }
 
   const ids = (body.userIds || []).filter(Boolean);

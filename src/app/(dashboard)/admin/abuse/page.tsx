@@ -57,6 +57,19 @@ export default function AbusePage() {
     load();
   }, [load]);
 
+  async function block(kind: string, key: string, label: string) {
+    setBusy(label);
+    const res = await fetch("/api/admin/abuse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "block", kind, key, reason: "blocked from the abuse page" }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    setBusy("");
+    setMsg(data.error || `Blocked ${kind === "device" ? "device" : "network"} — no new account can be opened from it`);
+    load();
+  }
+
   async function act(action: string, userIds: string[], label: string) {
     setBusy(label);
     setMsg("");
@@ -117,6 +130,14 @@ export default function AbusePage() {
                     </p>
                     <p className="mt-1 font-mono text-[11px] text-zinc-500">{c.key}</p>
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => block(c.kind === "network" ? "ip_prefix" : c.kind, c.key, `block-${c.key}`)}
+                      disabled={!!busy}
+                      className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium hover:bg-white/5 disabled:opacity-50"
+                    >
+                      {busy === `block-${c.key}` ? "Blocking…" : "Block this " + (c.kind === "network" ? "network" : "device")}
+                    </button>
                   {active.length > 0 && (
                     <button
                       onClick={() =>
@@ -132,6 +153,7 @@ export default function AbusePage() {
                       {busy === c.key ? "Suspending…" : `Suspend ${active.length}`}
                     </button>
                   )}
+                  </div>
                 </div>
 
                 <div className="mt-4 overflow-x-auto">

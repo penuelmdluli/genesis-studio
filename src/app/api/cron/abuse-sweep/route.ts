@@ -82,16 +82,21 @@ export async function GET(req: NextRequest) {
     const protectedRow = (r: Row) =>
       OWNER_EMAILS.includes((r.email || "").toLowerCase()) || r.paid > 0 || (r.plan && r.plan !== "free");
 
-    // Everything after the oldest account on this device is a duplicate.
-    const extras = rows.slice(1).filter((r) => !r.suspended && !protectedRow(r));
+    // Everything after the oldest account on this device is a duplicate. Only
+    // recent ones: an account that has been open for a fortnight without being
+    // caught is treated as real, and left to a human on /admin/abuse.
+    const recent = (r: Row) => Date.now() - Date.parse(r.created_at) < 14 * 86_400_000;
+    const extras = rows.slice(1).filter((r) => !r.suspended && !protectedRow(r) && recent(r));
     if (!extras.length) continue;
 
     const generated = rows.filter((r) => emailLooksGenerated(r.email || "")).length;
     const times = rows.map((r) => Date.parse(r.created_at)).filter((n) => !Number.isNaN(n));
     const spanHours = times.length > 1 ? (Math.max(...times) - Math.min(...times)) / 3_600_000 : 999;
 
-    // Same evidence bar as sign-up blocking, applied to accounts already open.
-    const isFarm = rows.length >= 3 || generated >= 1 || spanHours < 24;
+    // A farm signs up in a burst with throwaway addresses. Several accounts on
+    // one device spread over months is a household or an owner's own logins, so
+    // account count alone never triggers a suspension.
+    const isFarm = generated >= 1 || spanHours < 24 || (rows.length >= 4 && spanHours < 24 * 7);
     if (!isFarm) {
       skipped.push(`${device.slice(0, 8)}: ${rows.length} accounts, looks like a shared device`);
       continue;

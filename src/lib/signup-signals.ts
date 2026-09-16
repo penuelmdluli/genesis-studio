@@ -103,6 +103,9 @@ export interface RelatedAccounts {
   byDevice: string[];
   byIp: string[];
   byFingerprint: string[];
+  /** Same network in the last 24 hours — a burst, not a housemate last month. */
+  byIpToday: string[];
+  byFingerprintToday: string[];
 }
 
 /** Other accounts that used the same device, network or fingerprint recently. */
@@ -120,12 +123,26 @@ export async function relatedAccounts(s: Signals, excludeUserId?: string): Promi
       .all<{ user_id: string }>();
     return (results || []).map((r) => r.user_id);
   };
-  const [byDevice, byIp, byFingerprint] = await Promise.all([
+  const today = new Date(Date.now() - 86_400_000).toISOString();
+  const pullToday = async (column: string, value: string): Promise<string[]> => {
+    if (!value) return [];
+    const { results } = await d1
+      .prepare(
+        `SELECT DISTINCT user_id FROM signup_signals
+          WHERE ${column} = ? AND created_at >= ? AND user_id != ?`
+      )
+      .bind(value, today, excludeUserId || "")
+      .all<{ user_id: string }>();
+    return (results || []).map((r) => r.user_id);
+  };
+  const [byDevice, byIp, byFingerprint, byIpToday, byFingerprintToday] = await Promise.all([
     pull("device_id", s.deviceId),
     pull("ip_prefix", s.ipPrefix),
     pull("fingerprint", s.fingerprint),
+    pullToday("ip_prefix", s.ipPrefix),
+    pullToday("fingerprint", s.fingerprint),
   ]);
-  return { byDevice, byIp, byFingerprint };
+  return { byDevice, byIp, byFingerprint, byIpToday, byFingerprintToday };
 }
 
 export interface Risk {
@@ -135,6 +152,10 @@ export interface Risk {
   denyFreeCredits: boolean;
   /** True when the account should be blocked outright, not merely credit-starved. */
   autoBlock: boolean;
+  /** Ban the whole /24 — only on an obvious burst from one network. */
+  blockNetwork: boolean;
+  /** Ban this browser build + language + platform combination. */
+  blockFingerprint: boolean;
 }
 
 export function scoreRisk(s: Signals, email: string, related: RelatedAccounts): Risk {
@@ -144,6 +165,19 @@ export function scoreRisk(s: Signals, email: string, related: RelatedAccounts): 
   const devices = new Set(related.byDevice).size;
   const ips = new Set(related.byIp).size;
   const prints = new Set(related.byFingerprint).size;
+  const ipsToday = new Set(related.byIpToday).size;
+  const printsToday = new Set(related.byFingerprintToday).size;
+
+  // The burst signals. A private window gives a fresh cookie every time, so
+  // these are what catch a farm; the cookie only catches the lazy version.
+  if (ipsToday >= 1) {
+    score += 60 * Math.min(ipsToday, 3);
+    reasons.push(`${ipsToday} other account${ipsToday > 1 ? "s" : ""} from this network today`);
+  }
+  if (printsToday >= 1) {
+    score += 40 * Math.min(printsToday, 3);
+    reasons.push(`${printsToday} other account${printsToday > 1 ? "s" : ""} with this exact browser today`);
+  }
 
   if (devices >= 1) {
     score += 50 * Math.min(devices, 3);
@@ -175,9 +209,23 @@ export function scoreRisk(s: Signals, email: string, related: RelatedAccounts): 
     (devices >= 1 && emailLooksGenerated(email)) ||
     devices >= 2 ||
     (devices >= 1 && !s.userAgent) ||
+    // Second account in a day from one browser build, or a throwaway address on
+    // a network already opening accounts today.
+    printsToday >= 1 ||
+    (ipsToday >= 1 && emailLooksGenerated(email)) ||
+    ipsToday >= 2 ||
     score >= 130;
 
-  return { score, reasons, denyFreeCredits: devices >= 1 || score >= 80, autoBlock };
+  return {
+    score,
+    reasons,
+    denyFreeCredits: devices >= 1 || ipsToday >= 1 || printsToday >= 1 || score >= 80,
+    autoBlock,
+    // Ban the network itself only on a clear burst: offices and mobile carriers
+    // share a /24, and one wrong ban turns away every real customer behind it.
+    blockNetwork: ipsToday >= 3,
+    blockFingerprint: printsToday >= 1,
+  };
 }
 
 export async function recordSignals(

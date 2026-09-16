@@ -141,7 +141,10 @@ export async function POST(req: NextRequest) {
     if (risk.autoBlock) {
       // Ban the browser itself, not only this account: the next attempt from it
       // is refused before any record is created.
-      await blockValue("device", signals.deviceId, `auto: ${risk.reasons.join("; ")}`);
+      const why = `auto: ${risk.reasons.join("; ")}`;
+      await blockValue("device", signals.deviceId, why);
+      if (risk.blockFingerprint) await blockValue("fingerprint", signals.fingerprint, why);
+      if (risk.blockNetwork) await blockValue("ip_prefix", signals.ipPrefix, why);
       // The account exists (so the evidence is kept and one click restores it),
       // but no session is issued and sign-in is refused.
       sendSlackAlert({

@@ -1,15 +1,16 @@
 // ============================================
 // Growth brain: approve or reject a whole batch from one tap
 // ============================================
-// GET /api/growth/batch?ids=<id,id,...>&do=approve|reject&t=<signature>
+// GET  /api/growth/batch?ids=<id,id,...>&do=approve|reject&t=<signature>
+// POST (same query) - records the decisions
 //
 // The owner asked to decide a batch at once - six trending videos, or every
 // task in an email - instead of tapping each. The signature covers the exact
 // sorted set of ids and the decision, so a link cannot be edited to include an
 // action it was not sent for.
 //
-// Only still-pending actions change. Anything already decided is reported as
-// such and left alone, so tapping an old batch link cannot undo a decision.
+// Pending actions change; a rejected one can still be approved (it never ran).
+// Anything the brain has already acted on is reported and left alone.
 
 import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv } from "@/lib/cf-env";
@@ -39,7 +40,7 @@ function page(title: string, body: string, tone: "ok" | "warn"): NextResponse {
   );
 }
 
-export async function GET(req: NextRequest) {
+async function read(req: NextRequest) {
   const ids = (req.nextUrl.searchParams.get("ids") || "")
     .split(",")
     .map((s) => s.trim())
@@ -47,8 +48,34 @@ export async function GET(req: NextRequest) {
     .slice(0, MAX_BATCH);
   const decision = (req.nextUrl.searchParams.get("do") || "").toLowerCase();
   const token = req.nextUrl.searchParams.get("t") || "";
+  const valid = ["approve", "reject"].includes(decision) && (await verifyBatchToken(ids, decision, token));
+  return { ids, decision, valid };
+}
 
-  if (!["approve", "reject"].includes(decision) || !(await verifyBatchToken(ids, decision, token))) {
+// GET never decides: mail scanners open every link in an email before the
+// owner does, and a batch "Reject all" fetched by a scanner would silently
+// throw away a whole email of decisions. The page submits itself in a browser.
+export async function GET(req: NextRequest) {
+  const { decision, valid } = await read(req);
+  if (!valid) {
+    return page("That link is not valid", `<p style="color:#a1a1aa">Nothing was changed.</p>`, "warn");
+  }
+  const action = esc(req.nextUrl.pathname + req.nextUrl.search);
+  return page(
+    "Saving…",
+    `<form method="post" action="${action}">
+       <noscript><p style="color:#a1a1aa">Tap to confirm.</p></noscript>
+       <button type="submit" style="margin-top:16px;background:${decision === "approve" ? "#10b981" : "#52525b"};
+         color:#fff;border:0;border-radius:12px;font-size:17px;font-weight:600;padding:14px 26px">
+         ${decision === "approve" ? "Confirm approve all" : "Confirm reject all"}</button>
+     </form><script>document.forms[0].submit()</script>`,
+    "ok"
+  );
+}
+
+export async function POST(req: NextRequest) {
+  const { ids, decision, valid } = await read(req);
+  if (!valid) {
     return page("That link is not valid", `<p style="color:#a1a1aa">Nothing was changed.</p>`, "warn");
   }
 
@@ -64,10 +91,12 @@ export async function GET(req: NextRequest) {
       .bind(id)
       .first<{ title: string; status: string }>();
     if (!row) continue;
-    if (row.status === "pending") {
+    // A rejected action never ran, so approving it now is safe - this is how a
+    // batch recovers from a scanner having opened "Reject all" first.
+    if (row.status === "pending" || (row.status === "rejected" && status === "approved")) {
       await d1
-        .prepare("UPDATE growth_actions SET status = ?, decided_at = datetime('now') WHERE id = ? AND status = 'pending'")
-        .bind(status, id)
+        .prepare("UPDATE growth_actions SET status = ?, decided_at = datetime('now') WHERE id = ? AND status = ?")
+        .bind(status, id, row.status)
         .run();
       changed++;
       rows.push(`<li style="margin:6px 0">${esc(row.title)}</li>`);
@@ -78,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   const summary =
     decision === "approve"
-      ? `${changed} approved. The brain starts on them within ten minutes and emails you the results.`
+      ? `${changed} approved. The brain starts on them within a minute and emails you the results.`
       : `${changed} rejected. The brain will stop proposing them.`;
   return page(
     decision === "approve" ? "Batch approved" : "Batch rejected",

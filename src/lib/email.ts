@@ -263,6 +263,25 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   });
 }
 
+export async function sendVerifyEmail(email: string, name: string, url: string, credits: number): Promise<boolean> {
+  const first = (name || "there").split(" ")[0];
+  return sendEmail({
+    to: email,
+    subject: `Confirm your email to unlock ${credits} free credits`,
+    tags: [{ name: "type", value: "verify" }],
+    html: layout({
+      preheader: `One tap and your ${credits} credits are ready.`,
+      content: `
+        ${h1(`Almost there, ${esc(first)}.`)}
+        ${p(`Tap the button to confirm this is your email address. Your <strong>${credits} free credits</strong> land in your account the moment you do.`)}
+        ${button("Confirm my email", url)}
+        ${p(`The link works for 7 days. If the button does nothing, copy this into your browser:<br><span style="word-break:break-all">${esc(url)}</span>`, { muted: true, size: 13 })}
+        ${p("If you didn't create an iVideo Studio account, you can ignore this email.", { muted: true, size: 13 })}
+      `,
+    }),
+  });
+}
+
 export async function sendVideoReadyEmail(email: string, name: string, videoId: string): Promise<boolean> {
   const { APP_URL } = getEmailConfig();
   const first = (name || "there").split(" ")[0];

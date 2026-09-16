@@ -5,7 +5,8 @@ import {
   buildSessionCookie,
 } from "@/lib/auth-custom/session";
 import { getDb } from "@/lib/db-driver";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendVerifyEmail, sendWelcomeEmail } from "@/lib/email";
+import { verificationUrl } from "@/lib/email-verification";
 import { sendSlackAlert } from "@/lib/alerts";
 import { initCloudflareEnv } from "@/lib/cf-env";
 import {
@@ -99,7 +100,9 @@ export async function POST(req: NextRequest) {
       password_hash: passwordHash,
       auth_provider: "email",
       plan: "free",
-      credit_balance: freeCredits,
+      credit_balance: 0,
+      pending_credits: freeCredits,
+      email_verified: 0,
       monthly_credits_used: 0,
       monthly_credits_limit: 100,
       suspended: risk.autoBlock ? 1 : 0,
@@ -126,10 +129,13 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
     });
 
-    // Welcome email (fire-and-forget)
-    sendWelcomeEmail(email, name).catch((err: unknown) =>
-      console.error("[AUTH] Welcome email failed:", err)
-    );
+    // Confirm the address first: the credits are waiting behind this link, so a
+    // farm of invented addresses never collects them. The welcome tour follows
+    // once we know the inbox is real.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+    verificationUrl(appUrl, userId)
+      .then((url) => sendVerifyEmail(email, name, url, freeCredits))
+      .catch((err: unknown) => console.error("[AUTH] Verification email failed:", err));
 
     // Slack alert
     sendSlackAlert(
@@ -176,7 +182,10 @@ export async function POST(req: NextRequest) {
     }
 
     const response = NextResponse.json({
-      user: { id: userId, email, name, plan: "free", creditBalance: freeCredits },
+      user: { id: userId, email, name, plan: "free", creditBalance: 0 },
+      // The sign-up form tells the customer to go and confirm.
+      verificationRequired: true,
+      pendingCredits: freeCredits,
       // Shown by the sign-up form so a real person is not left wondering.
       creditsWithheld: risk.denyFreeCredits || undefined,
     });

@@ -14,6 +14,7 @@ export function SignUpForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sentTo, setSentTo] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +37,11 @@ export function SignUpForm() {
       }
 
       trackEvent("signup_completed", { method: "email" });
+      if (data.verificationRequired) {
+        // The account exists; the credits are waiting behind the email link.
+        setSentTo(email);
+        return;
+      }
       router.push("/onboarding/first-video");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -49,6 +55,30 @@ export function SignUpForm() {
   const handleGoogleSignUp = () => {
     window.location.href = "/api/auth/google/authorize";
   };
+
+  if (sentTo) {
+    return (
+      <div className="w-full max-w-sm space-y-4 text-center">
+        <div className="text-5xl">📧</div>
+        <h1 className="text-2xl font-bold text-white">Check your email</h1>
+        <p className="text-sm text-zinc-300">
+          We sent a confirmation link to <strong className="text-white">{sentTo}</strong>. Tap it and your free
+          credits are added straight away.
+        </p>
+        <p className="text-xs text-zinc-500">
+          Nothing after a minute or two? Check spam, or{" "}
+          <button
+            type="button"
+            onClick={() => setSentTo("")}
+            className="text-violet-300 underline"
+          >
+            try a different address
+          </button>
+          .
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-sm space-y-6">

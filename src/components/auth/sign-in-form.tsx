@@ -9,6 +9,16 @@ export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect_url") || "/dashboard";
+  // Set by the link in the confirmation email.
+  const verified = searchParams.get("verified");
+  const VERIFIED_MESSAGE: Record<string, string> = {
+    ok: "Email confirmed. Your free credits are in — sign in and start creating.",
+    "ok-nocredits": "Email confirmed. Sign in to get started.",
+    already: "This email was already confirmed. Sign in below.",
+    expired: "That confirmation link has expired. Sign in and we'll send a new one.",
+    invalid: "That confirmation link isn't valid. Sign in and we'll send a new one.",
+    suspended: "This account has been suspended. Email support@ivideostudio.ai if you think that's wrong.",
+  };
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,6 +66,18 @@ export function SignInForm() {
           Sign in to your iVideo Studio account
         </p>
       </div>
+
+      {verified && VERIFIED_MESSAGE[verified] && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            verified.startsWith("ok") || verified === "already"
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+              : "border-amber-500/20 bg-amber-500/10 text-amber-300"
+          }`}
+        >
+          {VERIFIED_MESSAGE[verified]}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">

@@ -97,14 +97,27 @@ export function pfEncode(value: string): string {
 }
 
 /**
- * MD5 of `key=value&...` for the given keys in the given order, skipping
- * blanks, with the passphrase appended when one is set.
+ * MD5 of `key=value&...` for the given keys in the given order, with the
+ * passphrase appended when one is set.
+ *
+ * `keepBlanks` is the difference between the two signatures PayFast uses, and
+ * getting it wrong is silent: the checkout form omits empty fields, but an ITN
+ * is signed over every field PayFast posts, empty ones included. Skipping them
+ * on the way in made every ITN fail verification, answer 400, and be retried
+ * for two days - nine deliveries of one payment - while the payments themselves
+ * were only settled later by the reconcile sweep.
  */
-export function pfSignature(params: Record<string, string>, order: string[], passphrase: string): string {
+export function pfSignature(
+  params: Record<string, string>,
+  order: string[],
+  passphrase: string,
+  keepBlanks = false
+): string {
   const parts: string[] = [];
   for (const key of order) {
     const v = params[key];
-    if (v === undefined || v === null || String(v) === "") continue;
+    if (v === undefined || v === null) continue;
+    if (String(v) === "" && !keepBlanks) continue;
     parts.push(`${key}=${pfEncode(String(v).trim())}`);
   }
   let str = parts.join("&");
@@ -342,7 +355,8 @@ export class PayFastProvider implements PaymentProvider {
     );
     const receivedSignature = data.signature;
     const orderedKeys = Object.keys(data).filter((k) => k !== "signature");
-    const expected = pfSignature(data, orderedKeys, this.passphrase);
+    // keepBlanks: an ITN is signed over every field posted, empty ones included.
+    const expected = pfSignature(data, orderedKeys, this.passphrase, true);
     if (!receivedSignature || receivedSignature !== expected) {
       throw new Error("Invalid PayFast ITN signature");
     }

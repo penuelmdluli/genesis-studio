@@ -73,6 +73,6 @@ export async function GET(req: NextRequest) {
     .run();
 
   return decision === "approve"
-    ? page("Approved", `“${row.title}” will be carried out within the hour.`)
+    ? page("Approved", `“${row.title}” starts within ten minutes. You will get an email with the result.`)
     : page("Rejected", `“${row.title}” will not be done. The brain will stop proposing it.`, "warn");
 }

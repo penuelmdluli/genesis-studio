@@ -24,11 +24,26 @@ export async function actionToken(id: string, decision: string): Promise<string>
   return sign(`${id}:${decision}`);
 }
 
-export async function verifyActionToken(id: string, decision: string, token: string): Promise<boolean> {
-  if (!id || !decision || !token || !SECRET()) return false;
-  const expected = await actionToken(id, decision);
+function sameToken(expected: string, token: string): boolean {
   if (expected.length !== token.length) return false;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ token.charCodeAt(i);
   return diff === 0;
+}
+
+export async function verifyActionToken(id: string, decision: string, token: string): Promise<boolean> {
+  if (!id || !decision || !token || !SECRET()) return false;
+  return sameToken(await actionToken(id, decision), token);
+}
+
+// A batch link covers an exact set of actions. The ids are sorted before
+// signing, so the set cannot be widened by appending an id to the URL - any
+// change to the list breaks the signature.
+export async function batchToken(ids: string[], decision: string): Promise<string> {
+  return sign(`batch:${[...ids].sort().join(",")}:${decision}`);
+}
+
+export async function verifyBatchToken(ids: string[], decision: string, token: string): Promise<boolean> {
+  if (!ids.length || !decision || !token || !SECRET()) return false;
+  return sameToken(await batchToken(ids, decision), token);
 }

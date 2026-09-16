@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
     // account, so there is nothing to clean up afterwards.
     const block = await blockedBy(signals);
     if (block) {
+      // Tarpit: a scripted farm retries as fast as we answer, so a blocked
+      // attempt is answered slowly and at a random pace. Costs us idle wall
+      // time, costs them throughput, and hides which signal caught them.
+      await new Promise((r) => setTimeout(r, 4000 + Math.floor(Math.random() * 5000)));
       await logAttempt(
         "blocked",
         "register",

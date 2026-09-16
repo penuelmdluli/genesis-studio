@@ -317,3 +317,37 @@ export async function blockValue(kind: "device" | "ip_prefix" | "fingerprint", v
     console.error("[ABUSE] blockValue failed:", err);
   }
 }
+
+/** Record a refused (or credit-starved) attempt, so repeat pressure is visible. */
+export async function logAttempt(
+  outcome: "blocked" | "auto_blocked" | "credits_withheld",
+  route: "register" | "login",
+  s: Signals,
+  email: string,
+  reason: string
+): Promise<void> {
+  try {
+    await getD1()
+      .prepare(
+        `INSERT INTO blocked_attempts
+           (id, outcome, route, email, ip, ip_prefix, country, device_id, fingerprint, user_agent, reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        outcome,
+        route,
+        (email || "").slice(0, 200),
+        s.ip,
+        s.ipPrefix,
+        s.country,
+        s.deviceId,
+        s.fingerprint,
+        s.userAgent,
+        reason.slice(0, 300)
+      )
+      .run();
+  } catch (err) {
+    console.error("[ABUSE] logAttempt failed:", err);
+  }
+}

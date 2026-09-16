@@ -11,6 +11,7 @@ import { initCloudflareEnv } from "@/lib/cf-env";
 import {
   blockValue,
   blockedBy,
+  logAttempt,
   deviceCookie,
   recordSignals,
   relatedAccounts,
@@ -63,6 +64,13 @@ export async function POST(req: NextRequest) {
     // account, so there is nothing to clean up afterwards.
     const block = await blockedBy(signals);
     if (block) {
+      await logAttempt(
+        "blocked",
+        "register",
+        signals,
+        email,
+        `${block.kind} on blocklist: ${block.reason || "no reason recorded"}`
+      );
       return NextResponse.json(
         {
           error:
@@ -107,6 +115,9 @@ export async function POST(req: NextRequest) {
     }
 
     await recordSignals(userId, "register", signals, risk);
+    if (risk.denyFreeCredits && !risk.autoBlock) {
+      await logAttempt("credits_withheld", "register", signals, email, risk.reasons.join("; "));
+    }
 
     // Create session
     const token = await createSession({
@@ -145,6 +156,7 @@ export async function POST(req: NextRequest) {
       await blockValue("device", signals.deviceId, why);
       if (risk.blockFingerprint) await blockValue("fingerprint", signals.fingerprint, why);
       if (risk.blockNetwork) await blockValue("ip_prefix", signals.ipPrefix, why);
+      await logAttempt("auto_blocked", "register", signals, email, risk.reasons.join("; "));
       // The account exists (so the evidence is kept and one click restores it),
       // but no session is issued and sign-in is refused.
       sendSlackAlert({

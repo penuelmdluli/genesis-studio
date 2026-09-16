@@ -140,11 +140,46 @@ export async function GET(req: NextRequest) {
   const rank = { device: 0, fingerprint: 1, network: 2 };
   clusters.sort((a, b) => rank[a.kind] - rank[b.kind] || b.accounts - a.accounts || b.lastSeen.localeCompare(a.lastSeen));
 
+  // How hard the blocklist is being pushed: totals, the busiest sources, and
+  // the most recent tries.
+  const { results: attemptTotals } = await d1
+    .prepare(
+      `SELECT outcome, COUNT(*) n, MAX(created_at) last_seen
+         FROM blocked_attempts WHERE created_at >= ? GROUP BY outcome`
+    )
+    .bind(since)
+    .all<{ outcome: string; n: number; last_seen: string }>();
+
+  const { results: attemptSources } = await d1
+    .prepare(
+      `SELECT ip_prefix, country, COUNT(*) n, MAX(created_at) last_seen
+         FROM blocked_attempts WHERE created_at >= ? AND ip_prefix IS NOT NULL AND ip_prefix != ''
+        GROUP BY ip_prefix ORDER BY n DESC LIMIT 10`
+    )
+    .bind(since)
+    .all<{ ip_prefix: string; country: string; n: number; last_seen: string }>();
+
+  const { results: attemptsRecent } = await d1
+    .prepare(
+      `SELECT created_at, outcome, route, email, ip, country, reason
+         FROM blocked_attempts ORDER BY created_at DESC LIMIT 40`
+    )
+    .all<{ created_at: string; outcome: string; route: string; email: string; ip: string; country: string; reason: string }>();
+
   const { results: blocks } = await d1
     .prepare(`SELECT kind, value, reason, hits, created_at FROM blocked_devices ORDER BY created_at DESC LIMIT 100`)
     .all<{ kind: string; value: string; reason: string; hits: number; created_at: string }>();
 
-  return NextResponse.json({ days, clusters: clusters.slice(0, 100), blocks: blocks || [] });
+  return NextResponse.json({
+    days,
+    clusters: clusters.slice(0, 100),
+    blocks: blocks || [],
+    attempts: {
+      totals: attemptTotals || [],
+      sources: attemptSources || [],
+      recent: attemptsRecent || [],
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth-custom/session";
 import { getDb } from "@/lib/db-driver";
 import { initCloudflareEnv } from "@/lib/cf-env";
-import { blockedBy, deviceCookie, recordSignals, signalsFrom } from "@/lib/signup-signals";
+import { blockedBy, deviceCookie, logAttempt, recordSignals, signalsFrom } from "@/lib/signup-signals";
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,7 +58,11 @@ export async function POST(req: NextRequest) {
       const { deviceId, setCookie } = deviceCookie(req);
       loginDeviceCookie = setCookie;
       const signals = await signalsFrom(req, deviceId);
-      blockedDevice = !!(await blockedBy(signals));
+      const hit = await blockedBy(signals);
+      blockedDevice = !!hit;
+      if (hit) {
+        await logAttempt("blocked", "login", signals, email, `${hit.kind} on blocklist: ${hit.reason || ""}`);
+      }
       await recordSignals(user.id as string, "login", signals);
     } catch (err) {
       console.error("[ABUSE] login signal failed:", err);

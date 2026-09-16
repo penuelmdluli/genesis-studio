@@ -13,6 +13,37 @@ interface Member {
   generatedEmail: boolean;
 }
 
+interface Attempt {
+  created_at: string;
+  outcome: string;
+  route: string;
+  email: string | null;
+  ip: string | null;
+  country: string | null;
+  reason: string | null;
+}
+
+interface AttemptSource {
+  ip_prefix: string;
+  country: string | null;
+  n: number;
+  last_seen: string;
+}
+
+interface Blocked {
+  kind: string;
+  value: string;
+  reason: string | null;
+  hits: number;
+  created_at: string;
+}
+
+interface Totals {
+  outcome: string;
+  n: number;
+  last_seen: string;
+}
+
 interface Cluster {
   kind: "device" | "network" | "fingerprint";
   key: string;
@@ -41,6 +72,12 @@ const KIND_COLOR: Record<Cluster["kind"], string> = {
 
 export default function AbusePage() {
   const [clusters, setClusters] = useState<Cluster[]>([]);
+  const [blocks, setBlocks] = useState<Blocked[]>([]);
+  const [attempts, setAttempts] = useState<{ totals: Totals[]; sources: AttemptSource[]; recent: Attempt[] }>({
+    totals: [],
+    sources: [],
+    recent: [],
+  });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -48,8 +85,14 @@ export default function AbusePage() {
   const load = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/admin/abuse");
-    const data = (await res.json().catch(() => ({}))) as { clusters?: Cluster[] };
+    const data = (await res.json().catch(() => ({}))) as {
+      clusters?: Cluster[];
+      blocks?: Blocked[];
+      attempts?: { totals: Totals[]; sources: AttemptSource[]; recent: Attempt[] };
+    };
     setClusters(data.clusters || []);
+    setBlocks(data.blocks || []);
+    setAttempts(data.attempts || { totals: [], sources: [], recent: [] });
     setLoading(false);
   }, []);
 
@@ -57,16 +100,21 @@ export default function AbusePage() {
     load();
   }, [load]);
 
-  async function block(kind: string, key: string, label: string) {
+  async function block(kind: string, key: string, label: string, action: "block" | "unblock" = "block") {
     setBusy(label);
     const res = await fetch("/api/admin/abuse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "block", kind, key, reason: "blocked from the abuse page" }),
+      body: JSON.stringify({ action, kind, key, reason: "blocked from the abuse page" }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     setBusy("");
-    setMsg(data.error || `Blocked ${kind === "device" ? "device" : "network"} — no new account can be opened from it`);
+    setMsg(
+      data.error ||
+        (action === "block"
+          ? `Blocked — nothing can sign up from this ${kind === "ip_prefix" ? "network" : kind} again`
+          : "Unblocked")
+    );
     load();
   }
 
@@ -104,6 +152,103 @@ export default function AbusePage() {
       </div>
 
       {msg && <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm">{msg}</p>}
+
+      {(attempts.totals.length > 0 || blocks.length > 0) && (
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-[#111118] p-5">
+            <h2 className="font-semibold">Attempts turned away</h2>
+            {attempts.totals.length === 0 ? (
+              <p className="mt-2 text-sm text-zinc-400">None yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {attempts.totals.map((t) => (
+                  <li key={t.outcome} className="flex justify-between gap-3">
+                    <span className="text-zinc-300">
+                      {t.outcome === "blocked"
+                        ? "Refused (on blocklist)"
+                        : t.outcome === "auto_blocked"
+                          ? "Auto-blocked at sign-up"
+                          : "Free credits withheld"}
+                    </span>
+                    <span className="font-semibold">
+                      {t.n}
+                      <span className="ml-2 text-xs font-normal text-zinc-500">
+                        last {String(t.last_seen).slice(5, 16).replace("T", " ")}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {attempts.sources.length > 0 && (
+              <>
+                <p className="mt-4 text-xs uppercase text-zinc-500">Busiest networks</p>
+                <ul className="mt-1.5 space-y-1 text-sm">
+                  {attempts.sources.map((src) => (
+                    <li key={src.ip_prefix} className="flex justify-between gap-3">
+                      <span className="font-mono text-xs text-zinc-300">
+                        {src.ip_prefix} {src.country ? `\u00b7 ${src.country}` : ""}
+                      </span>
+                      <span>{src.n} tries</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#111118] p-5">
+            <h2 className="font-semibold">Blocklist ({blocks.length})</h2>
+            {blocks.length === 0 ? (
+              <p className="mt-2 text-sm text-zinc-400">Nothing blocked yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-sm">
+                {blocks.map((b) => (
+                  <li key={`${b.kind}-${b.value}`} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs text-zinc-300">
+                        {b.kind}: {b.value.length > 26 ? b.value.slice(0, 26) + "\u2026" : b.value}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">{b.reason}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="text-xs text-zinc-400">{b.hits || 0} hits</span>
+                      <button
+                        onClick={() => block(b.kind, b.value, `unblock-${b.value}`, "unblock")}
+                        className="ml-3 text-xs text-zinc-500 underline hover:text-white"
+                      >
+                        unblock
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {attempts.recent.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-[#111118] p-5">
+          <h2 className="font-semibold">Latest attempts</h2>
+          <div className="mt-3 max-h-72 overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <tbody>
+                {attempts.recent.map((a, i) => (
+                  <tr key={i} className="border-t border-white/5">
+                    <td className="py-1.5 pr-3 text-zinc-400">{String(a.created_at).slice(5, 16).replace("T", " ")}</td>
+                    <td className="py-1.5 pr-3">{a.email || "\u2014"}</td>
+                    <td className="py-1.5 pr-3 font-mono text-xs text-zinc-400">
+                      {a.ip} {a.country ? `\u00b7 ${a.country}` : ""}
+                    </td>
+                    <td className="py-1.5 text-xs text-zinc-500">{a.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="mt-8 text-sm text-zinc-400">Loading…</p>

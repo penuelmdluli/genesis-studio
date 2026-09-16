@@ -7,6 +7,14 @@ import {
 import { getDb } from "@/lib/db-driver";
 import { sendWelcomeEmail } from "@/lib/email";
 import { sendSlackAlert } from "@/lib/alerts";
+import { initCloudflareEnv } from "@/lib/cf-env";
+import {
+  deviceCookie,
+  recordSignals,
+  relatedAccounts,
+  scoreRisk,
+  signalsFrom,
+} from "@/lib/signup-signals";
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,6 +50,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Who is signing up, and from where. One person farming throwaway accounts
+    // for free credits costs us real generation spend, so the free grant is
+    // withheld when this device has already opened an account.
+    initCloudflareEnv();
+    const { deviceId, setCookie: deviceSetCookie } = deviceCookie(req);
+    const signals = await signalsFrom(req, deviceId);
+    const related = await relatedAccounts(signals);
+    const risk = scoreRisk(signals, email.toLowerCase().trim(), related);
+    const freeCredits = risk.denyFreeCredits ? 0 : 100;
+
     // Hash password
     const passwordHash = await hashPassword(password);
 
@@ -57,9 +75,11 @@ export async function POST(req: NextRequest) {
       password_hash: passwordHash,
       auth_provider: "email",
       plan: "free",
-      credit_balance: 100,
+      credit_balance: freeCredits,
       monthly_credits_used: 0,
       monthly_credits_limit: 100,
+      suspended: risk.autoBlock ? 1 : 0,
+      suspended_reason: risk.autoBlock ? risk.reasons.join("; ").slice(0, 200) : null,
     });
 
     if (error) {
@@ -69,6 +89,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await recordSignals(userId, "register", signals, risk);
 
     // Create session
     const token = await createSession({
@@ -83,16 +105,49 @@ export async function POST(req: NextRequest) {
     );
 
     // Slack alert
-    sendSlackAlert({
-      level: "info",
-      title: "New customer signed up",
-      message: `${name} (${email}) just joined iVideo Studio with 100 free credits.`,
-    }).catch(() => {});
+    sendSlackAlert(
+      risk.denyFreeCredits
+        ? {
+            level: "warning",
+            title: "Sign-up flagged: no free credits granted",
+            message:
+              `${name} (${email}) — risk ${risk.score}\n${risk.reasons.join("\n")}\n` +
+              `Device ${signals.deviceId.slice(0, 8)}, ${signals.country || "??"} ${signals.ipPrefix}\n` +
+              `Review: ${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/abuse`,
+          }
+        : {
+            level: "info",
+            title: "New customer signed up",
+            message: `${name} (${email}) just joined iVideo Studio with ${freeCredits} free credits.`,
+          }
+    ).catch(() => {});
+
+    if (risk.autoBlock) {
+      // The account exists (so the evidence is kept and one click restores it),
+      // but no session is issued and sign-in is refused.
+      sendSlackAlert({
+        level: "warning",
+        title: "Sign-up auto-blocked",
+        message:
+          `${name} (${email}) — risk ${risk.score}\n${risk.reasons.join("\n")}\n` +
+          `Review: ${process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai"}/admin/abuse`,
+      }).catch(() => {});
+      return NextResponse.json(
+        {
+          error:
+            "We could not open an account from this device. If you think this is a mistake, email support@ivideostudio.ai.",
+        },
+        { status: 403 }
+      );
+    }
 
     const response = NextResponse.json({
-      user: { id: userId, email, name, plan: "free", creditBalance: 100 },
+      user: { id: userId, email, name, plan: "free", creditBalance: freeCredits },
+      // Shown by the sign-up form so a real person is not left wondering.
+      creditsWithheld: risk.denyFreeCredits || undefined,
     });
-    response.headers.set("Set-Cookie", buildSessionCookie(token));
+    response.headers.append("Set-Cookie", buildSessionCookie(token));
+    if (deviceSetCookie) response.headers.append("Set-Cookie", deviceSetCookie);
 
     return response;
   } catch (err) {

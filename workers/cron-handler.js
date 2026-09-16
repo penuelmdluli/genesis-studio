@@ -25,6 +25,8 @@ const CRON_MAP = {
   "0 16,17 * * *": ["/api/cron/ad-loop"],
   "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments"],
   "0 */6 * * *": ["/api/cron/purge-stale"],
+  // Suspends extra accounts farmed on one device. Paying customers are exempt.
+  "0 * * * *": ["/api/cron/abuse-sweep"],
   "*/1 * * * *": ["/api/cron/process-fallbacks", "/api/cron/check-singer", "/api/cron/reap-jobs"],
   "*/2 * * * *": ["/api/cron/check-mimic"],
   "*/30 * * * *": ["/api/cron/provider-balance"],

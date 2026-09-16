@@ -5,6 +5,8 @@ import {
   buildSessionCookie,
 } from "@/lib/auth-custom/session";
 import { getDb } from "@/lib/db-driver";
+import { initCloudflareEnv } from "@/lib/cf-env";
+import { deviceCookie, recordSignals, signalsFrom } from "@/lib/signup-signals";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +19,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let loginDeviceCookie: string | null = null;
     const db = getDb();
 
     const { data: user } = await db
@@ -32,12 +35,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (Number(user.suspended) === 1) {
+      return NextResponse.json(
+        { error: "This account has been suspended. Contact support@ivideostudio.ai." },
+        { status: 403 }
+      );
+    }
+
     const valid = await verifyPassword(password, user.password_hash as string);
     if (!valid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
       );
+    }
+
+    // Record the device this account signs in from: accounts made in the same
+    // browser keep linking to each other even after the sign-up itself.
+    try {
+      initCloudflareEnv();
+      const { deviceId, setCookie } = deviceCookie(req);
+      loginDeviceCookie = setCookie;
+      await recordSignals(user.id as string, "login", await signalsFrom(req, deviceId));
+    } catch (err) {
+      console.error("[ABUSE] login signal failed:", err);
     }
 
     // Create session
@@ -56,7 +77,8 @@ export async function POST(req: NextRequest) {
         creditBalance: user.credit_balance,
       },
     });
-    response.headers.set("Set-Cookie", buildSessionCookie(token));
+    response.headers.append("Set-Cookie", buildSessionCookie(token));
+    if (loginDeviceCookie) response.headers.append("Set-Cookie", loginDeviceCookie);
 
     return response;
   } catch (err) {

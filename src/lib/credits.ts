@@ -43,11 +43,18 @@ export async function deductCredits(
   // requests could both read a sufficient balance and both deduct.
   const { data: user, error: userError } = await getSupabase()
     .from("users")
-    .select("credit_balance, plan")
+    .select("credit_balance, plan, suspended")
     .eq("id", userId)
     .single();
 
   if (userError) throw new Error(`Failed to get user: ${userError.message}`);
+
+  // A suspended account (multi-account abuse) spends nothing, even if a stale
+  // session is still open in its browser.
+  if (Number(user.suspended) === 1) {
+    console.warn(`[CREDITS] refused: user ${userId} is suspended`);
+    return { success: false, newBalance: 0 };
+  }
 
   // Daily spend cap — defense-in-depth against runaway costs
   try {

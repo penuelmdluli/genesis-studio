@@ -3,6 +3,8 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { getDb } from "@/lib/db-driver";
 import { REFERRAL_REWARDS } from "@/lib/constants";
+import { initCloudflareEnv } from "@/lib/cf-env";
+import { rewardsAllowed, sameActor } from "@/lib/signup-signals";
 import {
   celebrate,
   friendsToNextReward,
@@ -73,6 +75,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invite links are for new accounts" }, { status: 400 });
     }
 
+    // Inviting yourself from a second browser is the oldest trick here, so the
+    // friend must not look like the inviter, and a flagged account earns nothing.
+    initCloudflareEnv();
+    const allowed = await rewardsAllowed(user.id);
+    if (!allowed.ok) {
+      return NextResponse.json({ error: "This account cannot claim invite bonuses." }, { status: 403 });
+    }
+
     const db = getDb();
     const { data: referralCode } = await db.from("referral_codes").select("*").eq("code", code).maybeSingle();
     if (!referralCode) return NextResponse.json({ error: "Invalid referral code" }, { status: 404 });
@@ -81,6 +91,15 @@ export async function POST(req: NextRequest) {
     }
     if ((referralCode.referral_count || 0) >= REFERRAL_REWARDS.maxReferrals) {
       return NextResponse.json({ error: "Referral code has reached maximum uses" }, { status: 400 });
+    }
+
+    const shared = await sameActor(user.id, referralCode.user_id as string);
+    if (shared) {
+      console.warn(`[referrals] refused: ${user.id} and inviter ${referralCode.user_id} share ${shared}`);
+      return NextResponse.json(
+        { error: "This invite link cannot be used on the same device as the person who sent it." },
+        { status: 403 }
+      );
     }
 
     // The unique index on referred_user_id makes this insert the claim: a

@@ -6,6 +6,7 @@ import { getAuthUserId } from "@/lib/auth";
 import { getUserByClerkId } from "@/lib/db";
 import { getDb } from "@/lib/db-driver";
 import { celebrate } from "@/lib/referrals";
+import { rewardsAllowed } from "@/lib/signup-signals";
 import {
   PLAY_OPT_IN_URL,
   TESTER_BONUS_CREDITS,
@@ -75,7 +76,10 @@ export async function POST(req: NextRequest) {
   }
 
   let bonus = 0;
-  if (user) {
+  // A flagged or suspended account joins the tester list but earns nothing:
+  // the +50 credits are for real testers, not for a farm of throwaway accounts.
+  const bonusAllowed = user ? await rewardsAllowed(user.id) : { ok: false };
+  if (user && bonusAllowed.ok) {
     const { addCreditPackCredits } = await import("@/lib/credits");
     await addCreditPackCredits(user.id, TESTER_BONUS_CREDITS, "Thank you for testing the Android app");
     bonus = TESTER_BONUS_CREDITS;

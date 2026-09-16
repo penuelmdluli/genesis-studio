@@ -351,3 +351,47 @@ export async function logAttempt(
     console.error("[ABUSE] logAttempt failed:", err);
   }
 }
+
+// ============================================
+// Reward guards
+// ============================================
+// Every free-credit path is worth money, so each one asks the same question the
+// sign-up asks: is this actually a different person? Two accounts that share a
+// device, a network on the same day, or an identical browser are treated as one.
+
+/** Do these two accounts look like the same person? */
+export async function sameActor(userA: string, userB: string): Promise<string | null> {
+  if (!userA || !userB) return null;
+  const d1 = getD1();
+  for (const column of ["device_id", "fingerprint", "ip_prefix"] as const) {
+    const row = await d1
+      .prepare(
+        `SELECT a.${column} AS shared FROM signup_signals a
+           JOIN signup_signals b ON b.${column} = a.${column}
+          WHERE a.user_id = ? AND b.user_id = ? AND a.${column} IS NOT NULL AND a.${column} != ''
+          LIMIT 1`
+      )
+      .bind(userA, userB)
+      .first<{ shared: string }>();
+    if (row) return column === "device_id" ? "same device" : column === "fingerprint" ? "same browser" : "same network";
+  }
+  return null;
+}
+
+/** Accounts that are suspended, or whose own sign-up was flagged, earn nothing. */
+export async function rewardsAllowed(userId: string): Promise<{ ok: boolean; reason?: string }> {
+  const d1 = getD1();
+  const user = await d1
+    .prepare(`SELECT COALESCE(suspended,0) suspended FROM users WHERE id = ?`)
+    .bind(userId)
+    .first<{ suspended: number }>();
+  if (Number(user?.suspended) === 1) return { ok: false, reason: "account suspended" };
+
+  const flagged = await d1
+    .prepare(`SELECT risk_score FROM signup_signals WHERE user_id = ? AND event = 'register' ORDER BY created_at LIMIT 1`)
+    .bind(userId)
+    .first<{ risk_score: number }>();
+  if (Number(flagged?.risk_score || 0) >= 80) return { ok: false, reason: "sign-up flagged as a duplicate account" };
+
+  return { ok: true };
+}

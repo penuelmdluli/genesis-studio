@@ -44,6 +44,7 @@ import {
   Clapperboard,
   Gift,
   Smartphone,
+  Package,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -77,6 +78,7 @@ const baseNavItems: NavItem[] = [
   { href: "/generate", label: "Generate", icon: Sparkles, section: "Create" },
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
+  { href: "/action-figure", label: "AI Action Figure", icon: Package, section: "Create", badge: "NEW" },
   { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "NEW" },
   { href: "/react-studio", label: "React Studio", icon: Users, section: "Create" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create" },

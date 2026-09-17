@@ -44,6 +44,10 @@ export const FEATURE_REQUIREMENTS: Record<string, Requirement> = {
   "/images": { kind: "wavespeed" },           // flux-dev (was mislabelled fal)
   "/ai-singer": { kind: "wavespeed" },        // ace-step-1.5 + infinitetalk-fast
   "/tools": { kind: "wavespeed" },            // creator tools registry
+  // nano-banana-pro/edit for the boxed figure, wan-2.2 i2v for the shots.
+  // The voice and the caption burn are ours, so WaveSpeed is the only
+  // outside thing it needs.
+  "/action-figure": { kind: "wavespeed" },
 
   // Still FAL-only: lib/video-pipeline.ts calls fal.subscribe for audio,
   // loudnorm and compose. Hidden from the menu until moved.

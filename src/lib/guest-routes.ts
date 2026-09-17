@@ -17,6 +17,7 @@ export const GUEST_BROWSABLE_PATHS = new Set([
   "/tools",
   "/motion-control",
   "/talking-avatar",
+  "/action-figure",
   "/music-video",
   "/product-ads",
   "/voiceover",

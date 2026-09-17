@@ -45,6 +45,7 @@ import {
   Gift,
   Smartphone,
   Package,
+  Heart,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -79,6 +80,10 @@ const baseNavItems: NavItem[] = [
   { href: "/motion-control", label: "Motion Control", icon: Move, section: "Create", badge: "HOT" },
   { href: "/talking-avatar", label: "AI Avatar", icon: MessageCircle, section: "Create" },
   { href: "/action-figure", label: "AI Action Figure", icon: Package, section: "Create", badge: "NEW" },
+  // An occasion, not a daily filter: two photos, an invented child, and a
+  // short film of their day. Badged PREMIUM rather than NEW because what it
+  // costs is the first thing someone should know about it.
+  { href: "/face-blend", label: "Our Child's First Day", icon: Heart, section: "Create", badge: "PREMIUM" },
   { href: "/ai-singer", label: "AI Singer", icon: Music, section: "Create", badge: "NEW" },
   { href: "/react-studio", label: "React Studio", icon: Users, section: "Create" },
   { href: "/brain", label: "Brain Studio", icon: Brain, section: "Create" },

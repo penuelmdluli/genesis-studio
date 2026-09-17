@@ -38,15 +38,17 @@ export async function GET(
 
     // If job is still queued/processing and has a job ID, poll for updates
     // AI Singer jobs are polled by /api/cron/check-singer — just return current state
-    // AI Action Figure jobs carry "af:<join>|<videoId>" here: that points at a
-    // join running on our own video service, not at a model provider, so
-    // polling one below would look up a request id no provider has heard of.
-    // They are finished by /api/action-figure/[jobId].
+    // AI Action Figure jobs carry "af:<join>|<videoId>" here, and child
+    // montages carry "cm:<join>|<videoId>": both point at a join running on
+    // our own video service, not at a model provider, so polling one below
+    // would look up a request id no provider has heard of. They are finished
+    // by /api/action-figure/[jobId] and /api/child-montage/[jobId].
     if (
       (job.status === "queued" || job.status === "processing") &&
       job.runpod_job_id &&
       job.model_id !== "ai-singer" &&
-      !job.runpod_job_id.startsWith("af:")
+      !job.runpod_job_id.startsWith("af:") &&
+      !job.runpod_job_id.startsWith("cm:")
     ) {
       // Determine provider for this model
       const modelConfig = AI_MODELS[job.model_id as ModelId];

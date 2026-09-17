@@ -48,6 +48,10 @@ export const FEATURE_REQUIREMENTS: Record<string, Requirement> = {
   // The voice and the caption burn are ours, so WaveSpeed is the only
   // outside thing it needs.
   "/action-figure": { kind: "wavespeed" },
+  // nano-banana-pro/edit for the child's face, wan-2.2 i2v for the three
+  // montage scenes, and the score model for the music under them. The join is
+  // our own video service, so WaveSpeed is the only outside thing it needs.
+  "/face-blend": { kind: "wavespeed" },
 
   // Still FAL-only: lib/video-pipeline.ts calls fal.subscribe for audio,
   // loudnorm and compose. Hidden from the menu until moved.

@@ -24,6 +24,7 @@ export const LAUNCH_VISIBLE_ROUTES: Record<string, boolean> = {
   "/api-keys": true,
   "/tools": true,
   "/action-figure": true,
+  "/face-blend": true,
   // Hidden — these still depend on a provider we cannot run right now
   // (lib/video-pipeline.ts on FAL). The code stays; the menu does not
   // advertise what cannot be delivered.

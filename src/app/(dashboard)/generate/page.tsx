@@ -180,11 +180,36 @@ export default function GeneratePage() {
 
   const resolutionSource = isReel ? REEL_RESOLUTIONS : RESOLUTIONS;
   const durationSource = isReel ? REEL_DURATIONS : DURATIONS;
+  // Only the lengths THIS model will accept.
+  //
+  // Resolutions were already filtered per model; durations were not, so the
+  // picker offered 3, 5, 6, 8 and 10 seconds to every model while wan-2.2
+  // takes 5 or 8. A customer on 2026-09-18 chose one of the others, was
+  // refused by the server ("Wan 2.2 (A14B) supports 5 or 8 second clips"),
+  // and abandoned a R185 checkout minutes later. Nothing was charged - the
+  // check runs before credits - but the customer met an error the site could
+  // have avoided offering.
+  const availableDurations = durationSource.filter((d) => {
+    if (currentModel?.supportedDurations?.length) return currentModel.supportedDurations.includes(d);
+    return !currentModel?.maxDuration || d <= currentModel.maxDuration;
+  });
   const availableResolutions = resolutionSource.filter((r) => {
     const modelMaxRes = currentModel?.maxResolution;
     const resOrder = ["480p", "720p", "1080p", "4k"];
     return resOrder.indexOf(r.value) <= resOrder.indexOf(modelMaxRes || "720p");
   });
+
+  // A length the new model cannot take must not survive a model change: the
+  // picker would keep showing "10s" while the model accepts 5 or 8, and the
+  // request would only be refused after the customer pressed Generate.
+  useEffect(() => {
+    if (availableDurations.length && !availableDurations.includes(form.duration)) {
+      const nearest = availableDurations.reduce((best, d) =>
+        Math.abs(d - form.duration) < Math.abs(best - form.duration) ? d : best);
+      setFormField("duration", nearest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelId, isReel, availableDurations.join(",")]);
 
   const filteredAudioTracks = BUILT_IN_AUDIO_TRACKS.filter(
     (t) => audioGenreFilter === "All" || t.genre === audioGenreFilter
@@ -827,7 +852,8 @@ export default function GeneratePage() {
                   <Select
                     value={form.duration.toString()}
                     onChange={(v) => setFormField("duration", parseInt(v))}
-                    options={durationSource.map((d) => ({ value: String(d), label: `${d}s` }))}
+                    options={(availableDurations.length ? availableDurations : durationSource)
+                      .map((d) => ({ value: String(d), label: `${d}s` }))}
                   />
                 </div>
                 <div>

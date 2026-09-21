@@ -7,11 +7,13 @@ import { useStore } from "@/hooks/use-store";
 import { CREDIT_PACKS } from "@/lib/constants";
 import { Zap, ArrowRight, Crown, Check } from "lucide-react";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
+import { trackEvent } from "@/lib/analytics-events";
 
 export function CreditPurchaseModal() {
   const router = useRouter();
   const { user, creditPurchaseOpen, setCreditPurchaseOpen } = useStore();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const packs = CREDIT_PACKS.map((pack, i) => ({
     ...pack,
@@ -23,6 +25,17 @@ export function CreditPurchaseModal() {
       "Best value",
   }));
 
+  // A checkout that cannot start MUST say so.
+  //
+  // This used to read `if (data.url) window.location.href = data.url` and
+  // nothing else: when the server answered with an error - payments briefly
+  // unavailable, no ZAR price on a pack, a provider misconfigured - the
+  // customer got no message, no redirect, and a button that span forever,
+  // because setLoading(null) only ran in the catch. From the outside that is
+  // indistinguishable from a broken site, and it is invisible from the inside:
+  // no event is recorded, so the funnel shows a customer who "never tried".
+  // Three checkouts went unpaid between 15 and 20 Sep 2026 with no trace of
+  // what the customer saw (2026-09-21).
   async function handleBuyPack(packId: string) {
     setLoading(packId);
     try {
@@ -31,11 +44,18 @@ export function CreditPurchaseModal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
-    } catch {
+      const reason = data.error || `Checkout did not start (${res.status})`;
+      setError(reason);
+      trackEvent("checkout_failed", { kind: "pack", product: packId, reason: String(reason).slice(0, 80) });
+    } catch (err) {
+      setError("Could not reach the payment page. Check your connection and try again.");
+      trackEvent("checkout_failed", { kind: "pack", product: packId, reason: "network" });
+    } finally {
       setLoading(null);
     }
   }
@@ -59,6 +79,16 @@ export function CreditPurchaseModal() {
           </p>
         )}
       </div>
+
+      {/* A checkout that cannot start says why, right where the customer tapped. */}
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+          <div className="mt-1 text-xs text-red-300/80">
+            Nothing has been charged. Email support@ivideostudio.ai and we will sort it out.
+          </div>
+        </div>
+      )}
 
       {/* Credit Packs */}
       <div className="space-y-2.5">

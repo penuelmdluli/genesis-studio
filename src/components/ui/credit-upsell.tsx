@@ -17,6 +17,7 @@ interface CreditUpsellProps {
 export function CreditUpsell({ variant = "inline", context = "low-credits", onDismiss }: CreditUpsellProps) {
   const { user } = useStore();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!user || user.isOwner) return null;
 
@@ -36,12 +37,16 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+      // Silence here was the bug: the customer saw a spinner stop and nothing
+      // else, and nothing was recorded either (2026-09-21).
+      setError(data.error || "Checkout could not start. Please try again.");
     } catch {
-      // Error handled silently
+      setError("Could not reach the payment page. Check your connection and try again.");
     } finally {
       setLoading(null);
     }
@@ -56,12 +61,16 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId: targetPlan }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+      // Silence here was the bug: the customer saw a spinner stop and nothing
+      // else, and nothing was recorded either (2026-09-21).
+      setError(data.error || "Checkout could not start. Please try again.");
     } catch {
-      // Error handled silently
+      setError("Could not reach the payment page. Check your connection and try again.");
     } finally {
       setLoading(null);
     }
@@ -71,6 +80,9 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
   if (variant === "banner") {
     return (
       <div className="relative bg-gradient-to-r from-violet-500/10 via-cyan-500/5 to-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3 mb-4">
+        {error && (
+          <p className="mb-2 text-xs text-red-300">{error} Nothing has been charged.</p>
+        )}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
@@ -114,6 +126,11 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
     return (
       <Card className="border-violet-500/20 bg-gradient-to-br from-violet-500/[0.04] to-transparent overflow-hidden">
         <CardContent className="p-5">
+          {error && (
+            <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              {error} Nothing has been charged.
+            </p>
+          )}
           <div className="flex items-center gap-2 mb-4">
             <Gift className="w-5 h-5 text-violet-400" />
             <h3 className="text-sm font-semibold text-zinc-200">

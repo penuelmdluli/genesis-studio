@@ -88,6 +88,54 @@ export function normalizeSourceUrl(raw: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+/**
+ * Turn a Facebook share link into the canonical reel/video URL.
+ *
+ * facebook.com/share/r/<id> is what the Facebook app's share sheet produces,
+ * and it is what a person actually pastes. yt-dlp cannot resolve it — every
+ * lead added that way failed with "yt-dlp failed" on --dump-json, three
+ * attempts each, silently.
+ *
+ * The link is a plain 302 to /reel/<numeric id>, but Facebook only serves that
+ * redirect to crawler user agents: a desktop Chrome UA gets a bare 400, which
+ * is why following it the obvious way looked like a dead link. Identifying
+ * honestly as a crawler is what makes it work, and it is a public share link
+ * either way.
+ *
+ * Returns the original URL unchanged on any failure — a lead that cannot be
+ * resolved should still be saved and retried, never dropped.
+ */
+export async function resolveShareUrl(url: string): Promise<string> {
+  if (!/facebook\.com\/share\//i.test(url)) return url;
+
+  try {
+    const res = await fetch(url, {
+      redirect: "manual",
+      headers: { "User-Agent": "facebookexternalhit/1.1" },
+    });
+
+    const location = res.headers.get("location");
+    if (!location) return url;
+
+    // The redirect carries share-tracking params (s, fs, rdid, share_url).
+    // Strip them: they are per-share noise, and keeping them would defeat the
+    // dedupe that stops the same reel being downloaded twice.
+    const canonical = new URL(location, url);
+    canonical.search = "";
+
+    // Only accept a real video permalink. Facebook sends login walls and
+    // interstitials through the same header, and storing one of those would
+    // replace a retryable link with a permanently broken one.
+    if (!/\/(reel|videos|watch)\//i.test(canonical.pathname)) return url;
+
+    console.log(`[Leads] Resolved share link ${url} -> ${canonical.toString()}`);
+    return canonical.toString();
+  } catch (err) {
+    console.warn(`[Leads] Could not resolve share link ${url}:`, err);
+    return url;
+  }
+}
+
 export function detectPlatform(url: string): string {
   const u = url.toLowerCase();
   if (u.includes("facebook.com") || u.includes("fb.watch") || u.includes("fb.me")) return "facebook";
@@ -199,7 +247,8 @@ export async function addLead(params: {
   notes?: string;
   tags?: string[];
 }): Promise<{ lead: LeadVideo; alreadyExisted: boolean }> {
-  const sourceUrl = normalizeSourceUrl(params.url);
+  // Resolve before normalising so dedupe compares canonical URLs.
+  const sourceUrl = normalizeSourceUrl(await resolveShareUrl(params.url.trim()));
   const db = getDb();
 
   const { data: existing } = await db
@@ -308,6 +357,13 @@ export async function fetchLead(leadId: string, userId: string): Promise<LeadVid
 
 async function downloadLead(lead: LeadVideo, userId: string): Promise<FetchedLead> {
   const targetKey = `lead-videos/${userId}/${lead.id}.mp4`;
+
+  // Leads saved before share-link resolution existed still hold the /share/
+  // form, so resolve here too rather than leaving them permanently broken.
+  const sourceUrl = await resolveShareUrl(lead.sourceUrl);
+  if (sourceUrl !== lead.sourceUrl) {
+    lead = { ...lead, sourceUrl };
+  }
 
   // Metadata is a separate, cheap yt-dlp call and the only source of a title,
   // but a lead is still worth saving without one — a failure here must not

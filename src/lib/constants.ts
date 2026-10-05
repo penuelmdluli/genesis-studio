@@ -320,7 +320,15 @@ export const PLANS: Plan[] = [
 ];
 
 // --- Credit Packs ---
+// The starter pack exists because the first purchase was the wall: the
+// cheapest thing on sale was R185, and 43 people ran out of free credits
+// after a video they liked without one of them paying (2026-10-05 audit).
+// R49 buys about four standard videos. It costs more per credit than the
+// bigger packs on purpose, so the ladder still rewards buying more.
+export const STARTER_PACK_ID = "pack-starter";
+
 export const CREDIT_PACKS: CreditPack[] = [
+  { id: STARTER_PACK_ID, credits: 120, price: 3, priceZAR: 49 },
   { id: "pack-500", credits: 500, price: 10, priceZAR: 185 },
   { id: "pack-2000", credits: 2000, price: 35, priceZAR: 650 },
   { id: "pack-10000", credits: 10000, price: 130, priceZAR: 2400 },

@@ -663,6 +663,53 @@ export function inviteFriendsUpdate(appUrl: string, invite: { shareUrl: string; 
   };
 }
 
+/**
+ * For people who made a video, liked it enough to use up their free credits,
+ * and stopped there. The cheapest way to keep going was R185; now it is R49.
+ * Audience: see AUDIENCES in /api/admin/broadcast.
+ */
+export function starterOfferUpdate(appUrl: string): ProductUpdate {
+  const topup = `${appUrl}/generate?topup=1&src=email-starter`;
+  return {
+    subject: "Keep creating: 120 credits for R49",
+    preheader: "You used up your free credits. The new starter pack is R49, one payment, no subscription.",
+    headline: "Your next videos are R49 away",
+    intro:
+      "you made a video with your free credits and used them all. A lot of you told us R185 was too big a first step, so there is now a starter pack: 120 credits for R49. That's about four more videos. You pay once, there's no subscription, and the credits never expire.",
+    items: [
+      { icon: "⚡", title: "120 credits for R49", text: "About four standard videos, or a mix of videos, voiceovers and thumbnails.", href: topup },
+      { icon: "💳", title: "Pay the way you like", text: "Card, Instant EFT, SnapScan or Zapper through PayFast's secure South African checkout.", href: topup },
+      { icon: "↩️", title: "Only charged when it works", text: "If a video fails, the credits go straight back to you, every time.", href: `${appUrl}/generate` },
+    ],
+    ctaLabel: "Get 120 credits for R49",
+    ctaHref: topup,
+    outro: "Questions, or paying from outside South Africa? Just reply to this email and we'll help.",
+  };
+}
+
+/**
+ * For people whose every attempt failed (mostly the old GPU outage). Their
+ * credits were refunded, so this is an apology and an invitation, not a grant.
+ */
+export function weFixedItUpdate(appUrl: string): ProductUpdate {
+  const go = `${appUrl}/generate?src=email-fixed`;
+  return {
+    subject: "Sorry, your video didn't work. It does now",
+    preheader: "We fixed what broke. Your free credits are still in your account.",
+    headline: "We fixed it, and your credits are still there",
+    intro:
+      "when you tried iVideo Studio, your video failed. That was our fault, not yours: a video server we relied on went down. We've moved everything to a new setup, and in the last two weeks every video has finished. You were never charged, and your free credits are still in your account.",
+    items: [
+      { icon: "🎬", title: "Try the same idea again", text: "Type what you want to see, or upload a photo to bring it to life. Most videos are ready in 1 to 3 minutes.", href: go },
+      { icon: "🕺", title: "Or start with a dance or a cartoon", text: "Motion Control makes anyone dance, and the 3D cartoon style is our most popular.", href: `${appUrl}/motion-control?src=email-fixed` },
+      { icon: "↩️", title: "Only charged when it works", text: "If a video ever fails, the credits come straight back automatically.", href: go },
+    ],
+    ctaLabel: "Make my video",
+    ctaHref: go,
+    outro: "If anything goes wrong again, reply to this email. It comes straight to us and we'll fix it.",
+  };
+}
+
 /** Tell an inviter a friend joined (and celebrate a reward when one is earned). */
 export async function sendInviteCelebrationEmail(opts: {
   email: string;

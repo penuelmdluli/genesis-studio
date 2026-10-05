@@ -19,6 +19,7 @@ import { AdsConversions } from "@/components/ads-conversions";
 import { Celebrations } from "@/components/celebrations";
 import { Suspense } from "react";
 import { isGuestBrowsable } from "@/lib/guest-routes";
+import { trackEvent } from "@/lib/analytics-events";
 
 function mapVideo(v: Record<string, unknown>) {
   return {
@@ -81,7 +82,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification, setInitialized, setGuest } = useStore();
+  const { sidebarOpen, setUser, setVideos, setActiveJobs, updateJob, addVideo, addNotification, setInitialized, setGuest, setCreditPurchaseOpen } = useStore();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completedJobsRef = useRef<Set<string>>(new Set());
 
@@ -185,13 +186,27 @@ export default function DashboardLayout({
             setInitialized(true);
             return;
           }
-          window.location.href = "/sign-in?expired=1";
+          // Come back to the same place after signing in, so a link from an
+          // email (e.g. /generate?topup=1) still lands where it pointed.
+          const back = window.location.pathname + window.location.search;
+          window.location.href = `/sign-in?expired=1&redirect_url=${encodeURIComponent(back)}`;
           return;
         }
 
         if (userRes.ok) {
           const userData = await userRes.json();
           setUser(userData);
+          // ?topup=1 (from an email or an ad) lands on the top-up sheet
+          // already open: one tap from the inbox to the payment page.
+          const qs = new URLSearchParams(window.location.search);
+          if (qs.get("topup") === "1") {
+            trackEvent("topup_deeplink", { src: (qs.get("src") || "unknown").slice(0, 40) });
+            setCreditPurchaseOpen(true);
+            qs.delete("topup");
+            qs.delete("src");
+            const rest = qs.toString();
+            window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
+          }
         }
         if (videosRes.ok) {
           const videosData = await videosRes.json();

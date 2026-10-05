@@ -8,7 +8,10 @@ import { InAppGoogleNotice, useInAppBrowser } from "@/components/auth/in-app-goo
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirect_url") || "/dashboard";
+  // Same-site paths only: an absolute or protocol-relative URL here would turn
+  // the sign-in page into an open redirect.
+  const rawRedirect = searchParams.get("redirect_url") || "";
+  const redirectUrl = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/dashboard";
   // Set by the link in the confirmation email.
   const verified = searchParams.get("verified");
   const VERIFIED_MESSAGE: Record<string, string> = {
@@ -55,7 +58,9 @@ export function SignInForm() {
   const inApp = useInAppBrowser();
 
   const handleGoogleSignIn = () => {
-    window.location.href = "/api/auth/google/authorize";
+    window.location.href = redirectUrl !== "/dashboard"
+      ? `/api/auth/google/authorize?next=${encodeURIComponent(redirectUrl)}`
+      : "/api/auth/google/authorize";
   };
 
   return (

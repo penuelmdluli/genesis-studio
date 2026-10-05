@@ -1,23 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/hooks/use-store";
-import { CREDIT_PACKS, UPSELL_THRESHOLDS } from "@/lib/constants";
+import { CREDIT_PACKS, STARTER_PACK_ID, UPSELL_THRESHOLDS } from "@/lib/constants";
+import { usePaymentInfo, packPriceLabel } from "@/hooks/use-payment-info";
+import { trackEvent } from "@/lib/analytics-events";
 import { Zap, ArrowRight, Gift, X, TrendingUp } from "lucide-react";
 
 interface CreditUpsellProps {
   variant?: "inline" | "banner" | "modal";
-  context?: "low-credits" | "out-of-credits" | "post-generation" | "upgrade";
+  /** "insufficient": the thing they want costs more than they have. Always shown. */
+  context?: "low-credits" | "out-of-credits" | "insufficient" | "post-generation" | "upgrade";
+  /** Credits short for the current job, for the "insufficient" message. */
+  shortfall?: number;
   onDismiss?: () => void;
 }
 
-export function CreditUpsell({ variant = "inline", context = "low-credits", onDismiss }: CreditUpsellProps) {
+export function CreditUpsell({ variant = "inline", context = "low-credits", shortfall, onDismiss }: CreditUpsellProps) {
   const { user } = useStore();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const payInfo = usePaymentInfo();
+
+  // Record each time a free user is actually shown a way to pay, once per
+  // mount, so the funnel can compare "saw an offer" with "tapped it".
+  const visible =
+    !!user && !user.isOwner &&
+    !(context === "low-credits" && user.creditBalance > UPSELL_THRESHOLDS.lowCreditWarning) &&
+    !(context === "out-of-credits" && user.creditBalance > 0);
+  useEffect(() => {
+    if (visible) trackEvent("upsell_shown", { context, variant, balance: user?.creditBalance ?? -1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, context]);
 
   if (!user || user.isOwner) return null;
 
@@ -31,6 +48,8 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
 
   const handleBuyPack = async (packId: string) => {
     setLoading(packId);
+    trackEvent("topup_pack_clicked", { product: packId, balance: user.creditBalance, source: `upsell_${variant}` });
+    trackEvent("checkout_started", { kind: "pack", product: packId, currency: "ZAR", source: `upsell_${variant}` });
     try {
       const res = await fetch("/api/credits/buy-pack", {
         method: "POST",
@@ -45,12 +64,17 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
       // Silence here was the bug: the customer saw a spinner stop and nothing
       // else, and nothing was recorded either (2026-09-21).
       setError(data.error || "Checkout could not start. Please try again.");
+      trackEvent("checkout_failed", { kind: "pack", product: packId, reason: String(data.error || res.status).slice(0, 80) });
     } catch {
       setError("Could not reach the payment page. Check your connection and try again.");
+      trackEvent("checkout_failed", { kind: "pack", product: packId, reason: "network" });
     } finally {
       setLoading(null);
     }
   };
+
+  const starter = CREDIT_PACKS.find((p) => p.id === STARTER_PACK_ID)!;
+  const starterPrice = packPriceLabel(starter, payInfo).main;
 
   const handleUpgrade = async () => {
     setLoading("upgrade");
@@ -83,32 +107,35 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
         {error && (
           <p className="mb-2 text-xs text-red-300">{error} Nothing has been charged.</p>
         )}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
               <Zap className="w-4 h-4 text-violet-400" />
             </div>
             <div className="min-w-0">
               <p className="text-sm text-zinc-300">
-                {isEmpty
-                  ? "You're out of credits!"
-                  : `Only ${balance} credits remaining`}
+                {context === "insufficient" && shortfall
+                  ? `You need ${shortfall} more credits for this`
+                  : isEmpty
+                    ? "You're out of credits!"
+                    : `Only ${balance} credits remaining`}
               </p>
               <p className="text-xs text-zinc-400 mt-0.5">
-                {isEmpty
-                  ? "Buy a credit pack to keep generating"
+                {isEmpty || context === "insufficient"
+                  ? "Top up to keep generating"
                   : "Top up now to avoid interruptions"}
+                {" · "}One-time payment, no subscription
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
               size="sm"
-              onClick={() => handleBuyPack("pack-500")}
+              onClick={() => handleBuyPack(STARTER_PACK_ID)}
               disabled={!!loading}
               className="bg-violet-600 hover:bg-violet-500 text-white text-xs"
             >
-              {loading === "pack-500" ? "..." : "Buy 500 Credits — $12"}
+              {loading === STARTER_PACK_ID ? "..." : `${starter.credits} credits — ${starterPrice}`}
             </Button>
             {onDismiss && (
               <button onClick={onDismiss} className="p-1 text-zinc-400 hover:text-zinc-400">
@@ -157,7 +184,7 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CREDIT_PACKS.map((pack) => (
                 <button
                   key={pack.id}
@@ -170,10 +197,10 @@ export function CreditUpsell({ variant = "inline", context = "low-credits", onDi
                   </div>
                   <div className="text-xs text-zinc-400 mt-0.5">credits</div>
                   <div className="text-sm font-semibold text-violet-400 mt-2">
-                    ${pack.price}
+                    {packPriceLabel(pack, payInfo).main}
                   </div>
                   <div className="text-[10px] text-zinc-400 mt-0.5">
-                    ${(pack.price / pack.credits * 100).toFixed(1)}c each
+                    {pack.id === STARTER_PACK_ID ? "Start here" : `About ${Math.floor(pack.credits / 30)} videos`}
                   </div>
                 </button>
               ))}

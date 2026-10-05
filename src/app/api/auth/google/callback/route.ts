@@ -81,12 +81,17 @@ export async function GET(req: NextRequest) {
       name: (user.name as string) || profile.name,
     });
 
+    // A returning user who started from a deep link goes back to it (set by
+    // /api/auth/google/authorize, same-site paths only).
+    const next = req.cookies.get("ivs_next")?.value;
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
     const redirectUrl = isNewUser
       ? `${appUrl}/onboarding/first-video`
-      : `${appUrl}/dashboard`;
+      : `${appUrl}${safeNext || "/dashboard"}`;
 
     const response = NextResponse.redirect(redirectUrl);
     response.headers.set("Set-Cookie", buildSessionCookie(token));
+    if (next) response.headers.append("Set-Cookie", "ivs_next=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
 
     return response;
   } catch (err) {

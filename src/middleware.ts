@@ -94,7 +94,9 @@ function handler(req: NextRequest) {
     const token = req.cookies.get(SESSION_COOKIE)?.value;
     if (!token) {
       const signInUrl = new URL("/sign-in", req.url);
-      signInUrl.searchParams.set("redirect_url", pathname);
+      // Keep the query too: email links like /generate?topup=1 must still
+      // open the top-up sheet once the person has signed in.
+      signInUrl.searchParams.set("redirect_url", pathname + req.nextUrl.search);
       return NextResponse.redirect(signInUrl);
     }
     // Authenticated page — never edge-cache

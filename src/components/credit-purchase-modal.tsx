@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useStore } from "@/hooks/use-store";
-import { CREDIT_PACKS } from "@/lib/constants";
+import { CREDIT_PACKS, STARTER_PACK_ID } from "@/lib/constants";
+import { usePaymentInfo, packPriceLabel } from "@/hooks/use-payment-info";
 import { Zap, ArrowRight, Crown, Check } from "lucide-react";
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { trackEvent } from "@/lib/analytics-events";
@@ -15,15 +16,45 @@ export function CreditPurchaseModal() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const packs = CREDIT_PACKS.map((pack, i) => ({
+  const payInfo = usePaymentInfo();
+
+  // Someone on free credits is deciding whether to pay at all, so the cheap
+  // way in leads. Someone who already pays is topping up, so value leads.
+  const firstPurchase = !user || user.plan === "free";
+  const highlightId = firstPurchase ? STARTER_PACK_ID : "pack-2000";
+  const packs = CREDIT_PACKS.map((pack) => ({
     ...pack,
-    popular: i === 1,
-    perCredit: (pack.price / pack.credits * 100).toFixed(1),
+    popular: pack.id === highlightId,
+    label: packPriceLabel(pack, payInfo),
+    perCredit: pack.priceZAR ? `${((pack.priceZAR / pack.credits) * 100).toFixed(0)}c per credit` : "",
+    videos: Math.floor(pack.credits / 30),
     savings:
-      i === 0 ? null :
-      i === 1 ? "Save 17%" :
+      pack.id === STARTER_PACK_ID ? null :
+      pack.id === "pack-500" ? "Save 9%" :
+      pack.id === "pack-2000" ? "Save 20%" :
       "Best value",
   }));
+
+  // The funnel: did the sheet appear, which pack did they tap, or did they
+  // close it. Before this, "ran out of credits" and "left" looked identical.
+  const shownAt = useRef<number | null>(null);
+  const clicked = useRef(false);
+  useEffect(() => {
+    if (creditPurchaseOpen) {
+      shownAt.current = Date.now();
+      clicked.current = false;
+      trackEvent("topup_shown", { balance: user?.creditBalance ?? -1, plan: user?.plan || "anon", country: payInfo.country || "?" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creditPurchaseOpen]);
+
+  function close() {
+    if (!clicked.current && shownAt.current) {
+      trackEvent("topup_dismissed", { seconds: Math.round((Date.now() - shownAt.current) / 1000), balance: user?.creditBalance ?? -1 });
+    }
+    shownAt.current = null;
+    setCreditPurchaseOpen(false);
+  }
 
   // A checkout that cannot start MUST say so.
   //
@@ -38,6 +69,9 @@ export function CreditPurchaseModal() {
   // what the customer saw (2026-09-21).
   async function handleBuyPack(packId: string) {
     setLoading(packId);
+    clicked.current = true;
+    trackEvent("topup_pack_clicked", { product: packId, balance: user?.creditBalance ?? -1 });
+    trackEvent("checkout_started", { kind: "pack", product: packId, currency: "ZAR", source: "topup_sheet" });
     try {
       const res = await fetch("/api/credits/buy-pack", {
         method: "POST",
@@ -63,7 +97,7 @@ export function CreditPurchaseModal() {
   return (
     <Modal
       open={creditPurchaseOpen}
-      onClose={() => setCreditPurchaseOpen(false)}
+      onClose={close}
       size="md"
     >
       {/* Header */}
@@ -72,7 +106,7 @@ export function CreditPurchaseModal() {
           <Zap className="w-7 h-7 text-white" />
         </div>
         <h2 className="text-xl font-bold text-white">Add Credits</h2>
-        <p className="text-sm text-zinc-400 mt-1">Credits never expire. Use them anytime.</p>
+        <p className="text-sm text-zinc-400 mt-1">One-time payment, no subscription. Credits never expire.</p>
         {user && (
           <p className="text-xs text-zinc-400 mt-2">
             Current balance: <span className="text-violet-400 font-semibold">{user.creditBalance.toLocaleString()}</span> credits
@@ -114,7 +148,7 @@ export function CreditPurchaseModal() {
                   {pack.credits.toLocaleString()} credits
                 </p>
                 <p className="text-[11px] text-zinc-400">
-                  {pack.perCredit}¢ per credit
+                  About {pack.videos.toLocaleString()} videos · {pack.perCredit}
                 </p>
               </div>
             </div>
@@ -125,7 +159,8 @@ export function CreditPurchaseModal() {
                 </span>
               )}
               <div className="text-right">
-                <p className="text-white font-bold">${pack.price}</p>
+                <p className="text-white font-bold">{pack.label.main}</p>
+                {pack.label.sub && <p className="text-[10px] text-zinc-400">{pack.label.sub}</p>}
               </div>
               {loading === pack.id ? (
                 <GenesisButtonLoader />
@@ -135,12 +170,20 @@ export function CreditPurchaseModal() {
             </div>
             {pack.popular && (
               <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-[10px] text-white font-bold tracking-wide shadow-lg">
-                POPULAR
+                {pack.id === STARTER_PACK_ID ? "START HERE" : "POPULAR"}
               </span>
             )}
           </button>
         ))}
       </div>
+
+      <p className="mt-3 text-center text-[11px] text-zinc-400">
+        {payInfo.isSA
+          ? "Pay with card, Instant EFT, SnapScan or Zapper via PayFast."
+          : payInfo.usdCheckout
+            ? "Pay by card in USD."
+            : "Charged in South African rand (ZAR). Your bank converts it to your currency."}
+      </p>
 
       {/* Plan Upgrade CTA */}
       {user && user.plan !== "studio" && (
@@ -156,7 +199,9 @@ export function CreditPurchaseModal() {
               </p>
               <button
                 onClick={() => {
-                  setCreditPurchaseOpen(false);
+                  clicked.current = true;
+                  trackEvent("topup_view_plans", { balance: user?.creditBalance ?? -1 });
+                  close();
                   router.push("/pricing");
                 }}
                 className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"

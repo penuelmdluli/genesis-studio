@@ -1193,11 +1193,20 @@ export default function GeneratePage() {
                     </p>
                   )}
 
+                  {/* The wall, and the cheapest way over it, in one place. This
+                      was a line of small red text; 43 people reached it and
+                      none bought (2026-10-05). */}
                   {!isLoading && !hasEnoughCredits && !error && (
-                    <p className="text-xs text-center text-red-400">
-                      You need {creditCost - (user?.creditBalance ?? 0)} more credits.{" "}
-                      <button onClick={() => setCreditPurchaseOpen(true)} className="underline hover:text-red-300 transition-colors">Buy credits</button>
-                    </p>
+                    <div className="mt-3">
+                      <CreditUpsell
+                        variant="banner"
+                        context="insufficient"
+                        shortfall={creditCost - (user?.creditBalance ?? 0)}
+                      />
+                      <button onClick={() => setCreditPurchaseOpen(true)} className="block mx-auto -mt-2 text-xs text-zinc-400 underline hover:text-zinc-300 transition-colors">
+                        See all packs
+                      </button>
+                    </div>
                   )}
                 </>
               ) : (
@@ -1213,7 +1222,7 @@ export default function GeneratePage() {
           </Card>
 
           {/* Credit Upsell */}
-          {upsellContext && (
+          {upsellContext && hasEnoughCredits && (
             <CreditUpsell variant="inline" context={upsellContext} />
           )}
         </div>

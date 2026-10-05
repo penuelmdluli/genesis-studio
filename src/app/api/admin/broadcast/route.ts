@@ -13,7 +13,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
 import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
-import { actionCartoonUpdate, androidBetaUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
+import { actionCartoonUpdate, androidBetaUpdate, inviteFriendsUpdate, newToolsUpdate, seriesStudioUpdate, starterOfferUpdate, weFixedItUpdate, sendProductUpdateEmail, type ProductUpdate } from "@/lib/email";
+import { getD1 } from "@/lib/d1";
+import { initCloudflareEnv } from "@/lib/cf-env";
 import { getOrCreateReferralCode, shareUrl, whatsappUrl } from "@/lib/referrals";
 import { unsubscribeUrl } from "@/lib/unsubscribe";
 import { betaWhatsappUrl } from "@/lib/android-beta";
@@ -43,7 +45,35 @@ const CAMPAIGNS: Record<string, Campaign> = {
   "2026-09-action-cartoon": (appUrl) => actionCartoonUpdate(appUrl),
   "2026-09-invite-friends": inviteFor,
   "2026-09-android-beta": (appUrl) => androidBetaUpdate(appUrl, betaWhatsappUrl(appUrl)),
+  "2026-10-starter-offer": (appUrl) => starterOfferUpdate(appUrl),
+  "2026-10-we-fixed-it": (appUrl) => weFixedItUpdate(appUrl),
 };
+
+// Campaigns meant for one group rather than everyone. The SQL returns the
+// ids of the users who should get it; anyone else is skipped. Suspended
+// accounts (credit farms) never qualify. Evaluated at send time, so someone
+// who buys between batches drops out of the offer.
+const AUDIENCES: Record<string, string> = {
+  // Made at least one video, then ran (nearly) dry on free credits.
+  "2026-10-starter-offer": `
+    SELECT u.id FROM users u
+    WHERE u.plan = 'free' AND COALESCE(u.suspended, 0) = 0 AND u.credit_balance < 30
+      AND EXISTS (SELECT 1 FROM generation_jobs g WHERE g.user_id = u.id AND g.status = 'completed')`,
+  // Every attempt failed, and the refunded credits are still there to use.
+  "2026-10-we-fixed-it": `
+    SELECT u.id FROM users u
+    WHERE COALESCE(u.suspended, 0) = 0 AND u.credit_balance >= 30
+      AND EXISTS (SELECT 1 FROM generation_jobs g WHERE g.user_id = u.id AND g.status = 'failed')
+      AND NOT EXISTS (SELECT 1 FROM generation_jobs g WHERE g.user_id = u.id AND g.status = 'completed')`,
+};
+
+async function audienceFor(campaign: string): Promise<Set<string> | null> {
+  const sql = AUDIENCES[campaign];
+  if (!sql) return null;
+  initCloudflareEnv();
+  const { results } = await getD1().prepare(sql).all<{ id: string }>();
+  return new Set((results || []).map((r) => r.id));
+}
 
 type CampaignId = string;
 
@@ -62,6 +92,7 @@ export async function POST(req: NextRequest) {
     to?: string;
     limit?: number;
     campaign?: string;
+    dryRun?: boolean;
   };
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
 
@@ -99,12 +130,22 @@ export async function POST(req: NextRequest) {
   const { data: optedOut } = await db.from("email_optouts").select("user_id");
   const out = new Set((optedOut || []).map((r: { user_id: string }) => r.user_id));
 
+  const audience = await audienceFor(CAMPAIGN_ID);
+
+  // Who would get it, without sending anything.
+  if (body.dryRun) {
+    const pool = (users || []).filter(
+      (u: { id: string; email: string | null }) => u.email && !done.has(u.id) && !out.has(u.id) && (!audience || audience.has(u.id))
+    );
+    return NextResponse.json({ campaign: CAMPAIGN_ID, dryRun: true, wouldSend: pool.length, alreadySent: done.size, optedOut: out.size });
+  }
+
   let sent = 0;
   let skipped = 0;
   const failures: string[] = [];
   for (const u of users || []) {
     if (sent >= limit) break;
-    if (!u.email || done.has(u.id) || out.has(u.id)) {
+    if (!u.email || done.has(u.id) || out.has(u.id) || (audience && !audience.has(u.id))) {
       skipped++;
       continue;
     }
@@ -131,7 +172,9 @@ export async function POST(req: NextRequest) {
   // How many are still owed this campaign, so the caller knows to run again.
   const { data: allWithEmail } = await db.from("users").select("id").not("email", "is", null);
   const { data: sentRows } = await db.from("email_sends").select("user_id").eq("campaign", CAMPAIGN_ID);
-  const remaining = Math.max(0, (allWithEmail?.length || 0) - (sentRows?.length || 0) - out.size);
+  const remaining = audience
+    ? [...audience].filter((id) => !out.has(id) && !(sentRows || []).some((r: { user_id: string }) => r.user_id === id)).length
+    : Math.max(0, (allWithEmail?.length || 0) - (sentRows?.length || 0) - out.size);
 
   return NextResponse.json({ campaign: CAMPAIGN_ID, sent, skipped, failures, remaining });
 }

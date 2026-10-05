@@ -27,7 +27,7 @@ export function LowCreditBanner() {
             <Zap className="w-3 h-3 text-red-400" />
           </div>
           <p className="text-xs text-red-300">
-            <span className="font-semibold">Out of credits.</span> Buy more to continue creating.
+            <span className="font-semibold">Out of credits.</span> Get 120 more for R49, one-time, no subscription.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -35,7 +35,7 @@ export function LowCreditBanner() {
             onClick={() => setCreditPurchaseOpen(true)}
             className="px-3 py-1 rounded-full bg-red-500 hover:bg-red-400 text-white text-xs font-medium transition-colors"
           >
-            Buy Credits
+            Top up
           </button>
           <button onClick={() => setDismissed(true)} className="text-red-400/50 hover:text-red-400 transition-colors">
             <X className="w-3.5 h-3.5" />

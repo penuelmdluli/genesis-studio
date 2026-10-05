@@ -98,6 +98,9 @@ export default function PricingPage() {
   // Which rails are live. PayFast (Instant EFT, SnapScan, Zapper) is only
   // offered once the server says its account is verified and enabled.
   const [methods, setMethods] = useState<string[]>(["yoco"]);
+  // Paystack is the only rail that bills dollars. Without it, a "USD" price is
+  // only an estimate and the card is charged in rands; the page must say so.
+  const [usdCheckout, setUsdCheckout] = useState(false);
   // PayFast is the default rail. Yoco is kept configured server-side but
   // not offered here for now (its checkout page carries another business's
   // trading name and card attempts were being declined account-side).
@@ -107,6 +110,10 @@ export default function PricingPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (Array.isArray(d?.providers) && d.providers.length) setMethods(d.providers);
+        setUsdCheckout(!!d?.usdCheckout);
+        // Visitors abroad see dollars first, so the number means something
+        // to them. South Africans (and unknown) keep rands.
+        if (d?.country && d.country !== "ZA" && d.country !== "XX") setCurrency("USD");
       })
       .catch(() => {});
   }, []);
@@ -210,6 +217,11 @@ export default function PricingPage() {
 
           {currency === "ZAR" && payfastAvailable && (
             <p className="text-xs text-zinc-500">Pay by card, Instant EFT, SnapScan, Zapper or Mobicred — secure South African checkout.</p>
+          )}
+          {currency === "USD" && !usdCheckout && (
+            <p className="text-xs text-zinc-400 max-w-md text-center">
+              Dollar prices are approximate. Your card is charged the rand (ZAR) price and your bank converts it — Visa and Mastercard from most countries work.
+            </p>
           )}
 
           <div className="flex items-center gap-3">
@@ -368,7 +380,7 @@ export default function PricingPage() {
           <h2 className="text-xl font-bold text-zinc-100 mb-2">Need more credits?</h2>
           <p className="text-sm text-zinc-400">One-time purchase. Never expire. Stack with your subscription.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
           {CREDIT_PACKS.map((pack) => (
             <Card key={pack.id} hover className="cursor-pointer">
               <CardContent className="p-5 text-center space-y-4">
@@ -383,7 +395,7 @@ export default function PricingPage() {
                   <div className="text-xl font-bold text-emerald-400">{formatPrice(pack.price, pack.priceZAR)}</div>
                   <div className="text-xs text-zinc-400 mt-0.5">
                     {currency === "ZAR" && pack.priceZAR
-                      ? `${(pack.priceZAR / pack.credits).toFixed(1)}c per credit`
+                      ? `${Math.round((pack.priceZAR / pack.credits) * 100)}c per credit · about ${Math.floor(pack.credits / 30)} videos`
                       : `${(pack.price / pack.credits * 100).toFixed(1)}\u00A2 per credit`}
                   </div>
                 </div>

@@ -97,8 +97,10 @@ describe("PLANS", () => {
 });
 
 describe("CREDIT_PACKS", () => {
-  it("has 3 packs", () => {
-    expect(CREDIT_PACKS).toHaveLength(3);
+  it("has 4 packs, starter first", () => {
+    expect(CREDIT_PACKS).toHaveLength(4);
+    expect(CREDIT_PACKS[0].id).toBe("pack-starter");
+    expect(CREDIT_PACKS[0].priceZAR).toBeLessThanOrEqual(49);
   });
 
   it("each pack has credits and price", () => {

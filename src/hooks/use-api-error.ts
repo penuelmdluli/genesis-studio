@@ -20,6 +20,7 @@
 import { useCallback } from "react";
 import { useStore } from "@/hooks/use-store";
 import { useToast } from "@/components/ui/toast";
+import { trackEvent } from "@/lib/analytics-events";
 
 export interface ApiErrorBody {
   error?: string;
@@ -49,6 +50,12 @@ export function useApiError() {
           ? `You need ${short.toLocaleString()} more credits for this.`
           : "You don't have enough credits for this.";
         toast(text, "error");
+        // The moment a free user becomes a possible buyer. Recorded so the
+        // funnel shows how many hit the wall, not just how many paid.
+        trackEvent("out_of_credits", {
+          required: needed ?? -1,
+          balance: data?.balance ?? -1,
+        });
         // The sheet is the answer to the problem, so open it rather than
         // asking them to find it.
         setCreditPurchaseOpen(true);

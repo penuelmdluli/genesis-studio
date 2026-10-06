@@ -28,6 +28,7 @@ import {
   Video,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
+import { ViralFormatsRow } from "@/components/viral-formats-row";
 
 // Every tool that actually works today, grouped by what the creator is
 // trying to do rather than by which model powers it. Anything still dark
@@ -396,6 +397,11 @@ export default function DashboardPage() {
           </div>
         </MotionSection>
       )}
+
+      {/* ====== TRENDING FORMATS ====== */}
+      <MotionSection>
+        <ViralFormatsRow onSelect={(f) => { window.location.href = `/generate?format=${f.id}`; }} />
+      </MotionSection>
 
       {/* ====== TRENDING NOW ====== */}
       {trends.length > 0 && (

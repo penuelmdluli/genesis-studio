@@ -10,6 +10,7 @@ import { GenesisLoader } from "@/components/ui/genesis-loader";
 import { PageTransition, MotionSection } from "@/components/ui/motion";
 import { getRandomPrompts, type SamplePrompt } from "@/lib/sample-prompts";
 import { Sparkles, ArrowRight, Play, RefreshCw, Brain, Film } from "lucide-react";
+import { ViralFormatsRow } from "@/components/viral-formats-row";
 
 const ONBOARDING_SKIP_KEY = "onboarding_skipped";
 const REFERRAL_PROCESSED_KEY = "referral_processed";
@@ -207,6 +208,15 @@ export default function FirstVideoPage() {
               </div>
             </div>
           </div>
+
+          {/* The fastest route to a video worth sharing: a trending format
+              plus their own photo. */}
+          <ViralFormatsRow
+            onSelect={(f) => {
+              document.cookie = `${ONBOARDING_SKIP_KEY}=true; max-age=${60 * 60 * 24 * 30}; path=/`;
+              router.push(`/generate?format=${f.id}`);
+            }}
+          />
 
           {/* Where things live. A new account otherwise has to guess what the
               sidebar words mean, so each one says what it is FOR. */}

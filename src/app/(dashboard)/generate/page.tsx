@@ -62,6 +62,8 @@ import {
 import { GenesisButtonLoader } from "@/components/ui/genesis-loader";
 import { GenerationProgress, useGenerationProgress } from "@/components/ui/generation-progress";
 import { TrendingBar } from "@/components/trending-bar";
+import { ViralFormatsRow } from "@/components/viral-formats-row";
+import { getViralFormat, modelForFormat, type ViralFormat } from "@/lib/viral-formats";
 
 const TYPE_OPTIONS: { value: GenerationType; label: string; icon: typeof Film; desc: string }[] = [
   { value: "t2v", label: "Text to Video", icon: Film, desc: "Generate from text prompt" },
@@ -177,6 +179,43 @@ export default function GeneratePage() {
 
   // "Ready to generate" — all required info is provided
   const isReadyToGenerate = form.prompt.trim().length >= 5 && (form.type !== "i2v" || !!form.inputImage);
+
+  // ── Trending formats: one tap sets up the whole video ──────────────────
+  const [activeFormat, setActiveFormat] = useState<ViralFormat | null>(null);
+  const uploadCardRef = useRef<HTMLDivElement | null>(null);
+  const applyFormat = useCallback((f: ViralFormat, source: string) => {
+    setActiveFormat(f);
+    setFormField("type", "i2v");
+    setFormField("videoFormat", "reel");
+    setFormField("aspectRatio", "portrait");
+    setFormField("prompt", f.prompt);
+    const m = modelForFormat(f, availableModels);
+    if (m) setFormField("modelId", m);
+    setFormField("duration", 5);
+    setModerationWarning(null);
+    trackEvent("format_selected", { format: f.id, source });
+    // The only thing left is their photo, so take them to it.
+    setTimeout(() => uploadCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setFormField, availableModels.join(",")]);
+
+  // ?format=<id> (from emails, ads, the dashboard) opens with it applied.
+  const formatParamApplied = useRef(false);
+  useEffect(() => {
+    if (formatParamApplied.current || !isInitialized) return;
+    const f = getViralFormat(searchParams.get("format"));
+    if (f) {
+      formatParamApplied.current = true;
+      applyFormat(f, "link");
+    }
+  }, [searchParams, isInitialized, applyFormat]);
+
+  // No photo? Switching to text keeps the format, with its no-photo wording.
+  useEffect(() => {
+    if (!activeFormat) return;
+    if (form.type === "t2v" && form.prompt === activeFormat.prompt) setFormField("prompt", activeFormat.promptNoPhoto);
+    if (form.type === "i2v" && form.prompt === activeFormat.promptNoPhoto) setFormField("prompt", activeFormat.prompt);
+  }, [form.type, form.prompt, activeFormat, setFormField]);
 
   const resolutionSource = isReel ? REEL_RESOLUTIONS : RESOLUTIONS;
   const durationSource = isReel ? REEL_DURATIONS : DURATIONS;
@@ -423,7 +462,7 @@ export default function GeneratePage() {
         progress.setProgress(60, "Generating on AI servers...");
         const estMin = Math.ceil((data.estimatedTime || 120) / 60);
         toast(`Video submitted! Est. ~${estMin} min. We'll notify you when it's ready.`, "success");
-        trackEvent("generate_submitted", { model: modelId, type: form.type, resolution: form.resolution, duration: form.duration, credits: creditCost });
+        trackEvent("generate_submitted", { model: modelId, type: form.type, resolution: form.resolution, duration: form.duration, credits: creditCost, format: activeFormat?.id || "none" });
       } else {
         setError(data.error || "Generation failed. Please try again.");
         toast(data.error || "Generation failed", "error");
@@ -451,6 +490,8 @@ export default function GeneratePage() {
           Create AI-generated {isReel ? "reels" : "videos"} from text, images, or other videos{isReel ? " — optimized for social media" : ""}.
         </p>
       </div>
+
+      <ViralFormatsRow activeId={activeFormat?.id} onSelect={(f) => applyFormat(f, "row")} />
 
       <TrendingBar onSelectTrend={(trend) => {
         setFormField("prompt", trend.prompt);
@@ -736,11 +777,16 @@ export default function GeneratePage() {
 
           {/* Image Upload (for I2V) */}
           {form.type === "i2v" && (
-            <Card>
+            <Card ref={uploadCardRef}>
               <CardContent className="p-4">
                 <label className="text-sm font-medium text-zinc-300 block mb-2">
-                  Input Image
+                  {activeFormat ? `Your photo for "${activeFormat.title}"` : "Input Image"}
                 </label>
+                {activeFormat && !inputImagePreview && (
+                  <p className="text-xs text-violet-300 mb-2">
+                    {activeFormat.emoji} {activeFormat.photoHint}. Everything else is set up. No photo? Switch to Text to Video above.
+                  </p>
+                )}
                 {inputImagePreview ? (
                   <div className="relative rounded-xl overflow-hidden border border-white/[0.10]">
                     <img

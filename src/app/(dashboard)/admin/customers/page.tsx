@@ -108,6 +108,7 @@ function when(iso: string | null | undefined): string {
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stages, setStages] = useState<Record<string, number>>({});
+  const [totals, setTotals] = useState<{ total: number; suspended: number; joined24h: number; joined7d: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -124,6 +125,9 @@ export default function CustomersPage() {
         const data = await res.json();
         setCustomers(data.customers || []);
         setStages(data.stages || {});
+        if (typeof data.total === "number") {
+          setTotals({ total: data.total, suspended: data.suspended || 0, joined24h: data.joined24h || 0, joined7d: data.joined7d || 0 });
+        }
       }
     } finally {
       setLoading(false);
@@ -174,7 +178,19 @@ export default function CustomersPage() {
         </Link>
         <Users className="w-6 h-6 text-violet-400" />
         <h1 className="text-2xl font-bold text-zinc-100">Customers</h1>
-        <span className="text-sm text-zinc-500">{customers.length} accounts</span>
+        <span className="text-sm text-zinc-400">
+          {totals ? (
+            <>
+              <strong className="text-zinc-200">{totals.total.toLocaleString()}</strong> accounts
+              {" · "}{(totals.total - totals.suspended).toLocaleString()} real
+              {totals.suspended > 0 && <> · {totals.suspended} suspended (fake)</>}
+              {" · "}<span className="text-emerald-400">+{totals.joined24h} today</span>
+              {" · "}+{totals.joined7d} this week
+            </>
+          ) : (
+            `${customers.length} accounts`
+          )}
+        </span>
       </div>
 
       {/* Journey stages — click to filter */}

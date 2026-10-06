@@ -63,7 +63,9 @@ export async function GET(req: NextRequest) {
 
   const q = (req.nextUrl.searchParams.get("q") || "").trim().toLowerCase();
   const sort = req.nextUrl.searchParams.get("sort") || "last_seen";
-  const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 200, 1), 500);
+  // Was 200, and the page printed the row count as the account count, so
+  // it read "200 accounts" forever once the 201st person signed up.
+  const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 1000, 1), 2000);
 
   initCloudflareEnv();
   const d1 = getD1();
@@ -140,5 +142,24 @@ export async function GET(req: NextRequest) {
   const stages: Record<string, number> = {};
   for (const r of rows) stages[r.stage] = (stages[r.stage] || 0) + 1;
 
-  return NextResponse.json({ customers: rows, total: rows.length, stages });
+  // Real totals, independent of the row limit and the search box.
+  const counts = await d1
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(COALESCE(suspended, 0)) AS suspended,
+              SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS joined_24h,
+              SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS joined_7d
+       FROM users`
+    )
+    .first<{ total: number; suspended: number; joined_24h: number; joined_7d: number }>();
+
+  return NextResponse.json({
+    customers: rows,
+    total: Number(counts?.total ?? rows.length),
+    suspended: Number(counts?.suspended ?? 0),
+    joined24h: Number(counts?.joined_24h ?? 0),
+    joined7d: Number(counts?.joined_7d ?? 0),
+    shown: rows.length,
+    stages,
+  });
 }

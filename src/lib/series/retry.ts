@@ -60,15 +60,27 @@ export async function retryFailedShots(
   // Anything stuck in that state for more than a few minutes is put back.
   const { data: stuck } = await db
     .from("series_shots")
-    .select("id, updated_at")
+    .select("id, updated_at, stage, clip_url, raw_clip_url")
     .eq("episode_id", episodeId)
     .eq("status", "retrying")
     .limit(20);
 
-  for (const row of (stuck || []) as Array<{ id: string; updated_at: string | null }>) {
+  type StuckRow = { id: string; updated_at: string | null; stage: string | null; clip_url: string | null; raw_clip_url: string | null };
+  for (const row of (stuck || []) as StuckRow[]) {
     const at = Date.parse((row.updated_at || "").replace(" ", "T") + "Z");
     if (!Number.isFinite(at) || Date.now() - at > 5 * 60 * 1000) {
-      await db.from("series_shots").update({ status: "failed" }).eq("id", row.id);
+      // A shot that was already filmed and voiced, and only lost its
+      // finishing pass, is kept as it is. Retrying it would re-film the scene
+      // from scratch, pay for it again and throw the finished clip away.
+      const finished = row.stage === "upscale" ? row.raw_clip_url || row.clip_url : row.stage === "foley" ? row.clip_url : null;
+      if (finished) {
+        await db
+          .from("series_shots")
+          .update({ status: "completed", stage: "done", clip_url: finished })
+          .eq("id", row.id);
+      } else {
+        await db.from("series_shots").update({ status: "failed" }).eq("id", row.id);
+      }
     }
   }
 

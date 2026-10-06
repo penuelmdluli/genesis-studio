@@ -5,7 +5,9 @@
 //
 // Returns the written script (so a creator can read their own episode in
 // their own language before spending anything on it) alongside the state of
-// every shot once rendering has started.
+// every shot once rendering has started. Reading it also moves the episode
+// forward (lib/series/advance.ts); the series-progress cron does the same
+// for episodes whose creator has closed the page.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
@@ -14,10 +16,7 @@ import { isOwnerClerkId } from "@/lib/credits";
 import { getDb } from "@/lib/db-driver";
 import { renderCost } from "@/lib/series/pricing";
 import { styleForGenre, styleSpec } from "@/lib/series/style";
-import type { Shot } from "@/lib/series/writer";
-import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
-import { retryFailedShots } from "@/lib/series/retry";
-import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
+import { advanceEpisode, type EpisodeRow } from "@/lib/series/advance";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -48,116 +47,23 @@ export async function GET(
   const { data: seriesMeta } = await db.from("series").select("genre").eq("id", seriesId).maybeSingle();
   const seriesGenre: string | null = seriesMeta?.genre || null;
 
-  let shots: Shot[] = [];
-  let cliffhanger = "";
-  try {
-    const parsed = JSON.parse(episode.script || "{}") as { shots?: Shot[]; cliffhanger?: string };
-    shots = parsed.shots || [];
-    cliffhanger = parsed.cliffhanger || "";
-  } catch {
-    // A corrupt script should show an empty episode, not crash the page.
-  }
-
-  const { data: rendered } = await db
-    .from("series_shots")
-    .select(SHOT_SELECT)
-    .eq("episode_id", episodeId)
-    .order("shot_index", { ascending: true })
-    .limit(20);
-
-  const shotRows = (rendered || []) as ShotRow[];
-  await refreshShots(db, shotRows);
-
-  // Any scene that failed for a passing reason is put back in, without the
-  // creator having to notice or ask. Capped, so a genuinely bad shot does not
-  // loop.
-  if (shotRows.some((s) => s.status === "failed")) {
-    const { data: seriesRow } = await db
-      .from("series")
-      .select("language, character_description, character_name, genre")
-      .eq("id", seriesId)
-      .maybeSingle();
-    if (seriesRow) {
-      const outcome = await retryFailedShots(episodeId, seriesId, user.id, shots, seriesRow);
-      if (outcome.submitted > 0) {
-        const { data: refreshed } = await db
-          .from("series_shots")
-          .select(SHOT_SELECT)
-          .eq("episode_id", episodeId)
-          .order("shot_index", { ascending: true })
-          .limit(20);
-        shotRows.length = 0;
-        shotRows.push(...((refreshed || []) as ShotRow[]));
-      }
-    }
-  }
-
-  const done = shotRows.filter((s) => s.status === "completed").length;
-  const failed = shotRows.filter((s) => s.status === "failed").length;
-
-  // The episode is finished the moment nothing is still moving. Recorded
-  // here so a creator who closes the tab still comes back to a finished
-  // episode rather than one stuck on "rendering" forever.
-  if (shotRows.length > 0 && done + failed === shotRows.length && episode.status === "rendering") {
-    const finalStatus = done > 0 ? "completed" : "failed";
-    await db.from("series_episodes").update({ status: finalStatus }).eq("id", episodeId);
-    episode.status = finalStatus;
-  }
-
-  // Join the shots into something watchable, once, as soon as they are all
-  // in. Guarded on video_id rather than on status so a reload mid-assembly
-  // cannot start a second one, and so an episode finished before this
-  // existed still gets assembled the next time it is opened.
-  if (!episode.video_id && episode.status === "completed" && done >= 2) {
-    if (episode.assembly_job) {
-      // A join is already running. Collect it if it has finished.
-      const { data: series } = await db.from("series").select("title").eq("id", seriesId).maybeSingle();
-      const result = await collectAssembly(
-        episodeId,
-        user.id,
-        episode.assembly_job,
-        episode.title || `Episode ${episode.episode_number}`,
-        series?.title || "Series",
-        done
-      );
-      if (isAssembled(result)) {
-        episode.video_id = result.videoId;
-        episode.video_url = result.url;
-      }
-    } else {
-      // Nothing running: start one. It finishes on a later poll.
-      //
-      // Our mark goes on free-tier episodes and on the operator's own, which
-      // is how anyone who sees a shared episode learns where it was made. A
-      // paying creator's work stays clean — that is what they upgraded for,
-      // and they can put their own brand on it instead.
-      const ours = isOwnerClerkId(clerkId) || user.plan === "free";
-      const { data: seriesForScore } = await db
-        .from("series")
-        .select("genre")
-        .eq("id", seriesId)
-        .maybeSingle();
-      await startAssembly(
-        episodeId,
-        user.id,
-        true,
-        undefined,
-        ours ? "ivideostudio.ai" : null,
-        seriesForScore?.genre || null
-      );
-    }
-  }
+  // Our mark goes on free-tier episodes and on the operator's own, which is
+  // how anyone who sees a shared episode learns where it was made. A paying
+  // creator's work stays clean — that is what they upgraded for.
+  const brandMark = isOwnerClerkId(clerkId) || user.plan === "free";
+  const ep = episode as EpisodeRow;
+  const { shots, cliffhanger, shotRows, done, failed } = await advanceEpisode(ep, brandMark);
 
   return NextResponse.json({
     episode: {
-      id: episode.id,
-      episodeNumber: episode.episode_number,
-      title: episode.title,
-      synopsis: episode.synopsis,
-      status: episode.status,
+      id: ep.id,
+      episodeNumber: ep.episode_number,
+      title: ep.title,
+      synopsis: ep.synopsis,
+      status: ep.status,
       cliffhanger,
-      videoId: episode.video_id || null,
-      videoUrl: episode.video_url || null,
+      videoId: ep.video_id || null,
+      videoUrl: ep.video_url || null,
     },
     shots,
     cost: renderCost(shots, styleSpec(styleForGenre(seriesGenre)).blockbuster),

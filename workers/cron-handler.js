@@ -23,7 +23,7 @@ const CRON_MAP = {
   // Daily marketing ad loop, 18:00 SAST, retried 19:00 if the first try failed.
   // Reposts finished ads only; spends no generation credit.
   "0 16,17 * * *": ["/api/cron/ad-loop"],
-  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments"],
+  "*/5 * * * *": ["/api/cron/recover-scenes", "/api/cron/check-stuck-jobs", "/api/cron/reconcile-payments", "/api/cron/series-progress"],
   "0 */6 * * *": ["/api/cron/purge-stale"],
   // Suspends extra accounts farmed on one device. Paying customers are exempt.
   "0 * * * *": ["/api/cron/abuse-sweep"],

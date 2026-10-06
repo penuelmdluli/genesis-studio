@@ -29,10 +29,12 @@ export interface ShotRow {
   /** 1 when the video model spoke the line itself (English dialogue). */
   native_audio?: number | null;
   created_at: string;
+  /** When the shot last changed stage; the timeout is measured from here. */
+  updated_at?: string | null;
 }
 
 export const SHOT_SELECT =
-  "id, shot_index, status, stage, kind, action, audio_url, clip_url, raw_clip_url, sfx_url, native_audio, image_url, provider_ref, error, created_at";
+  "id, shot_index, status, stage, kind, action, audio_url, clip_url, raw_clip_url, sfx_url, native_audio, image_url, provider_ref, error, created_at, updated_at";
 
 /**
  * A shot that has been rendering for longer than this is not coming back.
@@ -189,9 +191,23 @@ export async function refreshShots(
           return;
         }
 
-        // Still working — unless it has been working far too long.
-        const startedAt = Date.parse((row.created_at || "").replace(" ", "T") + "Z");
+        // Still working — unless THIS STEP has been working far too long.
+        // Measured from the last stage change, not from creation: a shot that
+        // waited 45 minutes for anyone to collect it (2026-10-06) was declared
+        // dead the moment its upscale started.
+        const startedAt = Date.parse(((row.updated_at || row.created_at) || "").replace(" ", "T") + "Z");
         if (Number.isFinite(startedAt) && Date.now() - startedAt > SHOT_TIMEOUT_MS) {
+          // Only the finishing pass is late: the creator keeps the scene.
+          const finished = row.stage === "upscale" ? row.raw_clip_url || row.clip_url : row.stage === "foley" ? row.clip_url : null;
+          if (finished) {
+            row.status = "completed";
+            row.clip_url = finished;
+            await db
+              .from("series_shots")
+              .update({ status: "completed", stage: "done", clip_url: finished, updated_at: now })
+              .eq("id", row.id);
+            return;
+          }
           row.status = "failed";
           await db
             .from("series_shots")

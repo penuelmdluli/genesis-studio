@@ -73,6 +73,16 @@ export async function GET(req: NextRequest) {
   const force = q.get("force") === "1";
   const now = Date.now();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai";
+
+  // Paused (owner 2026-10-06): the win-back, starter-offer and checkout
+  // recovery emails went out this week, and 90 spotlight emails on top in a
+  // day risks unsubscribes from the very people we want to buy. Scheduled
+  // sends stop until this date; dry runs and test sends still work.
+  const pausedUntil = Date.parse(process.env.SPOTLIGHT_PAUSED_UNTIL || "2026-10-13T00:00:00+02:00");
+  if (!dry && !test && now < pausedUntil) {
+    return NextResponse.json({ paused: true, until: new Date(pausedUntil).toISOString() });
+  }
+
   const { key: week } = spotlightWeek(now);
   const db = getDb();
 

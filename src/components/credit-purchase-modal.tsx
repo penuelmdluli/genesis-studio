@@ -21,7 +21,18 @@ export function CreditPurchaseModal() {
   // Someone on free credits is deciding whether to pay at all, so the cheap
   // way in leads. Someone who already pays is topping up, so value leads.
   const firstPurchase = !user || user.plan === "free";
-  const highlightId = firstPurchase ? STARTER_PACK_ID : "pack-2000";
+  // A pack chosen earlier (recovery email deep link) wins over the default.
+  const [chosenPack, setChosenPack] = useState<string | null>(null);
+  useEffect(() => {
+    if (!creditPurchaseOpen) return;
+    try {
+      const v = sessionStorage.getItem("ivs_topup_pack");
+      if (v && CREDIT_PACKS.some((p) => p.id === v)) setChosenPack(v);
+    } catch {
+      // Storage blocked; keep the default.
+    }
+  }, [creditPurchaseOpen]);
+  const highlightId = chosenPack || (firstPurchase ? STARTER_PACK_ID : "pack-2000");
   const packs = CREDIT_PACKS.map((pack) => ({
     ...pack,
     popular: pack.id === highlightId,
@@ -170,7 +181,7 @@ export function CreditPurchaseModal() {
             </div>
             {pack.popular && (
               <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-[10px] text-white font-bold tracking-wide shadow-lg">
-                {pack.id === STARTER_PACK_ID ? "START HERE" : "POPULAR"}
+                {pack.id === chosenPack ? "YOUR PICK" : pack.id === STARTER_PACK_ID ? "START HERE" : "POPULAR"}
               </span>
             )}
           </button>

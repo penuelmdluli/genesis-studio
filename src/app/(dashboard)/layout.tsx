@@ -200,10 +200,19 @@ export default function DashboardLayout({
           // already open: one tap from the inbox to the payment page.
           const qs = new URLSearchParams(window.location.search);
           if (qs.get("topup") === "1") {
-            trackEvent("topup_deeplink", { src: (qs.get("src") || "unknown").slice(0, 40) });
+            trackEvent("topup_deeplink", { src: (qs.get("src") || "unknown").slice(0, 40), pack: (qs.get("pack") || "").slice(0, 32) });
+            // The pack they picked before (recovery emails) is the one the
+            // sheet highlights, so "finish my order" means exactly that.
+            try {
+              const pack = qs.get("pack");
+              if (pack) sessionStorage.setItem("ivs_topup_pack", pack);
+            } catch {
+              // Storage blocked; the default highlight is fine.
+            }
             setCreditPurchaseOpen(true);
             qs.delete("topup");
             qs.delete("src");
+            qs.delete("pack");
             const rest = qs.toString();
             window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
           }

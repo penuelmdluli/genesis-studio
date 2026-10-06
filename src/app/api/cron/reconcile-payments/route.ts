@@ -27,6 +27,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 import { notifyOwner } from "@/lib/owner-notify";
 import { CREDIT_PACKS } from "@/lib/constants";
 import { sqlTimestamp } from "@/lib/job-finalizer";
+import { runCheckoutRecovery } from "@/lib/checkout-recovery";
 
 export const maxDuration = 60;
 
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
     yoco: { checked: 0, settled: 0 },
     escalated: 0,
     abandoned: 0,
+    recovery: null as null | { step1: number; step2: number; skipped: number; errors: string[] },
   };
 
   // ── Pass 1: PayFast transaction feed ───────────────────────────────────
@@ -248,7 +250,16 @@ export async function GET(req: NextRequest) {
     out.abandoned++;
   }
 
-  if (out.payfast.settled || out.yoco.settled || out.escalated) {
+  // ── Pass 4: win back people who left a checkout unpaid ────────────────
+  // Runs after settlement on purpose, so anyone whose payment just landed
+  // is already "completed" and never gets a "did something go wrong?" email.
+  try {
+    out.recovery = await runCheckoutRecovery(process.env.NEXT_PUBLIC_APP_URL || "https://ivideostudio.ai");
+  } catch (err) {
+    console.error("[RECONCILE] checkout recovery failed:", err instanceof Error ? err.message : err);
+  }
+
+  if (out.payfast.settled || out.yoco.settled || out.escalated || out.recovery?.step1 || out.recovery?.step2) {
     console.log(`[RECONCILE] ${JSON.stringify(out)}`);
   }
   return NextResponse.json(out);

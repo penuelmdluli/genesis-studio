@@ -490,13 +490,24 @@ body {
   }
 }
 
-/* Fix Safari input styling */
-input,
+/* Fix Safari input styling.
+   Checkboxes and radios are left alone: with appearance:none and no custom
+   drawing they render as nothing at all, which hid every consent box on the
+   site (Face Blend, Action Figure) while they still worked when clicked. */
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: #8b5cf6;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
 }
 
 /* Fix iOS tap highlight */

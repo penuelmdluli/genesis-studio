@@ -22,7 +22,8 @@ export const maxDuration = 300;
 
 const PAGE_KEY = "mzansi_baby_stars"; // SAGA of the NORTH
 const CDN = "https://cdn.ivideostudio.ai/marketing/ads";
-const LINK = "https://ivideostudio.ai";
+// Tracked, so sign-ups and sales from the SAGA ad loop show up by source.
+const LINK = "https://ivideostudio.ai/generate?utm_source=facebook&utm_medium=ad_loop&utm_campaign=saga";
 const TAGS = "#AI #AIVideo #iVideoStudio #MadeWithAI #SouthAfrica #Mzansi";
 
 /** Rotation order. 2026-09-14 (day 0) was AI Beast Wars. */

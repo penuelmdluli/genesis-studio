@@ -21,7 +21,7 @@ import { envString } from "@/lib/env";
 import { submitShot, prepareEpisodeReferences, type RenderContext } from "@/lib/series/render";
 import { ensureCast } from "@/lib/series/cast";
 import { guessGender } from "@/lib/series/writer";
-import { renderCost, shotCredits } from "@/lib/series/pricing";
+import { renderCost, shotCredits, isHeroShot } from "@/lib/series/pricing";
 import { styleForGenre, styleSpec } from "@/lib/series/style";
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { toUserFacingProviderError } from "@/lib/user-errors";
@@ -262,7 +262,7 @@ export async function POST(
     } else {
       const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
       console.error(`[SERIES] shot ${index} failed to submit:`, message);
-      refundDue += shotCredits(shot.kind, blockbuster);
+      refundDue += shotCredits(shot.kind, blockbuster || isHeroShot(shot));
       await db
         .from("series_shots")
         .update({

@@ -41,6 +41,18 @@ export const MAX_SEASON_EPISODES = 10;
 
 export interface ShotLike {
   kind: "dialogue" | "action";
+  beat?: string;
+}
+
+/**
+ * The shots an episode lives or dies on: the hook, the face-slap and the
+ * cliffhanger. They are filmed on the best model even in a drama series
+ * (2026-10-07), so they are priced like a blockbuster shot: the model costs
+ * about twice as much and the price must cover it.
+ */
+const HERO_BEATS = new Set(["hook", "slap", "cliff"]);
+export function isHeroShot(s: { beat?: string }): boolean {
+  return !!s.beat && HERO_BEATS.has(s.beat);
 }
 
 /** Credits for one shot of a given kind, in a normal or blockbuster series. */
@@ -51,7 +63,7 @@ export function shotCredits(kind: ShotLike["kind"], blockbuster = false): number
 
 /** What rendering these shots will cost the creator. Quoted before charging. */
 export function renderCost(shots: ShotLike[], blockbuster = false): number {
-  return shots.reduce((total, s) => total + shotCredits(s.kind, blockbuster), 0);
+  return shots.reduce((total, s) => total + shotCredits(s.kind, blockbuster || isHeroShot(s)), 0);
 }
 
 /** An upfront estimate, before the script exists. Assumes a dialogue-led scene. */

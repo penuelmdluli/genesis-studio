@@ -742,6 +742,9 @@ app.post("/stitch-episode", auth, async (req, res) => {
   const streamPipeline = require("util").promisify(require("stream").pipeline);
 
   const FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  // A cinematic low boom: a falling sine with a short noise transient on top.
+  // Synthesised, so there is no audio asset to host or license.
+  const BOOM = "aevalsrc=exprs='0.9*sin(2*PI*(46+34*exp(-7*t))*t)*exp(-2.6*t)+0.3*(random(0)-0.5)*exp(-22*t)':s=48000:d=1.8";
 
   // Height is chosen by the caller, defaulting to 720p.
   //
@@ -807,9 +810,30 @@ app.post("/stitch-episode", auth, async (req, res) => {
     res.status(202).json({ jobId, status: "running", clips: clips.length });
 
     const normalised = [];
+    // Where each part starts in the finished episode, so a sound hit can land
+    // exactly on the beat it belongs to (the face-slap, the cut to black).
+    const durations = [];
+    const durationOf = (file) =>
+      new Promise((resolve) => {
+        execFile("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], (err, out) =>
+          resolve(err ? 0 : parseFloat(String(out).trim()) || 0)
+        );
+      });
+    const ENCODE = [
+      "-threads", "1",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+    ];
 
     for (let i = 0; i < clips.length; i++) {
       const clip = clips[i] || {};
+      // Pace (2026-10-07). A video model's own soundtrack runs the full five
+      // seconds whatever the line's length, so every spoken shot used to last
+      // five seconds: a metronome cut every 5.4s. trimSilence ends the shot
+      // when the speaking ends (plus a breath); maxSeconds caps any shot.
+      const voiceTail = clip.trimSilence
+        ? "areverse,silenceremove=start_periods=1:start_duration=0.04:start_threshold=-36dB,areverse,"
+        : "";
       if (!clip.url) throw new Error(`clip ${i} has no url`);
 
       const rawPath = path.join(tmp, `st-raw-${stamp}-${i}.mp4`);
@@ -919,7 +943,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
         args.push(
           "-filter_complex",
           `[0:v]${filter}[v];` +
-            `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,apad=pad_dur=0.35[vo];` +
+            `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,${voiceTail}apad=pad_dur=0.35[vo];` +
             `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.42,apad[fx];` +
             `[vo][fx]amix=inputs=2:duration=first:normalize=0[a]`,
           "-map", "[v]", "-map", "[a]",
@@ -944,7 +968,7 @@ app.post("/stitch-episode", auth, async (req, res) => {
           "-vf", filter,
           // A beat of air after the line, so a short reply does not end the
           // instant the last word does.
-          "-af", "apad=pad_dur=0.35",
+          "-af", `${voiceTail}apad=pad_dur=0.35`,
           "-map", "0:v:0", "-map", "1:a:0",
           "-shortest"
         );
@@ -957,16 +981,81 @@ app.post("/stitch-episode", auth, async (req, res) => {
           "-shortest"
         );
       }
-      args.push(
-        "-threads", "1",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"
-      );
+      args.push(...ENCODE);
+      if (Number(clip.maxSeconds) > 0) args.push("-t", String(Number(clip.maxSeconds)));
       args.push(normPath);
 
       await run(args, `normalise clip ${i}`);
       try { fs.unlinkSync(rawPath); } catch {}
       normalised.push(normPath);
+      durations.push(await durationOf(normPath));
+    }
+
+    // Sound hits, in seconds from the start: the beginning of every clip
+    // marked accent (the face-slap, the reveal).
+    const starts = durations.map((_, k) => durations.slice(0, k).reduce((a, b) => a + b, 0));
+    const hits = clips.map((c, k) => (c && c.accent ? starts[k] + (Number(c.accentAt) || 0) : null)).filter((t) => t !== null);
+    let musicOutAt = null;
+
+    // The ending (2026-10-07): a short push-in freeze on the last face, then a
+    // hard cut to black with the next-episode card and a boom. The music is
+    // faded out before the cut, so the hit lands in silence.
+    const ending = req.body.ending || null;
+    if (ending && normalised.length) {
+      const before = normalised.length;
+      try {
+        const total = starts[starts.length - 1] + durations[durations.length - 1];
+        const freezeSec = Math.min(Math.max(Number(ending.freezeSeconds) || 0, 0), 3);
+        let at = total;
+        if (freezeSec > 0) {
+          const framePath = path.join(tmp, `st-lastframe-${stamp}.png`);
+          const freezePath = path.join(tmp, `st-freeze-${stamp}.mp4`);
+          scratch.push(framePath, freezePath);
+          await run(["-y", "-sseof", "-0.08", "-i", normalised[normalised.length - 1], "-frames:v", "1", framePath], "last frame");
+          const frames = Math.round(freezeSec * FPS);
+          await run(
+            [
+              // ONE input frame: zoompan turns it into the whole push-in. A looped
+              // image made zoompan repeat the push-in once per frame (43s, not 1.2s).
+              "-y", "-i", framePath,
+              "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+              "-vf", `scale=${W}:${H},zoompan=z='min(zoom+0.0016,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${FPS},setsar=1`,
+              "-map", "0:v", "-map", "1:a", "-t", String(freezeSec), ...ENCODE, freezePath,
+            ],
+            "freeze frame"
+          );
+          normalised.push(freezePath);
+          at += freezeSec;
+        }
+        const cardSec = Math.min(Math.max(Number(ending.cardSeconds) || 1.8, 1), 4);
+        const cardPath = path.join(tmp, `st-card-${stamp}.mp4`);
+        const cardText = path.join(tmp, `st-cardtext-${stamp}.txt`);
+        const cardSub = path.join(tmp, `st-cardsub-${stamp}.txt`);
+        scratch.push(cardPath, cardText, cardSub);
+        fs.writeFileSync(cardText, String(ending.cardText || "TO BE CONTINUED").slice(0, 40), "utf8");
+        fs.writeFileSync(cardSub, String(ending.cardSub || "").slice(0, 60), "utf8");
+        const big = Math.round(W * 0.085), small = Math.round(W * 0.04);
+        await run(
+          [
+            "-y", "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${FPS}:d=${cardSec}`,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-vf",
+            `drawtext=textfile='${cardText}':fontfile='${FONT}':fontsize=${big}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-${big}` +
+              (ending.cardSub ? `,drawtext=textfile='${cardSub}':fontfile='${FONT}':fontsize=${small}:fontcolor=white@0.75:x=(w-text_w)/2:y=(h/2)+${small}` : "") +
+              ",setsar=1",
+            "-map", "0:v", "-map", "1:a", "-shortest", "-t", String(cardSec), ...ENCODE, cardPath,
+          ],
+          "end card"
+        );
+        normalised.push(cardPath);
+        hits.push(at);              // the boom lands on the cut to black
+        musicOutAt = Math.max(0, at - 1.0);
+      } catch (err) {
+        // The ending is a flourish; losing it must never lose the episode.
+        normalised.length = before;
+        musicOutAt = null;
+        console.error("[stitch-episode] ending skipped:", err.message);
+      }
     }
 
     const listPath = path.join(tmp, `st-list-${stamp}.txt`);
@@ -989,6 +1078,32 @@ app.post("/stitch-episode", auth, async (req, res) => {
     // the audio is re-encoded, so this adds seconds rather than minutes and
     // barely touches memory.
     let finalPath = outputPath;
+
+    // Sound hits without a score still get mixed in: a synthesised low boom
+    // with a short noise transient, one copy per hit.
+    if (!musicUrl && hits.length) {
+      try {
+        const hitPath = path.join(tmp, `st-hits-${stamp}.mp4`);
+        scratch.push(hitPath);
+        const split = hits.map((_, k) => `[h${k}]`).join("");
+        const delayed = hits.map((t, k) => `[h${k}]adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)}[d${k}]`).join(";");
+        await run(
+          [
+            "-y", "-i", outputPath, "-f", "lavfi", "-i", BOOM,
+            "-filter_complex",
+            `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.9,asplit=${hits.length}${split};${delayed};` +
+              `[0:a]${hits.map((_, k) => `[d${k}]`).join("")}amix=inputs=${hits.length + 1}:duration=first:dropout_transition=0:normalize=0[a]`,
+            "-map", "0:v", "-map", "[a]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", hitPath,
+          ],
+          "sound hits"
+        );
+        finalPath = hitPath;
+      } catch (err) {
+        console.error("[stitch-episode] sound hits skipped:", err.message);
+      }
+    }
+
     if (musicUrl) {
       try {
         const musicPath = path.join(tmp, `st-music-${stamp}.mp3`);
@@ -1006,9 +1121,17 @@ app.post("/stitch-episode", auth, async (req, res) => {
             // Looped so a short bed still covers a long episode; the mix ends
             // with the picture, never after it.
             "-stream_loop", "-1", "-i", musicPath,
+            ...(hits.length ? ["-f", "lavfi", "-i", BOOM] : []),
             "-filter_complex",
-            `[1:a]volume=${Number(musicVolume) > 0 ? Number(musicVolume) : 0.14}[bed];` +
-              `[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]`,
+            `[1:a]volume=${Number(musicVolume) > 0 ? Number(musicVolume) : 0.14}` +
+              // Silence before the hard cut: the score is gone a beat before black.
+              (musicOutAt !== null ? `,afade=t=out:st=${musicOutAt.toFixed(2)}:d=0.9` : "") +
+              `[bed];` +
+              (hits.length
+                ? `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.9,asplit=${hits.length}${hits.map((_, k) => `[h${k}]`).join("")};` +
+                  hits.map((t, k) => `[h${k}]adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)}[d${k}]`).join(";") + ";" +
+                  `[0:a][bed]${hits.map((_, k) => `[d${k}]`).join("")}amix=inputs=${hits.length + 2}:duration=first:dropout_transition=0:normalize=0[a]`
+                : `[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]`),
             "-map", "0:v", "-map", "[a]",
             "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
             mixedPath,

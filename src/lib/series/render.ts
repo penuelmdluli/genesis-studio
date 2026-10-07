@@ -27,6 +27,7 @@ import { speakOmnivoice } from "@/lib/series/omnivoice";
 import { getDb } from "@/lib/db-driver";
 import { synthesiseSpeech } from "@/lib/edge-tts";
 import { styleSpec, type VisualStyle } from "@/lib/series/style";
+import { isHeroShot } from "@/lib/series/pricing";
 
 // The video model now comes from the series style (src/lib/series/style.ts):
 // drama films on Seedance 1.5 Pro, action and cartoon on Seedance 2.5.
@@ -63,6 +64,8 @@ const LIPSYNC_VIDEO_MODEL = "sync/lipsync-2";
  * real action instead of endless close-ups.
  */
 const REFERENCE_SHOT_MODEL = "google/nano-banana-pro/edit";
+/** The best picture on the platform; the action series film every shot on it. */
+const HERO_VIDEO_MODEL = "bytedance/seedance-2.5/image-to-video";
 
 /** Submits the speech pass onto an already-moving shot. */
 export async function submitLipsync(videoUrl: string, audioUrl: string): Promise<string> {
@@ -129,14 +132,17 @@ const SHOT_FRAMING: Record<string, string> = {
 };
 
 /** Emotion colours the light and the performance, not the lens. */
+// Bodies, not labels (2026-10-07): "sad" gets a neutral face from the video
+// models; "eyes welling, jaw tight, swallowing" gets a performance. These
+// are the fallback when the writer gave a shot no "acting" of its own.
 const EMOTION_TONE: Record<string, string> = {
-  calm: "soft natural light, relaxed posture",
-  angry: "hard side light, jaw set, shoulders squared",
-  afraid: "low key light, tense posture, eyes searching",
-  joyful: "warm golden light, open expression",
-  grieving: "muted desaturated light, shoulders low",
-  tense: "high contrast light, body rigid, held breath",
-  shocked: "stark light, body recoiling, eyes wide",
+  calm: "soft motivated key light; a still, watchful face, slow blink, weight settled",
+  angry: "hard side light; jaw clenched, nostrils flaring, a vein at the temple, eyes narrowed and unblinking",
+  afraid: "low-key light; pupils wide, breath shallow and fast, lips parted, eyes darting to the door",
+  joyful: "warm golden light; a smile breaking through despite themselves, eyes creasing, a short breath of a laugh",
+  grieving: "muted desaturated light; eyes welling, chin trembling, swallowing hard, a hand pressed to the mouth",
+  tense: "high-contrast light; body rigid, held breath, knuckles white, the smallest muscle in the jaw working",
+  shocked: "stark light; the face drains, mouth falling open, a half step back, eyes locked on what they just heard",
 };
 
 /**
@@ -283,6 +289,10 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: Shot
 
   // A speaking shot holds ONE person. With two people in frame the lip-sync
   // model animates both mouths, so the audience cannot tell who is talking.
+  // The writer's own direction for this shot wins over the emotion fallback.
+  const acting = shot.acting && shot.shotSize !== "insert" ? `Performance: ${shot.acting}. ` : "";
+  const camera = shot.camera ? `Camera: ${shot.camera}. ` : "";
+
   const solo =
     shot.kind === "dialogue" && shot.shotSize !== "insert"
       ? pair
@@ -295,6 +305,8 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: Shot
     solo,
     setting,
     shot.action,
+    acting,
+    camera,
     `${framing}, ${tone}.`,
     styleSpec(ctx.style).look,
     // An action or cartoon set piece is allowed its crowd, its villain and its
@@ -320,10 +332,9 @@ export function buildShotMotionPrompt(shot: Shot, style?: VisualStyle): string {
         ? `${shot.speaker} is talking to ${shot.listener}, mouth moving, expressive; ${shot.listener}, seen from behind in the foreground, stays silent and nearly still. `
         : "The character is talking to someone off camera, mouth moving, expressive. ";
 
-  return `${shot.action}. ${speaking}${motion}. ${styleSpec(style).motion}`.slice(
-    0,
-    600
-  );
+  const acting = shot.acting ? ` ${shot.acting}.` : "";
+  const camera = shot.camera ? ` Camera: ${shot.camera}.` : "";
+  return `${shot.action}.${acting} ${speaking}${motion}.${camera} ${styleSpec(style).motion}`.slice(0, 700);
 }
 
 /**
@@ -372,11 +383,15 @@ export function buildNativeDialoguePrompt(shot: Shot, style: VisualStyle | undef
   const line = shot.dialogue.replace(/["“”]/g, "'").replace(/\s+/g, " ").trim().slice(0, 220);
   const say = SAY_BY_EMOTION[shot.emotion] || SAY_BY_EMOTION.calm;
   // The line goes first so it survives the length cap; the look closes it.
+  // The writer's physical direction carries the performance; the emotion
+  // table only fills in when there is none.
+  const acting = shot.acting ? `${shot.acting}. ` : "";
+  const camera = shot.camera ? `Camera: ${shot.camera}. ` : "";
   return (
     `The ${who} on screen says ${say}, in ${accent}: "${line}" ` +
     `Only this ${who} speaks, clear dialogue, lips matching every word, natural room sound, no music, no other voices. ` +
-    `${shot.action}. ${motion}. ${styleSpec(style).motion}`
-  ).slice(0, 900);
+    `${acting}${shot.action}. ${camera}${motion}. ${styleSpec(style).motion}`
+  ).slice(0, 1000);
 }
 
 /** Performance direction for a speaking shot — what the lip-sync model reads. */
@@ -812,9 +827,14 @@ export async function submitShot(
   //    moving footage afterwards, in the polling stage.
   const spec = styleSpec(ctx.style);
   const motionPrompt = native ? buildNativeDialoguePrompt(shot, ctx.style, ctx.language) : buildShotMotionPrompt(shot, ctx.style);
+  // The hook, the face-slap and the cliffhanger are filmed on the best model
+  // even in a drama (priced to match, see isHeroShot): they are the three
+  // shots that decide whether anyone watches the next episode.
+  const hero = !spec.blockbuster && isHeroShot(shot);
+  const bestModel = hero || spec.blockbuster;
   const prediction = await submitWsModel(
-    spec.videoModel,
-    spec.blockbuster
+    hero ? HERO_VIDEO_MODEL : spec.videoModel,
+    bestModel
       ? {
           // Seedance 2.5 takes a narrower schema: no aspect ratio (the still
           // sets the shape), no seed. Audio is generated only when the model

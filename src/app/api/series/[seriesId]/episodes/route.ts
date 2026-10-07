@@ -21,6 +21,8 @@ import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
 import { getDb } from "@/lib/db-driver";
 import { writeEpisode, type SeriesLanguage } from "@/lib/series/writer";
+import { planSeason, type SeasonPlan } from "@/lib/series/season";
+import { localeById } from "@/lib/series/locales";
 import {
   EPISODE_SCRIPT_CREDITS,
   MAX_SEASON_EPISODES,
@@ -99,6 +101,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
   const knownLooks: Array<{ name: string; look: string }> = ((castLooks || []) as Array<{ display_name: string | null; character_key: string; look: string }>)
     .map((c) => ({ name: c.display_name || c.character_key, look: c.look }));
   let episodeNumber: number = (series.episode_count || 0) + 1;
+
+  // The showrunner's plan, written once and kept: every episode is written
+  // against it (humiliation then face-slap, where the free run ends, which
+  // cliffhanger comes next). An older series gets one the first time it
+  // writes. A plan that cannot be made never blocks the episode.
+  let seasonPlan: SeasonPlan | null = null;
+  try {
+    seasonPlan = series.season_plan ? (JSON.parse(series.season_plan) as SeasonPlan) : null;
+  } catch {
+    seasonPlan = null;
+  }
+  if (!seasonPlan) {
+    try {
+      seasonPlan = await planSeason({
+        title: series.title,
+        genre: series.genre,
+        logline: series.logline,
+        characterName: series.character_name,
+        characterDescription: series.character_description,
+        languageName: localeById(series.language || "en-ZA")?.label || "South African English",
+        episodeCount: Math.max(12, episodeNumber + 8),
+      });
+      await db.from("series").update({ season_plan: JSON.stringify(seasonPlan) }).eq("id", seriesId);
+    } catch (err) {
+      console.error("[SERIES] season plan skipped:", err instanceof Error ? err.message : err);
+    }
+  }
   const written: Array<{ id: string; episodeNumber: number; title: string; synopsis: string; shots: number; renderCost: number }> = [];
 
   try {
@@ -114,6 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
           storySoFar,
           episodeNumber,
           knownLooks,
+          seasonPlan,
         },
         shotCount
       );

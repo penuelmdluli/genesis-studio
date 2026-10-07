@@ -19,6 +19,8 @@
 
 import { styleForGenre } from "@/lib/series/style";
 import { envString } from "@/lib/env";
+import { askClaude, parseJson } from "@/lib/series/claude";
+import { episodeBrief, type SeasonPlan } from "@/lib/series/season";
 import { localeOrDefault } from "@/lib/series/locales";
 
 /** Any locale id from the catalogue of languages we can actually speak. */
@@ -114,6 +116,18 @@ export interface Shot {
   /** Action shots get cinematic motion; dialogue shots get lip sync. */
   kind: "dialogue" | "action";
   /**
+   * The shot's job in the episode's emotional spring (2026-10-07): the
+   * editor holds each beat for as long as that job needs, and the reveal
+   * and the cliffhanger get their sound.
+   */
+  beat?: "hook" | "squeeze" | "slap" | "reaction" | "drop" | "build" | "cliff";
+  /** The performance as a body does it: eyes, jaw, hands, breath. Not a label. */
+  acting?: string;
+  /** Angle and move: "low angle, slow push-in", "eye level, static". */
+  camera?: string;
+  /** How long the shot is held on screen, in seconds (1.5 to 5). */
+  holdSeconds?: number;
+  /**
    * The approved still for this shot, made by the stills step before any
    * video is paid for. When present, filming starts from it as-is.
    */
@@ -159,10 +173,46 @@ export interface SeriesContext {
    * returning character is described exactly as before.
    */
   knownLooks?: CharacterLook[];
+  /** The showrunner's season plan; every episode is written against it. */
+  seasonPlan?: SeasonPlan | null;
 }
 
 const EMOTIONS = ["calm", "angry", "afraid", "joyful", "grieving", "tense", "shocked"] as const;
 const SHOT_SIZES = ["wide", "medium", "close", "insert", "ots", "two"] as const;
+const BEATS = ["hook", "squeeze", "slap", "reaction", "drop", "build", "cliff"] as const;
+
+/**
+ * The script editor. Reads the draft against the rules it was written to,
+ * scores the parts that decide whether anyone pays for the next episode,
+ * and returns the rewritten script in the same shape.
+ */
+async function editDraft(draft: EpisodeDraft, brief: string, shotCount: number): Promise<EpisodeDraft> {
+  const prompt = `You are the script editor on a hit paid micro-drama. The head writer was given the brief below and wrote the draft after it. Your job: make viewers desperate for the next episode.
+
+Judge the draft, privately, on each of these, 1 to 10:
+1. Hook: is something already wrong in the first three seconds, and is the episode's biggest reveal held back rather than spent in shot 1?
+2. Squeeze: is the hero humiliated or wronged specifically enough that the audience is angry for them?
+3. Slap: does the reversal land in three beats, ending on the mocker's face falling?
+4. Drop: does something worse hit right after the win?
+5. Cliffhanger: does it cut one beat before the answer, on new information or a face, not on a threat we expected?
+6. Dialogue: is every line short, loaded and specific, with subtext, no exposition, and one quotable line?
+7. Performance and camera: does every face shot have physical "acting" and a "camera" angle that fits who holds power?
+8. Pace: a turn at least every fifteen seconds, most "holdSeconds" under 3?
+9. Season plan: does it deliver this episode's planned beat and cliffhanger type?
+
+Then REWRITE every shot that scored under 9 until it would score 9 or 10. Keep exactly ${shotCount} shots, the same characters, location and looks, and every rule in the brief (one speaker per dialogue shot, language, gender, subtitles, shot sizes, listener). Keep what already works.
+
+--- BRIEF ---
+${brief}
+--- END BRIEF ---
+
+--- DRAFT ---
+${JSON.stringify(draft)}
+--- END DRAFT ---
+
+Respond with ONLY the rewritten script as JSON in exactly the draft's shape, no markdown, no scores.`;
+  return parseJson<EpisodeDraft>(await askClaude(prompt, { effort: "high" }));
+}
 
 /**
  * Shot size and the second person in frame, made safe. A speaking line is
@@ -184,13 +234,6 @@ function framing(
   return size === "ots" || size === "two" ? { shotSize: size, listener } : { shotSize: size };
 }
 
-function stripFence(raw: string): string {
-  const t = raw.trim();
-  if (t.startsWith("```")) {
-    return t.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-  }
-  return t;
-}
 
 /**
  * Last resort when the writer omits a gender. Names common in South African
@@ -223,8 +266,7 @@ function looksEnglish(language: string): boolean {
  */
 async function ensureEnglishSubtitles(
   shots: Shot[],
-  language: string,
-  apiKey: string
+  language: string
 ): Promise<void> {
   const english = looksEnglish(language);
 
@@ -247,27 +289,15 @@ async function ensureEnglishSubtitles(
   }
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 1500,
-        messages: [
-          {
-            role: "user",
-            content: `Translate each line into natural English subtitles. Translate the meaning, not the words — an English viewer should feel what a speaker of the original feels. Keep each translation short enough to read on screen.
+    const translations = parseJson<string[]>(
+      await askClaude(
+        `Translate each line into natural English subtitles. Translate the meaning, not the words — an English viewer should feel what a speaker of the original feels. Keep each translation short enough to read on screen.
 
 Respond with ONLY a JSON array of strings, in the same order, no markdown:
 ${JSON.stringify(needing.map(({ shot }) => shot.dialogue))}`,
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) throw new Error(`translation failed (${res.status})`);
-    const json = (await res.json()) as { content?: Array<{ text?: string }> };
-    const translations = JSON.parse(stripFence(json.content?.[0]?.text || "[]")) as string[];
+        { effort: "low", maxTokens: 4000 }
+      )
+    );
 
     needing.forEach(({ shot }, i) => {
       const line = String(translations[i] || "").trim();
@@ -308,7 +338,7 @@ export async function writeEpisode(
   const first = ctx.episodeNumber <= 1;
 
   const continuity = first
-    ? `This is EPISODE 1. Open the world, introduce ${ctx.characterName || "the lead"}, and end on a hook that demands episode 2.`
+    ? `This is EPISODE 1. Do not "open the world": open on ${ctx.characterName || "the lead"} already being humiliated, accused or wronged, so the audience is on their side within ten seconds, and end on a hook that demands episode 2.`
     : `This is EPISODE ${ctx.episodeNumber}. Here is everything that has happened so far:
 
 --- STORY SO FAR ---
@@ -357,6 +387,8 @@ LEAD CHARACTER: ${ctx.characterName || "the lead"}${ctx.characterDescription ? `
 
 ${continuity}
 
+${episodeBrief(ctx.seasonPlan || null, ctx.episodeNumber)}
+
 ${styleRules}
 
 ${ctx.knownLooks?.length ? `CHARACTERS ALREADY ON SCREEN — reuse these looks WORD FOR WORD if they appear:
@@ -373,11 +405,14 @@ Write exactly ${shotCount} shots — not one more. ${options.shortForm
 
 Build it the way a vertical micro-drama is built:
 
-STRUCTURE — hook, escalation, cliffhanger.
-- Shot 1 is the HOOK. Something must already be wrong in the first three seconds. No throat-clearing, no arriving-and-greeting, no scene-setting. Open in the middle of trouble.
-- The middle shots ESCALATE. Every shot raises the stakes on the one before it. Cut anything that is only information.
-- The last shot is the CLIFFHANGER.
-- There is no room for filler dialogue. If a line does not raise the stakes or reveal something, delete it.
+STRUCTURE — the emotional spring, then the cut.
+- Shot 1 is the HOOK. Trouble is already happening in the first three seconds: a face mid-shock, a public humiliation, a line that stops the scroll. No throat-clearing, no arriving-and-greeting, no scene-setting. Never spend the episode's biggest reveal in shot 1: show the wound, hold the reveal.
+- SQUEEZE: the hero is mocked, accused, cornered or dismissed by someone with status who enjoys it. Make the audience angry on the hero's behalf. Specific insults, never generic ones.
+- SLAP (打脸): the reversal in three fast beats: the mockery lands, the hero's real worth or power is shown, and the mocker's face falls (a silent "reaction" shot of THEM). This is the moment people pay for: build to it, then let it breathe.
+- DROP: immediately after the win, something worse. Never let the episode rest in comfort.
+- The last shot is the CLIFFHANGER: cut ONE BEAT BEFORE the answer, on new information or a question, ideally landing on a face. Not a threat everyone saw coming ("I will break it" is not a cliffhanger). If the viewer feels satisfied, you cut too late.
+- A turn, a reveal or a reversal at least every fifteen seconds. Cut anything that is only information.
+- Give every shot a "beat": "hook", "squeeze", "slap", "reaction", "drop", "build" or "cliff".
 
 SHOTS — vary the framing, deliberately, like a filmed scene and not a row of passport photos.
 Give every shot a "shotSize" of "ots", "medium", "close", "two", "wide" or "insert":
@@ -403,6 +438,18 @@ CONTINUITY — the picture must match the words.
 - Say which way the character faces or moves when it matters, and keep it consistent between consecutive shots.
 - One speaker per dialogue shot. The only other person allowed in a dialogue frame is the "ots" listener, seen from behind with their face hidden.
 
+DIALOGUE — every line is a weapon or a wound.
+- Short, loaded, specific. People say less than they mean. Subtext over statement: never "I am angry", never "you are lying to me"; slam the door, throw the papers, laugh at the wrong moment.
+- No exposition and no explaining feelings. Nobody tells another character something they both already know.
+- The villain is articulate, cruel and sure of their status. The hero says little, and when the hero finally speaks, it lands.
+- At least one line per episode the audience will want to quote.
+
+PERFORMANCE AND CAMERA — direct like a premium short drama.
+- "acting": the performance as the body does it, never a label. Not "sad" but "eyes welling, jaw clenched, swallowing hard, fingers crushing the paper". Not "angry" but "nostrils flaring, voice dropping to a whisper, leaning in". Every face shot gets one.
+- "camera": angle and movement in a few words. Low angle on whoever holds power in that moment; high angle on whoever has just lost it; a slow push-in on a reveal; a static frame on a stare-down; a whip to the face that reacts.
+- Faces fill the vertical frame: mostly "ots", "medium" and "close"; "wide" only to show a confrontation's distance.
+- "holdSeconds": how long the shot stays on screen. Reactions and inserts 1.5 to 2.5; a normal line is about its length plus a breath; the slap and the cliffhanger may hold 3 to 4. Most shots are under 3.
+
 Rules that matter:
 - ${options.shortForm
     ? "A dialogue line is ONE person speaking, 3 to 8 words — never more. This is a fifteen-second episode; every line must land in under three seconds."
@@ -421,7 +468,7 @@ Respond with ONLY this JSON, no markdown:
   "title": "episode title",
   "synopsis": "two sentences, English, for the creator",
   "shots": [
-    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "ots" | "medium" | "close" | "two" | "wide" | "insert", "listener": "the other person in frame for ots and two, else omit", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm" }
+    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "ots" | "medium" | "close" | "two" | "wide" | "insert", "listener": "the other person in frame for ots and two, else omit", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm", "beat": "hook" | "squeeze" | "slap" | "reaction" | "drop" | "build" | "cliff", "acting": "the performance as the body does it", "camera": "angle and move", "holdSeconds": 2.5 }
   ],
   "cliffhanger": "one line, English, what is left hanging",
   "location": "the ONE set this episode happens in, described visually: place, time of day, light, specific objects",
@@ -429,33 +476,24 @@ Respond with ONLY this JSON, no markdown:
   "storySoFar": "a rewritten recap covering everything from episode 1 through this one, under 250 words, English. This is the only memory the next episode gets, so carry forward every name, relationship and unresolved thread."
 }`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 4500,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 200);
-    throw new Error(`Writer unavailable (${res.status}): ${detail}`);
-  }
-
-  const json = (await res.json()) as { content?: Array<{ text?: string }> };
-  const text = json.content?.[0]?.text || "";
-
   let draft: EpisodeDraft;
   try {
-    draft = JSON.parse(stripFence(text)) as EpisodeDraft;
-  } catch {
-    throw new Error("The writer returned something unreadable — please try again");
+    draft = parseJson<EpisodeDraft>(await askClaude(prompt, { effort: "high" }));
+  } catch (err) {
+    if (err instanceof SyntaxError) throw new Error("The writer returned something unreadable — please try again");
+    throw err;
+  }
+
+  // The script editor's pass: the same script, judged against what makes a
+  // viewer pay for the next episode, and rewritten where it falls short.
+  // A failed pass keeps the first draft rather than losing the episode.
+  if (!options.shortForm && Array.isArray(draft.shots) && draft.shots.length) {
+    try {
+      const edited = await editDraft(draft, prompt, shotCount);
+      if (Array.isArray(edited.shots) && edited.shots.length) draft = edited;
+    } catch (err) {
+      console.error("[SERIES] script editor pass skipped:", err instanceof Error ? err.message : err);
+    }
   }
 
   if (!Array.isArray(draft.shots) || draft.shots.length === 0) {
@@ -487,10 +525,16 @@ Respond with ONLY this JSON, no markdown:
       emotion: EMOTIONS.includes(s.emotion as never) ? s.emotion : "calm",
       ...framing(s, dialogue),
       kind: dialogue ? ("dialogue" as const) : ("action" as const),
+      beat: BEATS.includes(s.beat as never) ? s.beat : undefined,
+      acting: s.acting ? String(s.acting).slice(0, 240) : undefined,
+      camera: s.camera ? String(s.camera).slice(0, 120) : undefined,
+      holdSeconds: Number.isFinite(Number(s.holdSeconds))
+        ? Math.min(5, Math.max(1.5, Number(s.holdSeconds)))
+        : undefined,
     };
   });
 
-  await ensureEnglishSubtitles(draft.shots, ctx.language, key);
+  await ensureEnglishSubtitles(draft.shots, ctx.language);
 
   draft.title = String(draft.title || `Episode ${ctx.episodeNumber}`).slice(0, 120);
   draft.synopsis = String(draft.synopsis || "").slice(0, 600);

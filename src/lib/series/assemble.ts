@@ -22,6 +22,38 @@ import { r2PublicUrl, videoStorageKey } from "@/lib/storage";
 import { extractAndUploadThumbnail } from "@/lib/thumbnails";
 import { generateScore } from "@/lib/series/score";
 import { styleForGenre, styleSpec } from "@/lib/series/style";
+import { runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools";
+import type { Shot } from "@/lib/series/writer";
+
+/**
+ * When the last word is spoken in a filmed clip, in seconds.
+ *
+ * The video model speaks the line and then keeps going with room sound for
+ * the rest of its five seconds, so every speaking shot used to run five
+ * seconds whatever the line: a cut every 5.4s, a metronome (owner,
+ * 2026-10-07). Silence detection cannot tell that room sound from speech;
+ * a transcript's timings can. Null when it cannot be read: the shot then
+ * keeps its full length, never a clipped line.
+ */
+async function lastWordAt(clipUrl: string): Promise<number | null> {
+  try {
+    const p = await runWsModelSync(
+      WS_MODELS.transcribeVideo,
+      { video: clipUrl, task: "transcribe", enable_timestamps: true, language: "en" },
+      { timeoutMs: 60_000 }
+    );
+    const first = p.outputs?.[0] as unknown;
+    const details =
+      first && typeof first === "object"
+        ? ((first as { text_details?: Array<{ end?: number; text?: string }> }).text_details || [])
+        : [];
+    const ends = details.filter((d) => String(d.text || "").trim()).map((d) => Number(d.end) || 0);
+    return ends.length ? Math.max(...ends) : null;
+  } catch (err) {
+    console.error("[SERIES] could not time the line:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
 
 interface ShotForAssembly {
   shot_index: number;
@@ -122,10 +154,41 @@ export async function startAssembly(
   const videoId = randomUUID();
   const outputKey = videoStorageKey(userId, `episode-${videoId}`);
 
+  const spec = styleSpec(styleForGenre(genre));
+
+  // The writer's beat and hold for every shot, by index (2026-10-07 pace).
+  const { data: episodeRow } = await db
+    .from("series_episodes")
+    .select("episode_number, script")
+    .eq("id", episodeId)
+    .maybeSingle();
+  let scriptShots: Shot[] = [];
+  try {
+    scriptShots = (JSON.parse(episodeRow?.script || "{}") as { shots?: Shot[] }).shots || [];
+  } catch {
+    scriptShots = [];
+  }
+
+  // A spoken line ends when its last word does, plus a breath. Timed in
+  // parallel: about a second and a tenth of a cent per clip.
+  const speechEnds = await Promise.all(
+    usable.map((s) =>
+      s.kind === "dialogue" && s.native_audio && (s.raw_clip_url || s.clip_url)
+        ? lastWordAt(s.raw_clip_url || s.clip_url!)
+        : Promise.resolve(null)
+    )
+  );
+  const lengths = usable.map((s, i) => {
+    const planned = scriptShots[s.shot_index]?.holdSeconds;
+    if (speechEnds[i] !== null) return Math.min(5.2, Math.max(1.5, (speechEnds[i] as number) + 0.35));
+    if (s.kind === "dialogue" && (s.audio_url || s.native_audio)) return 5;
+    return planned || spec.silentHold;
+  });
+
   // Made before the join so it can be mixed in the same pass. A failure
   // here returns null and the episode is assembled without it.
-  const musicUrl = await generateScore(genre, usable.length * 5);
-  const spec = styleSpec(styleForGenre(genre));
+  const musicUrl = await generateScore(genre, Math.ceil(lengths.reduce((a, b) => a + b, 0) + 4));
+  const nextEpisode = (Number(episodeRow?.episode_number) || 1) + 1;
 
   try {
     const res = await fetch(`${svc.url}/stitch-episode`, {
@@ -136,7 +199,7 @@ export async function startAssembly(
         // model's own soundtrack is discarded during the join — it invents
         // speech, in Chinese, under every shot.
         clips: [
-          ...usable.map((s) => ({
+          ...usable.map((s, i) => ({
             url: s.clip_url,
             subtitle: s.subtitle || "",
             // English dialogue: the speech is the filmed clip's own track,
@@ -146,9 +209,15 @@ export async function startAssembly(
             // The shot's own sound effects, mixed under the voice. The clip's
             // original soundtrack is still never used.
             sfxUrl: s.sfx_url || null,
-            // Action and cartoon set pieces are the point of those series,
-            // so a silent shot is held longer than in a talky drama.
-            ...(s.kind === "dialogue" && (s.audio_url || s.native_audio) ? {} : { holdSeconds: spec.silentHold }),
+            // Silent shots hold for the writer's planned beat (reactions and
+            // inserts short); a speaking shot ends a breath after its line.
+            ...(s.kind === "dialogue" && (s.audio_url || s.native_audio)
+              ? speechEnds[i] !== null
+                ? { maxSeconds: lengths[i] }
+                : {}
+              : { holdSeconds: lengths[i] }),
+            // The face-slap lands with a hit.
+            ...(scriptShots[s.shot_index]?.beat === "slap" ? { accent: true } : {}),
           })),
           ...appendClips.map((c) => ({ url: c.url, subtitle: "", audioUrl: null, holdSeconds: 3.4 })),
         ],
@@ -158,6 +227,12 @@ export async function startAssembly(
         watermark,
         musicUrl,
         musicVolume: spec.musicVolume,
+        // Freeze on the last face, cut to black, the next episode's card and
+        // a boom, with the score gone a beat before. Marketing episodes keep
+        // their own end card instead.
+        ...(appendClips.length
+          ? {}
+          : { ending: { freezeSeconds: 1.2, cardSeconds: 1.8, cardText: `EPISODE ${nextEpisode}`, cardSub: "what happens next..." } }),
       }),
     });
 

@@ -113,7 +113,15 @@ const SHOT_FRAMING: Record<string, string> = {
   wide:
     "wide establishing shot, full environment visible, characters small in frame, deep focus, the place itself doing the work",
   medium:
-    "medium shot framed from the waist up, subject slightly above centre, shallow depth of field, background falling away",
+    "medium shot framed from the waist up, subject slightly above centre, shallow depth of field, background falling away, never a full-length standing pose",
+  // Two people in one frame while only one face shows: the listener's back
+  // and shoulder in the foreground. How a confrontation is filmed, and safe
+  // for lip-sync because there is only one mouth to move.
+  ots:
+    "over-the-shoulder shot: the speaker faces the camera, framed from the chest up; in the near foreground, soft and out of focus, the back of the other person's head and one shoulder fill one side of the frame, their face completely hidden; shallow depth of field",
+  // Silent only: both faces visible.
+  two:
+    "two-shot: both people in the same frame, side-on to the camera and facing each other across the room, framed from the knees up, the space between them part of the drama, shallow depth of field",
   close:
     "tight close-up on the face, eyes high in frame, very shallow depth of field, background completely soft",
   insert:
@@ -152,6 +160,7 @@ const MOTION_BY_EMOTION: Record<string, string> = {
 const MOTION_BY_SHOT: Record<string, string> = {
   wide: "the camera cranes slowly across the space, traffic and people moving through the background",
   insert: "the camera pushes in on the detail, hands entering frame and moving",
+  two: "the camera drifts slowly between them, both holding still, eyes locked, a breath before someone moves",
 };
 
 /**
@@ -166,7 +175,13 @@ const MOTION_BY_SHOT: Record<string, string> = {
 // shot, which changes who she is. Lettering on garments is named explicitly.
 const NEGATIVE =
   "no bystanders, no crowd, no extra people, no onlookers, no text, no watermark, no split screen, " +
-  "no printed words, letters, badges, insignia or logos on any clothing or uniform";
+  "no printed words, letters, badges, insignia or logos on any clothing or uniform, " +
+  "no stiff catalogue pose, nobody standing straight facing the camera with arms at their sides";
+
+/** Same rules for a frame that legitimately holds two people. */
+const NEGATIVE_PAIR =
+  "nobody else in the room besides these two, no crowd, no onlookers, no text, no watermark, no split screen, " +
+  "no printed words, letters, badges, insignia or logos on any clothing or uniform, no stiff catalogue pose";
 
 const NEGATIVE_LIGHT = "no text, no watermark, no split screen, no printed words, letters or logos on clothing";
 
@@ -192,6 +207,20 @@ export interface ShotRefs {
   look?: string | null;
   /** The episode's location, used in words when no set picture exists. */
   location?: string | null;
+  /** A portrait of the second person in frame (ots / two) is attached. */
+  listener?: boolean;
+  /** The second person's locked look, used in words when no portrait exists. */
+  listenerLook?: string | null;
+}
+
+/** "first", "second", "third" for the reference image order. */
+function nth(i: number): string {
+  return ["first", "second", "third", "fourth"][i] || `number ${i + 1}`;
+}
+
+/** A frame that holds two people: over-the-shoulder or a silent two-shot. */
+function isPairShot(shot: Shot): boolean {
+  return (shot.shotSize === "ots" || shot.shotSize === "two") && !!shot.listener;
 }
 
 /**
@@ -214,20 +243,37 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: Shot
   // the same room in the same light.
   let character: string;
   let setting = "";
+  const pair = isPairShot(shot);
   if (refs) {
+    // Reference images arrive in this order: speaker, listener, set.
+    let i = 0;
+    const personAt = refs.person ? i++ : -1;
+    const listenerAt = pair && refs.listener ? i++ : -1;
+    const setAt = refs.set ? i++ : -1;
     character =
       shot.shotSize === "insert"
         ? ""
-        : refs.person
-          ? `${shot.speaker || "The person"} is the person in the first reference image: keep that exact face, hair, build and clothing. `
+        : personAt >= 0
+          ? `${shot.speaker || "The person"} is the person in the ${nth(personAt)} reference image: keep that exact face, hair, build and clothing. `
           : refs.look
             ? `${shot.speaker}: ${refs.look}. `
             : "";
-    setting = refs.set
-      ? `The scene takes place in the room shown in the ${refs.person ? "second" : "first"} reference image: the same walls, furniture, windows and light. Same time of day and lighting as every other shot of this scene. `
-      : refs.location
-        ? `Setting: ${refs.location}. Same time of day and lighting as every other shot of this scene. `
-        : "";
+    if (pair) {
+      const who =
+        listenerAt >= 0
+          ? `${shot.listener} is the person in the ${nth(listenerAt)} reference image (same hair, build and clothing)`
+          : `${shot.listener}${refs.listenerLook ? ` (${refs.listenerLook})` : ""}`;
+      character +=
+        shot.shotSize === "ots"
+          ? `${who}, seen strictly FROM BEHIND in the near foreground: only the back of their head and one shoulder, their face never visible. ${shot.speaker} faces the camera and faces ${shot.listener}. `
+          : `${who}. Both are in frame, facing each other. `;
+    }
+    setting =
+      setAt >= 0
+        ? `The scene takes place in the room shown in the ${nth(setAt)} reference image: the same walls, furniture, windows and light. Same time of day and lighting as every other shot of this scene. `
+        : refs.location
+          ? `Setting: ${refs.location}. Same time of day and lighting as every other shot of this scene. `
+          : "";
   } else {
     character =
       shot.shotSize === "insert" || !ctx.characterDescription
@@ -239,7 +285,9 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: Shot
   // model animates both mouths, so the audience cannot tell who is talking.
   const solo =
     shot.kind === "dialogue" && shot.shotSize !== "insert"
-      ? `Only ${shot.speaker} is visible, completely alone in frame. `
+      ? pair
+        ? `Only ${shot.speaker}'s face is visible. `
+        : `Only ${shot.speaker} is visible, completely alone in frame. `
       : "";
 
   return [
@@ -251,7 +299,7 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: Shot
     styleSpec(ctx.style).look,
     // An action or cartoon set piece is allowed its crowd, its villain and its
     // cheering village; only a speaking frame must hold one person.
-    (shot.kind === "action" && styleSpec(ctx.style).blockbuster ? NEGATIVE_LIGHT : NEGATIVE) + ".",
+    (shot.kind === "action" && styleSpec(ctx.style).blockbuster ? NEGATIVE_LIGHT : pair ? NEGATIVE_PAIR : NEGATIVE) + ".",
   ]
     .filter(Boolean)
     .join(" ")
@@ -266,9 +314,11 @@ export function buildShotMotionPrompt(shot: Shot, style?: VisualStyle): string {
       : MOTION_BY_SHOT[shot.shotSize] || MOTION_BY_EMOTION[shot.emotion] || MOTION_BY_EMOTION.calm;
 
   const speaking =
-    shot.kind === "dialogue"
-      ? "The character is talking to someone off camera, mouth moving, expressive. "
-      : "";
+    shot.kind !== "dialogue"
+      ? ""
+      : shot.shotSize === "ots" && shot.listener
+        ? `${shot.speaker} is talking to ${shot.listener}, mouth moving, expressive; ${shot.listener}, seen from behind in the foreground, stays silent and nearly still. `
+        : "The character is talking to someone off camera, mouth moving, expressive. ";
 
   return `${shot.action}. ${speaking}${motion}. ${styleSpec(style).motion}`.slice(
     0,
@@ -507,19 +557,41 @@ export async function portraitForShot(
   shot: Shot,
   ctx: RenderContext
 ): Promise<{ url: string | null; look: string | null } | null> {
-  const leadKey = ctx.characterName ? characterKey(ctx.characterName) : null;
   const speakerKey = shot.speaker ? characterKey(shot.speaker) : null;
 
   if (shot.kind !== "dialogue") {
-    // An action shot: the lead only if the direction is about them.
-    const aboutLead = !!ctx.characterName && (shot.action || "").toLowerCase().includes(ctx.characterName.toLowerCase());
+    // An action shot: whoever it is about. A silent reaction close-up of
+    // Lerato needs Lerato's face, not a fresh stranger; the lead only when
+    // the direction is about them.
+    const action = (shot.action || "").toLowerCase();
+    if (shot.speaker && action.includes(shot.speaker.toLowerCase())) {
+      return portraitForName(seriesId, shot.speaker, ctx);
+    }
+    const aboutLead = !!ctx.characterName && action.includes(ctx.characterName.toLowerCase());
     if (!aboutLead) return null;
     return { url: await ensureCharacterReference(seriesId, ctx), look: ctx.characterDescription };
   }
   if (!speakerKey) return null;
+  return portraitForName(seriesId, shot.speaker, ctx);
+}
+
+/**
+ * One character's portrait by name: the lead's reference for the lead, the
+ * cast row's portrait (made once from its locked look) for everyone else.
+ * Also used for the second person in an over-the-shoulder or two-shot.
+ */
+export async function portraitForName(
+  seriesId: string,
+  name: string,
+  ctx: RenderContext
+): Promise<{ url: string | null; look: string | null } | null> {
+  const leadKey = ctx.characterName ? characterKey(ctx.characterName) : null;
+  const speakerKey = name ? characterKey(name) : null;
+  if (!speakerKey) return null;
   if (speakerKey === leadKey) {
     return { url: await ensureCharacterReference(seriesId, ctx), look: ctx.characterDescription };
   }
+  const shot = { speaker: name };
 
   const db = getDb();
   const { data: row } = await db
@@ -638,9 +710,16 @@ export async function prepareEpisodeReferences(
   const seen = new Set<string>();
   for (const shot of shots) {
     const key = shot.kind === "dialogue" && shot.speaker ? characterKey(shot.speaker) : "";
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    await portraitForShot(seriesId, shot, withEpisode);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      await portraitForShot(seriesId, shot, withEpisode);
+    }
+    // The second person in an over-the-shoulder or two-shot needs a face too.
+    const other = isPairShot(shot) ? characterKey(shot.listener!) : "";
+    if (other && !seen.has(other)) {
+      seen.add(other);
+      await portraitForName(seriesId, shot.listener!, withEpisode);
+    }
   }
 }
 
@@ -660,10 +739,19 @@ export async function prepareEpisodeReferences(
  */
 export async function makeShotStill(shot: Shot, ctx: RenderContext, seriesId?: string): Promise<string> {
   const person = shot.shotSize === "insert" || !seriesId ? null : await portraitForShot(seriesId, shot, ctx);
+  const other = isPairShot(shot) && seriesId ? await portraitForName(seriesId, shot.listener!, ctx) : null;
   const set = seriesId && ctx.episodeId ? await ensureSetImage(seriesId, ctx.episodeId, ctx) : { url: null, location: null };
-  const refs: ShotRefs = { person: !!person?.url, set: !!set.url, look: person?.look || null, location: set.location };
+  const refs: ShotRefs = {
+    person: !!person?.url,
+    set: !!set.url,
+    look: person?.look || null,
+    location: set.location,
+    listener: !!other?.url,
+    listenerLook: other?.look || null,
+  };
   const prompt = buildShotImagePrompt(shot, ctx, refs);
-  const images = [person?.url, set.url].filter((u): u is string => !!u);
+  // Order matters: the prompt names them first, second, third in this order.
+  const images = [person?.url, other?.url, set.url].filter((u): u is string => !!u);
 
   let imageUrl = "";
   if (images.length) {

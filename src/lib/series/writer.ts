@@ -100,7 +100,15 @@ export interface Shot {
    * wide is used sparingly because 9:16 wastes width, and an insert on a
    * prop or a pair of hands is the cheapest variety there is.
    */
-  shotSize: "wide" | "medium" | "close" | "insert";
+  shotSize: "wide" | "medium" | "close" | "insert" | "ots" | "two";
+  /**
+   * The other person sharing the frame (2026-10-07 film upgrade). In an
+   * "ots" (over-the-shoulder) dialogue shot they are seen FROM BEHIND in the
+   * foreground, face hidden, so the lip-sync still animates one mouth; in a
+   * silent "two" shot both faces are visible. A scene where everyone stands
+   * alone in their own frame never feels like two people in one room.
+   */
+  listener?: string;
   /** Drives both the performance and the camera. */
   emotion: "calm" | "angry" | "afraid" | "joyful" | "grieving" | "tense" | "shocked";
   /** Action shots get cinematic motion; dialogue shots get lip sync. */
@@ -154,7 +162,27 @@ export interface SeriesContext {
 }
 
 const EMOTIONS = ["calm", "angry", "afraid", "joyful", "grieving", "tense", "shocked"] as const;
-const SHOT_SIZES = ["wide", "medium", "close", "insert"] as const;
+const SHOT_SIZES = ["wide", "medium", "close", "insert", "ots", "two"] as const;
+
+/**
+ * Shot size and the second person in frame, made safe. A speaking line is
+ * never a two-shot (two visible faces, two moving mouths): it becomes an
+ * over-the-shoulder instead. A two-person framing without a second person
+ * named falls back to medium, and nobody shares a frame with themselves.
+ */
+function framing(
+  s: { shotSize?: unknown; listener?: unknown; speaker?: unknown },
+  dialogue: string
+): { shotSize: Shot["shotSize"]; listener?: string } {
+  let size: Shot["shotSize"] = SHOT_SIZES.includes(s.shotSize as never) ? (s.shotSize as Shot["shotSize"]) : "medium";
+  const listener = typeof s.listener === "string" ? s.listener.trim().slice(0, 60) : "";
+  const speaker = typeof s.speaker === "string" ? s.speaker.trim() : "";
+  if (size === "two" && dialogue) size = "ots";
+  if ((size === "ots" || size === "two") && (!listener || listener.toLowerCase() === speaker.toLowerCase())) {
+    return { shotSize: "medium" };
+  }
+  return size === "ots" || size === "two" ? { shotSize: size, listener } : { shotSize: size };
+}
 
 function stripFence(raw: string): string {
   const t = raw.trim();
@@ -351,13 +379,20 @@ STRUCTURE — hook, escalation, cliffhanger.
 - The last shot is the CLIFFHANGER.
 - There is no room for filler dialogue. If a line does not raise the stakes or reveal something, delete it.
 
-SHOTS — vary the framing, deliberately.
-Give every shot a "shotSize" of "wide", "medium", "close" or "insert":
-- "medium" (waist up) is the DEFAULT for dialogue. Most of your dialogue shots are medium.
+SHOTS — vary the framing, deliberately, like a filmed scene and not a row of passport photos.
+Give every shot a "shotSize" of "ots", "medium", "close", "two", "wide" or "insert":
+- "ots" (over-the-shoulder) is how a confrontation is filmed: the speaker faces the camera, and the person they are talking to is in the near foreground SEEN FROM BEHIND (back of the head and one shoulder, face hidden). Set "listener" to that person's exact name. Use "ots" for most of the lines in an argument or an exchange between two people, alternating sides as the speakers alternate, so the audience always knows who is facing whom.
+- "medium" (waist up) is for a line spoken to nobody in particular, or to a group. Never a full-length standing pose.
 - "close" is for the ONE line in the scene that has to land emotionally. Do not put a close-up on every beat; that is the commonest mistake and it makes an episode feel flat.
 - "wide" establishes where we are. Use it sparingly, and only when the space itself matters.
 - "insert" is a detail with no face in it: a hand on a gate latch, cash on a table, a phone screen, a car door. Use at least one per episode. It is the cheapest way to make a scene feel filmed.
+- "two" is a SILENT shot (kind "action", no dialogue) with both people fully in frame, facing each other: the stare-down, the moment someone walks in on someone. Set "listener" to the second person. Use one or two per episode, usually at the turn and at the cliffhanger.
+- REACTION SHOTS: after a line that lands, cut to the person who heard it — a silent "close" action shot of their face reacting. At least one per episode. It is what makes a line hit.
 Do not repeat the same shotSize more than twice in a row.
+
+BODIES — nobody poses for the camera.
+- Every person is doing something with their body and the room: sitting at the desk, leaning on a chair back, gripping the papers, turning towards the window, standing up from a chair. Say it in "action".
+- Never describe someone standing straight, arms at their sides, facing the camera.
 
 ACTION — this is a drama, not an interview.
 - Use "action" shots (no speech) for arrivals, reveals, and the beats between lines, and make them genuinely physical: a car pulls up, a gate is shoved open, money is thrown down, somebody walks out.
@@ -366,7 +401,7 @@ ACTION — this is a drama, not an interview.
 CONTINUITY — the picture must match the words.
 - "action" must agree with the line. If a character says "come inside", the action shows them moving through the doorway — not standing outside facing the street. If they are leaving, they move away from what they are leaving.
 - Say which way the character faces or moves when it matters, and keep it consistent between consecutive shots.
-- One speaker per dialogue shot, and the "action" for that shot describes ONLY that person. Never put a second person in a dialogue frame.
+- One speaker per dialogue shot. The only other person allowed in a dialogue frame is the "ots" listener, seen from behind with their face hidden.
 
 Rules that matter:
 - ${options.shortForm
@@ -374,7 +409,7 @@ Rules that matter:
     : "A dialogue line is ONE person speaking, 4 to 18 words. Real speech, not a speech."}
 - Alternate speakers where two people are talking.
 - "action" is a single clear visual sentence: who is in frame, what they do, where. Always name the character.
-- For a DIALOGUE shot, "action" must describe ONLY the speaker and what their body is doing — never two people in the same frame. Dialogue is filmed one person at a time, and a second face on screen makes it impossible to tell who is talking.
+- For a DIALOGUE shot, "action" describes the speaker and what their body is doing. In an "ots" shot it may also place the listener's back and shoulder in the foreground, but NEVER their face: a second face on screen makes it impossible to tell who is talking.
 - Give every character ONE name and use that exact name every single time, in this episode and all later ones. Never "The Man" in one shot and "Jabulani" in the next — that is the same person and must read as the same person.
 - Put real physical action in the shots: people arrive, grab, walk out, slam things, turn away. A scene of talking heads is not a drama.
 - Every dialogue shot MUST carry "gender" for the speaker. Keep it the same every time that character speaks, in this episode and in every later one.
@@ -386,7 +421,7 @@ Respond with ONLY this JSON, no markdown:
   "title": "episode title",
   "synopsis": "two sentences, English, for the creator",
   "shots": [
-    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "wide" | "medium" | "close" | "insert", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm" }
+    { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "ots" | "medium" | "close" | "two" | "wide" | "insert", "listener": "the other person in frame for ots and two, else omit", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm" }
   ],
   "cliffhanger": "one line, English, what is left hanging",
   "location": "the ONE set this episode happens in, described visually: place, time of day, light, specific objects",
@@ -450,7 +485,7 @@ Respond with ONLY this JSON, no markdown:
       subtitle: String(s.subtitle || "").slice(0, 300).trim(),
       action: String(s.action || "").slice(0, 400),
       emotion: EMOTIONS.includes(s.emotion as never) ? s.emotion : "calm",
-      shotSize: SHOT_SIZES.includes(s.shotSize as never) ? s.shotSize : "medium",
+      ...framing(s, dialogue),
       kind: dialogue ? ("dialogue" as const) : ("action" as const),
     };
   });

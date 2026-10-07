@@ -23,6 +23,8 @@ import {
   Sparkles,
   AlertCircle,
   CheckCircle2,
+  Image as ImageIcon,
+  RotateCcw,
 } from "lucide-react";
 
 import { localeOrDefault } from "@/lib/series/locales";
@@ -54,6 +56,18 @@ interface Shot {
   subtitle: string;
   action: string;
   emotion: string;
+  /** Approved still, from the stills step. */
+  stillUrl?: string;
+  stillRedos?: number;
+}
+
+interface StillsState {
+  remaining: number;
+  set: string | null;
+  location: string | null;
+  lead: { name: string | null; portrait: string | null } | null;
+  cast: Array<{ name: string; look: string | null; portrait: string | null }>;
+  stills: Array<{ url: string | null; redos: number }>;
 }
 
 interface RenderedShot {
@@ -93,6 +107,9 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
   const [detail, setDetail] = useState<EpisodeDetail | null>(null);
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [note, setNote] = useState("");
+  // Stills first: the picture is got right before any video is paid for.
+  const [stills, setStills] = useState<StillsState | null>(null);
+  const [stilling, setStilling] = useState(false);
 
   useEffect(() => {
     params.then((p) => setSeriesId(p.seriesId));
@@ -178,7 +195,40 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
     }
   }
 
+  /**
+   * Makes (or retakes) the stills. The endpoint does a slice of the work per
+   * call and says how much is left, so keep calling until nothing is.
+   */
+  async function makeStills(episodeId: string, redo?: number) {
+    setStilling(true);
+    setNote("");
+    try {
+      let first = true;
+      for (let round = 0; round < 12; round++) {
+        const res = await fetch(`/api/series/${seriesId}/episodes/${episodeId}/stills`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(first && typeof redo === "number" ? { redo } : {}),
+        });
+        first = false;
+        const data = await res.json();
+        if (!res.ok) {
+          setNote(handleApiError(res, data));
+          return;
+        }
+        setStills(data as StillsState);
+        if (!data.remaining) break;
+      }
+      await loadDetail(episodeId);
+    } catch {
+      setNote("Could not make the stills. Check your connection and try again.");
+    } finally {
+      setStilling(false);
+    }
+  }
+
   function toggleEpisode(id: string) {
+    setStills(null);
     if (openEpisode === id) {
       setOpenEpisode("");
       setDetail(null);
@@ -397,6 +447,24 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                                     <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed">{shot.action}</p>
                                   )}
 
+                                  {!made && (shot.stillUrl || stills?.stills[i]?.url) && (
+                                    <div className="mt-2.5 flex items-end gap-2">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={stills?.stills[i]?.url || shot.stillUrl}
+                                        alt={`Still for shot ${i + 1}`}
+                                        className="w-full max-w-[160px] rounded-lg border border-white/[0.08]"
+                                      />
+                                      <button
+                                        onClick={() => makeStills(ep.id, i)}
+                                        disabled={stilling}
+                                        className="text-[11px] text-zinc-300 hover:text-white flex items-center gap-1 disabled:opacity-50"
+                                        title="Make this still again"
+                                      >
+                                        <RotateCcw className="w-3 h-3" /> Redo
+                                      </button>
+                                    </div>
+                                  )}
                                   {made?.clip_url && (
                                     <video
                                       src={made.clip_url}
@@ -467,9 +535,46 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                               )}
                             </div>
                           ) : (
+                            <div className="space-y-2">
+                              {/* The set and the faces every shot is built from. */}
+                              {stills && (stills.set || stills.cast.some((c) => c.portrait) || stills.lead?.portrait) && (
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                  {stills.set && (
+                                    <figure className="shrink-0">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={stills.set} alt="The set" className="h-24 rounded-lg border border-white/[0.08]" />
+                                      <figcaption className="text-[10px] text-zinc-400 mt-1">The set</figcaption>
+                                    </figure>
+                                  )}
+                                  {[...(stills.lead?.portrait ? [{ name: stills.lead.name || "Lead", portrait: stills.lead.portrait }] : []), ...stills.cast]
+                                    .filter((c) => c.portrait)
+                                    .map((c) => (
+                                      <figure key={c.name} className="shrink-0">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={c.portrait!} alt={c.name} className="h-24 rounded-lg border border-white/[0.08]" />
+                                        <figcaption className="text-[10px] text-zinc-400 mt-1 capitalize">{c.name}</figcaption>
+                                      </figure>
+                                    ))}
+                                </div>
+                              )}
+                              <button
+                                onClick={() => makeStills(ep.id)}
+                                disabled={stilling || rendering === ep.id}
+                                className="w-full rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-100 disabled:opacity-60 flex items-center justify-center gap-2"
+                              >
+                                {stilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                                {stilling
+                                  ? `Making stills${stills ? ` · ${stills.stills.length - stills.remaining} of ${stills.stills.length}` : "…"}`
+                                  : detail.shots.some((s) => s.stillUrl) || stills
+                                    ? "Finish the stills"
+                                    : "Preview the stills first (free)"}
+                              </button>
+                              <p className="text-[11px] text-zinc-400 text-center">
+                                See every shot as a picture, redo any that look wrong, then film. Filming starts from exactly these pictures.
+                              </p>
                             <button
                               onClick={() => renderEpisode(ep.id)}
-                              disabled={rendering === ep.id}
+                              disabled={rendering === ep.id || stilling}
                               className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-3 font-semibold text-white disabled:opacity-60 flex items-center justify-center gap-2"
                             >
                               {rendering === ep.id ? (
@@ -477,8 +582,9 @@ export default function SeriesPage({ params }: { params: Promise<{ seriesId: str
                               ) : (
                                 <Play className="w-4 h-4" />
                               )}
-                              {rendering === ep.id ? "Starting…" : `Make this episode · ${detail.cost} credits`}
+                              {rendering === ep.id ? "Starting…" : `Film this episode · ${detail.cost} credits`}
                             </button>
+                            </div>
                           )}
                         </>
                       )}

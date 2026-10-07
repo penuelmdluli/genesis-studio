@@ -22,7 +22,7 @@ import { submitWsModel, runWsModelSync, WS_MODELS } from "@/lib/wavespeed-tools"
 import type { Shot, SeriesLanguage } from "@/lib/series/writer";
 import { guessGender } from "@/lib/series/writer";
 import { localeOrDefault } from "@/lib/series/locales";
-import { voiceForCharacter } from "@/lib/series/cast";
+import { voiceForCharacter, characterKey } from "@/lib/series/cast";
 import { speakOmnivoice } from "@/lib/series/omnivoice";
 import { getDb } from "@/lib/db-driver";
 import { synthesiseSpeech } from "@/lib/edge-tts";
@@ -178,13 +178,27 @@ export interface RenderContext {
   aspectRatio: "9:16" | "16:9";
   /** The look of the series, from its genre. Drama when absent. */
   style?: VisualStyle;
+  /** The episode being filmed: its set picture is shared by every shot. */
+  episodeId?: string;
+}
+
+/** What a shot's still is built from: who is in it, and where. */
+export interface ShotRefs {
+  /** A portrait of the speaker (or the lead in an action shot) is attached. */
+  person: boolean;
+  /** The episode's set picture is attached. */
+  set: boolean;
+  /** The speaker's locked look, used in words when no portrait exists. */
+  look?: string | null;
+  /** The episode's location, used in words when no set picture exists. */
+  location?: string | null;
 }
 
 /**
  * The still for one shot. The locked character description leads, so the
  * model resolves the face before it resolves anything else.
  */
-export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
+export function buildShotImagePrompt(shot: Shot, ctx: RenderContext, refs?: ShotRefs): string {
   const framing = SHOT_FRAMING[shot.shotSize] || SHOT_FRAMING.medium;
   const tone = EMOTION_TONE[shot.emotion] || EMOTION_TONE.calm;
 
@@ -193,10 +207,33 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
   // Kept for the fallback path. When a reference photograph is used the
   // model is looking at the person, so leading with "the same person" beats
   // re-describing them.
-  const character =
-    shot.shotSize === "insert" || !ctx.characterDescription
-      ? ""
-      : `The same person from the reference photograph. ${ctx.characterDescription}. `;
+  //
+  // With refs, the person and the room come from pictures: image 1 is the
+  // speaker's own portrait (never the lead's, unless the lead is speaking)
+  // and the last image is the episode's set, so every shot of the scene is
+  // the same room in the same light.
+  let character: string;
+  let setting = "";
+  if (refs) {
+    character =
+      shot.shotSize === "insert"
+        ? ""
+        : refs.person
+          ? `${shot.speaker || "The person"} is the person in the first reference image: keep that exact face, hair, build and clothing. `
+          : refs.look
+            ? `${shot.speaker}: ${refs.look}. `
+            : "";
+    setting = refs.set
+      ? `The scene takes place in the room shown in the ${refs.person ? "second" : "first"} reference image: the same walls, furniture, windows and light. Same time of day and lighting as every other shot of this scene. `
+      : refs.location
+        ? `Setting: ${refs.location}. Same time of day and lighting as every other shot of this scene. `
+        : "";
+  } else {
+    character =
+      shot.shotSize === "insert" || !ctx.characterDescription
+        ? ""
+        : `The same person from the reference photograph. ${ctx.characterDescription}. `;
+  }
 
   // A speaking shot holds ONE person. With two people in frame the lip-sync
   // model animates both mouths, so the audience cannot tell who is talking.
@@ -208,6 +245,7 @@ export function buildShotImagePrompt(shot: Shot, ctx: RenderContext): string {
   return [
     character,
     solo,
+    setting,
     shot.action,
     `${framing}, ${tone}.`,
     styleSpec(ctx.style).look,
@@ -457,28 +495,182 @@ export interface SubmittedShot {
 }
 
 /**
+ * The portrait a shot is built from, and the look it stands for.
+ *
+ * The speaker's own portrait, made once from their locked look in the cast
+ * and reused forever. The lead's reference is used only when the lead is the
+ * one speaking, or is named in an action shot: handing the lead's photo to
+ * every shot is what put Lerato's lines in Sipho's mouth.
+ */
+export async function portraitForShot(
+  seriesId: string,
+  shot: Shot,
+  ctx: RenderContext
+): Promise<{ url: string | null; look: string | null } | null> {
+  const leadKey = ctx.characterName ? characterKey(ctx.characterName) : null;
+  const speakerKey = shot.speaker ? characterKey(shot.speaker) : null;
+
+  if (shot.kind !== "dialogue") {
+    // An action shot: the lead only if the direction is about them.
+    const aboutLead = !!ctx.characterName && (shot.action || "").toLowerCase().includes(ctx.characterName.toLowerCase());
+    if (!aboutLead) return null;
+    return { url: await ensureCharacterReference(seriesId, ctx), look: ctx.characterDescription };
+  }
+  if (!speakerKey) return null;
+  if (speakerKey === leadKey) {
+    return { url: await ensureCharacterReference(seriesId, ctx), look: ctx.characterDescription };
+  }
+
+  const db = getDb();
+  const { data: row } = await db
+    .from("series_cast")
+    .select("look, image_url")
+    .eq("series_id", seriesId)
+    .eq("character_key", speakerKey)
+    .maybeSingle();
+  if (row?.image_url) return { url: row.image_url, look: row.look || null };
+  if (!row?.look) return { url: null, look: null };
+
+  try {
+    const portrait = await runWsModelSync(WS_MODELS.textToImage, {
+      prompt: `${row.look}. ${styleSpec(ctx.style).portrait} ${NEGATIVE}.`,
+      size: "768*1344",
+    });
+    const url = Array.isArray(portrait?.outputs) ? String(portrait.outputs[0] || "") : "";
+    if (!url) return { url: null, look: row.look };
+    // Only the first portrait is kept: a character has ONE face.
+    await db
+      .from("series_cast")
+      .update({ image_url: url })
+      .eq("series_id", seriesId)
+      .eq("character_key", speakerKey)
+      .is("image_url", null);
+    const { data: saved } = await db
+      .from("series_cast")
+      .select("image_url")
+      .eq("series_id", seriesId)
+      .eq("character_key", speakerKey)
+      .maybeSingle();
+    return { url: saved?.image_url || url, look: row.look };
+  } catch (err) {
+    console.error(`[SERIES] could not make a portrait for ${shot.speaker}:`, err);
+    return { url: null, look: row.look };
+  }
+}
+
+/**
+ * The episode's set: one picture of the empty location, made once and handed
+ * to every shot, so a scene is one room in one light rather than ten rooms.
+ * The episode's own location (from the writer) wins; the series default
+ * covers older episodes. Nothing to show when neither is known.
+ */
+export async function ensureSetImage(
+  seriesId: string,
+  episodeId: string,
+  ctx: RenderContext
+): Promise<{ url: string | null; location: string | null }> {
+  const db = getDb();
+  const { data: ep } = await db
+    .from("series_episodes")
+    .select("location, set_image_url")
+    .eq("id", episodeId)
+    .maybeSingle();
+  if (ep?.set_image_url) return { url: ep.set_image_url, location: ep.location || null };
+
+  let location: string | null = ep?.location || null;
+  if (!location) {
+    const { data: series } = await db.from("series").select("location").eq("id", seriesId).maybeSingle();
+    location = series?.location || null;
+  }
+  if (!location) return { url: null, location: null };
+
+  try {
+    const plate = await runWsModelSync(WS_MODELS.textToImage, {
+      prompt:
+        `${location}. An empty film set photographed before the actors arrive: no people at all, ` +
+        `eye-level, the whole space readable, motivated practical lighting. ${styleSpec(ctx.style).look} ` +
+        `no text, no watermark.`,
+      size: ctx.aspectRatio === "9:16" ? "768*1344" : "1344*768",
+    });
+    const url = Array.isArray(plate?.outputs) ? String(plate.outputs[0] || "") : "";
+    if (!url) return { url: null, location };
+    // Only the first writer wins: two shots racing must share ONE set.
+    await db.from("series_episodes").update({ set_image_url: url }).eq("id", episodeId).is("set_image_url", null);
+    const { data: saved } = await db.from("series_episodes").select("set_image_url").eq("id", episodeId).maybeSingle();
+    return { url: saved?.set_image_url || url, location };
+  } catch (err) {
+    console.error("[SERIES] could not make the set picture:", err);
+    return { url: null, location };
+  }
+}
+
+/**
+ * Makes everything a scene shares BEFORE its shots are filmed in parallel:
+ * the set picture, the lead's reference and every speaker's portrait, and
+ * locks in the looks and location the writer gave this episode. Without
+ * this, ten shots submitted at once would each make their own set and their
+ * own version of every face.
+ */
+export async function prepareEpisodeReferences(
+  seriesId: string,
+  episodeId: string,
+  shots: Shot[],
+  ctx: RenderContext,
+  written?: { location?: string | null; characters?: Array<{ name: string; look: string }> }
+): Promise<void> {
+  const db = getDb();
+  if (written?.location) {
+    await db.from("series_episodes").update({ location: written.location.slice(0, 400) }).eq("id", episodeId).is("location", null);
+  }
+  // A returning character keeps the look they were first given.
+  for (const c of written?.characters || []) {
+    if (!c?.name || !c?.look) continue;
+    await db
+      .from("series_cast")
+      .update({ look: c.look.slice(0, 500) })
+      .eq("series_id", seriesId)
+      .eq("character_key", characterKey(c.name))
+      .is("look", null);
+  }
+
+  const withEpisode = { ...ctx, episodeId };
+  await ensureSetImage(seriesId, episodeId, withEpisode);
+  const seen = new Set<string>();
+  for (const shot of shots) {
+    const key = shot.kind === "dialogue" && shot.speaker ? characterKey(shot.speaker) : "";
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    await portraitForShot(seriesId, shot, withEpisode);
+  }
+}
+
+/**
  * Renders one shot. Returns as soon as the video job is accepted — the clip
  * is polled later like every other hosted job, so a nine-shot episode does
  * not hold a request open for ten minutes.
  */
-export async function submitShot(
-  shot: Shot,
-  ctx: RenderContext,
-  userId: string,
-  tag: string,
-  seriesId?: string
-): Promise<SubmittedShot> {
-  // 1. The still, built from a photograph of the character wherever we have
-  //    one. An insert has no face in it, so it needs no reference.
-  const prompt = buildShotImagePrompt(shot, ctx);
-  const reference = shot.shotSize === "insert" || !seriesId ? null : await ensureCharacterReference(seriesId, ctx);
+/**
+ * The still for one shot. Built from a portrait of whoever is actually in
+ * the shot (the speaker; the lead only when the lead is speaking or named in
+ * the action) plus the episode's set picture, so every shot of the scene is
+ * the same people in the same room. An insert has no face, only the set.
+ *
+ * Used by the stills step (the creator approves these before any video is
+ * paid for) and by submitShot when a shot has no approved still yet.
+ */
+export async function makeShotStill(shot: Shot, ctx: RenderContext, seriesId?: string): Promise<string> {
+  const person = shot.shotSize === "insert" || !seriesId ? null : await portraitForShot(seriesId, shot, ctx);
+  const set = seriesId && ctx.episodeId ? await ensureSetImage(seriesId, ctx.episodeId, ctx) : { url: null, location: null };
+  const refs: ShotRefs = { person: !!person?.url, set: !!set.url, look: person?.look || null, location: set.location };
+  const prompt = buildShotImagePrompt(shot, ctx, refs);
+  const images = [person?.url, set.url].filter((u): u is string => !!u);
 
   let imageUrl = "";
-  if (reference) {
+  if (images.length) {
     try {
       const edited = await runWsModelSync(
         REFERENCE_SHOT_MODEL,
-        { prompt, images: [reference], output_format: "png" },
+        { prompt, images, output_format: "png" },
         { timeoutMs: 150_000 }
       );
       imageUrl = Array.isArray(edited?.outputs) ? String(edited.outputs[0] || "") : "";
@@ -496,6 +688,18 @@ export async function submitShot(
     imageUrl = Array.isArray(image?.outputs) ? String(image.outputs[0] || "") : "";
   }
   if (!imageUrl) throw new Error("Could not compose this shot");
+  return imageUrl;
+}
+
+export async function submitShot(
+  shot: Shot,
+  ctx: RenderContext,
+  userId: string,
+  tag: string,
+  seriesId?: string
+): Promise<SubmittedShot> {
+  // 1. The still: the one the creator approved, or a fresh one.
+  const imageUrl = shot.stillUrl || (await makeShotStill(shot, ctx, seriesId));
 
   // 2. Speech, when there is any. The voice comes from the series cast, so a
   //    character sounds the same in every episode they appear in.

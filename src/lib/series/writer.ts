@@ -105,6 +105,19 @@ export interface Shot {
   emotion: "calm" | "angry" | "afraid" | "joyful" | "grieving" | "tense" | "shocked";
   /** Action shots get cinematic motion; dialogue shots get lip sync. */
   kind: "dialogue" | "action";
+  /**
+   * The approved still for this shot, made by the stills step before any
+   * video is paid for. When present, filming starts from it as-is.
+   */
+  stillUrl?: string;
+  /** How many times the creator asked for this still again (capped). */
+  stillRedos?: number;
+}
+
+/** A character's locked look, as the writer described them. */
+export interface CharacterLook {
+  name: string;
+  look: string;
 }
 
 export interface EpisodeDraft {
@@ -115,6 +128,13 @@ export interface EpisodeDraft {
   storySoFar: string;
   /** The hook that makes them watch the next one. */
   cliffhanger: string;
+  /**
+   * Where this episode happens, as ONE set described visually. Every shot is
+   * built in a picture of it, so the scene is one room in one light.
+   */
+  location?: string;
+  /** Every character on screen, with a fixed visual description. */
+  characters?: CharacterLook[];
 }
 
 export interface SeriesContext {
@@ -126,6 +146,11 @@ export interface SeriesContext {
   characterDescription: string | null;
   storySoFar: string | null;
   episodeNumber: number;
+  /**
+   * Looks already locked for this series. Handed back to the writer so a
+   * returning character is described exactly as before.
+   */
+  knownLooks?: CharacterLook[];
 }
 
 const EMOTIONS = ["calm", "angry", "afraid", "joyful", "grieving", "tense", "shocked"] as const;
@@ -306,6 +331,11 @@ ${continuity}
 
 ${styleRules}
 
+${ctx.knownLooks?.length ? `CHARACTERS ALREADY ON SCREEN — reuse these looks WORD FOR WORD if they appear:
+${ctx.knownLooks.map((c) => `- ${c.name}: ${c.look}`).join("\n")}
+` : ""}
+ONE SET PER EPISODE. The whole episode happens in ONE location unless the story truly moves. Describe it in "location" as a film set: the place, time of day, the light, and two or three objects that make it specific ("a Sandton mansion study at dusk, floor-to-ceiling windows over the city, dark wood desk, leather chairs, warm lamp light"). Every shot's "action" must agree with it.
+
 LANGUAGE: ${lang}
 Visual direction ("action") stays in ENGLISH. It is read by a camera system, never by the audience.
 
@@ -359,6 +389,8 @@ Respond with ONLY this JSON, no markdown:
     { "kind": "dialogue", "speaker": "character name", "gender": "female" or "male", "shotSize": "wide" | "medium" | "close" | "insert", "dialogue": "the line in the series language, empty for action shots", "subtitle": "the same line translated into natural English, empty for action shots", "action": "English visual direction that matches the line", "emotion": "calm" }
   ],
   "cliffhanger": "one line, English, what is left hanging",
+  "location": "the ONE set this episode happens in, described visually: place, time of day, light, specific objects",
+  "characters": [ { "name": "exactly as used in speaker", "look": "fixed visual description: age, build, skin, hair, clothing, one signature item. Reuse a known look word for word." } ],
   "storySoFar": "a rewritten recap covering everything from episode 1 through this one, under 250 words, English. This is the only memory the next episode gets, so carry forward every name, relationship and unresolved thread."
 }`;
 
@@ -371,7 +403,7 @@ Respond with ONLY this JSON, no markdown:
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 3000,
+      max_tokens: 4500,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -429,6 +461,13 @@ Respond with ONLY this JSON, no markdown:
   draft.synopsis = String(draft.synopsis || "").slice(0, 600);
   draft.cliffhanger = String(draft.cliffhanger || "").slice(0, 300);
   draft.storySoFar = String(draft.storySoFar || ctx.storySoFar || "").slice(0, 4000);
+  draft.location = draft.location ? String(draft.location).slice(0, 400) : undefined;
+  draft.characters = Array.isArray(draft.characters)
+    ? draft.characters
+        .filter((c) => c && typeof c.name === "string" && typeof c.look === "string")
+        .map((c) => ({ name: c.name.slice(0, 60), look: c.look.slice(0, 500) }))
+        .slice(0, 12)
+    : [];
 
   return draft;
 }

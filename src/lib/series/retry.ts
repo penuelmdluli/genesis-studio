@@ -104,6 +104,7 @@ export async function retryFailedShots(
     characterName: series.character_name || null,
     aspectRatio,
     style: styleForGenre(series.genre),
+    episodeId,
   };
 
   // Claim the shots first. Two polls arriving together would otherwise both

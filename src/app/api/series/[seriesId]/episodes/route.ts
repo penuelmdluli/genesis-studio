@@ -87,6 +87,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
   // Where the story currently stands. Written back after every episode so an
   // interrupted season leaves the series consistent rather than half-told.
   let storySoFar: string = series.story_so_far || "";
+
+  // Looks already locked for this series, so a returning character is
+  // written exactly as before. A character met in this batch for the first
+  // time is carried forward to the next episode of the batch too.
+  const { data: castLooks } = await db
+    .from("series_cast")
+    .select("display_name, character_key, look")
+    .eq("series_id", seriesId)
+    .not("look", "is", null);
+  const knownLooks: Array<{ name: string; look: string }> = ((castLooks || []) as Array<{ display_name: string | null; character_key: string; look: string }>)
+    .map((c) => ({ name: c.display_name || c.character_key, look: c.look }));
   let episodeNumber: number = (series.episode_count || 0) + 1;
   const written: Array<{ id: string; episodeNumber: number; title: string; synopsis: string; shots: number; renderCost: number }> = [];
 
@@ -102,6 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
           characterDescription: series.character_description,
           storySoFar,
           episodeNumber,
+          knownLooks,
         },
         shotCount
       );
@@ -114,12 +126,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
         episode_number: episodeNumber,
         title: draft.title,
         synopsis: draft.synopsis,
-        script: JSON.stringify({ shots: draft.shots, cliffhanger: draft.cliffhanger }),
+        script: JSON.stringify({
+          shots: draft.shots,
+          cliffhanger: draft.cliffhanger,
+          location: draft.location || null,
+          characters: draft.characters || [],
+        }),
         status: "written",
       });
       if (insertError) throw new Error(`Could not save episode ${episodeNumber}`);
 
       storySoFar = draft.storySoFar;
+      for (const c of draft.characters || []) {
+        const key = c.name.toLowerCase();
+        if (!knownLooks.some((k) => k.name.toLowerCase() === key)) knownLooks.push(c);
+      }
 
       // Saved per episode, not once at the end: if episode 6 of 10 fails,
       // the five that worked are still there and still consistent.

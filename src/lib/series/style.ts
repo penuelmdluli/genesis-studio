@@ -45,7 +45,10 @@ export const STYLES: Record<VisualStyle, StyleSpec> = {
   drama: {
     look: "Cinematic South African drama, photoreal, film grain, natural skin texture, 35mm.",
     motion: "Cinematic handheld camera movement, dramatic, photoreal.",
-    portrait: "Full body portrait standing in a South African township street, neutral expression, facing camera, even daylight. Photoreal, 35mm, natural skin texture.",
+    // A reference shows the PERSON only. A background baked in here was
+    // inherited by every shot: "The Maid's Son" ep 1 put a Sandton study
+    // scene on a township street because the portrait stood in one.
+    portrait: "Full body portrait against a plain light-grey studio backdrop, neutral expression, facing camera, soft even light. Photoreal, 35mm, natural skin texture.",
     videoModel: "bytedance/seedance-v1.5-pro/image-to-video",
     blockbuster: false,
     silentHold: 3.2,
@@ -55,7 +58,7 @@ export const STYLES: Record<VisualStyle, StyleSpec> = {
   action: {
     look: `${LIVE}, vertical composition with the subject centred.`,
     motion: "Fast dynamic camera, tracking and whip pans, slow motion on impacts, Hollywood action blockbuster, photoreal.",
-    portrait: `Full body character portrait, standing, facing camera, confident stance, city at dusk behind. ${LIVE}.`,
+    portrait: `Full body character portrait, standing, facing camera, confident stance, plain dark-grey studio backdrop. ${LIVE}.`,
     videoModel: "bytedance/seedance-2.5/image-to-video",
     blockbuster: true,
     silentHold: 4.6,
@@ -65,7 +68,7 @@ export const STYLES: Record<VisualStyle, StyleSpec> = {
   cartoon: {
     look: `${TOON}, vertical composition with the subject centred.`,
     motion: "Lively animated camera, bouncy expressive character animation, squash and stretch, 3D animated feature film.",
-    portrait: `Full body 3D animated character, standing, facing camera, friendly expressive pose, simple colourful background. ${TOON}.`,
+    portrait: `Full body 3D animated character, standing, facing camera, friendly expressive pose, plain light backdrop. ${TOON}.`,
     videoModel: "bytedance/seedance-2.5/image-to-video",
     blockbuster: true,
     silentHold: 4.2,

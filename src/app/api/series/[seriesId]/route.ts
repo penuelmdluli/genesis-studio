@@ -64,6 +64,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
     ["characterDescription", "character_description", 600],
     ["characterImageUrl", "character_image_url", 500],
     ["storySoFar", "story_so_far", 4000],
+    // The default set; each episode's writer can still name its own.
+    ["location", "location", 400],
   ];
   for (const [key, column, max] of allowed) {
     if (typeof body[key] === "string") patch[column] = body[key].slice(0, max);

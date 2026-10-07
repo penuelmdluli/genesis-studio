@@ -18,7 +18,7 @@ import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/fraud";
 import { getDb } from "@/lib/db-driver";
 import { envString } from "@/lib/env";
-import { submitShot, type RenderContext } from "@/lib/series/render";
+import { submitShot, prepareEpisodeReferences, type RenderContext } from "@/lib/series/render";
 import { ensureCast } from "@/lib/series/cast";
 import { guessGender } from "@/lib/series/writer";
 import { renderCost, shotCredits } from "@/lib/series/pricing";
@@ -95,8 +95,15 @@ export async function POST(
   if (!series) return NextResponse.json({ error: "Series not found" }, { status: 404 });
 
   let shots: Shot[] = [];
+  let written: { location?: string | null; characters?: Array<{ name: string; look: string }> } = {};
   try {
-    shots = (JSON.parse(episode.script || "{}") as { shots?: Shot[] }).shots || [];
+    const parsed = JSON.parse(episode.script || "{}") as {
+      shots?: Shot[];
+      location?: string;
+      characters?: Array<{ name: string; look: string }>;
+    };
+    shots = parsed.shots || [];
+    written = { location: parsed.location || null, characters: parsed.characters || [] };
   } catch {
     shots = [];
   }
@@ -118,6 +125,7 @@ export async function POST(
     characterName: series.character_name || null,
     aspectRatio: body.aspectRatio === "16:9" ? "16:9" : "9:16",
     style: styleForGenre(series.genre),
+    episodeId,
   };
   const blockbuster = styleSpec(ctx.style).blockbuster;
 
@@ -217,6 +225,9 @@ export async function POST(
   // Cast everyone before anything renders, so two characters cannot claim
   // the same voice at the same instant.
   await ensureCast(seriesId, shots, ctx.language, guessGender, user.id);
+
+  // The set and every face, made once, before ten shots race for them.
+  await prepareEpisodeReferences(seriesId, episodeId, shots, ctx, written);
 
   await db.from("series_episodes").update({ status: "rendering" }).eq("id", episodeId);
 

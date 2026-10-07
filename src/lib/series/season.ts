@@ -101,7 +101,7 @@ Respond with ONLY this JSON, no markdown:
   ]
 }`;
 
-  const plan = parseJson<SeasonPlan>(await askClaude(prompt, { effort: "high", maxTokens: 16000 }));
+  const plan = parseJson<SeasonPlan>(await askClaude(prompt, { effort: "medium" }));
   if (!Array.isArray(plan.episodes) || plan.episodes.length === 0) throw new Error("The season plan came back empty");
   plan.paywallAfter = Number(plan.paywallAfter) || paywall;
   plan.episodes = plan.episodes.slice(0, n).map((e, i) => ({

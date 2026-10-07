@@ -38,17 +38,20 @@ export async function askClaude(prompt: string, opts: AskOptions = {}): Promise<
   // sent as-is to the API, which is what reads them.
   const params = {
     model: WRITER_MODEL,
-    max_tokens: opts.maxTokens ?? 16000,
+    max_tokens: opts.maxTokens ?? 32000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: opts.effort ?? "medium" },
     ...(opts.system ? { system: opts.system } : {}),
     messages: [{ role: "user", content: prompt }],
-  } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming;
+  } as unknown as Anthropic.Beta.MessageCreateParamsStreaming;
 
   let msg: Anthropic.Beta.BetaMessage;
   try {
-    msg = (await client.beta.messages.create(params)) as Anthropic.Beta.BetaMessage;
+    // Streamed so a long think plus a long script fits under a large
+    // max_tokens without an HTTP timeout. The season planner once spent all
+    // 16,000 tokens thinking and returned no text at all (2026-10-07).
+    msg = (await client.beta.messages.stream(params).finalMessage()) as Anthropic.Beta.BetaMessage;
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) throw new WriterUnavailable("The writer is busy, try again in a minute");
     if (err instanceof Anthropic.APIError) {
@@ -65,7 +68,13 @@ export async function askClaude(prompt: string, opts: AskOptions = {}): Promise<
     .map((b) => b.text)
     .join("")
     .trim();
-  if (!text) throw new WriterUnavailable("The writer returned nothing, please try again");
+  if (!text) {
+    throw new WriterUnavailable(
+      msg.stop_reason === "max_tokens"
+        ? "The writer ran out of room before finishing, please try again"
+        : "The writer returned nothing, please try again"
+    );
+  }
   return text;
 }
 

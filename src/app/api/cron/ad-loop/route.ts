@@ -20,7 +20,8 @@ import { publishReel } from "@/lib/facebook-reels";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const PAGE_KEY = "mzansi_baby_stars"; // SAGA of the NORTH
+const AD_LOOP_DISABLED = true; // see GET: the page is now Mzansi Daily News
+const PAGE_KEY = "mzansi_baby_stars"; // SAGA of the NORTH (now Mzansi Daily News)
 const CDN = "https://cdn.ivideostudio.ai/marketing/ads";
 // Tracked, so sign-ups and sales from the SAGA ad loop show up by source.
 const LINK = "https://ivideostudio.ai/generate?utm_source=facebook&utm_medium=ad_loop&utm_campaign=saga";
@@ -98,6 +99,14 @@ export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.headers.get("x-cron-secret");
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // OFF since 2026-10-09 (owner): SAGA of the NORTH (112465853843545) became
+  // "Mzansi Daily News", a verified SA news-explainer page posted only by the
+  // traderadar-ai page revival engine. Drama ads must not land there any more.
+  // To revive the loop, point PAGE_KEY at another page and remove this return.
+  if (AD_LOOP_DISABLED) {
+    return NextResponse.json({ skipped: "ad loop disabled: page converted to Mzansi Daily News (2026-10-09)" });
   }
 
   const { day, index } = sastDay(Date.now());

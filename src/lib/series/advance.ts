@@ -15,7 +15,7 @@ import { getDb } from "@/lib/db-driver";
 import type { Shot } from "@/lib/series/writer";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import { retryFailedShots } from "@/lib/series/retry";
-import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
+import { startAssembly, collectAssembly, isAssembled, isJoinRunning } from "@/lib/series/assemble";
 
 export interface EpisodeRow {
   id: string;
@@ -104,7 +104,7 @@ export async function advanceEpisode(episode: EpisodeRow, brandMark: boolean): P
   // cannot start another one.
   if (!episode.video_id && episode.status === "completed" && done >= 2) {
     const { data: series } = await db.from("series").select("title, genre").eq("id", seriesId).maybeSingle();
-    if (episode.assembly_job) {
+    if (isJoinRunning(episode.assembly_job)) {
       // A join is already running. Collect it if it has finished.
       const result = await collectAssembly(
         episodeId,

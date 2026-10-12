@@ -25,7 +25,7 @@ import { ensureCast } from "@/lib/series/cast";
 import { submitShot, type RenderContext } from "@/lib/series/render";
 import { refreshShots, SHOT_SELECT, type ShotRow } from "@/lib/series/progress";
 import { retryFailedShots, MAX_SHOT_ATTEMPTS } from "@/lib/series/retry";
-import { startAssembly, collectAssembly, isAssembled } from "@/lib/series/assemble";
+import { startAssembly, collectAssembly, isAssembled, isJoinRunning } from "@/lib/series/assemble";
 import { publishReel } from "@/lib/facebook-reels";
 import { notifyOwner } from "@/lib/owner-notify";
 
@@ -233,7 +233,7 @@ export async function tickCampaign(campaign: Campaign): Promise<TickResult> {
     }
 
     if (!latest.video_id) {
-      if (latest.assembly_job) {
+      if (isJoinRunning(latest.assembly_job as string | null)) {
         const r = await collectAssembly(
           episodeId,
           series.user_id,

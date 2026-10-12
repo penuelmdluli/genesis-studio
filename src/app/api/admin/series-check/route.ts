@@ -287,7 +287,7 @@ export async function POST(req: NextRequest) {
 
     // Same two steps the episode page takes: collect a running job, or start
     // one if there is none.
-    const result = ep.assembly_job
+    const result = ep.assembly_job && !String(ep.assembly_job).startsWith("failed:")
       ? await collectAssembly(
           ep.id,
           ep.user_id,

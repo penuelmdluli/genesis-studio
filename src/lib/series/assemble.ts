@@ -94,6 +94,40 @@ export function isAssembled(r: AssemblyResult): r is AssembledEpisode {
 }
 
 /**
+ * JOIN ATTEMPTS ARE CAPPED (2026-10-12). A join that failed used to be
+ * retried by the 5-minute series-progress cron forever, and every attempt
+ * paid for a fresh score first: two owner episodes from 12 Sep whose join
+ * could never succeed generated 288 paid music tracks a day from 6 Oct until
+ * this cap — the steady drain on the provider balance. Failures are now
+ * tallied in assembly_job as "failed:N" and the episode is left alone after
+ * MAX_JOIN_ATTEMPTS. The admin re-join clears the column, which resets it.
+ */
+export const MAX_JOIN_ATTEMPTS = 3;
+
+/** Failed joins so far, read from the assembly_job marker. */
+export function joinFailures(assemblyJob: string | null | undefined): number {
+  const s = String(assemblyJob || "");
+  const failed = /^failed:(\d+)$/.exec(s);
+  if (failed) return Number(failed[1]) || 0;
+  // A running job carries the tally forward as a third field.
+  const parts = s.split("|");
+  return parts.length >= 3 ? Number(parts[2]) || 0 : 0;
+}
+
+/** True only for a join that is actually running at the video service. */
+export function isJoinRunning(assemblyJob: string | null | undefined): boolean {
+  return !!assemblyJob && !String(assemblyJob).startsWith("failed:");
+}
+
+async function recordJoinFailure(episodeId: string, failures: number): Promise<void> {
+  try {
+    await getDb().from("series_episodes").update({ assembly_job: `failed:${failures + 1}` }).eq("id", episodeId);
+  } catch {
+    // best effort: the cap is a spend guard, never a reason to throw
+  }
+}
+
+/**
  * Height of the joined episode.
  *
  * 1080p, measured rather than assumed. Joining at this size once exhausted
@@ -133,6 +167,14 @@ export async function startAssembly(
   if (!svc) return { reason: "the video service is not configured" };
 
   const db = getDb();
+
+  // Spend guard: stop before the paid score once the joins keep failing.
+  const { data: prior } = await db.from("series_episodes").select("assembly_job").eq("id", episodeId).maybeSingle();
+  const failures = joinFailures(prior?.assembly_job as string | null | undefined);
+  if (failures >= MAX_JOIN_ATTEMPTS) {
+    return { reason: `the join failed ${failures} times — stopped retrying (re-join from admin to try again)` };
+  }
+
   const { data: shotRows } = await db
     .from("series_shots")
     .select("shot_index, status, kind, clip_url, raw_clip_url, audio_url, sfx_url, native_audio, subtitle")
@@ -148,6 +190,11 @@ export async function startAssembly(
   if (usable.length < 2) {
     return { reason: `only ${usable.length} finished shot(s) — nothing to join` };
   }
+
+  // Count this attempt BEFORE the paid score: a request killed mid-way (the
+  // score alone can outlast the cron's time limit) must still use one up.
+  // A join that is accepted overwrites this with its running marker.
+  await recordJoinFailure(episodeId, failures);
 
   // The destination is chosen now so the video id is stable across the whole
   // job: the poll that collects the result must know where the file landed.
@@ -238,21 +285,26 @@ export async function startAssembly(
 
     if (!res.ok) {
       const detail = (await res.text()).slice(0, 300);
+      await recordJoinFailure(episodeId, failures);
       return { reason: `stitch ${res.status}: ${detail}` };
     }
 
     const body = (await res.json()) as { jobId?: string };
-    if (!body.jobId) return { reason: "the video service did not return a job" };
+    if (!body.jobId) {
+      await recordJoinFailure(episodeId, failures);
+      return { reason: "the video service did not return a job" };
+    }
 
     // videoId travels with the job so the collecting poll can file the result
     // without guessing.
     await db
       .from("series_episodes")
-      .update({ assembly_job: `${body.jobId}|${videoId}` })
+      .update({ assembly_job: `${body.jobId}|${videoId}|${failures + 1}` })
       .eq("id", episodeId);
 
     return { pending: true, jobId: body.jobId };
   } catch (err) {
+    await recordJoinFailure(episodeId, failures);
     return { reason: err instanceof Error ? `${err.name}: ${err.message}` : String(err) };
   }
 }
@@ -286,7 +338,7 @@ export async function collectAssembly(
     // in memory. Clearing the marker lets the next poll start a fresh one
     // rather than waiting forever on a job that no longer exists.
     if (res.status === 404) {
-      await db.from("series_episodes").update({ assembly_job: null }).eq("id", episodeId);
+      await db.from("series_episodes").update({ assembly_job: `failed:${joinFailures(assemblyJob) + 1}` }).eq("id", episodeId);
       return { reason: "the join was interrupted — it will start again" };
     }
 
@@ -297,7 +349,7 @@ export async function collectAssembly(
     if (body.status === "running") return { pending: true, jobId };
 
     if (body.status !== "done") {
-      await db.from("series_episodes").update({ assembly_job: null }).eq("id", episodeId);
+      await db.from("series_episodes").update({ assembly_job: `failed:${joinFailures(assemblyJob) + 1}` }).eq("id", episodeId);
       return { reason: body.error || "the join failed" };
     }
 

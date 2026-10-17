@@ -164,6 +164,21 @@ export function useGenerationProgress() {
   const [stageMessage, setStageMessage] = useState("");
   const [isActive, setIsActive] = useState(false);
 
+  // Auto-creep: while a generation is active, keep the bar moving toward (but not
+  // past) 95% so the long wait never looks frozen. Explicit setProgress() jumps win;
+  // complete() finishes at 100, fail()/reset() stop it. Decelerates near the end.
+  useEffect(() => {
+    if (!isActive) return;
+    const id = setInterval(() => {
+      setPercent((p) => {
+        if (p >= 95) return p;
+        const step = p < 70 ? 1.5 : p < 85 ? 0.8 : 0.3;
+        return Math.min(95, Math.round((p + step) * 10) / 10);
+      });
+    }, 1500);
+    return () => clearInterval(id);
+  }, [isActive]);
+
   const start = (initialSteps: string[]) => {
     setSteps(initialSteps.map((label, i) => ({
       label,

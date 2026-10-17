@@ -87,7 +87,9 @@ export async function POST(req: NextRequest) {
 
     const related = await relatedAccounts(signals);
     const risk = scoreRisk(signals, email.toLowerCase().trim(), related);
-    const freeCredits = risk.denyFreeCredits ? 0 : 100;
+    // 2026-10-17: free-credit grant cut 100 → 20 (video now needs a paid plan; this
+  // is a small taste for the free tools only, not a pile to burn on GPU video).
+  const freeCredits = risk.denyFreeCredits ? 0 : 20;
 
     // Hash password
     const passwordHash = await hashPassword(password);

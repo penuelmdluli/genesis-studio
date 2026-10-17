@@ -41,9 +41,10 @@ export async function GET(req: NextRequest) {
         avatar_url: profile.avatarUrl,
         auth_provider: "google",
         plan: "free",
-        credit_balance: 100,
+        // 2026-10-17: cut 100 → 20 to match the email signup grant (video needs a paid plan).
+        credit_balance: 20,
         monthly_credits_used: 0,
-        monthly_credits_limit: 100,
+        monthly_credits_limit: 20,
       });
 
       if (error) {

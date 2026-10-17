@@ -668,7 +668,11 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
   // failed" support tickets). It is now REMOVED from every tier. wan-2.2
   // (WaveSpeed, verified end to end) is the reliable base; kling / veo /
   // seedance-2.5 route to FAL on the paid tiers.
-  free: ["wan-2.2", "mimic-motion"],
+  // No free video generation (2026-10-17): making a video requires a paid plan.
+  // Free users keep the cheap, non-GPU tools (captions / voiceover / thumbnails /
+  // image-upscale, see TOOL access below); every video model costs money to run,
+  // so "whoever wants a video pays". Was ["wan-2.2","mimic-motion"].
+  free: [],
   creator: [
     "kling-2.6",
     "mimic-motion",

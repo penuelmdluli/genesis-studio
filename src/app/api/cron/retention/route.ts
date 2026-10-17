@@ -1,7 +1,7 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db-driver";
-import { sendCreditsExpiryEmail, sendWinBackEmail, sendWeeklyDigestEmail } from "@/lib/email-retention";
+import { sendCreditsExpiryEmail, sendWeeklyDigestEmail } from "@/lib/email-retention";
 
 /**
  * Cron job: Retention campaigns.
@@ -38,27 +38,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2. Win-back: users inactive for 14+ days with free plan
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 86_400_000).toISOString();
-    const { data: inactiveUsers } = await supabase
-      .from("users")
-      .select("id, email, name")
-      .eq("plan", "free")
-      .lt("updated_at", fourteenDaysAgo)
-      .limit(20);
-
-    for (const user of inactiveUsers || []) {
-      if (user.email) {
-        // Grant 25 bonus credits
-        await supabase
-          .from("users")
-          .update({ credit_balance: 25 })
-          .eq("id", user.id)
-          .eq("credit_balance", 0); // Only if they have 0 credits
-        sendWinBackEmail(user.email, user.name || "Creator", 25).catch(() => {});
-        results.winBackEmails++;
-      }
-    }
+    // 2. Win-back grant REMOVED (2026-10-17): the recurring 25-credit give-away to
+    // dormant free users was a pure cost with no revenue, so no free credits are
+    // granted here any more. (Re-engagement toward paid plans can be redesigned later.)
 
     // 3. Weekly digest (only on Mondays)
     const today = new Date();

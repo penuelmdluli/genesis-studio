@@ -40,7 +40,7 @@ export const OUTRO_PRESETS: OutroConfig[] = [
     bgColor: "#0a0a0a",
     textLines: ["GENESIS STUDIO", "AI Video Platform"],
     websiteUrl: "ivideostudio.ai",
-    ctaText: "Create YOUR own AI videos FREE",
+    ctaText: "Create YOUR own AI videos → ivideostudio.ai",
     style: "dark",
   },
   {
@@ -70,7 +70,7 @@ export const OUTRO_PRESETS: OutroConfig[] = [
     bgColor: "#000000",
     textLines: ["ivideostudio.ai"],
     websiteUrl: "ivideostudio.ai",
-    ctaText: "50 FREE credits → No card needed",
+    ctaText: "Start free → ivideostudio.ai",
     style: "minimal",
   },
 ];

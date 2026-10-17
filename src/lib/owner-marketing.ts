@@ -200,13 +200,13 @@ ${extraText ? extraText + "\n\n" : ""}${marketingLine}
 
 const MARKETING_COMMENTS = [
   "This was made with AI! Create your own → ivideostudio.ai 🔥",
-  "Make YOUR own AI dance video FREE → ivideostudio.ai",
-  "Want this for YOUR character? Try it free → ivideostudio.ai",
+  "Make YOUR own AI dance video → ivideostudio.ai",
+  "Want this for YOUR character? → ivideostudio.ai",
   "100% AI-generated! Make yours → ivideostudio.ai",
   "Turn ANY photo into a dancing video → ivideostudio.ai 🔥",
-  "50 FREE credits to create your own → ivideostudio.ai",
+  "Create your own → ivideostudio.ai",
   "AI made this in 60 seconds. Your turn → ivideostudio.ai",
-  "Create videos like this FREE → ivideostudio.ai 🎬",
+  "Create videos like this → ivideostudio.ai 🎬",
 ];
 
 const ENGAGEMENT_COMMENTS = [

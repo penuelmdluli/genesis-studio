@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       pending_credits: freeCredits,
       email_verified: 0,
       monthly_credits_used: 0,
-      monthly_credits_limit: 100,
+      monthly_credits_limit: 20,
       suspended: risk.autoBlock ? 1 : 0,
       suspended_reason: risk.autoBlock ? risk.reasons.join("; ").slice(0, 200) : null,
     });

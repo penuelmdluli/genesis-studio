@@ -240,10 +240,10 @@ export const PLANS: Plan[] = [
     name: "Free",
     price: 0,
     priceZAR: 0,
-    credits: 100,
+    credits: 20,
     maxResolution: "720p",
     features: [
-      "100 credits/month",
+      "20 credits to try the free tools",
       "720p max resolution",
       "Watermarked output",
       "Auto Captions (3/month)",

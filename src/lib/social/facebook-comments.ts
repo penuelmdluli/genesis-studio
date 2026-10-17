@@ -35,9 +35,9 @@ export async function postPageComment(
 // ── Marketing Comments for Owner Auto-Posts ──
 
 const PINNED_COMMENTS = [
-  "🎬 This was 100% AI-generated using iVideo Studio. No camera. No crew. No editing. Just one prompt.\n\n👉 Try it FREE: https://ivideostudio.ai\n🎁 100 free credits — create your first video in 60 seconds!",
+  "🎬 This was 100% AI-generated using iVideo Studio. No camera. No crew. No editing. Just one prompt.\n\n👉 Try it FREE: https://ivideostudio.ai\n🎁 20 free credits — create your first video in 60 seconds!",
   "⚡ How was this made? One prompt + iVideo Studio = this video.\n\nAI does the script, voiceover, music, and captions.\n\n🚀 https://ivideostudio.ai — try it free, no card needed!",
-  "🤖 Yes, this is AI. And yes, you can make your own.\n\niVideo Studio — the #1 AI video tool for African creators.\n\n👇 https://ivideostudio.ai\n✨ 100 free credits waiting for you!",
+  "🤖 Yes, this is AI. And yes, you can make your own.\n\niVideo Studio — the #1 AI video tool for African creators.\n\n👇 https://ivideostudio.ai\n✨ 20 free credits waiting for you!",
   "💡 Imagine creating content like this every day without a camera.\n\nThat's iVideo Studio. AI video generation. Built in South Africa.\n\n🔗 https://ivideostudio.ai — start free today!",
   "🌍 Made in Africa. Powered by AI. Available worldwide.\n\niVideo Studio turns your ideas into cinematic videos.\nVoiceover. Music. Captions. All automatic.\n\n🚀 https://ivideostudio.ai",
 ];

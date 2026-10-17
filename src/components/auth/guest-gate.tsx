@@ -66,7 +66,7 @@ export function GuestGate() {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-zinc-200">
             <Sparkles className="inline w-4 h-4 text-violet-300 mr-1.5 -mt-0.5" />
-            You&apos;re looking around as a guest. Sign up free to create, with 100 credits on us.
+            You&apos;re looking around as a guest. Sign up free to explore, with 20 credits on us.
           </p>
           <div className="flex items-center gap-2">
             <Link href={`/sign-in?redirect_url=${back}`} className="text-sm text-zinc-300 hover:text-white px-3 py-1.5">
@@ -100,8 +100,8 @@ export function GuestGate() {
             </div>
             <h2 className="text-xl font-bold text-white">Create your free account</h2>
             <p className="mt-2 text-sm text-zinc-400">
-              You&apos;re one step from making this. Sign up in under a minute and get 100 free credits to
-              start creating straight away.
+              You&apos;re one step from making this. Sign up in under a minute and get 20 free credits to
+              explore the tools.
             </p>
             <div className="mt-5 flex flex-col gap-2">
               <Link

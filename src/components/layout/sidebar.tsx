@@ -258,7 +258,7 @@ export function Sidebar() {
                 {expanded ? (
                   <>
                     <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Free to start</p>
-                    <p className="text-lg font-extrabold text-white leading-tight">🎁 100 free credits</p>
+                    <p className="text-lg font-extrabold text-white leading-tight">🎁 20 free credits</p>
                     <p className="text-[11px] text-zinc-300 mt-0.5">when you sign up. No card needed.</p>
                     <a href="/sign-up" className="mt-2.5 flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 px-2 py-2 text-xs font-bold text-white hover:brightness-110">
                       Sign up free
@@ -266,7 +266,7 @@ export function Sidebar() {
                     <p className="text-[10px] text-zinc-400 mt-2 text-center">Then invite friends: every 5 who join = +50 credits</p>
                   </>
                 ) : (
-                  <a href="/sign-up" aria-label="Sign up free for 100 credits" className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center mx-auto text-sm">🎁</a>
+                  <a href="/sign-up" aria-label="Sign up free for 20 credits" className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center mx-auto text-sm">🎁</a>
                 )}
               </div>
             );

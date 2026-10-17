@@ -29,7 +29,7 @@ const appSchema = {
     "@type": "Offer",
     price: "0",
     priceCurrency: "USD",
-    description: "100 free credits, no credit card required",
+    description: "20 free credits to try the tools, no credit card required",
   },
   aggregateRating: {
     "@type": "AggregateRating",
@@ -55,7 +55,7 @@ const faqSchema = {
       name: "Is iVideo Studio free?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes, sign up with 100 free credits, no credit card required. You can generate multiple AI videos for free and upgrade to a paid plan for more credits and premium features.",
+        text: "Yes, sign up with 20 free credits to try the tools, no credit card required. Video generation runs on an affordable paid plan — from R220/month.",
       },
     },
     {

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s | iVideo Studio",
   },
   description:
-    "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
+    "Create AI videos. Text to video, dance transfer, short films with audio. 20 free credits. Made in South Africa.",
   keywords: [
     "AI video generator",
     "AI video maker",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "iVideo Studio — AI Video Creation Platform",
     description:
-      "Create AI videos. Text to video, dance transfer, short films with audio. 100 free credits. Made in South Africa.",
+      "Create AI videos. Text to video, dance transfer, short films with audio. 20 free credits. Made in South Africa.",
     type: "website",
     siteName: "iVideo Studio",
     locale: "en_ZA",
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "iVideo Studio — Create AI Videos in Seconds",
     description:
-      "Text to video, dance transfer, short films with audio. 100 free credits.",
+      "Text to video, dance transfer, short films with audio. 20 free credits.",
   },
   robots: {
     index: true,

@@ -263,7 +263,7 @@ export default function DashboardPage() {
             </div>
             <p className="text-sm text-zinc-400">
               {isGuest
-                ? "Sign up free and get 100 credits to make AI movies, cartoons, dance reels and ads. Invite friends and every 5 who join gives you 50 more."
+                ? "Sign up free and get 20 credits to explore the tools. Invite friends and every 5 who join gives you 50 more."
                 : (videos || []).length > 0
                 ? `You've created ${(videos || []).length} videos (${totalDuration}s of footage). Keep creating!`
                 : "Ready to create something amazing? Let's get started."}

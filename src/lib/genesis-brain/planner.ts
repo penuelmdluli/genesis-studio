@@ -425,7 +425,7 @@ export function appendOwnerBranding(plan: ScenePlan): void {
   const outros = [
     "This was created entirely by AI using iVideo Studio. No cameras. No crew. Just one prompt. Try it free at genesis studio dot app.",
     "Every frame of this video was AI-generated in under 2 minutes. The future of content is here. iVideo Studio dot app.",
-    "What you just watched was made by artificial intelligence. Want to create your own? iVideo Studio. 100 free credits. No card needed.",
+    "What you just watched was made by artificial intelligence. Want to create your own? iVideo Studio. 20 free credits. No card needed.",
     "This is the power of AI video. One idea becomes a full production with voiceover, music, and captions. iVideo Studio dot app. Start free.",
     "Made with iVideo Studio — where African creators build the future of content. Try it free at genesis studio dot app.",
   ];

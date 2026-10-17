@@ -184,7 +184,7 @@ export default function FirstVideoPage() {
             <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-cyan-500/15 blur-3xl" />
             <div className="relative">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.08] border border-white/[0.12] text-[11px] font-semibold text-violet-200 uppercase tracking-wider">
-                <Sparkles className="w-3 h-3" /> {user?.creditBalance ?? 100} free credits
+                <Sparkles className="w-3 h-3" /> {user?.creditBalance ?? 20} free credits
               </span>
               <h1 className="mt-4 text-3xl sm:text-4xl font-bold text-white leading-tight">
                 Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}.

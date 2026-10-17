@@ -92,7 +92,7 @@ export function EmailCapture() {
         </div>
 
         {/* Heading */}
-        <h2 className="text-2xl font-bold text-white mb-2">Get 100 Free Credits</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Get 20 Free Credits</h2>
 
         {/* Subtext */}
         <p className="text-sm text-zinc-400 leading-relaxed mb-6">

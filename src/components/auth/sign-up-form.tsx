@@ -85,7 +85,7 @@ export function SignUpForm() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-white">Create your account</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Start creating AI videos with 100 free credits
+          Start with 20 free credits to explore the tools
         </p>
       </div>
 

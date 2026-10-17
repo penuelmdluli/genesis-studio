@@ -119,7 +119,7 @@ export async function processDunningQueue() {
         // Day 7: Downgrade to free
         await supabase
           .from("users")
-          .update({ plan: "free", monthly_credits_limit: 100 })
+          .update({ plan: "free", monthly_credits_limit: 20 })
           .eq("id", record.user_id);
 
         await supabase

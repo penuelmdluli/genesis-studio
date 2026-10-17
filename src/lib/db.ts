@@ -47,9 +47,12 @@ export async function createUser(params: {
       name: params.name,
       avatar_url: params.avatarUrl,
       plan: "free",
-      credit_balance: 100,
+      // 2026-10-17: free grant cut 100 → 20 to match the register/Google signup paths
+      // (video needs a paid plan; this is a small taste for the free tools only). This
+      // auto-create path (api/user on first request) was the last one still giving 100.
+      credit_balance: 20,
       monthly_credits_used: 0,
-      monthly_credits_limit: 100,
+      monthly_credits_limit: 20,
     })
     .select()
     .single();
@@ -65,7 +68,7 @@ export async function updateUserPlan(
   stripeSubscriptionId?: string
 ) {
   const creditLimits: Record<PlanId, number> = {
-    free: 100,
+    free: 20, // 2026-10-17: free monthly limit cut 100 → 20 (paid plan for video)
     creator: 500,
     pro: 2000,
     studio: 8000,

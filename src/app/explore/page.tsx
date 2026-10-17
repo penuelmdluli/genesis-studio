@@ -275,7 +275,7 @@ export default function ExplorePage() {
                 )}
               >
                 <Sparkles className="w-4 h-4" />
-                Create Your First Video — 100 Free Credits
+                Create Your First Video — 20 Free Credits
                 <ArrowRight className="w-4 h-4 opacity-60" />
               </Link>
               <span className="text-xs text-zinc-400">No credit card required</span>
@@ -305,7 +305,7 @@ export default function ExplorePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-wrap justify-center gap-8 text-center">
               <div>
-                <p className="text-lg font-bold text-zinc-200">100</p>
+                <p className="text-lg font-bold text-zinc-200">20</p>
                 <p className="text-[10px] text-zinc-400 uppercase tracking-wider">Free Credits</p>
               </div>
               <div>
@@ -421,7 +421,7 @@ export default function ExplorePage() {
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/25 hover:shadow-violet-500/35 transition-all"
                     >
                       <Sparkles className="w-4 h-4" />
-                      Try It Free — 100 Credits
+                      Try It Free — 20 Credits
                     </Link>
                   </div>
                 )}

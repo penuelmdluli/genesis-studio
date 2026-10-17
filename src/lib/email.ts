@@ -242,14 +242,14 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   const first = (name || "there").split(" ")[0];
   return sendEmail({
     to: email,
-    subject: "Welcome to iVideo Studio — your first 100 credits are in",
+    subject: "Welcome to iVideo Studio — your 20 free credits are in",
     tags: [{ name: "type", value: "welcome" }],
     html: layout({
-      preheader: "100 free credits are waiting. Here's the fastest way to your first video.",
+      preheader: "20 free credits are waiting. Here's the fastest way to explore the tools.",
       content: `
         ${h1(`Welcome, ${esc(first)}.`)}
-        ${p(`You now have an iVideo Studio account with <strong>100 free credits</strong> — enough for your first videos, a voiceover and captions. Nothing expires while you learn the tools.`)}
-        ${callout("Your balance", "100 credits", "Credits you buy never expire.")}
+        ${p(`You now have an iVideo Studio account with <strong>20 free credits</strong> — enough to try the tools: a voiceover, captions and thumbnails. When you're ready to make full videos, an affordable paid plan unlocks them. Nothing expires while you learn the tools.`)}
+        ${callout("Your balance", "20 credits", "Credits you buy never expire.")}
         ${p("<strong>Three things to try in your first ten minutes</strong>")}
         ${featureList([
           { icon: "🎬", title: "Generate a video from text", text: "Describe a scene, pick a style, get a cinematic clip with sound in about a minute.", href: `${APP_URL}/generate` },

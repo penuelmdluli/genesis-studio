@@ -109,7 +109,7 @@ export async function advanceEpisode(episode: EpisodeRow, brandMark: boolean): P
       const result = await collectAssembly(
         episodeId,
         episode.user_id,
-        episode.assembly_job,
+        episode.assembly_job!, // isJoinRunning() above guarantees a non-null job string here
         episode.title || `Episode ${episode.episode_number}`,
         series?.title || "Series",
         done

@@ -1,7 +1,7 @@
 import { isAutomationPaused } from "@/lib/automation-killswitch";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db-driver";
-import { sendCreditsExpiryEmail, sendWeeklyDigestEmail } from "@/lib/email-retention";
+import { sendCreditsExpiryEmail, sendWeeklyDigestEmail, sendNewToolsEmail } from "@/lib/email-retention";
 
 /**
  * Cron job: Retention campaigns.
@@ -13,13 +13,14 @@ import { sendCreditsExpiryEmail, sendWeeklyDigestEmail } from "@/lib/email-reten
  */
 export async function GET(req: NextRequest) {
   if (isAutomationPaused()) return NextResponse.json({ paused: true, reason: "AUTOMATION_PAUSED=true" });
-  const secret = req.nextUrl.searchParams.get("secret");
+  // Accept the secret as ?secret= or an "Authorization: Bearer" header (the cron worker sends Bearer).
+  const secret = req.nextUrl.searchParams.get("secret") || req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = getDb();
-  const results = { expiryEmails: 0, winBackEmails: 0, digestEmails: 0 };
+  const results = { expiryEmails: 0, winBackEmails: 0, digestEmails: 0, reengageEmails: 0 };
 
   try {
     // 1. Credits expiry: users with credits > 0 who haven't generated in 7 days
@@ -82,6 +83,25 @@ export async function GET(req: NextRequest) {
         }).catch(() => {});
         results.digestEmails++;
       }
+    }
+
+    // 4. Re-engagement: dormant users (last active 8–22 days ago) get one nudge to come
+    //    back and make another video. No free credits — the email points to /generate and
+    //    the paid plans. The 8–22-day window means ~1–2 nudges, then they age out (no spam).
+    //    This is the missing retention loop: ~96% of users never returned a second day.
+    const d8 = new Date(Date.now() - 8 * 86_400_000).toISOString();
+    const d22 = new Date(Date.now() - 22 * 86_400_000).toISOString();
+    const { data: dormant } = await supabase
+      .from("users")
+      .select("id, email, name, credit_balance")
+      .lt("updated_at", d8)
+      .gte("updated_at", d22)
+      .limit(100);
+
+    for (const user of dormant || []) {
+      if (!user.email) continue;
+      sendNewToolsEmail(user.email, user.name || "Creator", user.credit_balance || 0).catch(() => {});
+      results.reengageEmails++;
     }
 
     return NextResponse.json({

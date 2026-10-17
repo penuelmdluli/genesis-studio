@@ -29,15 +29,15 @@ export default function SignUpPage() {
             <span className="gradient-text">that stop the scroll.</span>
           </h1>
           <p className="text-zinc-400 leading-relaxed mb-10 text-[15px]">
-            100 free credits. No credit card. Your first video renders in under 60 seconds.
+            20 free credits to explore. No card to sign up. Make videos on an affordable paid plan — from R220/mo.
           </p>
 
           {/* Stats row */}
           <div className="grid grid-cols-3 gap-3 mb-10">
             {[
-              { value: "50", label: "Free credits", sub: "to start" },
+              { value: "20", label: "Free credits", sub: "to explore" },
               { value: "10+", label: "AI models", sub: "included" },
-              { value: "60s", label: "First video", sub: "that fast" },
+              { value: "60s", label: "Per video", sub: "that fast" },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl border border-white/[0.10] bg-white/[0.04] p-4 text-center">
                 <div className="text-2xl font-bold gradient-text mb-0.5">{stat.value}
@@ -102,7 +102,7 @@ export default function SignUpPage() {
               <Logo size="md" />
 
             </div>
-            <p className="text-sm text-zinc-400 font-medium">100 free credits. No card needed.</p>
+            <p className="text-sm text-zinc-400 font-medium">20 free credits. No card to sign up.</p>
 
     </div>
 

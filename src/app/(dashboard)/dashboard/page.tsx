@@ -272,7 +272,7 @@ export default function DashboardPage() {
           <Link href={isGuest ? "/sign-up" : "/generate"}>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button className="shadow-lg shadow-violet-600/30 text-base px-6 py-3">
-                <Sparkles className="w-5 h-5" /> {isGuest ? "Get 100 free credits" : "Generate Video"}
+                <Sparkles className="w-5 h-5" /> {isGuest ? "Start free" : "Generate Video"}
               </Button>
             </motion.div>
           </Link>
@@ -285,9 +285,9 @@ export default function DashboardPage() {
       {isGuest ? (
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { text: "🎁 100 free credits when you sign up", tone: "text-emerald-200 bg-emerald-500/10 border-emerald-500/30" },
-            { text: "👥 +50 credits for every 5 friends you invite", tone: "text-violet-200 bg-violet-500/10 border-violet-500/30" },
-            { text: "💳 No card needed", tone: "text-cyan-200 bg-cyan-500/10 border-cyan-500/30" },
+            { text: "🎁 20 free credits to explore the tools", tone: "text-emerald-200 bg-emerald-500/10 border-emerald-500/30" },
+            { text: "🎬 Make videos on a plan — from R220/mo", tone: "text-violet-200 bg-violet-500/10 border-violet-500/30" },
+            { text: "💳 Free to sign up", tone: "text-cyan-200 bg-cyan-500/10 border-cyan-500/30" },
           ].map((c) => (
             <a key={c.text} href="/sign-up" className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-medium ${c.tone}`}>
               {c.text}

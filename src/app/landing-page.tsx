@@ -119,7 +119,7 @@ const capabilities = [
 
 export default function LandingPage() {
   // A signed-in visitor (owner, paying customer, or free user) is not a
-  // prospect. Every "Get 100 Free Credits" call to action becomes a way back
+  // prospect. Every "Start Free" call to action becomes a way back
   // into the product instead, and plan cards reflect what they already have.
   const { isSignedIn, user: authUser } = useAuth();
   const currentPlan = isSignedIn ? authUser?.plan ?? "free" : null;
@@ -216,7 +216,7 @@ export default function LandingPage() {
               <Link href={isSignedIn ? "/generate" : "/sign-up"} className="w-full sm:w-auto" onClick={() => trackEvent("cta_click", { location: "hero" })}>
                 <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                   <Sparkles className="w-5 h-5" />
-                  {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
+                  {isSignedIn ? "Create a Video" : "Start Free"}
                 </Button>
               </Link>
               {/* Look before signing up: the studio is open to visitors, and the
@@ -486,7 +486,7 @@ export default function LandingPage() {
                           className="w-full"
                         >
                           {plan.price === 0
-                            ? isSignedIn ? "Open Studio" : "Get 100 Free Credits"
+                            ? isSignedIn ? "Open Studio" : "Start Free"
                             : isSignedIn ? "Upgrade" : "Subscribe"}
                           <ArrowRight className="w-4 h-4" />
                         </Button>
@@ -557,13 +557,13 @@ export default function LandingPage() {
                 Create your first AI video now.
               </h2>
               <p className="text-zinc-400 text-lg mb-8 max-w-lg mx-auto">
-                100 free credits. No credit card. Start creating in minutes.
+                Start free, no card. Make studio-quality videos on a plan — from R220/mo.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href={isSignedIn ? "/generate" : "/sign-up"} onClick={() => trackEvent("cta_click", { location: "footer" })}>
                   <Button size="lg" className="text-base px-10 py-4">
                     <Sparkles className="w-5 h-5" />
-                    {isSignedIn ? "Create a Video" : "Get 100 Free Credits"}
+                    {isSignedIn ? "Create a Video" : "Start Free"}
                   </Button>
                 </Link>
                 <Link href="/motion-control">

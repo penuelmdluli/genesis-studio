@@ -89,18 +89,28 @@ export default function DashboardPage() {
 
     let cancelled = false;
     (async () => {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       try {
-        const res = await fetch("/api/payments/verify", { method: "POST" });
-        const data = res.ok ? await res.json() : null;
+        // PayFast's history API lags a few seconds after the return redirect, so a single check
+        // usually says "not paid yet" even for a real payer. Poll briefly (~9s) and confirm as
+        // soon as the credit lands, so a successful buyer sees success — not a vague "soon".
+        let credited = false;
+        for (let i = 0; i < 4 && !cancelled; i++) {
+          const res = await fetch("/api/payments/verify", { method: "POST" });
+          const data = res.ok ? await res.json() : null;
+          if (cancelled) return;
+          if (data?.credited || data?.alreadyCredited) { credited = true; break; }
+          if (i < 3) await sleep(3000);
+        }
         if (cancelled) return;
 
-        if (data?.credited || data?.alreadyCredited) {
+        if (credited) {
           toast(
             isPlan ? "Payment confirmed — your plan is active!" : "Payment confirmed — credits added to your account!",
             "success"
           );
         } else {
-          toast("Payment received. Your credits will appear within a few minutes.", "info");
+          toast("Payment received — we're confirming it now. Your credits will appear within a few minutes.", "info");
         }
 
         const userRes = await fetch("/api/user");

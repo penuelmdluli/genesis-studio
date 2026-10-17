@@ -133,6 +133,8 @@ export default function PricingPage() {
         body: JSON.stringify({ planId, provider: getProvider(), currency }),
       });
       const data = await res.json();
+      // Logged-out buyer: send them to sign in and back to pricing, not a dead-end "Unauthorized" toast.
+      if (res.status === 401) { window.location.href = `/sign-in?redirect_url=${encodeURIComponent("/pricing")}`; return; }
       if (data.url) window.location.href = data.url;
       else if (data.error) {
         toast(data.error, "error");
@@ -155,6 +157,8 @@ export default function PricingPage() {
         body: JSON.stringify({ packId, provider: getProvider(), currency }),
       });
       const data = await res.json();
+      // Logged-out buyer: send them to sign in and back to pricing, not a dead-end "Unauthorized" toast.
+      if (res.status === 401) { window.location.href = `/sign-in?redirect_url=${encodeURIComponent("/pricing")}`; return; }
       if (data.url) window.location.href = data.url;
       else if (data.error) {
         toast(data.error, "error");

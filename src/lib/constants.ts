@@ -661,25 +661,19 @@ export const MOTION_PRESETS: MotionPreset[] = [
 
 // --- Plan access control ---
 export const MODEL_ACCESS: Record<string, ModelId[]> = {
-  // RunPod models removed — endpoint unreliable (cold starts, timeouts).
-  // All generation routes through FAL.AI (always warm, managed infrastructure).
-  // RunPod models kept in AI_MODELS registry for historical job lookups but
-  // not offered to users for new generations.
-  // seedance-1.5 was the free default and was the single worst path in the
-  // product: 59 failed / 7 completed (89%) across production history, which
-  // is ~46% of every failure ever recorded. Its failures were RunPod 404s
-  // inherited from the old fallback branch, so new users' first impression
-  // was an error from a vendor their model never used. Free now gets wan-2.2,
-  // which routes to WaveSpeed 480p — the cheapest path we have verified end
-  // to end. seedance stays available on paid tiers.
+  // RunPod models removed — endpoint unreliable (cold starts, 404s, timeouts).
+  // All generation routes through FAL.AI / WaveSpeed (always warm, managed).
+  // seedance-1.5 was the single worst path in the product: RunPod 404s, 54+
+  // production failures — the biggest single source of errors ("seedance pro
+  // failed" support tickets). It is now REMOVED from every tier. wan-2.2
+  // (WaveSpeed, verified end to end) is the reliable base; kling / veo /
+  // seedance-2.5 route to FAL on the paid tiers.
   free: ["wan-2.2", "mimic-motion"],
   creator: [
-    "seedance-1.5",
     "kling-2.6",
     "mimic-motion",
   ],
   pro: [
-    "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",
@@ -689,7 +683,6 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
     "mimic-motion",
   ],
   studio: [
-    "seedance-1.5",
     "kling-2.6",
     "kling-3.0",
     "veo-3.1",

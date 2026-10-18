@@ -1,8 +1,17 @@
 import { z } from "zod";
+import { AI_MODELS } from "./constants";
+import type { ModelId } from "@/types";
+
+// Derived from AI_MODELS so the schema can never drift from the real model set.
+// A hardcoded list silently dropped seedance-2.5 (and kept the removed
+// seedance-1.5/mochi-1), so picking the current flagship 400'd with a cryptic
+// "Invalid option" (2026-10-18). Plan access + type support are still enforced
+// in the route (MODEL_ACCESS) and modelAvailability().
+const MODEL_IDS = Object.keys(AI_MODELS) as [ModelId, ...ModelId[]];
 
 export const generateSchema = z.object({
   prompt: z.string().min(5, "Prompt must be at least 5 characters").max(2000, "Prompt too long"),
-  modelId: z.enum(["wan-2.2", "hunyuan-video", "ltx-video", "wan-2.1-turbo", "mochi-1", "mimic-motion", "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5"]),
+  modelId: z.enum(MODEL_IDS),
   type: z.enum(["t2v", "i2v", "v2v", "motion"]).default("t2v"),
   resolution: z.enum(["480p", "720p", "1080p", "4k"]).default("720p"),
   duration: z.number().int().min(1).max(60).default(5),

@@ -27,7 +27,7 @@ import { sendSlackAlert } from "@/lib/alerts";
 import { notifyOwner } from "@/lib/owner-notify";
 import { CREDIT_PACKS } from "@/lib/constants";
 import { sqlTimestamp } from "@/lib/job-finalizer";
-import { runCheckoutRecovery } from "@/lib/checkout-recovery";
+import { runCheckoutRecovery, supersededByCompletion } from "@/lib/checkout-recovery";
 
 export const maxDuration = 60;
 
@@ -208,6 +208,22 @@ export async function GET(req: NextRequest) {
     .limit(20);
 
   for (const c of stuck || []) {
+    // An abandoned RETRY, not lost money: the same user completed the same
+    // product around the same time. Mark it failed (status CHECK allows
+    // pending/completed/failed) so it stops being scanned, and never email.
+    const { data: completedForProduct } = await db
+      .from("pending_checkouts")
+      .select("user_id, product_id, created_at")
+      .eq("user_id", c.user_id)
+      .eq("product_id", c.product_id)
+      .eq("status", "completed");
+    if (supersededByCompletion(c, completedForProduct || [])) {
+      await db.from("pending_checkouts").update({ status: "failed" }).eq("id", c.id);
+      out.abandoned++;
+      console.log(`[RECONCILE] ${c.id} superseded by a completed ${c.product_id} checkout — not escalating`);
+      continue;
+    }
+
     const { data: user } = await db.from("users").select("email").eq("id", c.user_id).maybeSingle();
     const amount = `${c.currency || "ZAR"} ${(c.amount / 100).toFixed(2)}`;
     await notifyOwner({

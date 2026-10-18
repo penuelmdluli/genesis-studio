@@ -170,7 +170,15 @@ export default function GeneratePage() {
   const userPlan = user?.plan || "free";
   const availableModels = MODEL_ACCESS[userPlan] || MODEL_ACCESS.free;
 
-  const modelId = availableModels.includes(form.modelId) ? form.modelId : availableModels[0];
+  // The effective model must be one the user has AND one that supports the
+  // current generation type — otherwise the request would submit an impossible
+  // combo (e.g. a motion-only model for t2v). Fall back to the first model that
+  // supports this type, then to the first available.
+  const supportsCurrentType = (m: string) => !!AI_MODELS[m as keyof typeof AI_MODELS]?.types.includes(form.type);
+  const modelId =
+    availableModels.includes(form.modelId) && supportsCurrentType(form.modelId)
+      ? form.modelId
+      : availableModels.find(supportsCurrentType) ?? availableModels[0];
   const currentModel = AI_MODELS[modelId];
   const modelSupportsAudio = !!currentModel?.hasAudio;
   const effectiveAudio = form.enableLiveSound && modelSupportsAudio;

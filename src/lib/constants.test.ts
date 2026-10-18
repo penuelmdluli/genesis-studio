@@ -1,20 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { AI_MODELS, PLANS, CREDIT_PACKS, RESOLUTIONS, DURATIONS, FPS_OPTIONS, MODEL_ACCESS } from "./constants";
+import { generateSchema } from "./validation";
 
 describe("AI_MODELS", () => {
-  it("has all 10 models defined", () => {
+  it("has every model defined", () => {
     const modelIds = Object.keys(AI_MODELS);
-    expect(modelIds).toHaveLength(10);
-    expect(modelIds).toContain("wan-2.2");
-    expect(modelIds).toContain("hunyuan-video");
-    expect(modelIds).toContain("ltx-video");
-    expect(modelIds).toContain("wan-2.1-turbo");
-    expect(modelIds).toContain("mochi-1");
-    expect(modelIds).toContain("mimic-motion");
-    expect(modelIds).toContain("kling-2.6");
-    expect(modelIds).toContain("kling-3.0");
-    expect(modelIds).toContain("veo-3.1");
-    expect(modelIds).toContain("seedance-1.5");
+    for (const id of [
+      "wan-2.2", "hunyuan-video", "ltx-video", "wan-2.1-turbo", "mochi-1", "mimic-motion",
+      "kling-2.6", "kling-3.0", "veo-3.1", "seedance-1.5", "seedance-2.5", "ai-singer",
+    ]) {
+      expect(modelIds).toContain(id);
+    }
+    expect(modelIds).toHaveLength(12);
+  });
+
+  // 2026-10-18: a hardcoded Zod enum in validation.ts drifted from AI_MODELS —
+  // it dropped seedance-2.5, so picking the current flagship 400'd with a cryptic
+  // "Invalid option". The enum is now derived from AI_MODELS; this keeps it honest.
+  it("generateSchema accepts every model id in AI_MODELS (no drift)", () => {
+    for (const id of Object.keys(AI_MODELS)) {
+      const r = generateSchema.safeParse({ prompt: "a lion on the beach at sunset", modelId: id });
+      expect(r.success, `generateSchema should accept modelId "${id}"`).toBe(true);
+    }
+    expect(generateSchema.safeParse({ prompt: "a lion on the beach at sunset", modelId: "seedance-2.5" }).success).toBe(true);
+    expect(generateSchema.safeParse({ prompt: "a lion on the beach at sunset", modelId: "not-a-real-model" }).success).toBe(false);
   });
 
   it("each model has required fields", () => {
@@ -66,10 +75,11 @@ describe("PLANS", () => {
     expect(PLANS.map((p) => p.id)).toEqual(["free", "creator", "pro", "studio"]);
   });
 
-  it("free plan has 0 price", () => {
+  it("free plan has 0 price and 20 taste credits", () => {
     const free = PLANS.find((p) => p.id === "free");
     expect(free?.price).toBe(0);
-    expect(free?.credits).toBe(50);
+    // 2026-10-17: free grant cut to 20 (a taste of the tools; video needs a paid plan).
+    expect(free?.credits).toBe(20);
   });
 
   it("studio plan has 8000 credits", () => {
@@ -151,15 +161,18 @@ describe("MODEL_ACCESS", () => {
   // seedance-1.5 was removed from free on 2026-09-09: 59 failed / 7 completed
   // in production, the worst path in the product, and it was what every new
   // signup landed on first. It stays on the paid tiers.
-  it("free plan has wan-2.2 and mimic-motion, and never seedance", () => {
-    expect(MODEL_ACCESS.free).toEqual(["wan-2.2", "mimic-motion"]);
+  it("free plan has no video models (2026-10-17: video needs a paid plan)", () => {
+    expect(MODEL_ACCESS.free).toEqual([]);
     expect(MODEL_ACCESS.free).not.toContain("seedance-1.5");
   });
 
-  it("creator has 8, pro has 10, studio has 10 models", () => {
-    expect(MODEL_ACCESS.creator).toHaveLength(8);
-    expect(MODEL_ACCESS.pro).toHaveLength(10);
-    expect(MODEL_ACCESS.studio).toHaveLength(10);
+  it("paid tiers grant the reliable model set; none includes the retired seedance-1.5", () => {
+    expect(MODEL_ACCESS.creator).toEqual(["kling-2.6", "mimic-motion"]);
+    expect(MODEL_ACCESS.pro).toContain("seedance-2.5");
+    expect(MODEL_ACCESS.studio).toContain("seedance-2.5");
+    for (const tier of ["creator", "pro", "studio"] as const) {
+      expect(MODEL_ACCESS[tier]).not.toContain("seedance-1.5");
+    }
   });
 
   it("all model IDs in access lists are valid", () => {

@@ -37,6 +37,30 @@ const MAX_PER_RUN = 10;
 // so the automation starts from here and never doubles a personal email.
 const RECOVERY_SINCE = "2026-10-06 08:00:00";
 
+/**
+ * A stale PENDING checkout is an abandoned RETRY — not lost money — when the
+ * same user COMPLETED the same product around the same time (a later attempt
+ * that went through). The reconcile watchdog must NOT page the owner about
+ * these; only genuinely stuck checkouts (PayFast complete but never credited)
+ * should escalate. Real case 2026-10-17: lumireceptionist made 3 pack-starter
+ * checkouts 5 minutes apart; the 3rd completed (+120 credits), but the first
+ * two still fired "money not settled" false alarms.
+ */
+export function supersededByCompletion(
+  stuck: { user_id: string; product_id: string; created_at: string },
+  completed: Array<{ user_id: string; product_id: string; created_at: string }>,
+  windowHours = 2,
+): boolean {
+  const t = Date.parse(String(stuck.created_at).replace(" ", "T") + "Z");
+  if (!Number.isFinite(t)) return false;
+  const w = windowHours * 3_600_000;
+  return completed.some((c) => {
+    if (c.user_id !== stuck.user_id || c.product_id !== stuck.product_id) return false;
+    const ct = Date.parse(String(c.created_at).replace(" ", "T") + "Z");
+    return Number.isFinite(ct) && ct >= t - w && ct <= t + w;
+  });
+}
+
 type Lang = "en" | "fr";
 
 interface Candidate {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectLang, promptSnippet, buildRecoveryEmail } from "./checkout-recovery";
+import { detectLang, promptSnippet, buildRecoveryEmail, supersededByCompletion } from "./checkout-recovery";
 
 const nassimaPrompt = `"Créer une histoire éducatif animé pour enfants de 8 ans intitulé « Léo et la Forêt des Lettres », série « Les Petits Génies »`;
 const base = {
@@ -32,5 +32,41 @@ describe("checkout recovery", () => {
     expect(m.subject).toContain("R49");
     expect(m.content).toContain("pack=pack-starter");
     expect(m.content).not.toContain("outside South Africa");
+  });
+});
+
+// 2026-10-17: the reconcile watchdog emailed "money not settled" for abandoned
+// retries that the same user had already completed (lumireceptionist: 3 pack-starter
+// checkouts, the 3rd completed, the first two false-alarmed). Only genuinely stuck
+// checkouts should escalate.
+describe("supersededByCompletion", () => {
+  const stuck = { user_id: "u1", product_id: "pack-starter", created_at: "2026-10-17 17:40:11" };
+
+  it("is superseded by the same user's completed same-product checkout minutes later", () => {
+    expect(supersededByCompletion(stuck, [
+      { user_id: "u1", product_id: "pack-starter", created_at: "2026-10-17 17:45:44" },
+    ])).toBe(true);
+  });
+
+  it("is NOT superseded by a completion of a different product", () => {
+    expect(supersededByCompletion(stuck, [
+      { user_id: "u1", product_id: "pack-2000", created_at: "2026-10-17 17:45:44" },
+    ])).toBe(false);
+  });
+
+  it("is NOT superseded by another user's completion", () => {
+    expect(supersededByCompletion(stuck, [
+      { user_id: "u2", product_id: "pack-starter", created_at: "2026-10-17 17:45:44" },
+    ])).toBe(false);
+  });
+
+  it("is NOT superseded by a completion far outside the window", () => {
+    expect(supersededByCompletion(stuck, [
+      { user_id: "u1", product_id: "pack-starter", created_at: "2026-10-24 10:00:00" },
+    ])).toBe(false);
+  });
+
+  it("a genuinely stuck checkout (no completion) still escalates", () => {
+    expect(supersededByCompletion(stuck, [])).toBe(false);
   });
 });

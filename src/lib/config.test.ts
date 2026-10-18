@@ -80,3 +80,24 @@ describe("checkCoreConfig", () => {
     expect(checkCoreConfig()).toEqual([]);
   });
 });
+
+// 2026-10-18: a motion-only model submitted for t2v slipped past modelAvailability
+// (it only checked provider keys, not whether the model supports the type) and
+// died at submission after the user was already charged. modelAvailability now
+// refuses an unsupported model+type combo BEFORE any credit is taken.
+describe("modelAvailability — type support", () => {
+  beforeEach(() => {
+    process.env.WAVESPEED_API_KEY = "ws-test-key";
+  });
+
+  it("refuses a motion-only model for t2v, before any credit", () => {
+    const r = modelAvailability("mimic-motion", "t2v");
+    expect(r.runnable).toBe(false);
+    expect(r.detail).toContain("not in");
+  });
+
+  it("allows a model for a type it supports", () => {
+    expect(modelAvailability("wan-2.2", "t2v").runnable).toBe(true);
+    expect(modelAvailability("wan-2.2", "i2v").runnable).toBe(true);
+  });
+});

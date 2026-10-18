@@ -151,6 +151,19 @@ export function modelAvailability(
     return { runnable: false, reason: `${model.name} is not available yet.`, detail: "comingSoon" };
   }
 
+  // The model must support the requested generation type — a motion/i2v-only
+  // model can't do t2v. Reject here (before any credit is taken) with a clear
+  // reason, so no path submits an impossible combo. /api/generate also checks
+  // this explicitly; /api/v1/generate relies on this guard.
+  if (!model.types.includes(type)) {
+    const label = type === "t2v" ? "text-to-video" : type === "i2v" ? "image-to-video" : type === "motion" ? "motion-transfer" : type;
+    return {
+      runnable: false,
+      reason: `${model.name} can't make a ${label} clip. Please pick a model that supports it.`,
+      detail: `type "${type}" not in ${modelId}.types [${model.types.join(", ")}]`,
+    };
+  }
+
   // Hosted models (provider "fal" means "the hosted router" — WaveSpeed, then
   // FAL — see lib/provider-router.ts).
   if (model.provider === "fal") {

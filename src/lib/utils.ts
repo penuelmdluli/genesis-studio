@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { AI_MODELS } from "./constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -65,10 +66,10 @@ export function estimateCreditCost(
   isDraft: boolean,
   enableAudio?: boolean
 ): number {
-  // Import AI_MODELS dynamically to avoid circular deps — use inline require
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { AI_MODELS } = require("@/lib/constants");
-  const model = AI_MODELS[modelId];
+  // AI_MODELS imported statically (constants.ts has no dep back on utils, so no
+  // cycle). The old inline require("@/lib/constants") didn't resolve under the
+  // ESM test runner, so estimateCreditCost silently returned the fallback there.
+  const model = AI_MODELS[modelId as keyof typeof AI_MODELS];
 
   if (!model || !model.creditCost) {
     // Unknown model — charge a safe minimum (never give away free GPU time)

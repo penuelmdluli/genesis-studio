@@ -172,17 +172,18 @@ describe("truncatePrompt", () => {
 
 describe("estimateCreditCost", () => {
   it("returns base cost for known model + resolution at 5s", () => {
-    expect(estimateCreditCost("wan-2.2", "480p", 5, false)).toBe(20);
+    // wan-2.2 480p base cost is 30 (creditCost { 480p:30, 720p:40, 1080p:80 }).
+    expect(estimateCreditCost("wan-2.2", "480p", 5, false)).toBe(30);
   });
 
   it("scales cost by duration", () => {
-    // 10s = 2x the base (normalized to 5s)
-    expect(estimateCreditCost("wan-2.2", "480p", 10, false)).toBe(40);
+    // 10s = 2x the base (normalized to 5s): 30 * 2 = 60
+    expect(estimateCreditCost("wan-2.2", "480p", 10, false)).toBe(60);
   });
 
   it("applies draft discount (30%)", () => {
-    // Base 20 * (5/5) * 0.3 = 6
-    expect(estimateCreditCost("wan-2.2", "480p", 5, true)).toBe(6);
+    // Base 30 * (5/5) * 0.3 = 9
+    expect(estimateCreditCost("wan-2.2", "480p", 5, true)).toBe(9);
   });
 
   it("returns fallback for unknown model", () => {
@@ -201,8 +202,8 @@ describe("estimateCreditCost", () => {
   });
 
   it("rounds up with Math.ceil", () => {
-    // wan-2.2 480p at 3s: 20 * (3/5) * 1 = 12
-    expect(estimateCreditCost("wan-2.2", "480p", 3, false)).toBe(12);
+    // wan-2.2 480p at 3s: 30 * (3/5) * 1 = 18
+    expect(estimateCreditCost("wan-2.2", "480p", 3, false)).toBe(18);
     // ltx-video 480p at 3s draft: 8 * (3/5) * 0.3 = 1.44 -> ceil = 2
     expect(estimateCreditCost("ltx-video", "480p", 3, true)).toBe(2);
   });

@@ -38,7 +38,9 @@ describe("profitability", () => {
     });
 
     it("has correct fixed costs including all services", () => {
-      expect(FIXED_COSTS_MONTHLY.total).toBe(155);
+      // 155 → 105 after the full Cloudflare migration (commit eada755) removed
+      // the separate Supabase/Vercel/Upstash lines; cloudflare now covers them.
+      expect(FIXED_COSTS_MONTHLY.total).toBe(105);
       expect(FIXED_COSTS_MONTHLY.resend).toBe(20);
       expect(FIXED_COSTS_MONTHLY.claude_api).toBe(30);
     });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFrom = vi.fn();
 
-vi.mock("./supabase", () => ({
+vi.mock("./db-driver", () => ({
   getDb: vi.fn(() => ({
     from: mockFrom,
   })),
@@ -76,7 +76,7 @@ describe("User Operations", () => {
   describe("createUser", () => {
     it("creates a user with free plan defaults", async () => {
       const chain = setupMockChain({
-        data: { id: "1", plan: "free", credit_balance: 50 },
+        data: { id: "1", plan: "free", credit_balance: 20 },
         error: null,
       });
 
@@ -86,14 +86,15 @@ describe("User Operations", () => {
         name: "Test User",
       });
 
-      expect(result).toEqual({ id: "1", plan: "free", credit_balance: 50 });
+      // 2026-10-17: free grant cut to 20 (a taste of the tools; video needs a paid plan).
+      expect(result).toEqual({ id: "1", plan: "free", credit_balance: 20 });
       expect(chain.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           clerk_id: "clerk_123",
           plan: "free",
-          credit_balance: 50,
+          credit_balance: 20,
           monthly_credits_used: 0,
-          monthly_credits_limit: 50,
+          monthly_credits_limit: 20,
         })
       );
     });
@@ -278,18 +279,21 @@ describe("API Key Operations", () => {
 
   describe("validateApiKey", () => {
     it("returns key record with user for valid key", async () => {
-      const keyData = {
-        id: "key-1",
-        users: { id: "user-1", plan: "pro" },
-      };
-      const chain = setupMockChain({ data: keyData, error: null });
-      // validateApiKey does a second update call
+      // validateApiKey does two separate queries (D1 has no joins): the key row,
+      // then the user row — returning { ...key, users: user }.
+      const key = { id: "key-1", user_id: "user-1", is_active: true };
+      const user = { id: "user-1", plan: "pro" };
+      const chain = setupMockChain({ data: key, error: null });
+      chain.single
+        .mockResolvedValueOnce({ data: key, error: null })
+        .mockResolvedValueOnce({ data: user, error: null });
+      // the last-used-at update call
       chain.update.mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
       });
 
       const result = await validateApiKey("valid-hash");
-      expect(result).toEqual(keyData);
+      expect(result).toEqual({ ...key, users: user });
     });
 
     it("returns null for invalid key", async () => {

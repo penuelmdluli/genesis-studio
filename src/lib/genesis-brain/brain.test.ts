@@ -515,8 +515,9 @@ describe("Planner", () => {
 
       const input = makeBrainInput();
       const plan = await planProduction(input);
-      // Planner forces all scenes to wan-2.2 (only RunPod endpoint with active workers)
-      expect(plan.scenes[0].modelId).toBe("wan-2.2");
+      // Planner defaults invalid/non-FAL models to DEFAULT_MODEL = seedance-1.5
+      // (FAL, always warm); wan-2.2/RunPod was dropped as the default for reliability.
+      expect(plan.scenes[0].modelId).toBe("seedance-1.5");
     });
 
     it("clamps scene duration to 5-10 range", async () => {

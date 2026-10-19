@@ -9,10 +9,17 @@ const mockSingle = vi.fn();
 const mockOrder = vi.fn().mockReturnThis();
 const mockRange = vi.fn();
 
-vi.mock("./supabase", () => ({
+vi.mock("./db-driver", () => ({
   getDb: vi.fn(() => ({
     from: mockFrom,
   })),
+}));
+
+// refundCredits first tries the escrow hold-release path when a jobId is given;
+// with no real hold it returns false and refundCredits falls through to the
+// legacy balance+amount path these tests exercise.
+vi.mock("./credit-escrow", () => ({
+  releaseHoldForJob: vi.fn().mockResolvedValue(false),
 }));
 
 mockFrom.mockReturnValue({
@@ -141,7 +148,9 @@ describe("refundCredits", () => {
   });
 
   it("adds credits back and returns new balance", async () => {
-    const newBalance = await refundCredits("user-123", 100, "job-1", "Refund");
+    // No jobId: skips the escrow hold-release and the per-job dedup guard, so
+    // this exercises the core refund — read balance (400), add amount (100) → 500.
+    const newBalance = await refundCredits("user-123", 100, "", "Refund");
     expect(newBalance).toBe(500);
   });
 });

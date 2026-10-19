@@ -21,13 +21,20 @@ describe("viral formats", () => {
     }
   });
 
-  it("every plan gets a model it is allowed to use", () => {
+  it("every plan gets a model it is allowed to use (free has none)", () => {
     for (const plan of Object.keys(MODEL_ACCESS)) {
+      const models = MODEL_ACCESS[plan];
       for (const f of VIRAL_FORMATS) {
-        expect(MODEL_ACCESS[plan]).toContain(modelForFormat(f, MODEL_ACCESS[plan])!);
+        const m = modelForFormat(f, models);
+        if (models.length === 0) {
+          // Free has no video models since 2026-10-17 — no format resolves to one.
+          expect(m).toBeUndefined();
+        } else {
+          expect(models).toContain(m!);
+        }
       }
     }
-    expect(modelForFormat(VIRAL_FORMATS[0], MODEL_ACCESS.free)).toBe("wan-2.2");
+    expect(modelForFormat(VIRAL_FORMATS[0], MODEL_ACCESS.free)).toBeUndefined();
   });
 
   it("looks formats up by id", () => {

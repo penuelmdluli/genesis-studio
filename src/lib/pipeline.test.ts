@@ -126,7 +126,9 @@ describe("E2E Generation Pipeline", () => {
     it.each(plans)("plan '%s' has model access defined", (plan) => {
       const models = MODEL_ACCESS[plan];
       expect(models).toBeDefined();
-      expect(models.length).toBeGreaterThan(0);
+      // Free has NO video models since 2026-10-17 (video needs a paid plan); paid
+      // tiers must have at least one.
+      if (plan !== "free") expect(models.length).toBeGreaterThan(0);
 
       // Every model in the access list should exist
       for (const modelId of models) {
@@ -144,9 +146,11 @@ describe("E2E Generation Pipeline", () => {
       expect(MODEL_ACCESS.free.length).toBeLessThanOrEqual(MODEL_ACCESS.creator.length);
     });
 
-    it("studio plan has access to ALL models", () => {
-      const allModelIds = Object.keys(AI_MODELS);
-      for (const modelId of allModelIds) {
+    it("studio plan has access to every model on any paid tier", () => {
+      // The unreliable RunPod models were removed from all tiers; "all models"
+      // no longer holds. Studio must still be a superset of the lower paid tiers.
+      const paidModels = new Set([...MODEL_ACCESS.creator, ...MODEL_ACCESS.pro]);
+      for (const modelId of paidModels) {
         expect(MODEL_ACCESS.studio).toContain(modelId);
       }
     });
@@ -229,21 +233,30 @@ describe("E2E Generation Pipeline", () => {
       for (const [modelId, model] of Object.entries(AI_MODELS)) {
         for (const [resolution, baseCost] of Object.entries(model.creditCost)) {
           const estimated = estimateCreditCost(modelId as ModelId, resolution, 5, false);
-          // estimateCreditCost uses baseCost * durationMultiplier(1.0 for 5s)
-          expect(estimated).toBe(baseCost);
+          // estimateCreditCost rounds up (credits are whole), so a fractional
+          // cost like ai-singer's 1.5 becomes 2 at the 5s base duration.
+          expect(estimated).toBe(Math.ceil(baseCost));
         }
       }
     });
 
-    it("draft mode is always ~30% of full cost", () => {
+    it("draft never costs more than full, and discounts ~30% when a draft slug exists", () => {
       for (const [modelId, model] of Object.entries(AI_MODELS)) {
         const resolution = Object.keys(model.creditCost)[0];
+        if (!resolution) continue;
         const full = estimateCreditCost(modelId as ModelId, resolution, 5, false);
         const draft = estimateCreditCost(modelId as ModelId, resolution, 5, true);
-        const ratio = draft / full;
-        // Draft should be roughly 30% (with rounding)
-        expect(ratio).toBeGreaterThan(0.2);
-        expect(ratio).toBeLessThan(0.5);
+        // Draft must never cost more than full.
+        expect(draft).toBeLessThanOrEqual(full);
+        // Draft pricing is only real when the model has a cheaper draft slug;
+        // without one the provider bills full, so draft == full (no loss).
+        const hasDraftSlug = !!(model.wavespeedModelIdDraft || model.wavespeedModelIdDraftI2V);
+        if (hasDraftSlug && full >= 4) {
+          const ratio = draft / full;
+          // ~30%, with Math.ceil rounding on smaller costs.
+          expect(ratio).toBeGreaterThan(0.2);
+          expect(ratio).toBeLessThanOrEqual(0.5);
+        }
       }
     });
   });

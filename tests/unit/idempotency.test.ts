@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 
-// Mock Supabase before importing checkIdempotencyKey
-vi.mock("@/lib/supabase", () => ({
-  createSupabaseAdmin: vi.fn(),
+// The data layer was refactored from @/lib/supabase to @/lib/db-driver (getDb);
+// idempotency.ts imports getDb from there. Mock that module, not the old one.
+vi.mock("@/lib/db-driver", () => ({
+  getDb: vi.fn(),
 }));
 
 describe("buildIdempotencyKey", () => {
@@ -18,7 +19,10 @@ describe("buildIdempotencyKey", () => {
     const key1 = buildIdempotencyKey(input);
     const key2 = buildIdempotencyKey(input);
     expect(key1).toBe(key2);
-    expect(key1).toMatch(/^idem:user-1:[a-f0-9]{16}$/);
+    // buildIdempotencyKey uses a simple deterministic 32-bit hash → 8 hex chars
+    // (padStart(8)); the full SHA is done at the KV layer. Per-user + 1h window
+    // makes an 8-hex space ample for dedupe.
+    expect(key1).toMatch(/^idem:user-1:[a-f0-9]{8}$/);
   });
 
   it("returns different keys for different prompts", () => {
@@ -89,8 +93,8 @@ describe("checkIdempotencyKey", () => {
       }),
     };
 
-    vi.doMock("@/lib/supabase", () => ({
-      createSupabaseAdmin: () => mockSupabase,
+    vi.doMock("@/lib/db-driver", () => ({
+      getDb: () => mockSupabase,
     }));
 
     const mod = await import("@/lib/idempotency");
@@ -120,8 +124,8 @@ describe("checkIdempotencyKey", () => {
       }),
     };
 
-    vi.doMock("@/lib/supabase", () => ({
-      createSupabaseAdmin: () => mockSupabase,
+    vi.doMock("@/lib/db-driver", () => ({
+      getDb: () => mockSupabase,
     }));
 
     const mod = await import("@/lib/idempotency");

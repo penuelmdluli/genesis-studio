@@ -5,7 +5,7 @@ import { deductCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { submitFalJob } from "@/lib/fal";
 import { submitVideoJob } from "@/lib/provider-router";
-import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
+import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS, modelsForUser } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { isProfitable } from "@/lib/profitability";
 import { generateSchema } from "@/lib/validation";
@@ -59,7 +59,10 @@ export async function POST(req: NextRequest) {
     // Validate model access (owners have access to all models)
     const ownerAccount = isOwnerClerkId(clerkId);
     if (!ownerAccount) {
-      const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
+      // Credit-aware: credit-pack buyers stay plan:'free' but have paid, so they
+      // get the reliable base models (see modelsForUser). Plan gating alone locked
+      // them out after the 2026-10-17 `free: []` change.
+      const allowedModels = modelsForUser(user.plan, user.credit_balance ?? 0);
       if (!allowedModels.includes(body.modelId)) {
         return NextResponse.json(
           { error: "Model not available on your plan" },

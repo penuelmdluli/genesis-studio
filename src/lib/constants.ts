@@ -695,6 +695,28 @@ export const MODEL_ACCESS: Record<string, ModelId[]> = {
   ],
 };
 
+// Credit-pack buyers stay plan:'free' (buying credits does NOT change the plan
+// tier), but they HAVE paid — so they get the reliable base models; the
+// per-generation credit cost is the real gate, and premium models stay
+// plan-gated as the upgrade reason. Without this, the 2026-10-17 `free: []`
+// change silently blocked every credit customer from generating: the UI
+// resolved modelId to `undefined`, which the API rejected with a 400 on every
+// attempt (0 jobs created platform-wide; paying customers locked out).
+export const CREDIT_BASE_MODELS: ModelId[] = ["wan-2.2", "mimic-motion"];
+
+/**
+ * The models a user may run. A real paid plan gets its tier; anyone else who has
+ * credits gets the reliable base set (they pay per video via credits); a user with
+ * no plan and no credits gets none. Used by BOTH the generate UI and the generate
+ * API so the two can never drift (the drift is exactly what broke generation).
+ */
+export function modelsForUser(plan: string | null | undefined, creditBalance: number): ModelId[] {
+  const tier = MODEL_ACCESS[plan || "free"];
+  if (tier && tier.length > 0) return tier;
+  if (creditBalance > 0) return CREDIT_BASE_MODELS;
+  return [];
+}
+
 // --- RunPod Hub Features ---
 export const FEATURES: FeatureConfig[] = [
   {

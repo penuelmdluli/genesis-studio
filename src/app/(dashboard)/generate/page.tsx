@@ -22,6 +22,7 @@ import {
   REEL_DURATIONS,
   FPS_OPTIONS,
   MODEL_ACCESS,
+  modelsForUser,
   BUILT_IN_AUDIO_TRACKS,
   AUDIO_GENRES,
 } from "@/lib/constants";
@@ -168,7 +169,12 @@ export default function GeneratePage() {
   const upsellContext = useUpsellContext();
 
   const userPlan = user?.plan || "free";
-  const availableModels = MODEL_ACCESS[userPlan] || MODEL_ACCESS.free;
+  // Credit-aware: a paid plan gets its tier; a credit-pack buyer (plan stays
+  // 'free') gets the reliable base models; the owner gets everything. Keying only
+  // off MODEL_ACCESS[plan] blocked every credit customer (free: [] since 2026-10-17).
+  const availableModels = user?.isOwner
+    ? (Object.keys(AI_MODELS) as ModelId[])
+    : modelsForUser(userPlan, user?.creditBalance ?? 0);
 
   // The effective model must be one the user has AND one that supports the
   // current generation type — otherwise the request would submit an impossible
@@ -378,6 +384,13 @@ export default function GeneratePage() {
     }
     if (!hasEnoughCredits) {
       setError(`Not enough credits. You need ${creditCost} but have ${user?.creditBalance ?? 0}.`);
+      generateLockRef.current = false;
+      return;
+    }
+    // Never submit an undefined/unavailable model (that produced a cryptic 400
+    // "Invalid option" that silently blocked everyone). Tell them what to do.
+    if (!modelId) {
+      setError("No video model is available on your account yet. Add credits to start generating.");
       generateLockRef.current = false;
       return;
     }

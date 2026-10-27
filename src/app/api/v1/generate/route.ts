@@ -9,7 +9,7 @@ import { createJob, updateJobStatus } from "@/lib/db";
 import { deductCredits, refundCredits, isOwnerClerkId } from "@/lib/credits";
 import { submitRunPodJob, buildRunPodInput } from "@/lib/runpod";
 import { submitVideoJob } from "@/lib/provider-router";
-import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS } from "@/lib/constants";
+import { AI_MODELS, MODEL_ACCESS, BUILT_IN_AUDIO_TRACKS, modelsForUser } from "@/lib/constants";
 import { estimateCreditCost } from "@/lib/utils";
 import { ModelId } from "@/types";
 import { modelAvailability, durationProblem } from "@/lib/config";
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     // Validate model access (owners have access to all models)
     const ownerAccount = isOwnerClerkId(user.clerk_id);
     if (!ownerAccount) {
-      const allowedModels = MODEL_ACCESS[user.plan] || MODEL_ACCESS.free;
+      const allowedModels = modelsForUser(user.plan, user.credit_balance ?? 0);
       if (!allowedModels.includes(modelId)) {
         return NextResponse.json(
           { error: `Model ${modelId} not available on ${user.plan} plan` },

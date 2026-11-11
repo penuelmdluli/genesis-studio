@@ -3,7 +3,8 @@ import { requireStudioOwner } from "@/lib/studio/auth";
 import { updateStudioPost } from "@/lib/studio/db";
 import { getDb } from "@/lib/db-driver";
 
-const PINNED_COMMENT_TEXT = "Follow for more \u26A1\u{1F525}";
+const PINNED_COMMENT_TEXT =
+  "Follow for more \u26A1\u{1F525}\n\n\u{1F3AC} Make AI videos like this: https://ivideostudio.ai\n\u{1F4C8} Live SMC trading setups on 27 markets: https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments";
 const VIEW_THRESHOLD = 50;
 
 /**

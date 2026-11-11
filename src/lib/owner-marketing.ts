@@ -191,6 +191,7 @@ ${characterName} ${scenario.emoji}
 ${extraText ? extraText + "\n\n" : ""}${marketingLine}
 
 🔗 https://ivideostudio.ai
+📈 Trade forex or gold? Live SMC setups on 27 markets → gettraderadar.com
 
 #MzansiBabyStars #MBS #GenesisStudio #AIVideo #MadeWithAI #SouthAfrica #Mzansi #Viral #FYP ${scenarioHashtags}`;
 }
@@ -207,6 +208,15 @@ const MARKETING_COMMENTS = [
   "Create your own → ivideostudio.ai",
   "AI made this in 60 seconds. Your turn → ivideostudio.ai",
   "Create videos like this → ivideostudio.ai 🎬",
+];
+
+// TradeRadar cross-promo (2026-11-11): every owner post also markets TradeRadar SMC Signals.
+// Analysis tool, not advice: no profit or win-rate claims.
+const TRADERADAR_COMMENTS = [
+  "📈 Trade forex, gold or indices? TradeRadar scans 27 markets and shows only the SMC setups you can still take: entry, stop loss and targets on one chart. Join free → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+  "📊 Stop staring at charts all day. TradeRadar SMC Signals pings your phone the moment a smart-money setup prints. Free to start → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+  "🎯 Smart-money (SMC) setups, live on 27 markets, built in South Africa. See what's tradable right now → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+  "🔔 Forex traders: TradeRadar shows the SMC setups that are tradable right now, with the levels. Join free, Pro R149/month → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
 ];
 
 const ENGAGEMENT_COMMENTS = [
@@ -235,14 +245,15 @@ export function generateMarketingComments(): {
   comments: string[];
   delayMinutes: number[];
 } {
+  // 2026-11-11: our two live products on every post (iVideo Studio + TradeRadar), then one engagement prompt.
+  // All posted in the same request: the old 15/60-minute setTimeout delays never fired on serverless.
   return {
     comments: [
-      pickRandom(ENGAGEMENT_COMMENTS),
-      pickRandom(ENGAGEMENT_COMMENTS.filter((c) => c !== pickRandom(ENGAGEMENT_COMMENTS))),
       pickRandom(MARKETING_COMMENTS),
+      pickRandom(TRADERADAR_COMMENTS),
+      pickRandom(ENGAGEMENT_COMMENTS),
     ],
-    // Stagger: immediate, 15 min later, 1 hour later
-    delayMinutes: [0, 15, 60],
+    delayMinutes: [0, 0, 0],
   };
 }
 
@@ -292,17 +303,10 @@ export async function autoCommentOnPost(
   postId: string,
   pageAccessToken: string
 ): Promise<void> {
-  const { comments, delayMinutes } = generateMarketingComments();
-
-  // Post first comment immediately
-  await commentOnFacebookPost(postId, comments[0], pageAccessToken);
-
-  // Schedule remaining comments (best-effort, non-blocking)
-  for (let i = 1; i < comments.length; i++) {
-    const delayMs = delayMinutes[i] * 60 * 1000;
-    setTimeout(async () => {
-      await commentOnFacebookPost(postId, comments[i], pageAccessToken);
-    }, delayMs);
+  const { comments } = generateMarketingComments();
+  for (let i = 0; i < comments.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 2000));
+    await commentOnFacebookPost(postId, comments[i], pageAccessToken);
   }
 }
 

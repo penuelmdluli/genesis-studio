@@ -42,6 +42,13 @@ const PINNED_COMMENTS = [
   "🌍 Made in Africa. Powered by AI. Available worldwide.\n\niVideo Studio turns your ideas into cinematic videos.\nVoiceover. Music. Captions. All automatic.\n\n🚀 https://ivideostudio.ai",
 ];
 
+// TradeRadar cross-promo (2026-11-11). Analysis tool, not advice: no profit claims.
+const TRADERADAR_COMMENTS = [
+  "📈 Also from our team: TradeRadar. Live SMC setups on 27 forex, gold, index and crypto markets, with entry, stop loss and targets. Join free → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+  "📊 Trader? TradeRadar SMC Signals shows only the setups you can still take, and alerts your phone when a new one prints. Free to start → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+  "🎯 Built in South Africa: TradeRadar scans 27 markets for smart-money setups so you don't have to. See what's tradable now → https://gettraderadar.com/?utm_source=facebook&utm_medium=organic&utm_campaign=page_comments",
+];
+
 const ENGAGEMENT_COMMENTS = [
   "👇 Drop a 🔥 if you think AI video is the future of content creation!",
   "💬 What would YOU create with AI video? Comment your idea below! 👇",
@@ -70,7 +77,11 @@ export async function postMarketingComments(
   // Small delay to avoid rate limits
   await new Promise((r) => setTimeout(r, 2000));
 
-  // Comment 2: Engagement prompt
+  // Comment 2: TradeRadar cross-promo
+  await postPageComment(postId, pickRandom(TRADERADAR_COMMENTS), pageToken);
+  await new Promise((r) => setTimeout(r, 2000));
+
+  // Comment 3: Engagement prompt
   const engagementComment = pickRandom(ENGAGEMENT_COMMENTS);
   await postPageComment(postId, engagementComment, pageToken);
 }

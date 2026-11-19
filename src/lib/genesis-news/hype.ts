@@ -568,7 +568,7 @@ export async function voiceBeats(plan: HypePlan, jobKey: string, page: PageProfi
 const IVIDEO_CTA = "🎬 Edited with AI on iVideo Studio — make your own videos FREE at ivideostudio.ai";
 const FIRST_COMMENTS = [
   "Want hype reels like this for YOUR page? 🎬 We make them with iVideo Studio — start FREE 👉 https://ivideostudio.ai",
-  "This reel was edited with AI 🤖⚽ Make yours in minutes, free to start 👉 https://ivideostudio.ai",
+  "This reel was edited with AI 🤖🎬 Make yours in minutes, free to start 👉 https://ivideostudio.ai",
   "Content creators 👀 Turn any clip into a hype edit with iVideo Studio — try it FREE 👉 https://ivideostudio.ai",
 ];
 

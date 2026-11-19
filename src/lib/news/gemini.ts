@@ -6,7 +6,7 @@
  */
 
 const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
 
 const REGION_MAP: Record<string, string> = {
   ZA: "South Africa",

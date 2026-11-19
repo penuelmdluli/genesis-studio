@@ -22,10 +22,12 @@ ARG YTDLP_VERSION=2026.8.19
 RUN apk add --no-cache python3 py3-pip ffmpeg curl \
     fontconfig font-noto font-noto-emoji ttf-dejavu \
     && pip3 install --break-system-packages "yt-dlp==${YTDLP_VERSION}" \
-    && fc-cache -f
+    && mkdir -p /usr/share/fonts/anton     && curl -fsSL -o /usr/share/fonts/anton/Anton-Regular.ttf        https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf     && fc-cache -f
 
 # Fail the BUILD on a bad pin rather than every download at run time.
 RUN yt-dlp --version | grep -q . && yt-dlp --version
+# Anton is the hype reels' poster face (hype-reel.js); OFL-licensed.
+RUN test -s /usr/share/fonts/anton/Anton-Regular.ttf
 
 WORKDIR /app
 COPY package.json package-lock.json* ./

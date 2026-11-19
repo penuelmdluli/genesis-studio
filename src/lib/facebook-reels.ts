@@ -51,7 +51,7 @@ export async function publishReel(opts: {
   videoUrl: string;
   caption: string;
   scheduledAt?: number;
-}): Promise<{ postId: string; pageName: string }> {
+}): Promise<{ postId: string; videoId: string; pageName: string }> {
   const token = pageToken(opts.pageKey);
   if (!token) throw new Error(`no token for ${opts.pageKey}`);
 
@@ -100,5 +100,5 @@ export async function publishReel(opts: {
   });
   if (!finish.ok) throw new Error(`publish failed: ${finish.status} ${(await finish.text()).slice(0, 200)}`);
   const done = (await finish.json()) as { id?: string; post_id?: string };
-  return { postId: done.post_id || done.id || video_id, pageName: me.name || opts.pageKey };
+  return { postId: done.post_id || done.id || video_id, videoId: video_id, pageName: me.name || opts.pageKey };
 }

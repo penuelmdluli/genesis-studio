@@ -2,22 +2,56 @@
 // GENESIS NEWS — edited soccer news reels from real (licensed) footage
 // ============================================
 // 1. Scraper /genesis-reel/find: YouTube Creative Commons clips for the story
-// 2. Gemini writes the banner, one caption per clip and the post caption
-//    (falls back to tidied clip titles if Gemini is unavailable)
+// 2. Claude (local CLI) writes the banner, one caption per clip and the post caption
+//    (falls back to tidied clip titles if the claude CLI is unavailable)
 // 3. Scraper /genesis-reel/render: crops source branding off, reframes 9:16,
 //    adds banner/captions/on-screen credits, uploads to R2. Started and then
 //    polled — downloading and encoding four clips takes minutes, and the proxy
 //    in front of the video service closes the request at 100 seconds.
 // 4. Optional: publish to the Genesis News Facebook page with credits in the caption
 //
-// Env: SCRAPER_SERVICE_URL, SCRAPER_SERVICE_SECRET, GEMINI_API_KEY,
+// Env: SCRAPER_SERVICE_URL, SCRAPER_SERVICE_SECRET, (claude CLI on PATH),
 //      FB_PAGE_TOKEN_genesis_news (scraper needs YOUTUBE_API_KEY)
 
 import { r2PublicUrl } from "@/lib/storage";
 import { publishReel } from "@/lib/facebook-reels";
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+/**
+ * Copy is written by the local Claude Code CLI (`claude -p`), on the owner's
+ * Claude subscription. This pipeline runs on the owner's PC next to the
+ * genesis-scraper container, so no API key is needed. The prompt goes in on
+ * stdin, so Windows never re-quotes it. Where the CLI does not exist (the
+ * hosted Cloudflare app) this throws and the caller falls back to clip titles.
+ */
+async function askClaude(prompt: string): Promise<string> {
+  const { spawn } = await import("node:child_process");
+  return new Promise((resolve, reject) => {
+    const child = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.GENESIS_NEWS_CLAUDE_MODEL || "sonnet"], {
+      shell: process.platform === "win32",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let out = "", err = "";
+    const timer = setTimeout(() => { child.kill(); reject(new Error("claude CLI timed out after 120s")); }, 120_000);
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", (e) => { clearTimeout(timer); reject(e); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) return reject(new Error(`claude CLI exit ${code}: ${err.trim().slice(0, 300)}`));
+      try {
+        const envelope = JSON.parse(out) as { result?: string; is_error?: boolean };
+        if (envelope.is_error || !envelope.result) return reject(new Error(`claude CLI error: ${String(envelope.result).slice(0, 300)}`));
+        // The model sometimes wraps its JSON in prose or a fence; keep the object only.
+        const m = envelope.result.match(/\{[\s\S]*\}/);
+        if (!m) return reject(new Error("claude CLI returned no JSON object"));
+        resolve(m[0]);
+      } catch (e) {
+        reject(e as Error);
+      }
+    });
+    child.stdin.end(prompt);
+  });
+}
 
 export interface FoundClip {
   id: string;
@@ -107,10 +141,8 @@ function fallbackCopy(story: string, clips: FoundClip[]): ReelCopy {
   };
 }
 
-/** Gemini writes copy that matches the actual clips. Never invents facts beyond story + clip titles. */
+/** Claude writes copy that matches the actual clips. Never invents facts beyond story + clip titles. */
 export async function writeReelCopy(story: string, summary: string | undefined, clips: FoundClip[]): Promise<ReelCopy> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return fallbackCopy(story, clips);
   const prompt = `You write on-screen text for "Genesis News", a South African soccer news Facebook page (Kaizer Chiefs / PSL / Bafana focus).
 Story: ${story}
 ${summary ? `Details: ${summary}\n` : ""}Clips in order (title by creator):
@@ -122,17 +154,7 @@ Return JSON only:
  "captions": [one punchy caption per clip, max 60 chars, wrap 1-2 key words in *stars* for gold],
  "postCaption": "2-3 short lines for the Facebook post, 1-2 emojis, end with a question to drive comments, plus 3 hashtags"}`;
   try {
-    const res = await fetch(`${GEMINI_ENDPOINT}?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 1024, responseMimeType: "application/json" },
-      }),
-    });
-    if (!res.ok) throw new Error(`Gemini ${res.status}`);
-    const data = await res.json();
-    const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const raw = await askClaude(prompt);
     const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")) as Partial<ReelCopy>;
     const fb = fallbackCopy(story, clips);
     const banner = (parsed.banner ?? []).map((s) => String(s).toUpperCase()).filter(Boolean);
@@ -142,7 +164,7 @@ Return JSON only:
       postCaption: String(parsed.postCaption ?? fb.postCaption),
     };
   } catch (e) {
-    console.warn("[genesis-news] Gemini copy failed, using clip titles:", (e as Error).message);
+    console.warn("[genesis-news] Claude copy failed, using clip titles:", (e as Error).message);
     return fallbackCopy(story, clips);
   }
 }

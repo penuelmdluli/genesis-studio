@@ -1289,7 +1289,10 @@ app.post("/genesis-reel/find", auth, async (req, res) => {
         type: "video",
         videoLicense: "creativeCommon",
         videoEmbeddable: "true",
-        order: "relevance",
+        // "date" for news/highlights so the newest uploads come first;
+        // publishedAfter keeps a highlights reel to this season's footage.
+        order: req.body?.order === "date" ? "date" : "relevance",
+        ...(req.body?.publishedAfter ? { publishedAfter: String(req.body.publishedAfter) } : {}),
         safeSearch: "moderate",
         relevanceLanguage: "en",
         maxResults: String(Math.min(want * 5, 25)),
@@ -1377,13 +1380,18 @@ async function renderGenesisReel({ clips, outputR2Key, banner, music, height, sc
   // this box has 512MB and has died encoding 1080x1920. Facebook accepts a
   // 720-wide reel, and `height: 1920` is here to measure the bigger one
   // rather than guess at it.
-  const H = Number(height) === 1920 ? 1920 : 1280;
+  // REEL_HD=1 is for a machine with cores to spare (the owner's PC runs this
+  // in Docker): full 1080x1920, all threads, a slower preset and a lower CRF.
+  // At 720/veryfast/crf21 the first reels came out ~1.4 Mbps and soft on a
+  // phone, which is the opposite of what a page trying to trend needs.
+  const HD = process.env.REEL_HD === "1";
+  const H = HD || Number(height) === 1920 ? 1920 : 1280;
   const W = H === 1920 ? 1080 : 720;
   const FPS = 30;
   const ENCODE = [
-    "-threads", "1",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+    "-threads", HD ? "0" : "1",
+    "-c:v", "libx264", "-preset", HD ? "medium" : "veryfast", "-crf", HD ? "18" : "21", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", HD ? "192k" : "128k", "-ar", "48000", "-ac", "2",
   ];
 
   const run = (bin, args, label, timeoutMs = 0) =>
@@ -1455,15 +1463,20 @@ async function renderGenesisReel({ clips, outputR2Key, banner, music, height, sc
   const bannerLines = [String(banner?.[0] || "").toUpperCase().slice(0, 24), String(banner?.[1] || "").toUpperCase().slice(0, 28)]
     .filter((s) => s.trim());
   const bannerPaths = bannerLines.map((line, i) => textFile(`banner${i}`, line));
+  // A fixed size only fits short lines: "KAIZER CHIEFS VS ORLANDO" at 7.2% of
+  // the width ran off both edges on the first render. Shrink each line until
+  // it fits 92% of the frame. DejaVu Sans Bold capitals average ~0.74em wide.
+  const fitSize = (line, max) => Math.min(max, Math.floor((W * 0.92) / (Math.max(1, line.length) * 0.74)));
+  const bannerSizes = bannerLines.map((line, i) => fitSize(line, i === 0 ? bannerSize : banner2Size));
 
   const header = [
     `drawbox=x=0:y=${stripTop}:w=${W}:h=${stripH}:color=black@0.55:t=fill`,
     `drawtext=textfile='${tagPath}':${fontOpt(false)}:fontsize=${tagSize}:fontcolor=0xFFC83D` +
       `:expansion=none:x=(w-text_w)/2:y=${stripTop + Math.round(stripH * 0.08)}`,
     ...bannerPaths.map((p, i) =>
-      `drawtext=textfile='${p}':${fontOpt(false)}:fontsize=${i === 0 ? bannerSize : banner2Size}` +
+      `drawtext=textfile='${p}':${fontOpt(false)}:fontsize=${bannerSizes[i]}` +
         `:fontcolor=${i === 0 ? "white" : "0xFFC83D"}:borderw=2:bordercolor=black@0.6:expansion=none` +
-        `:x=(w-text_w)/2:y=${stripTop + Math.round(stripH * 0.3) + (i === 0 ? 0 : Math.round(bannerSize * 1.15))}`
+        `:x=(w-text_w)/2:y=${stripTop + Math.round(stripH * 0.3) + (i === 0 ? 0 : Math.round(bannerSizes[0] * 1.15))}`
     ),
   ];
 
@@ -1706,6 +1719,9 @@ app.post("/genesis-reel/render", auth, async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: String(err.message).slice(0, 300) });
   }
 });
+
+// Edited, voiced, crowd-backed reels: see hype-reel.js.
+require("./hype-reel")(app, auth, r2, BUCKET);
 
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);

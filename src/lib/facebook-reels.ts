@@ -18,6 +18,7 @@ export const FACEBOOK_PAGES: Record<string, { pageId: string; tokenEnv: string; 
   mzansi_baby_stars: { pageId: "112465853843545", tokenEnv: "FB_PAGE_TOKEN_mzansi_baby_stars", label: "SAGA of the NORTH" },
   limitless_you: { pageId: "104120995511039", tokenEnv: "FB_PAGE_TOKEN_limitless_you", label: "Africa 2050" },
   penuel: { pageId: "", tokenEnv: "FB_PAGE_TOKEN_penuel", label: "Penuel" },
+  genesis_news: { pageId: "", tokenEnv: "FB_PAGE_TOKEN_genesis_news", label: "Genesis News" },
 };
 
 export function pageToken(pageKey: string): string | null {

@@ -21,8 +21,15 @@ export async function runClaude(prompt: string, opts: ClaudeOpts = {}): Promise<
   if (opts.tools?.length) args.push("--allowedTools", opts.tools.join(","));
   const timeoutMs = opts.timeoutMs ?? 120_000;
   return new Promise((resolve, reject) => {
+    // .env.local carries ANTHROPIC_API_KEY for the web app; the CLI would
+    // pick it up over the subscription login (and fail when that key is out
+    // of credit). The CLI always runs on the owner's login.
+    const env = { ...process.env };
+    delete env.ANTHROPIC_API_KEY;
+    delete env.ANTHROPIC_AUTH_TOKEN;
     const child = spawn("claude", args, {
       cwd: opts.cwd,
+      env,
       shell: process.platform === "win32",
       stdio: ["pipe", "pipe", "pipe"],
     });

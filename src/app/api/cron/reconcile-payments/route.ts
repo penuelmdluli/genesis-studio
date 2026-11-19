@@ -28,6 +28,7 @@ import { notifyOwner } from "@/lib/owner-notify";
 import { CREDIT_PACKS } from "@/lib/constants";
 import { sqlTimestamp } from "@/lib/job-finalizer";
 import { runCheckoutRecovery, supersededByCompletion } from "@/lib/checkout-recovery";
+import { reportPayFastFeedFailure, reportPayFastFeedOk } from "@/lib/payments/payfast-feed-alert";
 
 export const maxDuration = 60;
 
@@ -60,6 +61,7 @@ export async function GET(req: NextRequest) {
       const provider = getProvider("payfast") as PayFastProvider;
       const rows = await provider.listTransactions(3);
       out.payfast.seen = rows.length;
+      await reportPayFastFeedOk().catch(() => {});
 
       for (const row of rows) {
         if (!row.metadata.userId || !row.metadata.type) continue;
@@ -148,13 +150,9 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[RECONCILE] PayFast feed failed:", msg);
-      // A broken feed means payments stop settling — that is an outage.
-      await notifyOwner({
-        subject: "Payment reconciliation is failing",
-        title: "PayFast transaction feed unreachable",
-        body: `The 5-minute reconciliation could not read the PayFast transaction history, so new payments will not be credited automatically until this is fixed.<br><br><code>${msg}</code>`,
-        severity: "critical",
-      }).catch(() => {});
+      // Throttled: one email per outage, a daily reminder, one on recovery.
+      // (It used to email on every 5-minute run.) ITNs still settle payments.
+      await reportPayFastFeedFailure(msg).catch(() => {});
     }
   }
 

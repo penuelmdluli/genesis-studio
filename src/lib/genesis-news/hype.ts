@@ -491,7 +491,7 @@ export function withOutro(plan: HypePlan): HypePlan {
       {
         mode: "end",
         label: "MADE WITH AI",
-        voice: "Made with eye-video studio! Create your own videos free, at eye video studio dot A I!",
+        voice: "Made with eye-video studio. Try it free!",
         shots: [{ clip: last.clip, start: last.start, dur: 1.5, cap1: "iVIDEO STUDIO", cap2: "FREE AT IVIDEOSTUDIO.AI" }],
       },
     ],
@@ -762,4 +762,24 @@ async function uploadShort(reel: Pick<HypeReel, "videoUrl" | "caption" | "firstC
   } finally {
     fs.rmSync(desc, { force: true });
   }
+}
+
+/**
+ * Render a saved reel again (same plan, same clips) — after a renderer fix,
+ * or with a different voice — without re-picking, re-downloading or
+ * re-editing. Returns the new video URL; nothing is posted.
+ */
+export async function rerenderHypeReel(saved: HypeReel, log: (s: string) => void = console.log): Promise<HypeReel> {
+  const page = pageProfile(saved.page || "genesis_news");
+  const jobKey = `gh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  // The outro is re-added so a changed outro line takes effect.
+  const plan = withOutro({ ...saved.plan, beats: saved.plan.beats.filter((b) => b.label !== "MADE WITH AI").map((b) => ({ ...b, voiceFile: undefined })) });
+  log("voicing (local TTS)…");
+  await voiceBeats(plan, jobKey, page);
+  log("rendering…");
+  const r2Key = `${page.key === "genesis_news" ? "genesis-news" : page.key.replace(/_/g, "-")}/${today()}/${jobKey}.mp4`;
+  const { jobId } = await service<{ jobId: string }>("/hype/render", { plan: { ...plan, tag: page.tag, crowdGain: page.crowdGain }, clips: saved.clips, outputR2Key: r2Key });
+  const done = await waitJob<{ r2Key: string; duration: number }>(jobId, 30 * 60_000, log);
+  fs.rmSync(path.join(workDir(), "voices", jobKey), { recursive: true, force: true });
+  return { ...saved, plan, videoUrl: r2PublicUrl(done.r2Key), r2Key: done.r2Key, durationSec: done.duration };
 }

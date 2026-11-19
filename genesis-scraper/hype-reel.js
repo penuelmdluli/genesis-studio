@@ -181,29 +181,52 @@ async function renderHype(job, { plan, clips }) {
     })
   );
 
-  // 2. Cut every shot WITH its own sound: the stadium on the footage is the
-  //    crowd bed. A beat whose line outruns its footage holds its last frame
-  //    (and pads its audio) rather than cutting the commentator off.
+  // 2. Cut every shot. Flow rules (owner, 2026-11-19: "there is a pause
+  //    between the clips… the music plays and stops"):
+  //    - a beat whose footage runs >1s past its line is trimmed, so the next
+  //      beat starts ~0.4s after the narrator finishes — no dead air;
+  //    - a beat whose line outruns its footage keeps PLAYING the source
+  //      (the last shot runs on) and only freezes if the clip has ended;
+  //    - the picture and the sound are cut separately: video pieces are
+  //      video-only, the footage sound is cut as PCM and joined
+  //      sample-exact with 10ms edges, so the crowd/music flows straight
+  //      across every cut. (Per-piece AAC + 50-80ms fades made the bed drop
+  //      out at every cut — AAC priming adds a gap to every joined piece.)
   job.step = "cutting";
   const pieces = [];
+  const beds = [];
   const beatStarts = [];
   let t = 0;
   for (let b = 0; b < plan.beats.length; b++) {
     const beat = plan.beats[b];
     beatStarts.push(t);
-    const footage = beat.shots.reduce((s, x) => s + x.dur, 0);
-    const need = voiceFiles[b] ? voiceFiles[b].dur + 0.3 : 0;
-    const extra = Math.min(Math.max(0, need - footage), 4);
-    for (let s = 0; s < beat.shots.length; s++) {
-      const shot = beat.shots[s];
+    const shots = beat.shots.map((x) => ({ ...x }));
+    const footage = shots.reduce((s, x) => s + x.dur, 0);
+    const need = voiceFiles[b] ? voiceFiles[b].dur + 0.4 : footage;
+    // Tighten: trim from the last shot backwards, never below 1.2s a shot.
+    let excess = footage - need;
+    if (excess > 1.0) {
+      for (let s = shots.length - 1; s >= 0 && excess > 0.05; s--) {
+        const cut = Math.min(excess, Math.max(0, shots[s].dur - 1.2));
+        shots[s].dur -= cut;
+        excess -= cut;
+      }
+    }
+    // Run on: extend the last shot from the source before ever freezing.
+    let extra = Math.max(0, need - shots.reduce((s, x) => s + x.dur, 0));
+    const last = shots[shots.length - 1];
+    const lastClip = byId.get(last.clip);
+    const room = Math.max(0, (Number(lastClip.durationSec) || 0) - (last.start + last.dur) - 0.2);
+    const runOn = Math.min(extra, room);
+    last.dur += runOn;
+    extra = Math.min(extra - runOn, 4);
+
+    for (let s = 0; s < shots.length; s++) {
+      const shot = shots[s];
       const clip = byId.get(shot.clip);
-      const hold = s === beat.shots.length - 1 ? extra : 0;
+      const hold = s === shots.length - 1 ? extra : 0;
       const id = `${String(b).padStart(2, "0")}_${s}`;
       const out = path.join(dir, `p_${id}.mp4`);
-      const total = shot.dur + hold;
-      const audio = clip.hasAudio === false
-        ? `;[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a]`
-        : `;[0:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.05,afade=out:st=${Math.max(0, shot.dur - 0.08).toFixed(2)}:d=0.08,apad[a]`;
       const fc = shotFilter({
         id, dir, beat, shot, hold, crop: clip.crop,
         flash: s === 0 && beat.mode !== "hook",
@@ -211,21 +234,35 @@ async function renderHype(job, { plan, clips }) {
         title: plan.title,
         tag: plan.tag || "GENESIS NEWS",
         credit: `© ${clip.creator} · ${clip.license || "CC BY 3.0"}`.slice(0, 60),
-      }) + audio;
+      });
       const fcFile = path.join(dir, `f_${id}.txt`);
       fs.writeFileSync(fcFile, fc);
-      await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", String(shot.dur), "-i", srcPath(clip.id),
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-        "-filter_complex_script", fcFile, "-map", "[v]", "-map", "[a]", "-t", total.toFixed(3),
-        "-threads", "0", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-b:a", "192k", out], `cut ${id}`, 5 * 60 * 1000);
+      await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", shot.dur.toFixed(3), "-i", srcPath(clip.id),
+        "-filter_complex_script", fcFile, "-map", "[v]", "-an", "-t", (shot.dur + hold).toFixed(3),
+        "-threads", "0", "-c:v", "libx264", "-preset", "medium", "-crf", "18", out], `cut ${id}`, 5 * 60 * 1000);
       pieces.push(out);
-      t += await durationOf(out);
+      // The sound for exactly this piece's length, as PCM.
+      const len = await durationOf(out);
+      const wav = path.join(dir, `a_${id}.wav`);
+      if (clip.hasAudio === false) {
+        await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", len.toFixed(3), "-c:a", "pcm_s16le", wav], `bed ${id}`);
+      } else {
+        await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", shot.dur.toFixed(3), "-i", srcPath(clip.id), "-vn",
+          "-af", `aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.01,afade=out:st=${Math.max(0, shot.dur - 0.01).toFixed(3)}:d=0.01,apad`,
+          "-t", len.toFixed(3), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", wav], `bed ${id}`);
+      }
+      beds.push(wav);
+      t += len;
     }
   }
   const listFile = path.join(dir, "list.txt");
   fs.writeFileSync(listFile, pieces.map((p) => `file '${p}'`).join("\n"));
   const cut = path.join(dir, "cut.mp4");
   await run("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", cut], "concat");
+  const bedList = path.join(dir, "beds.txt");
+  fs.writeFileSync(bedList, beds.map((p) => `file '${p}'`).join("\n"));
+  const bed = path.join(dir, "bed.wav");
+  await run("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", bedList, "-c", "copy", bed], "bed concat");
   const total = await durationOf(cut);
 
   // 3. Mix: commentator compressed, brightened, a short stadium slap-back;
@@ -233,12 +270,13 @@ async function renderHype(job, { plan, clips }) {
   //    (-11 LUFS, limited at -1 dBTP) — the owner wants it to jump out of the
   //    feed, not sit at the -14 everyone else does.
   job.step = "mix";
-  const inputs = ["-i", cut];
+  // Input 0: the picture. Input 1: the continuous footage sound. 2..: voices.
+  const inputs = ["-i", cut, "-i", bed];
   const vo = [];
   voiceFiles.forEach((v, b) => {
     if (!v) return;
     inputs.push("-i", v.file);
-    vo.push({ idx: vo.length + 1, at: Math.round(beatStarts[b] * 1000) + 60 });
+    vo.push({ idx: vo.length + 2, at: Math.round(beatStarts[b] * 1000) + 60 });
   });
   const crowdGain = Number(plan.crowdGain) > 0 ? Number(plan.crowdGain) : 0.9;
   const parts = vo.map((v, k) => `[${v.idx}:a]aresample=48000,adelay=${v.at}:all=1[v${k}]`);
@@ -250,10 +288,12 @@ async function renderHype(job, { plan, clips }) {
   const graph = vo.length
     ? [...parts,
         `${voiceChain},asplit=2[voice][key]`,
-        `[0:a]aformat=sample_rates=48000:channel_layouts=stereo,highpass=f=60,volume=${crowdGain}[crowd]`,
-        `[crowd][key]sidechaincompress=threshold=0.03:ratio=5:attack=15:release=400:makeup=1[duck]`,
+        `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,highpass=f=60,volume=${crowdGain}[crowd]`,
+        // Gentler duck with a slow release: the bed dips under the voice
+        // and glides back, instead of pumping in and out between lines.
+        `[crowd][key]sidechaincompress=threshold=0.04:ratio=3:attack=25:release=700:makeup=1[duck]`,
         `[voice][duck]amix=inputs=2:normalize=0:duration=longest,${tail}`].join(";")
-    : `[0:a]aformat=sample_rates=48000:channel_layouts=stereo,${tail}`;
+    : `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,${tail}`;
   const mixFile = path.join(dir, "mix.txt");
   fs.writeFileSync(mixFile, graph);
   const final = path.join(dir, "final.mp4");

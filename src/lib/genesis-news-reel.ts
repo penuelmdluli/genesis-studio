@@ -5,7 +5,9 @@
 // 2. Gemini writes the banner, one caption per clip and the post caption
 //    (falls back to tidied clip titles if Gemini is unavailable)
 // 3. Scraper /genesis-reel/render: crops source branding off, reframes 9:16,
-//    adds banner/captions/on-screen credits, uploads to R2
+//    adds banner/captions/on-screen credits, uploads to R2. Started and then
+//    polled — downloading and encoding four clips takes minutes, and the proxy
+//    in front of the video service closes the request at 100 seconds.
 // 4. Optional: publish to the Genesis News Facebook page with credits in the caption
 //
 // Env: SCRAPER_SERVICE_URL, SCRAPER_SERVICE_SECRET, GEMINI_API_KEY,
@@ -41,10 +43,15 @@ export interface GenesisNewsReel {
   durationSec: number | null;
 }
 
-async function scraper<T>(route: string, body: unknown): Promise<T> {
+function service(): { url: string; secret: string } {
   const url = process.env.SCRAPER_SERVICE_URL;
   const secret = process.env.SCRAPER_SERVICE_SECRET;
   if (!url || !secret) throw new Error("SCRAPER_SERVICE_URL / SCRAPER_SERVICE_SECRET not set");
+  return { url, secret };
+}
+
+async function scraper<T>(route: string, body: unknown): Promise<T> {
+  const { url, secret } = service();
   const res = await fetch(`${url}${route}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-scraper-secret": secret },
@@ -53,6 +60,36 @@ async function scraper<T>(route: string, body: unknown): Promise<T> {
   const json = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(`scraper ${route} ${res.status}: ${json.error ?? "unknown error"}`);
   return json;
+}
+
+interface RenderJob {
+  status: "running" | "done" | "error";
+  r2Key?: string;
+  credits?: string;
+  duration?: number | null;
+  error?: string;
+}
+
+/** Waits on a started render. Polls, because the render outlives its request. */
+async function waitForRender(jobId: string, pollMs: number, timeoutMs: number): Promise<Required<Pick<RenderJob, "r2Key" | "credits">> & { duration: number | null }> {
+  const { url, secret } = service();
+  const deadline = Date.now() + timeoutMs;
+  for (let attempt = 0; ; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, pollMs));
+    const res = await fetch(`${url}/genesis-reel/render/${jobId}`, { headers: { "x-scraper-secret": secret } });
+    // The video service sleeps when idle and loses the jobs it was holding in
+    // memory, so a job that has stopped existing is a dead wait, not a slow one.
+    if (res.status === 404) throw new Error("the render was interrupted — start it again");
+    if (!res.ok) throw new Error(`render status ${res.status}`);
+    const job = (await res.json().catch(() => ({}))) as RenderJob;
+    if (job.status === "done" && job.r2Key) {
+      return { r2Key: job.r2Key, credits: job.credits ?? "", duration: job.duration ?? null };
+    }
+    if (job.status !== "running") throw new Error(job.error || "the render failed");
+    if (Date.now() >= deadline) {
+      throw new Error(`the render is still going after ${Math.round(timeoutMs / 60000)} minutes — check the video service`);
+    }
+  }
 }
 
 function tidyTitle(t: string): string {
@@ -117,6 +154,7 @@ export async function makeGenesisNewsReel(opts: {
   secondsPerClip?: number;
   musicUrl?: string; // licensed track only
   copy?: Partial<ReelCopy>; // override banner/captions/post caption
+  pollEveryMs?: number; // how often the render is checked on (default 6s)
 }): Promise<GenesisNewsReel> {
   const found = await scraper<{ jobId: string; clips: FoundClip[] }>("/genesis-reel/find", {
     story: opts.story,
@@ -132,13 +170,22 @@ export async function makeGenesisNewsReel(opts: {
   };
 
   const r2Key = `genesis-news/${new Date().toISOString().slice(0, 10)}/${found.jobId}.mp4`;
-  const rendered = await scraper<{ r2Key: string; credits: string; duration: number | null }>("/genesis-reel/render", {
+  const started = await scraper<{ jobId: string }>("/genesis-reel/render", {
     jobId: found.jobId,
     banner: copy.banner,
-    clips: found.clips.map((c, i) => ({ id: c.id, caption: copy.captions[i] ?? "", seconds: opts.secondsPerClip ?? 7.5 })),
+    // Every clip carries its own title, creator and licence rather than just
+    // an id. The video service sleeps between requests and loses what /find
+    // left in memory, and it refuses to render footage it cannot credit.
+    clips: found.clips.map((c, i) => ({
+      ...c,
+      caption: copy.captions[i] ?? "",
+      seconds: opts.secondsPerClip ?? 7.5,
+    })),
     outputR2Key: r2Key,
     music: opts.musicUrl,
   });
+  if (!started.jobId) throw new Error("the video service did not start the render");
+  const rendered = await waitForRender(started.jobId, opts.pollEveryMs ?? 6000, 12 * 60 * 1000);
 
   const credits = rendered.credits.replace(/^Footage credits.*\n/, "").trim();
   return {

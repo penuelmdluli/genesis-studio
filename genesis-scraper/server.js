@@ -1203,6 +1203,510 @@ app.post("/media-duration", auth, async (req, res) => {
   res.json({ durations, total: durations.reduce((a, b) => a + b, 0) });
 });
 
+// ─── Genesis News reels ───
+// Soccer news reels cut from footage we did not film. That is only lawful
+// because nothing enters one unless YouTube reports it as Creative Commons
+// AND the creator's name is burned onto the frames it appears in, so the two
+// checks below are the feature, not validation around it.
+//
+// Two endpoints, because they fail for unrelated reasons and the owner reads
+// the clip list before spending four minutes of encoding on it: /find returns
+// candidates (an exhausted quota or a story nobody filmed is "found nothing",
+// not "render failed"), /render cuts the chosen ones together.
+//
+// Env: YOUTUBE_API_KEY (search), R2_* (upload).
+
+const YT_API = "https://www.googleapis.com/youtube/v3";
+
+// Alpine's ttf-dejavu installs under /usr/share/fonts/ttf-dejavu, Debian's
+// under /usr/share/fonts/truetype/dejavu. Resolved once at startup so a base
+// image that moves them says so in the log, instead of once per clip inside
+// an ffmpeg error nobody reads.
+function resolveFont(file) {
+  const fs = require("fs");
+  for (const dir of [
+    "/usr/share/fonts/ttf-dejavu",
+    "/usr/share/fonts/truetype/dejavu",
+    "/usr/share/fonts/dejavu",
+    "/usr/share/fonts/TTF",
+  ]) {
+    if (fs.existsSync(`${dir}/${file}`)) return `${dir}/${file}`;
+  }
+  console.warn(`[fonts] ${file} not found on disk — falling back to fontconfig by family`);
+  return null;
+}
+const FONT_BOLD = resolveFont("DejaVuSans-Bold.ttf");
+const FONT_MONO = resolveFont("DejaVuSansMono-Bold.ttf");
+const fontOpt = (mono) => {
+  const file = mono ? FONT_MONO : FONT_BOLD;
+  return file ? `fontfile='${file}'` : `font='DejaVu Sans${mono ? " Mono" : ""}'`;
+};
+
+// Clips found for a story, waiting to be rendered, and the render's progress.
+// One entry per reel: /find creates it, /render fills in `render`.
+const genesisReelJobs = new Map();
+
+function pruneGenesisReelJobs() {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, job] of genesisReelJobs) if (job.at < cutoff) genesisReelJobs.delete(id);
+}
+
+// "PT1M30S" → 90
+function iso8601Seconds(value) {
+  const m = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?$/.exec(String(value || ""));
+  if (!m) return 0;
+  return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0);
+}
+
+async function youtube(path) {
+  const res = await fetch(`${YT_API}${path}`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Quota is the one that actually happens, and "HTTP 403" alone sends you
+    // looking at the key instead of at the clock.
+    const reason = json?.error?.errors?.[0]?.reason;
+    throw new Error(`YouTube API ${res.status}${reason ? ` (${reason})` : ""}: ${json?.error?.message || "unknown error"}`);
+  }
+  return json;
+}
+
+// ─── POST /genesis-reel/find ───
+// Creative Commons clips for one story, most relevant first.
+app.post("/genesis-reel/find", auth, async (req, res) => {
+  try {
+    const key = process.env.YOUTUBE_API_KEY;
+    if (!key) return res.status(500).json({ error: "YOUTUBE_API_KEY not set on the video service" });
+
+    const story = String(req.body?.story || "").trim().slice(0, 200);
+    if (!story) return res.status(400).json({ error: "story required" });
+    const want = Math.min(Math.max(Number(req.body?.clips) || 4, 1), 6);
+
+    const search = await youtube(
+      `/search?${new URLSearchParams({
+        key,
+        part: "snippet",
+        q: story,
+        type: "video",
+        videoLicense: "creativeCommon",
+        videoEmbeddable: "true",
+        order: "relevance",
+        safeSearch: "moderate",
+        relevanceLanguage: "en",
+        maxResults: String(Math.min(want * 5, 25)),
+      })}`
+    );
+
+    const ids = (search.items || []).map((i) => i?.id?.videoId).filter(Boolean);
+    if (!ids.length) return res.json({ jobId: null, clips: [] });
+
+    // The licence is read back per video rather than trusted from the search
+    // filter, which has returned standard-licence videos for years. Without
+    // this the reel would quietly reuse footage we have no right to.
+    const details = await youtube(
+      `/videos?${new URLSearchParams({ key, part: "snippet,contentDetails,status", id: ids.join(",") })}`
+    );
+
+    const rank = new Map(ids.map((id, i) => [id, i]));
+    const clips = (details.items || [])
+      .filter((v) => v?.status?.license === "creativeCommon" && v?.status?.embeddable !== false)
+      .map((v) => ({
+        id: v.id,
+        title: String(v.snippet?.title || "").slice(0, 140),
+        creator: String(v.snippet?.channelTitle || "").slice(0, 80),
+        url: `https://www.youtube.com/watch?v=${v.id}`,
+        license: "CC BY 3.0",
+        durationSec: iso8601Seconds(v.contentDetails?.duration),
+      }))
+      // A ten-second sting has nothing to cut from and a two-hour full match
+      // costs minutes to seek into for seven seconds of footage.
+      .filter((c) => c.durationSec >= 8 && c.durationSec <= 1800)
+      .sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99))
+      .slice(0, want);
+
+    if (!clips.length) return res.json({ jobId: null, clips: [] });
+
+    pruneGenesisReelJobs();
+    const jobId = `gn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    genesisReelJobs.set(jobId, { at: Date.now(), story, clips, render: null });
+
+    console.log(`[genesis-reel/find] "${story}" → ${clips.length} CC clips (${jobId})`);
+    res.json({ jobId, clips });
+  } catch (err) {
+    console.error("[genesis-reel/find]", err.message);
+    res.status(500).json({ error: String(err.message).slice(0, 300) });
+  }
+});
+
+// ─── GET /genesis-reel/render/:jobId ───
+app.get("/genesis-reel/render/:jobId", auth, (req, res) => {
+  const job = genesisReelJobs.get(req.params.jobId);
+  if (!job || !job.render) return res.status(404).json({ error: "unknown job" });
+  const r = job.render;
+  res.json({
+    status: r.status,
+    r2Key: r.r2Key || null,
+    credits: r.credits || null,
+    duration: r.duration ?? null,
+    fileSizeBytes: r.fileSizeBytes || null,
+    error: r.error || null,
+  });
+});
+
+/**
+ * Cuts the chosen clips into one 9:16 reel: branding cropped off the source,
+ * the full frame kept over a blurred fill of itself, the story banner across
+ * the top, one caption per clip and the creator's credit on their own frames.
+ *
+ * Returns { r2Key, credits, duration, fileSizeBytes }. Every temporary file it
+ * writes is pushed onto `scratch` for the caller to delete, success or not:
+ * this box has little disk to spare and a failed reel must not leave half a
+ * gigabyte of clips in /tmp behind it.
+ */
+async function renderGenesisReel({ clips, outputR2Key, banner, music, height, scratch = [] }) {
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+  const { execFile } = require("child_process");
+  const { Readable } = require("stream");
+  const streamPipeline = require("util").promisify(require("stream").pipeline);
+
+  const tmp = os.tmpdir();
+  const stamp = Date.now();
+
+  // 720x1280 by default for the same reason /stitch-episode defaults there:
+  // this box has 512MB and has died encoding 1080x1920. Facebook accepts a
+  // 720-wide reel, and `height: 1920` is here to measure the bigger one
+  // rather than guess at it.
+  const H = Number(height) === 1920 ? 1920 : 1280;
+  const W = H === 1920 ? 1080 : 720;
+  const FPS = 30;
+  const ENCODE = [
+    "-threads", "1",
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+  ];
+
+  const run = (bin, args, label, timeoutMs = 0) =>
+    new Promise((resolve, reject) => {
+      execFile(bin, args, { maxBuffer: 1024 * 1024 * 64, timeout: timeoutMs }, (err, _out, stderr) => {
+        if (err) return reject(new Error(`${label}: ${String(stderr || err.message).slice(-400)}`));
+        resolve();
+      });
+    });
+
+  const probeOne = (args) =>
+    new Promise((resolve) => execFile("ffprobe", args, (err, out) => resolve(err ? "" : String(out).trim())));
+  const hasAudio = (file) =>
+    probeOne(["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "csv=p=0", file]).then(Boolean);
+  const durationOf = (file) =>
+    probeOne(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).then((s) => parseFloat(s) || 0);
+
+  // Text always reaches drawtext through a file. Captions and page names carry
+  // apostrophes and colons, which are filter syntax, and a title with a comma
+  // in it would otherwise end the filter early.
+  const textFile = (name, body) => {
+    const p = path.join(tmp, `gr-${stamp}-${name}.txt`);
+    fs.writeFileSync(p, body, "utf8");
+    scratch.push(p);
+    return p;
+  };
+
+  const wrap = (text, width, maxLines) => {
+    const lines = [];
+    let line = "";
+    for (const word of String(text).replace(/\s+/g, " ").trim().split(" ")) {
+      if ((line + " " + word).trim().length > width) {
+        if (line) lines.push(line.trim());
+        line = word;
+      } else {
+        line = (line + " " + word).trim();
+      }
+    }
+    if (line) lines.push(line.trim());
+    return lines.slice(0, maxLines);
+  };
+
+  // *Stars* mark the words the copy wants in gold. drawtext paints one colour
+  // per call and cannot measure another call's text, so the line is drawn
+  // twice in a MONOSPACE bold: once with the gold words blanked to spaces,
+  // once with everything else blanked. Equal character counts give equal
+  // text_w, so both passes centre on the same pixel and each word lands in
+  // the gap the other left for it.
+  const maskPair = (line) => {
+    let plain = "", gold = "", on = false;
+    for (const ch of String(line)) {
+      if (ch === "*") { on = !on; continue; }
+      plain += on ? " " : ch;
+      gold += on ? ch : " ";
+    }
+    return { plain, gold: gold.trim() ? gold : null };
+  };
+
+  const bannerSize = Math.round(W * 0.072);
+  const banner2Size = Math.round(W * 0.050);
+  const tagSize = Math.round(W * 0.028);
+  const capSize = Math.round(W * 0.040);
+  const credSize = Math.round(W * 0.024);
+  const stripTop = Math.round(H * 0.05);
+  const stripH = Math.round(H * 0.15);
+
+  // The banner is the same on every clip, so its text files are written once.
+  const tagPath = textFile("tag", "GENESIS NEWS");
+  const bannerLines = [String(banner?.[0] || "").toUpperCase().slice(0, 24), String(banner?.[1] || "").toUpperCase().slice(0, 28)]
+    .filter((s) => s.trim());
+  const bannerPaths = bannerLines.map((line, i) => textFile(`banner${i}`, line));
+
+  const header = [
+    `drawbox=x=0:y=${stripTop}:w=${W}:h=${stripH}:color=black@0.55:t=fill`,
+    `drawtext=textfile='${tagPath}':${fontOpt(false)}:fontsize=${tagSize}:fontcolor=0xFFC83D` +
+      `:expansion=none:x=(w-text_w)/2:y=${stripTop + Math.round(stripH * 0.08)}`,
+    ...bannerPaths.map((p, i) =>
+      `drawtext=textfile='${p}':${fontOpt(false)}:fontsize=${i === 0 ? bannerSize : banner2Size}` +
+        `:fontcolor=${i === 0 ? "white" : "0xFFC83D"}:borderw=2:bordercolor=black@0.6:expansion=none` +
+        `:x=(w-text_w)/2:y=${stripTop + Math.round(stripH * 0.3) + (i === 0 ? 0 : Math.round(bannerSize * 1.15))}`
+    ),
+  ];
+
+  const normalised = [];
+  const used = [];
+
+  for (let i = 0; i < clips.length; i++) {
+    const clip = clips[i];
+    const rawPath = path.join(tmp, `gr-raw-${stamp}-${i}.mp4`);
+    const normPath = path.join(tmp, `gr-norm-${stamp}-${i}.mp4`);
+    scratch.push(rawPath, normPath);
+
+    // Only the window that ends up on screen is downloaded. A full match is
+    // 700MB and this box has neither the disk nor the minutes for it. Two
+    // extra seconds absorb the keyframe the cut snaps back to.
+    const dur = Number(clip.durationSec) || 0;
+    const start = dur ? Math.max(0, Math.min(Math.round(dur * 0.12), Math.round(dur - clip.seconds - 2))) : 0;
+    try {
+      await run(
+        "yt-dlp",
+        [
+          "--no-warnings", "--no-playlist",
+          "--download-sections", `*${start}-${start + clip.seconds + 2}`,
+          "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+          "--merge-output-format", "mp4",
+          "-o", rawPath,
+          clip.url,
+        ],
+        `download clip ${i}`,
+        240000
+      );
+    } catch (err) {
+      // One clip that will not download is a shorter reel, not a lost one:
+      // age-gates, blocks and takedowns are normal on borrowed footage.
+      console.error(`[genesis-reel/render] clip ${i} skipped:`, err.message);
+      continue;
+    }
+    if (!fs.existsSync(rawPath) || fs.statSync(rawPath).size < 10000) {
+      console.error(`[genesis-reel/render] clip ${i} skipped: download produced nothing`);
+      continue;
+    }
+
+    const overlays = [...header];
+
+    // The creator's name, on the frames their footage is on. The licence is
+    // conditional on this, so it is drawn in the same pass as everything else
+    // and there is no path through this function that renders without it.
+    const credPath = textFile(`cred${i}`, `© ${clip.creator} · ${clip.license}`.slice(0, 70));
+    const credY = H - Math.round(H * 0.035) - credSize;
+    overlays.push(
+      `drawtext=textfile='${credPath}':${fontOpt(false)}:fontsize=${credSize}:fontcolor=white@0.78` +
+        `:borderw=2:bordercolor=black@0.5:expansion=none:x=(w-text_w)/2:y=${credY}`
+    );
+
+    const capLines = wrap(clip.caption || "", 34, 2);
+    const lineH = Math.round(capSize * 1.32);
+    const capBottom = credY - Math.round(H * 0.02);
+    capLines.forEach((line, li) => {
+      const { plain, gold } = maskPair(line);
+      const y = capBottom - (capLines.length - li) * lineH;
+      const base =
+        `:${fontOpt(true)}:fontsize=${capSize}:borderw=3:bordercolor=black@0.85` +
+        `:expansion=none:x=(w-text_w)/2:y=${y}`;
+      overlays.push(`drawtext=textfile='${textFile(`cap${i}-${li}`, plain)}'${base}:fontcolor=white`);
+      if (gold) overlays.push(`drawtext=textfile='${textFile(`cap${i}-${li}-g`, gold)}'${base}:fontcolor=0xFFC83D`);
+    });
+
+    // Reframing to 9:16 by cropping a 16:9 shot keeps the middle third of the
+    // picture and throws away whoever was standing at the edge of it. The
+    // whole frame is kept instead, over a blurred, zoomed copy of itself —
+    // and that leaves the top and bottom bands free for the banner and the
+    // captions rather than printing them over the footage.
+    const small = `${Math.round(W / 8)}:${Math.round(H / 8)}`;
+    const video =
+      // Source branding lives in the edges: channel bugs top-left, score bars
+      // along the top, the broadcaster's own lower third at the bottom.
+      `[0:v]crop=iw*0.92:ih*0.83:iw*0.04:ih*0.07,split=2[keep][fill];` +
+      `[fill]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+      // Blurred small and scaled back up: a cheap blur on one core.
+      `scale=${small},gblur=sigma=4,scale=${W}:${H}[bg];` +
+      `[keep]scale=${W}:${H}:force_original_aspect_ratio=decrease[fg];` +
+      `[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=${FPS},${overlays.join(",")}[v]`;
+
+    const args = ["-y", "-i", rawPath];
+    if (await hasAudio(rawPath)) {
+      args.push("-filter_complex", `${video};[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]`);
+    } else {
+      // Silent footage still needs a track: concat refuses to join a clip
+      // that has one to a clip that does not.
+      args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+      args.push("-filter_complex", `${video};[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a]`);
+    }
+    args.push("-map", "[v]", "-map", "[a]", "-t", String(clip.seconds), ...ENCODE, normPath);
+
+    try {
+      await run("ffmpeg", args, `cut clip ${i}`);
+    } catch (err) {
+      // Same reasoning as a failed download: borrowed footage arrives in
+      // shapes ffmpeg sometimes refuses, and three clips is still a reel.
+      console.error(`[genesis-reel/render] clip ${i} skipped:`, err.message);
+      continue;
+    } finally {
+      try { fs.unlinkSync(rawPath); } catch {}
+    }
+    normalised.push(normPath);
+    used.push(clip);
+  }
+
+  if (!normalised.length) throw new Error("every clip failed to download — nothing to render");
+
+  const listPath = textFile("list", normalised.map((f) => `file '${f}'`).join("\n"));
+  const joinedPath = path.join(tmp, `gr-out-${stamp}.mp4`);
+  scratch.push(joinedPath);
+  await run(
+    "ffmpeg",
+    ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", joinedPath],
+    "join"
+  );
+
+  let finalPath = joinedPath;
+  if (music) {
+    try {
+      const musicPath = path.join(tmp, `gr-music-${stamp}.mp3`);
+      const mixedPath = path.join(tmp, `gr-mixed-${stamp}.mp4`);
+      scratch.push(musicPath, mixedPath);
+      const got = await fetch(music);
+      if (!got.ok) throw new Error(`music download failed (${got.status})`);
+      await streamPipeline(Readable.fromWeb(got.body), fs.createWriteStream(musicPath));
+      await run(
+        "ffmpeg",
+        [
+          "-y", "-i", joinedPath,
+          "-stream_loop", "-1", "-i", musicPath,
+          "-filter_complex",
+          // Under the commentary, not over it: the footage's own sound is
+          // what makes a news clip read as news.
+          "[1:a]volume=0.12[bed];[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]",
+          "-map", "0:v", "-map", "[a]",
+          "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", mixedPath,
+        ],
+        "music mix"
+      );
+      finalPath = mixedPath;
+    } catch (err) {
+      // A bed of music is not worth a reel.
+      console.error("[genesis-reel/render] music skipped:", err.message);
+    }
+  }
+
+  const duration = await durationOf(finalPath);
+  const bytes = fs.statSync(finalPath).size;
+  await r2.send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: outputR2Key,
+    Body: fs.createReadStream(finalPath),
+    ContentLength: bytes,
+    ContentType: "video/mp4",
+  }));
+  // Freed before the upload rather than after it: the cut clips are the bulk
+  // of the disk this reel holds and they are of no further use once joined.
+  normalised.forEach((f) => { try { fs.unlinkSync(f); } catch {} });
+
+  // The first line names itself so the caller can strip it and write its own
+  // heading for the post; the rest is the attribution the licence requires.
+  const credits = [
+    "Footage credits — Creative Commons BY, reused with attribution:",
+    ...used.map((c) => `• ${c.title} — ${c.creator} — https://youtu.be/${c.id}`),
+  ].join("\n");
+
+  console.log(`[genesis-reel/render] ${used.length} clips → ${outputR2Key} (${(bytes / 1024 / 1024).toFixed(1)}MB, ${duration.toFixed(1)}s)`);
+  return { r2Key: outputR2Key, credits, duration, fileSizeBytes: bytes };
+}
+
+// ─── POST /genesis-reel/render ───
+// Started, acknowledged and polled: four clips take minutes to download and
+// encode, and the proxy in front of this service gives up at 100s with a 524.
+app.post("/genesis-reel/render", auth, async (req, res) => {
+  try {
+    const { jobId, clips, outputR2Key, banner, music, height } = req.body || {};
+    if (!outputR2Key) return res.status(400).json({ error: "outputR2Key required" });
+    if (!Array.isArray(clips) || !clips.length) return res.status(400).json({ error: "clips array required" });
+    if (clips.length > 8) return res.status(400).json({ error: "too many clips (max 8)" });
+
+    pruneGenesisReelJobs();
+    const found = jobId ? genesisReelJobs.get(String(jobId)) : null;
+
+    // Clip metadata is taken from the request when it is there and from the
+    // find job only as a fallback. This service sleeps when idle, which loses
+    // the job it was holding in memory, and a reel should not die between two
+    // calls of the same pipeline for that.
+    const prepared = [];
+    let budget = 88; // Facebook rejects a reel over 90s.
+    for (const entry of clips) {
+      const meta = (found?.clips || []).find((c) => c.id === entry?.id) || {};
+      const url = entry?.url || meta.url || (entry?.id ? `https://www.youtube.com/watch?v=${entry.id}` : null);
+      const creator = entry?.creator || meta.creator;
+      if (!url || !creator) {
+        return res.status(400).json({
+          error: `clip ${entry?.id || "?"} has no creator to credit — pass the clips from /genesis-reel/find`,
+        });
+      }
+      const seconds = Math.min(Math.max(Number(entry?.seconds) || 7.5, 3), 15);
+      if (seconds > budget) break;
+      budget -= seconds;
+      prepared.push({
+        id: entry?.id || meta.id || "",
+        url,
+        creator,
+        title: entry?.title || meta.title || "",
+        license: entry?.license || meta.license || "CC BY 3.0",
+        durationSec: Number(entry?.durationSec || meta.durationSec) || 0,
+        caption: String(entry?.caption || ""),
+        seconds,
+      });
+    }
+    if (!prepared.length) return res.status(400).json({ error: "no usable clips" });
+
+    const job = found || { story: "", clips: prepared, render: null };
+    const renderId = String(jobId || `gr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    // Dated from the render, not from the find that led to it, so a reel
+    // rendered an hour after its search is not pruned out from under the poll.
+    job.at = Date.now();
+    job.render = { status: "running" };
+    genesisReelJobs.set(renderId, job);
+    res.status(202).json({ jobId: renderId, status: "running", clips: prepared.length });
+
+    const scratch = [];
+    try {
+      const done = await renderGenesisReel({ clips: prepared, outputR2Key, banner, music, height, scratch });
+      job.render = { status: "done", ...done };
+    } catch (err) {
+      console.error("[genesis-reel/render]", err.message);
+      job.render = { status: "error", error: String(err.message).slice(0, 400) };
+    } finally {
+      const fs = require("fs");
+      scratch.forEach((f) => { try { fs.unlinkSync(f); } catch {} });
+    }
+  } catch (err) {
+    console.error("[genesis-reel/render]", err.message);
+    if (!res.headersSent) res.status(500).json({ error: String(err.message).slice(0, 300) });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`genesis-scraper running on port ${PORT}`);
 });

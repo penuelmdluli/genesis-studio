@@ -108,6 +108,41 @@ Tone: warm, funny, proudly South African. No politics-bashing, no tragedy-bait, 
   },
 };
 
+// Tech Pulse Africa (10.4k) was built in 2022 on dogs and feel-good animal
+// photos ("This German Shepard actually climb in the pool by himself",
+// "Big Dogs are always the big Babies"); "pick the minister" polls got ~1
+// engagement. Relaunched 2026-11-19 as Pawsome Daily — the page's Facebook
+// key stays tech_news (FB_PAGE_TOKEN_tech_news).
+PAGES.pawsome_daily = {
+  key: "pawsome_daily",
+  name: "Pawsome Daily",
+  tag: "PAWSOME DAILY",
+  desk: `"Pawsome Daily", a Facebook page (10k followers) for the cutest, funniest and most heart-warming animal moments`,
+  sources: "BBC, The Dodo, People, Reuters, AP, National Geographic, SPCA, local rescue organisations",
+  footageHint: "real footage of the animals — pets doing funny or sweet things, rescues, reunions, wildlife moments",
+  picker: `You are the editor of "Pawsome Daily", a Facebook page with 10,400 followers.
+WHAT BUILT THIS PAGE (2022): dogs and feel-good animal moments — "This German Shepherd actually climbed in the pool by himself", "Big dogs are always the big babies", golden-hour pet photos, heart-warming animal families. People came for animals that make them smile. Since then it drifted into tech news and politics polls and died (~1 engagement a post). We go back to what worked.
+
+Use web search to see what animal stories and videos people are sharing RIGHT NOW (last 48h).
+Pick the ONE reel most likely to be SHARED today:
+- "countdown": "5 dogs who think they're human", "cats vs cucumbers", "the most dramatic huskies", "golden retrievers being golden", "baby animals' first steps", "animals reunited with their owners" — the backbone.
+- "news": a genuinely heart-warming animal story from the last 48h (a rescue, a reunion, a record) — only if it is real and big.
+- "throwback": a legendary viral animal moment people still love.
+Footage is Creative Commons YouTube, so pick subjects with lots of real footage (dogs, cats, farm animals, wildlife) over one-off stories.
+Tone: warm, funny, kind. Never mock an animal in distress; no injuries, no fights, no hunting.`,
+  narrator: `a warm, playful presenter who adores animals — gentle humour, a little giggle in the voice, never cheesy`,
+  editNotes: `This page lives on SHARES and TAGS: open on the funniest or cutest shot, give every beat an "aww" or "wait for it" payoff, and end on "Tag someone who needs this today" or "Which one is your pet?".`,
+  tts: { engine: "kokoro", voice: "af_heart", speed: "1.05" },
+  ytNiche: "",
+  crowdGain: 0.5,
+  fallbackTopic: "5 dogs who think they're human",
+  radar: {
+    newsQueries: ["dog rescue heartwarming", "viral animal video", "pet reunited owner", "cute animals"],
+    ytCategory: "15", // Pets & Animals
+    trendsMatch: /dog|cat|puppy|kitten|pet|animal|zoo|rescue|bird|horse|wildlife/i,
+  },
+};
+
 export function pageProfile(key: string): PageProfile {
   const p = PAGES[key];
   if (!p) throw new Error(`no hype-reel profile for page "${key}" (known: ${Object.keys(PAGES).join(", ")})`);

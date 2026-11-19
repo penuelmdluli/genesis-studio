@@ -718,7 +718,7 @@ export async function makeHypeReel(opts: {
   };
 }
 
-const PAGES_YT: Record<string, string> = { genesis_news: "sa_pulse", mzansi_daily_news: "" };
+const PAGES_YT: Record<string, string> = { genesis_news: "sa_pulse", mzansi_daily_news: "", pawsome_daily: "" };
 
 /** Post a finished reel and drop the marketing comment under it. */
 export async function publishHypeReel(

@@ -207,7 +207,7 @@ const FORMAT_GUIDE: Record<HypeFormat, string> = {
 - End card: "WHO WINS?" + "Comment your score".`,
   news: `NEWS FLASH. Tell the story fast and hyped.
 - Hook: the headline in 3-5 words.
-- 2-4 beats, one researched fact each, over footage of the team/player involved. Captions carry the fact; footage is illustration (say "file footage" in the post caption).
+- 2-4 beats, one researched fact each, over footage of the team/player involved. Captions carry the fact; the footage illustrates it (never claim archive footage is from this week).
 - End card: a question that splits opinion.`,
   countdown: `COUNTDOWN ("4 DERBY SCREAMERS"). The format that worked best.
 - Hook (2.5-3.5s): the best moment teased + "Wait for number 1…".
@@ -418,18 +418,23 @@ const FIRST_COMMENTS = [
   "Content creators 👀 Turn any clip into a hype edit with iVideo Studio — try it FREE 👉 https://ivideostudio.ai",
 ];
 
-export function packageCaption(plan: HypePlan, clips: HypeClip[], format: HypeFormat): { caption: string; firstComment: string } {
+/**
+ * Owner's rule (2026-11-19): the caption is our caption, our hashtags and the
+ * iVideo Studio line — nothing about how the reel was made. Footage gets one
+ * short credit line: the creator's name and the licence, which is what CC BY
+ * asks for (the on-screen credit carries it too).
+ */
+export function packageCaption(plan: HypePlan, clips: HypeClip[], _format: HypeFormat): { caption: string; firstComment: string } {
   const used = new Set(plan.beats.flatMap((b) => b.shots.map((s) => s.clip)));
-  const credits = clips
-    .filter((c) => used.has(c.id))
-    .map((c) => `• "${c.title}" by ${c.creator} — https://youtu.be/${c.id} — ${c.license || "CC BY 3.0"}`)
-    .join("\n");
+  const creators = [...new Set(clips.filter((c) => used.has(c.id)).map((c) => c.creator).filter(Boolean))];
   const caption = [
     plan.postCaption.trim(),
     IVIDEO_CTA,
     plan.hashtags.join(" "),
-    `🎥 ${format === "news" || format === "preview" ? "File footage" : "Footage"}:\n${credits}\nEdited: cropped, re-cut, captions and commentary added.`,
-  ].join("\n\n");
+    creators.length ? `🎥 Credit: ${creators.join(", ")} (CC BY)` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const firstComment = FIRST_COMMENTS[Math.floor(Date.now() / 86_400_000) % FIRST_COMMENTS.length];
   return { caption, firstComment };
 }

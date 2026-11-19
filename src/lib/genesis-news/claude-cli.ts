@@ -73,5 +73,12 @@ export function extractJson<T>(text: string): T {
 }
 
 export async function claudeJson<T>(prompt: string, opts: ClaudeOpts = {}): Promise<T> {
-  return extractJson<T>(await runClaude(prompt, opts));
+  try {
+    return extractJson<T>(await runClaude(prompt, opts));
+  } catch (e) {
+    // Now and then a reply comes back as prose with no JSON in it (a slot
+    // died on "Unexpected end of JSON input"). One fresh attempt fixes it.
+    if (!(e instanceof SyntaxError)) throw e;
+    return extractJson<T>(await runClaude(`${prompt}\n\nReply with the JSON object only.`, opts));
+  }
 }

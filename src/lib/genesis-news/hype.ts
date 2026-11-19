@@ -334,7 +334,8 @@ async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<H
   const script = path.join(process.cwd(), "scripts", "genesis_overlay.py");
   const kept: HypeClip[] = [];
   const rejected: string[] = [];
-  for (const c of clips) {
+  // Measured in parallel; results are put back in the original clip order.
+  await Promise.all(clips.map(async (c) => {
     try {
       const out = await new Promise<string>((resolve, reject) =>
         execFile(process.env.GENESIS_PYTHON || "python", [script, path.join(workDir(), "src", `${c.id}.mp4`)], { timeout: 5 * 60_000 },
@@ -344,7 +345,7 @@ async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<H
       if (!r.usable) {
         rejected.push(c.id);
         log(`  smart crop: ${c.id} has overlays over the middle of the picture — rejected`);
-        continue;
+        return;
       }
       const full = r.w >= 0.99 && r.h >= 0.99;
       kept.push({ ...c, crop: full ? undefined : { x: r.x, y: r.y, w: r.w, h: r.h } });
@@ -353,7 +354,8 @@ async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<H
       kept.push(c); // a failed measurement never loses a clip; the model check still runs
       log(`  smart crop: ${c.id} not measured (${(e as Error).message.slice(0, 60)})`);
     }
-  }
+  }));
+  kept.sort((a, b) => clips.indexOf(clips.find((x) => x.id === a.id)!) - clips.indexOf(clips.find((x) => x.id === b.id)!));
   addToBlocklist(rejected, "overlays over the middle of the picture (smart crop)");
   return kept;
 }
@@ -611,7 +613,11 @@ export async function makeHypeReel(opts: {
   page?: string;
   log?: (s: string) => void;
 }): Promise<HypeReel> {
-  const log = opts.log ?? ((s: string) => console.log(`[genesis-hype] ${s}`));
+  // Every line carries minutes:seconds since the start, so slow steps show.
+  const t0 = Date.now();
+  const stamp = () => { const s = Math.round((Date.now() - t0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  const baseLog = opts.log ?? ((s: string) => console.log(`[genesis-hype] ${s}`));
+  const log = (s: string) => baseLog(`[${stamp()}] ${s}`);
   const jobKey = `gh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const page = pageProfile(opts.page || "genesis_news");
 

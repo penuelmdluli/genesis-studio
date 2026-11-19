@@ -96,18 +96,28 @@ async function prepareClip(clip) {
   // used to read t*2, which doubled every label, so every automated edit on
   // 2026-11-19 cut twice as far into its clips as it meant to (bench shots
   // for goals, outro cards, shots "past the end").
-  for (const old of fs.readdirSync(path.join(WORK, "sheets"))) {
-    if (old.startsWith(`${clip.id}-`)) fs.unlinkSync(path.join(WORK, "sheets", old));
+  //
+  // Sheets are cached: a clip already on disk keeps the sheets drawn for it
+  // (the marker records the sheet version, so pre-fix t*2 sheets are redrawn).
+  // 288px tiles make a 1440px sheet — under the size Claude would shrink an
+  // image to anyway, so nothing it sees is lost and it reads them faster.
+  const marker = path.join(WORK, "sheets", `${clip.id}.v3`);
+  const cached = fs.existsSync(marker) && fs.statSync(marker).mtimeMs >= fs.statSync(file).mtimeMs;
+  if (!cached) {
+    for (const old of fs.readdirSync(path.join(WORK, "sheets"))) {
+      if (old.startsWith(`${clip.id}-`) || old.startsWith(`${clip.id}.v`)) fs.unlinkSync(path.join(WORK, "sheets", old));
+    }
+    const font = FONT_SMALL ? `fontfile='${FONT_SMALL}':` : "";
+    await run(
+      "ffmpeg",
+      ["-v", "error", "-y", "-threads", "0", "-i", file, "-vf",
+        `fps=1/2,scale=288:-2,drawtext=${font}text='%{eif\\:t\\:d}s':x=5:y=5:fontsize=22:fontcolor=yellow:box=1:boxcolor=black@0.75,tile=5x6`,
+        path.join(WORK, "sheets", `${clip.id}-%02d.png`)],
+      `sheets ${clip.id}`,
+      10 * 60 * 1000
+    );
+    fs.writeFileSync(marker, new Date().toISOString());
   }
-  const font = FONT_SMALL ? `fontfile='${FONT_SMALL}':` : "";
-  await run(
-    "ffmpeg",
-    ["-v", "error", "-y", "-i", file, "-vf",
-      `fps=1/2,scale=320:-2,drawtext=${font}text='%{eif\\:t\\:d}s':x=6:y=6:fontsize=24:fontcolor=yellow:box=1:boxcolor=black@0.75,tile=5x6`,
-      path.join(WORK, "sheets", `${clip.id}-%02d.png`)],
-    `sheets ${clip.id}`,
-    10 * 60 * 1000
-  );
   const sheets = fs.readdirSync(path.join(WORK, "sheets"))
     .filter((f) => f.startsWith(`${clip.id}-`) && f.endsWith(".png"))
     .sort()
@@ -321,8 +331,10 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
     (async () => {
       const ready = [];
       const failed = [];
-      for (const c of clips) {
-        job.step = `clip ${c.id}`;
+      // All clips at once: downloads wait on the network, sheets on the CPU,
+      // so in parallel they overlap instead of queueing.
+      job.step = `clips ${clips.map((c) => c.id).join(",")}`;
+      await Promise.all(clips.map(async (c) => {
         try {
           if (Number(c.durationSec) > 15 * 60) throw new Error("longer than 15 minutes");
           ready.push(await prepareClip(c));
@@ -330,7 +342,8 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
           // Takedowns, region blocks, age gates: normal on borrowed footage.
           failed.push({ id: c.id, error: String(err.message).slice(0, 200) });
         }
-      }
+      }));
+      ready.sort((a, b) => clips.findIndex((c) => c.id === a.id) - clips.findIndex((c) => c.id === b.id));
       job.result = { ready, failed, workDir: WORK };
       job.status = ready.length ? "done" : "error";
       if (!ready.length) job.error = `no clip could be downloaded: ${failed.map((f) => f.error).join(" / ").slice(0, 300)}`;

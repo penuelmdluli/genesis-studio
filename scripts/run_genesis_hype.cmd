@@ -8,7 +8,9 @@ set PAGE=%~1
 if "%PAGE%"=="" set PAGE=genesis_news
 set LOGDIR=C:\Users\PenuelM\genesis-work\logs
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
-set LOG=%LOGDIR%\hype.log
+REM One log per page: a running slot holds its log open, and Windows refuses
+REM a second writer, so a shared log silently killed overlapping slots.
+set LOG=%LOGDIR%\hype-%PAGE%.log
 
 echo. >> "%LOG%"
 echo ===== %DATE% %TIME% hype slot %PAGE% ===== >> "%LOG%"

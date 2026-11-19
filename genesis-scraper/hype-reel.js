@@ -119,7 +119,16 @@ async function prepareClip(clip) {
 
 const fit = (text, max, em) => Math.min(max, Math.floor((W * 0.92) / (Math.max(1, String(text).length) * em)));
 
-function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit }) {
+// Framing: inside the clip's overlay-free area (clip.crop, measured on the
+// host by scripts/genesis_overlay.py), at most 72% of the width. Mirrors
+// framing() in src/lib/genesis-news/hype.ts — keep them the same.
+function framing(c) {
+  const b = c || { x: 0.04, y: 0.07, w: 0.92, h: 0.86 };
+  const w = Math.min(b.w, 0.72);
+  return { x: b.x + (b.w - w) / 2, y: b.y, w, h: b.h };
+}
+
+function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit, crop }) {
   const tf = (name, body) => {
     const p = path.join(dir, `t_${id}_${name}.txt`);
     fs.writeFileSync(p, String(body || ""), "utf8");
@@ -138,10 +147,11 @@ function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit
   if (shot.cap2) lines.push(`drawtext=${hype}:textfile='${tf("c2", shot.cap2)}':fontsize=${fit(shot.cap2, 74, HYPE_EM)}:fontcolor=0xFFC83D:borderw=5:bordercolor=black:x=(w-tw)/2:y=1465`);
   lines.push(`drawtext=${small}:textfile='${tf("cred", credit)}':fontsize=30:fontcolor=white@0.8:borderw=2:bordercolor=black@0.5:x=(w-tw)/2:y=1800`);
 
-  // Whole frame kept (minus the edges where channel bugs and score bars
-  // live), as large as the 1080x780 box allows, over a blurred copy of itself.
+  // The clip's clean area, as large as the 1080x780 box allows, over a
+  // blurred copy of itself.
+  const f = framing(crop);
   return (
-    `[0:v]crop=iw*0.72:ih*0.86:iw*0.14:ih*0.07,split[a][b];` +
+    `[0:v]crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
     `[b]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},scale=108:192,gblur=sigma=2,scale=${W}:${H},eq=brightness=-0.18:saturation=1.3[bg];` +
     `[a]scale=${W}:780:force_original_aspect_ratio=decrease,eq=contrast=1.08:saturation=1.18,unsharp=5:5:0.6[fg];` +
     `[bg][fg]overlay=(W-w)/2:560+(780-h)/2,fps=${FPS},setsar=1` +
@@ -195,7 +205,7 @@ async function renderHype(job, { plan, clips }) {
         ? `;[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a]`
         : `;[0:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.05,afade=out:st=${Math.max(0, shot.dur - 0.08).toFixed(2)}:d=0.08,apad[a]`;
       const fc = shotFilter({
-        id, dir, beat, shot, hold,
+        id, dir, beat, shot, hold, crop: clip.crop,
         flash: s === 0 && beat.mode !== "hook",
         mode: beat.mode,
         title: plan.title,

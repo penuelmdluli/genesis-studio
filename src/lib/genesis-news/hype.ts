@@ -41,7 +41,25 @@ export interface HypeClip {
   durationSec: number;
   hasAudio?: boolean;
   sheets?: string[];
+  /** Overlay-free area (fractions), from scripts/genesis_overlay.py. */
+  crop?: { x: number; y: number; w: number; h: number };
 }
+
+/**
+ * The framing every shot of a clip gets: inside its overlay-free area, at
+ * most 72% of the width (so the footage fills more of the vertical frame).
+ * Mirrored in genesis-scraper/hype-reel.js — keep them the same.
+ */
+export function framing(c?: HypeClip["crop"]): { x: number; y: number; w: number; h: number } {
+  const b = c ?? { x: 0.04, y: 0.07, w: 0.92, h: 0.86 };
+  const w = Math.min(b.w, 0.72);
+  return { x: b.x + (b.w - w) / 2, y: b.y, w, h: b.h };
+}
+
+const cropExpr = (c?: HypeClip["crop"]) => {
+  const f = framing(c);
+  return `crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)}`;
+};
 
 export interface HypeShot { clip: string; start: number; dur: number; cap1?: string; cap2?: string }
 export interface HypeBeat { mode?: "hook" | "beat" | "end"; label: string; voice: string; shots: HypeShot[]; voiceFile?: string }
@@ -241,7 +259,7 @@ ${clipList}
 
 Rules for shots:
 - Use only real footage of the subject. Skip title cards, "NUMBER" cards, black or faded frames, transitions, other channels' intro/outro graphics, and tiny boxed-in footage.
-- Do NOT use a clip at all if its footage carries PERMANENT overlays in the middle of the picture: subscribe buttons, a presenter's face-cam, a big channel logo over the action. (Small corner bugs and broadcast score bars are fine — the edges are cropped.)
+- Channel graphics at the EDGES of a clip (subscribe buttons, bells, banners, logos, score bugs) are cropped away automatically — use the clean footage underneath. Only avoid a clip whose overlays sit over the MIDDLE of the action (a presenter's face-cam over the pitch).
 - A shot is 1.5–5 seconds; start at a stamped second (the moment can be up to 2s either side). Never run past the clip's length.
 - The key moment (the goal, the jump, the reveal) must be INSIDE a shot. Use different angles/replays when the sheet shows them.
 - Total 30–60 seconds. Hook ≤ 3.5s. End card: one shot ≤ 3s of fans/celebration.
@@ -259,6 +277,65 @@ ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${red
  "postCaption": "", "hashtags": ["#..."]}`;
   const plan = await claudeJson<HypePlan>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 });
   return validatePlan(plan, clips);
+}
+
+// ─── 3b. smart crop + blocklist ─────────────────────────────
+//
+// Most Creative Commons football on YouTube comes from fan channels that
+// paint subscribe buttons, bells, banners and logos over the picture. Their
+// edges never move while the match does, so genesis_overlay.py finds them
+// and returns the clean area; every shot of that clip is cropped to it. A
+// clip whose overlay sits over the middle (a face-cam) cannot be cropped
+// clean: it goes on a permanent blocklist and is never downloaded again.
+
+const BLOCKLIST = () => path.join(workDir(), "reels", "blocklist.json");
+
+export function readBlocklist(): string[] {
+  try {
+    return Object.keys(JSON.parse(fs.readFileSync(BLOCKLIST(), "utf8")));
+  } catch {
+    return [];
+  }
+}
+
+export function addToBlocklist(ids: string[], why: string) {
+  if (!ids.length) return;
+  let list: Record<string, { why: string; at: string }> = {};
+  try {
+    list = JSON.parse(fs.readFileSync(BLOCKLIST(), "utf8"));
+  } catch {}
+  for (const id of ids) list[id] = { why, at: new Date().toISOString() };
+  fs.mkdirSync(path.dirname(BLOCKLIST()), { recursive: true });
+  fs.writeFileSync(BLOCKLIST(), JSON.stringify(list, null, 1));
+}
+
+async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<HypeClip[]> {
+  const { execFile } = await import("node:child_process");
+  const script = path.join(process.cwd(), "scripts", "genesis_overlay.py");
+  const kept: HypeClip[] = [];
+  const rejected: string[] = [];
+  for (const c of clips) {
+    try {
+      const out = await new Promise<string>((resolve, reject) =>
+        execFile(process.env.GENESIS_PYTHON || "python", [script, path.join(workDir(), "src", `${c.id}.mp4`)], { timeout: 5 * 60_000 },
+          (err, stdout) => (err ? reject(err) : resolve(String(stdout))))
+      );
+      const r = JSON.parse(out.trim().split("\n").pop() || "{}") as { x: number; y: number; w: number; h: number; usable: boolean; blobs: number };
+      if (!r.usable) {
+        rejected.push(c.id);
+        log(`  smart crop: ${c.id} has overlays over the middle of the picture — rejected`);
+        continue;
+      }
+      const full = r.w >= 0.99 && r.h >= 0.99;
+      kept.push({ ...c, crop: full ? undefined : { x: r.x, y: r.y, w: r.w, h: r.h } });
+      log(`  smart crop: ${c.id} ${full ? "clean, no crop" : `keep ${Math.round(r.w * 100)}%×${Math.round(r.h * 100)}% (${r.blobs} overlay(s) cut)`}`);
+    } catch (e) {
+      kept.push(c); // a failed measurement never loses a clip; the model check still runs
+      log(`  smart crop: ${c.id} not measured (${(e as Error).message.slice(0, 60)})`);
+    }
+  }
+  addToBlocklist(rejected, "overlays over the middle of the picture (smart crop)");
+  return kept;
 }
 
 // ─── 4a. measured checks ────────────────────────────────────
@@ -311,7 +388,8 @@ interface ShotVerdict { beat: number; shot: number; verdict: "ok" | "drop" | "re
 interface BeatVoice { beat: number; voice: string }
 interface CheckResult { shots: ShotVerdict[]; dirtyClips: string[]; voices: BeatVoice[]; summary: string }
 
-async function shotStrips(plan: HypePlan, key: string): Promise<string[]> {
+async function shotStrips(plan: HypePlan, key: string, clips: HypeClip[] = []): Promise<string[]> {
+  const byId = new Map(clips.map((c) => [c.id, c]));
   const { execFile } = await import("node:child_process");
   const rel = path.posix.join("checks", key);
   fs.mkdirSync(path.join(workDir(), rel), { recursive: true });
@@ -324,7 +402,7 @@ async function shotStrips(plan: HypePlan, key: string): Promise<string[]> {
       const file = `${rel}/b${b}s${s}.png`;
       await new Promise<void>((resolve, reject) =>
         execFile("ffmpeg", ["-v", "error", "-y", ...ts.flatMap((t) => ["-ss", t, "-i", src]),
-          "-filter_complex", "[0:v]scale=400:-2[a];[1:v]scale=400:-2[b];[2:v]scale=400:-2[c];[a][b][c]hstack=3",
+          "-filter_complex", ((cr) => `[0:v]${cr},scale=-2:300[a];[1:v]${cr},scale=-2:300[b];[2:v]${cr},scale=-2:300[c];[a][b][c]hstack=3`)(cropExpr(byId.get(shot.clip)?.crop)),
           "-frames:v", "1", path.join(workDir(), file)], { timeout: 60_000 }, (err) => (err ? reject(err) : resolve()))
       );
       out.push(file);
@@ -333,14 +411,14 @@ async function shotStrips(plan: HypePlan, key: string): Promise<string[]> {
   return out;
 }
 
-export async function checkPlan(plan: HypePlan, key: string, facts: Research | null, page: PageProfile = pageProfile("genesis_news")): Promise<CheckResult> {
-  const strips = await shotStrips(plan, key);
+export async function checkPlan(plan: HypePlan, key: string, facts: Research | null, page: PageProfile = pageProfile("genesis_news"), clips: HypeClip[] = []): Promise<CheckResult> {
+  const strips = await shotStrips(plan, key, clips);
   let i = 0;
   const list = plan.beats.flatMap((b, bi) =>
     b.shots.map((s, si) => `- beat ${bi} shot ${si} [${b.mode || "beat"} "${b.label}"] clip ${s.clip} @${s.start.toFixed(1)}s: caption "${s.cap1 || ""}" / "${s.cap2 || ""}" — image ${strips[i++]}`)
   );
   const voices = plan.beats.map((b, bi) => `- beat ${bi} "${b.label}": "${b.voice}"`).join("\n");
-  const prompt = `You are the quality controller for "${page.name}" reels. Each image shows ONE planned shot: its first, middle and last frame side by side. Read EVERY image with the Read tool, then judge each shot.
+  const prompt = `You are the quality controller for "${page.name}" reels. Each image shows ONE planned shot: its first, middle and last frame side by side, ALREADY CROPPED to the framing that will air (channel graphics at the edges have been cut away). Read EVERY image with the Read tool, then judge each shot.
 
 ${list.join("\n")}
 
@@ -351,7 +429,7 @@ For each shot:
 - "ok": real footage of the subject (action, replay, people, animals, places, crowds), and the caption is a fair description of what these frames show.
 - "recaption": good footage but the caption claims something not shown (e.g. "ball in the net" over open play). Give a new cap1/cap2 (<= 26 chars each, upper case) that is true for these frames.
 - "drop": a title card, "NUMBER" card, black/blank/faded frame, transition, an intro/outro graphic, or footage mostly covered by overlays.
-Also list in dirtyClips every clip id whose footage carries PERMANENT overlays over the picture (subscribe buttons, presenter face-cams, big channel logos) — those clips must not be used at all. Small corner bugs and score bars are fine.
+Also list in dirtyClips every clip id whose cropped frames STILL carry permanent overlays over the picture (subscribe buttons, presenter face-cams, big channel logos) — those clips must not be used at all. Small corner bugs and score bars are fine.
 
 Then the COMMENTARY. For EVERY beat, return the line to be spoken over the shots you kept for that beat. Keep the planned line if every claim in it is either visible in those frames or in the researched facts. Otherwise rewrite it: same narrator (${page.narrator}) and about the same length, but it may only describe what the kept frames actually show (a scramble is a scramble, not a header; a bench celebrating is not a 41-metre strike) or state researched facts. Plain words, no [tags], no ALL CAPS.
 
@@ -527,14 +605,15 @@ export async function makeHypeReel(opts: {
   log("finding footage…");
   const queries = opts.clipIds?.length ? [] : opts.queries?.length ? opts.queries : facts?.youtubeQueries.length ? facts.youtubeQueries : [opts.topic];
   const newest = opts.newest ?? (opts.format === "news" || opts.format === "preview");
+  const avoid = [...(opts.avoidClipIds || []), ...readBlocklist()];
   let found = await findClips(queries, opts.maxClips ?? (opts.format === "throwback" ? 2 : 3), {
-    avoid: opts.avoidClipIds,
+    avoid,
     newest,
     // Newest-first searches look back one year so "latest" means this season.
     publishedAfter: newest ? new Date(Date.now() - 365 * 86_400_000).toISOString() : undefined,
   });
   // A fresh-only search can come back empty for niche stories; widen once.
-  if (!found.length && newest) found = await findClips(queries, opts.maxClips ?? 3, { avoid: opts.avoidClipIds });
+  if (!found.length && newest) found = await findClips(queries, opts.maxClips ?? 3, { avoid });
   if (opts.clipIds?.length) {
     found = opts.clipIds.map((id) => ({ id, title: "", creator: "", url: `https://www.youtube.com/watch?v=${id}`, license: "CC BY 3.0", durationSec: 0 }));
   }
@@ -542,7 +621,8 @@ export async function makeHypeReel(opts: {
   log(`  ${found.map((c) => c.title || c.id).join(" | ")}`);
 
   log("downloading + drawing frame sheets…");
-  const clips = (await prepareClips(found, log)).filter((c) => c.creator);
+  let clips = (await prepareClips(found, log)).filter((c) => c.creator);
+  clips = await smartCrop(clips, log);
   if (!clips.length) throw new Error("none of the footage could be downloaded");
 
   log("watching footage + writing the edit (claude)…");
@@ -554,7 +634,7 @@ export async function makeHypeReel(opts: {
   if (dead.dropped) log(`  dropped ${dead.dropped} black/frozen shot(s)`);
 
   log("quality check: every shot against its caption (claude)…");
-  let check = await checkPlan(plan, jobKey, facts, page);
+  let check = await checkPlan(plan, jobKey, facts, page, clips);
   const issues = (c: CheckResult) =>
     [...c.shots.filter((x) => x.verdict !== "ok").map((x) => `- beat ${x.beat} shot ${x.shot}: ${x.verdict} — ${x.reason || ""}`),
       ...c.dirtyClips.map((id) => `- clip ${id} has permanent overlays: do not use it`)].join("\n");
@@ -563,6 +643,7 @@ export async function makeHypeReel(opts: {
   if (check.dirtyClips.length || check.shots.filter((x) => x.verdict === "drop").length >= 2 || flagged >= 4) {
     // Too much went wrong to patch: one re-edit with the problems spelled
     // out and the dirty footage removed, then a second check.
+    addToBlocklist(check.dirtyClips, "overlays inside the crop (quality check)");
     usable = clips.filter((c) => !check.dirtyClips.includes(c.id));
     if (!usable.length) throw new Error("every clip found carries permanent overlays — no clean footage for this story");
     log(`  re-editing with ${usable.length} clean clip(s)…`);
@@ -570,7 +651,7 @@ export async function makeHypeReel(opts: {
     dead = await dropDeadShots(plan);
     plan = dead.plan;
     if (dead.dropped) log(`  dropped ${dead.dropped} black/frozen shot(s)`);
-    check = await checkPlan(plan, `${jobKey}-2`, facts, page);
+    check = await checkPlan(plan, `${jobKey}-2`, facts, page, clips);
     log(`  ${check.summary} (${check.shots.filter((x) => x.verdict !== "ok").length} flagged)`);
   }
   // Final gate: a second edit that still needs a quarter of its shots

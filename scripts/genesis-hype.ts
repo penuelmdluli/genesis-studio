@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { makeHypeReel, publishHypeReel, pickTopic, type HypeFormat } from "../src/lib/genesis-news/hype";
+import { pageProfile } from "../src/lib/genesis-news/pages";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -64,7 +65,7 @@ function readLedger(): LedgerRow[] {
     let why: string | undefined;
 
     if (process.argv.includes("--auto")) {
-      const pick = await pickTopic(readLedger().filter((r) => r.page === page));
+      const pick = await pickTopic(readLedger().filter((r) => r.page === page), pageProfile(page));
       ({ format, topic, why } = pick);
       queries = queries || (pick.format === "countdown" || pick.format === "throwback" ? pick.queries : undefined);
       console.log(`[genesis-hype] picked ${format}: ${topic} — ${why}`);
@@ -76,7 +77,7 @@ function readLedger(): LedgerRow[] {
     const recentClips = readLedger().filter((r) => r.page === page && Date.parse(r.at) > since).flatMap((r) => r.clipIds || []);
     const reel = await makeHypeReel({
       format: format || "countdown", topic, queries, clipIds: arg("clips")?.split(",").filter(Boolean),
-      avoidClipIds: recentClips, newest: process.argv.includes("--newest") ? true : undefined,
+      page, avoidClipIds: recentClips, newest: process.argv.includes("--newest") ? true : undefined,
     });
     const id = reel.r2Key.split("/").pop()!.replace(".mp4", "");
     fs.writeFileSync(path.join(WORK, "reels", `${id}.json`), JSON.stringify({ ...reel, why }, null, 2));

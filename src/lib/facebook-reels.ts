@@ -19,6 +19,8 @@ export const FACEBOOK_PAGES: Record<string, { pageId: string; tokenEnv: string; 
   limitless_you: { pageId: "104120995511039", tokenEnv: "FB_PAGE_TOKEN_limitless_you", label: "Africa 2050" },
   penuel: { pageId: "", tokenEnv: "FB_PAGE_TOKEN_penuel", label: "Penuel" },
   genesis_news: { pageId: "", tokenEnv: "FB_PAGE_TOKEN_genesis_news", label: "Genesis News" },
+  // 57k followers; the factory still stores its token as mzansi_baby_stars.
+  mzansi_daily_news: { pageId: "112465853843545", tokenEnv: "FB_PAGE_TOKEN_mzansi_daily_news", label: "Mzansi Daily News" },
 };
 
 export function pageToken(pageKey: string): string | null {

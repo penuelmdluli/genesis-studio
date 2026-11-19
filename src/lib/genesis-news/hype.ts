@@ -24,6 +24,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { claudeJson } from "./claude-cli";
+import { pageProfile, type PageProfile } from "./pages";
 import { r2PublicUrl } from "@/lib/storage";
 import { publishReel, pageToken } from "@/lib/facebook-reels";
 import { postPageComment } from "@/lib/social/facebook-comments";
@@ -67,6 +68,7 @@ export interface HypeReel {
   caption: string;
   firstComment: string;
   plan: HypePlan;
+  page: string;
   research: Research | null;
   clips: HypeClip[];
   durationSec: number;
@@ -112,14 +114,14 @@ async function waitJob<T>(jobId: string, timeoutMs: number, log: (s: string) => 
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function research(format: HypeFormat, topic: string): Promise<Research> {
-  const prompt = `You are the research desk for "Genesis News", a South African football page (PSL, Kaizer Chiefs, Orlando Pirates, Mamelodi Sundowns, Bafana Bafana).
+export async function research(format: HypeFormat, topic: string, page: PageProfile = pageProfile("genesis_news")): Promise<Research> {
+  const prompt = `You are the research desk for ${page.desk}.
 Today is ${today()}. Story: "${topic}". Reel type: ${format}.
 
 Use web search to establish what is TRUE and CURRENT about this story. ${format === "preview" ? "Find the fixture: teams, date, kick-off time (SAST), venue, competition, and each side's recent form or league position." : ""}
-Only keep facts you found on a reputable source (club sites, PSL, SuperSport, KickOff, iDiski Times, News24, BBC, ESPN). No rumours presented as fact.
+Only keep facts you found on a reputable source (${page.sources}). No rumours presented as fact.
 
-Then write 3 YouTube search queries likely to find Creative Commons FOOTAGE for this story (highlights of these teams/players, past meetings, famous goals). Short, like a fan would type.
+Then write 3 YouTube search queries likely to find Creative Commons FOOTAGE for this story (${page.footageHint}). Short, like a person would type.
 
 Reply with ONLY this JSON:
 {"headline": "max 60 chars", "facts": [{"fact": "...", "source": "url"}], "fixture": {"home": "", "away": "", "date": "", "time": "", "venue": "", "competition": ""} or null, "youtubeQueries": ["", "", ""]}`;
@@ -141,22 +143,12 @@ export interface TopicPick { format: HypeFormat; topic: string; why: string; que
  * Big fixture within 3 days → preview; a real story today → news; a quiet
  * day → countdown/throwback. `recent` keeps it from repeating itself.
  */
-export async function pickTopic(recent: { format: string; topic: string; at: string }[]): Promise<TopicPick> {
-  const prompt = `You are the editor of "Genesis News", a South African football Facebook page (10k+ followers; Kaizer Chiefs, Orlando Pirates, Mamelodi Sundowns, PSL, Bafana Bafana, SA players abroad).
-Today is ${today()}. Use web search to see what is happening in SA football RIGHT NOW: results in the last 48h, fixtures in the next 3 days, transfers, player form, Bafana.
-
-Pick the ONE reel most likely to trend today:
-- "preview": a big fixture (Chiefs, Pirates, Sundowns, Soweto Derby, Bafana, a cup semi/final) within 3 days.
-- "news": a genuine story from the last 48h that fans are talking about.
-- "countdown": "top N" of goals/saves/skills for a team, player or rivalry — great on quiet days.
-- "throwback": one legendary match or moment, ideally tied to an anniversary or this week's opponent.
-Our footage is Creative Commons YouTube highlights, so pick topics with lots of fan-uploaded footage (big clubs, derbies, Bafana) over obscure ones.
-
-THE AUDIENCE IS MOSTLY KAIZER CHIEFS FANS (owner's call, 2026-11-19). So:
-- Chiefs first. Every Chiefs fixture gets a preview, every Chiefs result gets a reaction/highlights reel, every real Chiefs story gets covered. Aim for at least half of all reels to be about Amakhosi.
-- Then Bafana Bafana (always big), then Pirates and Sundowns — especially when they play Chiefs or lead the league.
-- Quiet days: highlights and "best of" reels fans share — best Chiefs goals, best dribbles/skills, best saves, derby classics, a player's top moments. A "countdown" can be goals, skills/dribbles or saves.
-- Hype Chiefs, never mock rivals' fans; banter is fine, insults are not.
+export async function pickTopic(
+  recent: { format: string; topic: string; at: string }[],
+  page: PageProfile = pageProfile("genesis_news")
+): Promise<TopicPick> {
+  const prompt = `${page.picker}
+Today is ${today()}.
 
 Recently made (do NOT repeat the same topic within 3 days; vary the format):
 ${recent.slice(-10).map((r) => `- ${r.at.slice(0, 10)} ${r.format}: ${r.topic}`).join("\n") || "- nothing yet"}
@@ -164,7 +156,7 @@ ${recent.slice(-10).map((r) => `- ${r.at.slice(0, 10)} ${r.format}: ${r.topic}`)
 Reply with ONLY JSON: {"format": "preview"|"news"|"countdown"|"throwback", "topic": "one line a researcher can act on", "why": "one sentence", "queries": ["optional YouTube searches for footage"]}`;
   const p = await claudeJson<TopicPick>(prompt, { tools: ["WebSearch", "WebFetch"], timeoutMs: 6 * 60_000 });
   const format = (["preview", "news", "countdown", "throwback"] as const).includes(p.format) ? p.format : "countdown";
-  return { format, topic: String(p.topic || "Soweto Derby greatest goals"), why: String(p.why || ""), queries: p.queries?.filter(Boolean) };
+  return { format, topic: String(p.topic || page.fallbackTopic), why: String(p.why || ""), queries: p.queries?.filter(Boolean) };
 }
 
 // ─── 2. find + 3. watch ─────────────────────────────────────
@@ -182,7 +174,13 @@ export async function findClips(
     });
     // Footage used in a recent reel is skipped so the page never looks like
     // the same clip on loop.
-    for (const c of r.clips || []) if (!seen.has(c.id) && !avoid.has(c.id)) seen.set(c.id, c);
+    for (const c of r.clips || []) {
+      // "6 Big Chances Missed by Kaizer Chiefs" came back for "Chiefs best
+      // goals" and became half a reel of misses. Titles that announce the
+      // opposite of a highlight, or a talking-head show, are skipped.
+      if (/\b(miss(ed|es)?|fails?|bloopers?|reaction|react|podcast|interview|press conference|live stream|is live|preview show|prediction)\b/i.test(c.title)) continue;
+      if (!seen.has(c.id) && !avoid.has(c.id)) seen.set(c.id, c);
+    }
   }
   // Compilations and highlights (2-12 min) give the most moments per download.
   return [...seen.values()]
@@ -219,32 +217,32 @@ const FORMAT_GUIDE: Record<HypeFormat, string> = {
 - End card: "WHERE WERE YOU?" + "Tell us in the comments".`,
 };
 
-export async function planReel(format: HypeFormat, topic: string, facts: Research | null, clips: HypeClip[], redo?: string): Promise<HypePlan> {
+export async function planReel(format: HypeFormat, topic: string, facts: Research | null, clips: HypeClip[], redo?: string, page: PageProfile = pageProfile("genesis_news")): Promise<HypePlan> {
   const clipList = clips
     .map((c) => `- clip "${c.id}": "${c.title}" by ${c.creator}, ${Math.round(c.durationSec)}s. Sheets: ${(c.sheets || []).join(", ")}`)
     .join("\n");
-  const prompt = `You are the editor of "Genesis News", a South African football Facebook page. Make a reel that TRENDS: hyped, fast, every word true.
+  const prompt = `You are the editor of "${page.name}" (${page.desk}). Make a reel that TRENDS: hyped, fast, every word true.
 
 Story: "${topic}"   Today: ${today()}
 ${facts ? `Researched facts (the ONLY facts you may state beyond what is visible):\n${facts.facts.map((f) => `- ${f.fact}`).join("\n")}${facts.fixture ? `\nFixture: ${JSON.stringify(facts.fixture)}` : ""}` : "No research: state only what the footage itself shows (on-screen graphics, names on shirts, scoreboards)."}
 
-FORMAT: ${FORMAT_GUIDE[format]}
+FORMAT: ${FORMAT_GUIDE[format]}${page.editNotes ? `\n${page.editNotes}` : ""}
 
 FOOTAGE. Each sheet is a grid of frames, one every 2 seconds, stamped with the SECOND it was taken (top-left). Read EVERY sheet with the Read tool before planning:
 ${clipList}
 
 Rules for shots:
-- Use only real match footage. Skip title cards, "NUMBER" cards, black or faded frames, transitions, other channels' intro/outro graphics, and tiny boxed-in footage.
+- Use only real footage of the subject. Skip title cards, "NUMBER" cards, black or faded frames, transitions, other channels' intro/outro graphics, and tiny boxed-in footage.
 - Do NOT use a clip at all if its footage carries PERMANENT overlays in the middle of the picture: subscribe buttons, a presenter's face-cam, a big channel logo over the action. (Small corner bugs and broadcast score bars are fine — the edges are cropped.)
 - A shot is 1.5–5 seconds; start at a stamped second (the moment can be up to 2s either side). Never run past the clip's length.
-- The moment the ball goes in must be INSIDE a shot. Use different angles/replays when the sheet shows them.
+- The key moment (the goal, the jump, the reveal) must be INSIDE a shot. Use different angles/replays when the sheet shows them.
 - Total 30–60 seconds. Hook ≤ 3.5s. End card: one shot ≤ 3s of fans/celebration.
 
 Rules for text:
 - title: ≤ 22 chars, upper case, the reel's name ("SOWETO DERBY SCREAMERS").
 - label: ≤ 20 chars, upper case. cap1/cap2: ≤ 26 chars each; cap2 is the punchline (shown in gold). Captions describe what is on screen IN THAT SHOT.
 - Names: only if on a shirt, an on-screen graphic, or in the facts. Otherwise "the No.45", "the Chiefs skipper" etc. Never invent scores, dates or quotes.
-- voice: what an excited South African football commentator says over the WHOLE beat. Plain words (no [tags], no emojis, no ALL CAPS), short punchy phrases with "!" and "…". About 2.5 words per second of the beat. Local flavour welcome (Amakhosi, the Bucs, Masandawana, Bafana, "eish", "yho!") but keep it clear.
+- voice: what the narrator — ${page.narrator} — says over the WHOLE beat. Plain words (no [tags], no emojis, no ALL CAPS), short punchy phrases with "!" and "…". About 2.5 words per second of the beat.
 - postCaption: 2-4 short lines for Facebook, 1-3 emojis, ends with a question that gets comments. hashtags: 4-6.
 
 ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${redo}\nFix every point.\n\n` : ""}Reply with ONLY this JSON (no prose):
@@ -253,6 +251,43 @@ ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${red
  "postCaption": "", "hashtags": ["#..."]}`;
   const plan = await claudeJson<HypePlan>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 });
   return validatePlan(plan, clips);
+}
+
+// ─── 4a. measured checks ────────────────────────────────────
+//
+// Black frames and freeze-frames are facts ffmpeg can measure; they should
+// never depend on a model noticing them in a contact sheet.
+
+async function deadShare(clip: string, start: number, dur: number): Promise<number> {
+  const { execFile } = await import("node:child_process");
+  const src = path.join(workDir(), "src", `${clip}.mp4`);
+  const stderr = await new Promise<string>((resolve) =>
+    execFile("ffmpeg", ["-v", "info", "-ss", start.toFixed(2), "-t", dur.toFixed(2), "-i", src, "-an",
+      "-vf", "scale=320:-2,blackdetect=d=0.3:pix_th=0.12,freezedetect=n=0.004:d=0.8", "-f", "null", "-"],
+      { timeout: 60_000, maxBuffer: 8 * 1024 * 1024 }, (_e, _o, err) => resolve(String(err))));
+  let dead = 0;
+  for (const m of stderr.matchAll(/black_duration:([\d.]+)/g)) dead += parseFloat(m[1]);
+  for (const m of stderr.matchAll(/freeze_duration: ?([\d.]+)/g)) dead += parseFloat(m[1]);
+  // A freeze still running at the end of the window has no duration line.
+  const lastStart = [...stderr.matchAll(/freeze_start: ?([\d.]+)/g)].length > [...stderr.matchAll(/freeze_end/g)].length
+    ? parseFloat([...stderr.matchAll(/freeze_start: ?([\d.]+)/g)].at(-1)![1]) : null;
+  if (lastStart !== null) dead += Math.max(0, dur - lastStart);
+  return Math.min(1, dead / dur);
+}
+
+/** Drop shots that are mostly black or frozen. Returns how many went. */
+export async function dropDeadShots(plan: HypePlan): Promise<{ plan: HypePlan; dropped: number }> {
+  let dropped = 0;
+  const beats: HypeBeat[] = [];
+  for (const b of plan.beats) {
+    const shots: HypeShot[] = [];
+    for (const sh of b.shots) {
+      if ((await deadShare(sh.clip, sh.start, sh.dur)) > 0.4) dropped++;
+      else shots.push(sh);
+    }
+    if (shots.length) beats.push({ ...b, shots });
+  }
+  return { plan: { ...plan, beats }, dropped };
 }
 
 // ─── 4b. quality control ────────────────────────────────────
@@ -290,14 +325,14 @@ async function shotStrips(plan: HypePlan, key: string): Promise<string[]> {
   return out;
 }
 
-export async function checkPlan(plan: HypePlan, key: string, facts: Research | null): Promise<CheckResult> {
+export async function checkPlan(plan: HypePlan, key: string, facts: Research | null, page: PageProfile = pageProfile("genesis_news")): Promise<CheckResult> {
   const strips = await shotStrips(plan, key);
   let i = 0;
   const list = plan.beats.flatMap((b, bi) =>
     b.shots.map((s, si) => `- beat ${bi} shot ${si} [${b.mode || "beat"} "${b.label}"] clip ${s.clip} @${s.start.toFixed(1)}s: caption "${s.cap1 || ""}" / "${s.cap2 || ""}" — image ${strips[i++]}`)
   );
   const voices = plan.beats.map((b, bi) => `- beat ${bi} "${b.label}": "${b.voice}"`).join("\n");
-  const prompt = `You are the quality controller for "Genesis News" reels. Each image shows ONE planned shot: its first, middle and last frame side by side. Read EVERY image with the Read tool, then judge each shot.
+  const prompt = `You are the quality controller for "${page.name}" reels. Each image shows ONE planned shot: its first, middle and last frame side by side. Read EVERY image with the Read tool, then judge each shot.
 
 ${list.join("\n")}
 
@@ -305,12 +340,12 @@ Commentary planned per beat (spoken over that beat's shots):
 ${voices}
 ${facts ? `\nResearched facts the commentary may also state:\n${facts.facts.map((f) => `- ${f.fact}`).join("\n")}\n` : ""}
 For each shot:
-- "ok": real football footage (match action, replay, players, fans, stadium), and the caption is a fair description of what these frames show.
+- "ok": real footage of the subject (action, replay, people, animals, places, crowds), and the caption is a fair description of what these frames show.
 - "recaption": good footage but the caption claims something not shown (e.g. "ball in the net" over open play). Give a new cap1/cap2 (<= 26 chars each, upper case) that is true for these frames.
 - "drop": a title card, "NUMBER" card, black/blank/faded frame, transition, an intro/outro graphic, or footage mostly covered by overlays.
 Also list in dirtyClips every clip id whose footage carries PERMANENT overlays over the picture (subscribe buttons, presenter face-cams, big channel logos) — those clips must not be used at all. Small corner bugs and score bars are fine.
 
-Then the COMMENTARY. For EVERY beat, return the line to be spoken over the shots you kept for that beat. Keep the planned line if every claim in it is either visible in those frames or in the researched facts. Otherwise rewrite it: same excited South African commentator energy and about the same length, but it may only describe what the kept frames actually show (a scramble is a scramble, not a header; a bench celebrating is not a 41-metre strike) or state researched facts. Plain words, no [tags], no ALL CAPS.
+Then the COMMENTARY. For EVERY beat, return the line to be spoken over the shots you kept for that beat. Keep the planned line if every claim in it is either visible in those frames or in the researched facts. Otherwise rewrite it: same narrator (${page.narrator}) and about the same length, but it may only describe what the kept frames actually show (a scramble is a scramble, not a header; a bench celebrating is not a 41-metre strike) or state researched facts. Plain words, no [tags], no ALL CAPS.
 
 Reply with ONLY JSON: {"shots": [{"beat": 0, "shot": 0, "verdict": "ok"|"drop"|"recaption", "cap1": "", "cap2": "", "reason": ""}], "dirtyClips": [], "voices": [{"beat": 0, "voice": ""}], "summary": "one line"}`;
   const r = await claudeJson<CheckResult>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 10 * 60_000 });
@@ -363,6 +398,7 @@ const footageSecs = (p: HypePlan) => p.beats.reduce((t, b) => t + b.shots.reduce
 export function validatePlan(plan: HypePlan, clips: HypeClip[]): HypePlan {
   const byId = new Map(clips.map((c) => [c.id, c]));
   let budget = 85;
+  const used: { clip: string; start: number }[] = [];
   const beats: HypeBeat[] = [];
   for (const b of plan.beats || []) {
     const shots: HypeShot[] = [];
@@ -370,8 +406,18 @@ export function validatePlan(plan: HypePlan, clips: HypeClip[]): HypePlan {
       const c = byId.get(s.clip);
       if (!c) continue;
       const dur = Math.min(Math.max(Number(s.dur) || 2.5, 1), 6);
-      const start = Math.min(Math.max(Number(s.start) || 0, 0), Math.max(0, c.durationSec - dur - 0.3));
+      const asked = Math.max(Number(s.start) || 0, 0);
+      // A shot asked for past the end of its clip is a misread sheet, not a
+      // near miss. Clamping it used to pile every such shot onto the clip's
+      // last seconds (the Chiefs draft: 11 copies of the closing fans shot
+      // and a fade to black). Drop it instead; small overruns still clamp.
+      if (asked > c.durationSec - 1) continue;
+      const start = Math.min(asked, Math.max(0, c.durationSec - dur - 0.3));
       if (dur > budget) break;
+      // One clip moment, once: the Chiefs draft used the same fans still for
+      // 25 seconds under three different captions.
+      if (used.some((u) => u.clip === c.id && Math.abs(u.start - start) < 2.5)) continue;
+      used.push({ clip: c.id, start });
       budget -= dur;
       shots.push({ clip: c.id, start, dur, cap1: String(s.cap1 || "").slice(0, 32), cap2: String(s.cap2 || "").slice(0, 32) });
     }
@@ -383,11 +429,13 @@ export function validatePlan(plan: HypePlan, clips: HypeClip[]): HypePlan {
 
 // ─── 5. voice (local) ───────────────────────────────────────
 
-export async function voiceBeats(plan: HypePlan, jobKey: string): Promise<void> {
+export async function voiceBeats(plan: HypePlan, jobKey: string, page: PageProfile = pageProfile("genesis_news")): Promise<void> {
   const { execFile } = await import("node:child_process");
-  const engine = process.env.GENESIS_TTS_ENGINE || "kokoro";
-  const voice = process.env.GENESIS_TTS_VOICE || (engine === "edge" ? "en-ZA-LukeNeural" : "bm_george");
-  const speed = process.env.GENESIS_TTS_SPEED || "1.12";
+  // Each page has its own narrator; GENESIS_TTS_* only override Genesis News.
+  const own = page.key === "genesis_news";
+  const engine = (own && process.env.GENESIS_TTS_ENGINE) || page.tts.engine;
+  const voice = (own && process.env.GENESIS_TTS_VOICE) || page.tts.voice;
+  const speed = (own && process.env.GENESIS_TTS_SPEED) || page.tts.speed;
   const rel = path.posix.join("voices", jobKey);
   fs.mkdirSync(path.join(workDir(), rel), { recursive: true });
   const script = path.join(process.cwd(), "scripts", "genesis_tts.py");
@@ -453,15 +501,18 @@ export async function makeHypeReel(opts: {
   avoidClipIds?: string[];
   /** Newest uploads first (news, previews, "latest" highlights). */
   newest?: boolean;
+  /** Page profile key (pages.ts). Default genesis_news. */
+  page?: string;
   log?: (s: string) => void;
 }): Promise<HypeReel> {
   const log = opts.log ?? ((s: string) => console.log(`[genesis-hype] ${s}`));
   const jobKey = `gh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const page = pageProfile(opts.page || "genesis_news");
 
   let facts: Research | null = null;
   if (opts.format === "preview" || opts.format === "news") {
     log("researching…");
-    facts = await research(opts.format, opts.topic);
+    facts = await research(opts.format, opts.topic, page);
     log(`  ${facts.headline} — ${facts.facts.length} facts`);
   }
 
@@ -487,11 +538,15 @@ export async function makeHypeReel(opts: {
   if (!clips.length) throw new Error("none of the footage could be downloaded");
 
   log("watching footage + writing the edit (claude)…");
-  let plan = await planReel(opts.format, opts.topic, facts, clips);
+  let plan = await planReel(opts.format, opts.topic, facts, clips, undefined, page);
   let usable = clips;
 
+  let dead = await dropDeadShots(plan);
+  plan = dead.plan;
+  if (dead.dropped) log(`  dropped ${dead.dropped} black/frozen shot(s)`);
+
   log("quality check: every shot against its caption (claude)…");
-  let check = await checkPlan(plan, jobKey, facts);
+  let check = await checkPlan(plan, jobKey, facts, page);
   const issues = (c: CheckResult) =>
     [...c.shots.filter((x) => x.verdict !== "ok").map((x) => `- beat ${x.beat} shot ${x.shot}: ${x.verdict} — ${x.reason || ""}`),
       ...c.dirtyClips.map((id) => `- clip ${id} has permanent overlays: do not use it`)].join("\n");
@@ -503,9 +558,19 @@ export async function makeHypeReel(opts: {
     usable = clips.filter((c) => !check.dirtyClips.includes(c.id));
     if (!usable.length) throw new Error("every clip found carries permanent overlays — no clean footage for this story");
     log(`  re-editing with ${usable.length} clean clip(s)…`);
-    plan = await planReel(opts.format, opts.topic, facts, usable, issues(check));
-    check = await checkPlan(plan, `${jobKey}-2`, facts);
+    plan = await planReel(opts.format, opts.topic, facts, usable, issues(check), page);
+    dead = await dropDeadShots(plan);
+    plan = dead.plan;
+    if (dead.dropped) log(`  dropped ${dead.dropped} black/frozen shot(s)`);
+    check = await checkPlan(plan, `${jobKey}-2`, facts, page);
     log(`  ${check.summary} (${check.shots.filter((x) => x.verdict !== "ok").length} flagged)`);
+  }
+  // Final gate: a second edit that still needs a quarter of its shots
+  // patched is a weak reel. Skip the slot rather than post it.
+  const totalShots = plan.beats.reduce((n, b) => n + b.shots.length, 0);
+  const stillBad = check.shots.filter((x) => x.verdict !== "ok").length;
+  if (totalShots && stillBad / totalShots > 0.25) {
+    throw new Error(`quality gate: ${stillBad} of ${totalShots} shots still flagged after the re-edit — skipping rather than posting a weak reel`);
   }
   plan = applyCheck(plan, check);
   if (plan.beats.length < 3 || footageSecs(plan) < 18) {
@@ -516,11 +581,15 @@ export async function makeHypeReel(opts: {
   log(`  "${plan.title}": ${plan.beats.length} beats, ${plan.beats.reduce((s, b) => s + b.shots.reduce((x, y) => x + y.dur, 0), 0).toFixed(1)}s of footage`);
 
   log("voicing (local TTS)…");
-  await voiceBeats(plan, jobKey);
+  await voiceBeats(plan, jobKey, page);
 
   log("rendering…");
-  const r2Key = `genesis-news/${today()}/${jobKey}.mp4`;
-  const { jobId } = await service<{ jobId: string }>("/hype/render", { plan, clips, outputR2Key: r2Key });
+  const r2Key = `${page.key === "genesis_news" ? "genesis-news" : page.key.replace(/_/g, "-")}/${today()}/${jobKey}.mp4`;
+  const { jobId } = await service<{ jobId: string }>("/hype/render", {
+    plan: { ...plan, tag: page.tag, crowdGain: page.crowdGain },
+    clips,
+    outputR2Key: r2Key,
+  });
   const done = await waitJob<{ r2Key: string; duration: number }>(jobId, 30 * 60_000, log);
   fs.rmSync(path.join(workDir(), "voices", jobKey), { recursive: true, force: true });
 
@@ -533,11 +602,14 @@ export async function makeHypeReel(opts: {
     caption,
     firstComment,
     plan,
+    page: page.key,
     research: facts,
     clips,
     durationSec: done.duration,
   };
 }
+
+const PAGES_YT: Record<string, string> = { genesis_news: "sa_pulse", mzansi_daily_news: "" };
 
 /** Post a finished reel and drop the marketing comment under it. */
 export async function publishHypeReel(
@@ -555,7 +627,7 @@ export async function publishHypeReel(
   // Same reel as a YouTube Short on the Genesis News channel, through the
   // factory's authorised uploader. A YouTube failure never undoes Facebook.
   let youtubeId: string | null = null;
-  const ytNiche = process.env.GENESIS_YT_NICHE ?? (pageKey === "genesis_news" ? "sa_pulse" : "");
+  const ytNiche = process.env.GENESIS_YT_NICHE ?? (PAGES_YT[pageKey] || "");
   if (!scheduledAt && ytNiche && process.env.GENESIS_YOUTUBE !== "off") {
     try {
       youtubeId = await uploadShort(reel, ytNiche);

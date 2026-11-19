@@ -214,6 +214,26 @@ export async function findClips(
     .slice(0, want);
 }
 
+/**
+ * Clips named directly (--clips): title, creator and length from YouTube,
+ * and the same Creative Commons check the search applies — a named clip is
+ * not exempt from the licence.
+ */
+async function namedClips(ids: string[]): Promise<HypeClip[]> {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) throw new Error("YOUTUBE_API_KEY not set (needed to look up named clips)");
+  const j = (await (await fetch(`https://www.googleapis.com/youtube/v3/videos?${new URLSearchParams({ part: "snippet,contentDetails,status", id: ids.join(","), key })}`)).json()) as {
+    items?: { id: string; snippet: { title: string; channelTitle: string }; contentDetails: { duration: string }; status: { license: string } }[];
+  };
+  const secs = (d: string) => {
+    const m = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?$/.exec(d) || [];
+    return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0);
+  };
+  return (j.items || [])
+    .filter((v) => v.status.license === "creativeCommon")
+    .map((v) => ({ id: v.id, title: v.snippet.title, creator: v.snippet.channelTitle, url: `https://www.youtube.com/watch?v=${v.id}`, license: "CC BY 3.0", durationSec: secs(v.contentDetails.duration) }));
+}
+
 export async function prepareClips(clips: HypeClip[], log: (s: string) => void): Promise<HypeClip[]> {
   const { jobId } = await service<{ jobId: string }>("/hype/prepare", { clips });
   const r = await waitJob<{ ready: HypeClip[]; failed: { id: string; error: string }[] }>(jobId, 30 * 60_000, log);
@@ -615,7 +635,7 @@ export async function makeHypeReel(opts: {
   // A fresh-only search can come back empty for niche stories; widen once.
   if (!found.length && newest) found = await findClips(queries, opts.maxClips ?? 3, { avoid });
   if (opts.clipIds?.length) {
-    found = opts.clipIds.map((id) => ({ id, title: "", creator: "", url: `https://www.youtube.com/watch?v=${id}`, license: "CC BY 3.0", durationSec: 0 }));
+    found = await namedClips(opts.clipIds);
   }
   if (!found.length) throw new Error(`no Creative Commons footage found for "${opts.topic}"`);
   log(`  ${found.map((c) => c.title || c.id).join(" | ")}`);

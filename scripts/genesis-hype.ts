@@ -52,9 +52,15 @@ function readLedger(): LedgerRow[] {
   fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
   // One reel at a time: two runs would fight over the container and the CPU.
   // A lock older than 90 minutes is from a run that died.
-  if (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 90 * 60_000) {
-    console.log("another hype reel is being made — skipping this slot");
-    return;
+  // Wait (up to 45 min) for a reel already in progress rather than losing
+  // this slot; give up only if it is still busy after that.
+  const waitUntil = Date.now() + 45 * 60_000;
+  while (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 90 * 60_000) {
+    if (Date.now() > waitUntil) {
+      console.log("another hype reel has been running for 45+ minutes — skipping this slot");
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 30_000));
   }
   fs.writeFileSync(LOCK, String(process.pid));
   try {

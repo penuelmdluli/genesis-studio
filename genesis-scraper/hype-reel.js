@@ -92,6 +92,10 @@ async function prepareClip(clip) {
 
   // One frame every 2s, 30 to a sheet = a minute of footage per image, each
   // stamped with its second so the edit can point at exact moments.
+  // The stamp is plain `t`: fps=1/2 keeps each frame's source timestamp. It
+  // used to read t*2, which doubled every label, so every automated edit on
+  // 2026-11-19 cut twice as far into its clips as it meant to (bench shots
+  // for goals, outro cards, shots "past the end").
   for (const old of fs.readdirSync(path.join(WORK, "sheets"))) {
     if (old.startsWith(`${clip.id}-`)) fs.unlinkSync(path.join(WORK, "sheets", old));
   }
@@ -99,7 +103,7 @@ async function prepareClip(clip) {
   await run(
     "ffmpeg",
     ["-v", "error", "-y", "-i", file, "-vf",
-      `fps=1/2,scale=320:-2,drawtext=${font}text='%{eif\\:t*2\\:d}s':x=6:y=6:fontsize=24:fontcolor=yellow:box=1:boxcolor=black@0.75,tile=5x6`,
+      `fps=1/2,scale=320:-2,drawtext=${font}text='%{eif\\:t\\:d}s':x=6:y=6:fontsize=24:fontcolor=yellow:box=1:boxcolor=black@0.75,tile=5x6`,
       path.join(WORK, "sheets", `${clip.id}-%02d.png`)],
     `sheets ${clip.id}`,
     10 * 60 * 1000

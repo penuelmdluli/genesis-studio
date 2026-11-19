@@ -45,7 +45,7 @@ def kokoro(voice: str, speed: float, out: str, text: str) -> None:
         _PIPES[lang] = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M")
     pipe = _PIPES[lang]
     audio = [np.asarray(a) for _, _, a in pipe(text, voice=voice, speed=speed)]
-    sf.write(out, np.concatenate(audio), 24000)
+    sf.write(out, np.concatenate(audio), 24000, format="WAV")
 
 
 async def edge(voice: str, speed: float, out: str, text: str) -> None:
@@ -55,10 +55,19 @@ async def edge(voice: str, speed: float, out: str, text: str) -> None:
     await edge_tts.Communicate(text, voice, rate=rate, pitch="+4Hz").save(out)
 
 
+FALLBACK_VOICE = "am_michael"
+
+
 def speak(engine: str, voice: str, speed: str, out: str, text: str) -> float:
     text = clean(text)
     if engine == "edge":
-        asyncio.run(edge(voice, float(speed), out, text))
+        try:
+            asyncio.run(edge(voice, float(speed), out, text))
+        except Exception as e:  # free service: 429s and handshake failures happen
+            # Offline Kokoro instead of a dead slot. WAV data under the
+            # planned name: ffmpeg and soundfile read by content, not suffix.
+            print(f"edge-tts failed ({str(e)[:80]}); offline Kokoro {FALLBACK_VOICE}", file=sys.stderr)
+            kokoro(FALLBACK_VOICE, float(speed), out, text)
     else:
         kokoro(voice, float(speed), out, text)
     import soundfile as sf
@@ -72,6 +81,8 @@ def main() -> None:
         import json
 
         job = json.load(open(sys.argv[2], encoding="utf-8"))
+        global FALLBACK_VOICE
+        FALLBACK_VOICE = job.get("fallbackVoice") or FALLBACK_VOICE
         for line in job["lines"]:
             print(f"{line['out']}	{speak(job['engine'], job['voice'], str(job['speed']), line['out'], line['text']):.3f}", flush=True)
         return

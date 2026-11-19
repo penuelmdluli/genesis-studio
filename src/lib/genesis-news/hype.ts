@@ -164,24 +164,37 @@ export interface TopicPick { format: HypeFormat; topic: string; why: string; que
  */
 export async function pickTopic(
   recent: { format: string; topic: string; at: string }[],
-  page: PageProfile = pageProfile("genesis_news")
+  page: PageProfile = pageProfile("genesis_news"),
+  opts: {
+    /** Topics this slot already tried and could not make into a clean reel. */
+    failed?: { topic: string; why: string }[];
+    /** The overnight spare: a timeless countdown/throwback, no news. */
+    evergreen?: boolean;
+  } = {}
 ): Promise<TopicPick> {
   // What SA is searching/watching/reading right now; a dead radar never
-  // blocks the pick.
-  const radar = await scanRadar(page).then(radarBrief).catch(() => "");
+  // blocks the pick. The spare reel ignores it: it must still be good in a week.
+  const radar = opts.evergreen ? "" : await scanRadar(page).then(radarBrief).catch(() => "");
+  const failed = opts.failed?.length
+    ? `\nAlready tried in this slot and FAILED (not enough clean, matching footage) — pick something clearly different, with plenty of footage on YouTube:\n${opts.failed.map((f) => `- ${f.topic} (${f.why})`).join("\n")}\n`
+    : "";
+  const steer = opts.evergreen
+    ? `This is the SPARE reel, kept in reserve for a slot whose story falls through. It must be EVERGREEN: format "countdown" or "throwback", a timeless topic with lots of clean footage on YouTube, nothing dated or tied to this week's news.`
+    : `When a radar item fits this page's audience and has real footage behind it, prefer it over an evergreen topic — that is what gets shared today.`;
   const prompt = `${page.picker}
 Today is ${today()}.
 
 ${radar}
 
-When a radar item fits this page's audience and has real footage behind it, prefer it over an evergreen topic — that is what gets shared today.
-
+${steer}
+${failed}
 Recently made (do NOT repeat the same topic within 3 days; vary the format):
 ${recent.slice(-10).map((r) => `- ${r.at.slice(0, 10)} ${r.format}: ${r.topic}`).join("\n") || "- nothing yet"}
 
 Reply with ONLY JSON: {"format": "preview"|"news"|"countdown"|"throwback", "topic": "one line a researcher can act on", "why": "one sentence", "queries": ["optional YouTube searches for footage"]}`;
   const p = await claudeJson<TopicPick>(prompt, { tools: ["WebSearch", "WebFetch"], timeoutMs: 6 * 60_000 });
-  const format = (["preview", "news", "countdown", "throwback"] as const).includes(p.format) ? p.format : "countdown";
+  const allowed = opts.evergreen ? (["countdown", "throwback"] as const) : (["preview", "news", "countdown", "throwback"] as const);
+  const format = (allowed as readonly string[]).includes(p.format) ? p.format : "countdown";
   return { format, topic: String(p.topic || page.fallbackTopic), why: String(p.why || ""), queries: p.queries?.filter(Boolean) };
 }
 

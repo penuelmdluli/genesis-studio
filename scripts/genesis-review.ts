@@ -26,6 +26,7 @@ const day = new Date().toISOString().slice(0, 10);
   const prompt = `You are reviewing today's (${day}) run of the "hype reel" pipeline that makes and posts short football/news reels for the owner's Facebook pages (Genesis News, Mzansi Daily News). You can only READ files. The owner reads your report on their phone, so be short and concrete.
 
 Files (relative to the current folder):
+- reports/health-<date>.md — this morning's health check (service, claude login, tokens, spare reels); logs/spares.log — the overnight spare reels; "attempt N FAILED" / "posting the spare" lines in the slot logs show stories that fell through.
 - logs/hype-<page>.log (and the older shared logs/hype.log) — every scheduled slot: what it picked, quality-check summaries, "quality gate"/"not enough clean footage" skips, FAILED lines, POSTED lines.
 - reels/ledger.jsonl — one line per reel made (page, format, topic, published, clipIds).
 - metrics/latest-genesis_news.md and any other metrics/latest-*.md — scoreboards (hype reels vs other reels).

@@ -31,6 +31,8 @@ export interface PageProfile {
   crowdGain: number;
   /** For the crowd-free pages, the pipeline's fallback topic. */
   fallbackTopic: string;
+  /** Trending radar (radar.ts): Google News SA searches, YouTube SA chart category ("" = all), Trends keywords that make a search trend relevant. */
+  radar: { newsQueries: string[]; ytCategory: string; trendsMatch: RegExp | null };
 }
 
 export const PAGES: Record<string, PageProfile> = {
@@ -61,6 +63,11 @@ THE AUDIENCE IS MOSTLY KAIZER CHIEFS FANS (owner's call, 2026-11-19). So:
     ytNiche: "sa_pulse",
     crowdGain: 0.9,
     fallbackTopic: "Soweto Derby greatest goals",
+    radar: {
+      newsQueries: ["Kaizer Chiefs", "Bafana Bafana", "Orlando Pirates", "Mamelodi Sundowns", "PSL Betway Premiership"],
+      ytCategory: "17", // Sports
+      trendsMatch: /chiefs|amakhosi|pirates|sundowns|bafana|psl|soccer|football|derby|cup|fc|vs/i,
+    },
   },
 
   // 57k followers, all won in March 2022 by short viral feel-good videos
@@ -93,6 +100,11 @@ Tone: warm, funny, proudly South African. No politics-bashing, no tragedy-bait, 
     ytNiche: "",
     crowdGain: 0.45,
     fallbackTopic: "5 places in South Africa that look unreal",
+    radar: {
+      newsQueries: ["South Africa viral video", "Mzansi trending", "South Africa news today", "Kruger National Park sighting", "South Africa proud"],
+      ytCategory: "",
+      trendsMatch: null, // everything South Africans search is fair game
+    },
   },
 };
 

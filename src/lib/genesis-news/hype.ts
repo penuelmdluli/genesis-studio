@@ -25,6 +25,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { claudeJson } from "./claude-cli";
 import { pageProfile, type PageProfile } from "./pages";
+import { scanRadar, radarBrief } from "./radar";
 import { r2PublicUrl } from "@/lib/storage";
 import { publishReel, pageToken } from "@/lib/facebook-reels";
 import { postPageComment } from "@/lib/social/facebook-comments";
@@ -147,8 +148,15 @@ export async function pickTopic(
   recent: { format: string; topic: string; at: string }[],
   page: PageProfile = pageProfile("genesis_news")
 ): Promise<TopicPick> {
+  // What SA is searching/watching/reading right now; a dead radar never
+  // blocks the pick.
+  const radar = await scanRadar(page).then(radarBrief).catch(() => "");
   const prompt = `${page.picker}
 Today is ${today()}.
+
+${radar}
+
+When a radar item fits this page's audience and has real footage behind it, prefer it over an evergreen topic — that is what gets shared today.
 
 Recently made (do NOT repeat the same topic within 3 days; vary the format):
 ${recent.slice(-10).map((r) => `- ${r.at.slice(0, 10)} ${r.format}: ${r.topic}`).join("\n") || "- nothing yet"}

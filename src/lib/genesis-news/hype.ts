@@ -750,7 +750,7 @@ export async function makeHypeReel(opts: {
   log("downloading + drawing frame sheets…");
   let clips = (await prepareClips(found, log)).filter((c) => c.creator);
   clips = await smartCrop(clips, log);
-  if (!clips.length) throw new Error("none of the footage could be downloaded");
+  if (!clips.length) throw new Error(`no usable footage: ${found.length} clip(s) found, none downloaded clean (overlays over the picture or download errors — see lines above)`);
 
   log("watching footage + writing the edit (claude)…");
   let plan = await planReel(opts.format, opts.topic, facts, clips, undefined, page);

@@ -1277,7 +1277,7 @@ async function youtube(path) {
 //   2. when the API search is out of quota, yt-dlp reads YouTube's own search
 //      page with its Creative Commons filter (sp=EgIwAQ==), which costs no
 //      quota. The licence is still verified per video by /videos (1 unit).
-async function ccSearchIds(key, q, { order, publishedAfter, max }) {
+async function ccSearchIds(key, q, { order, publishedAfter, max, quotaFree }) {
   const fs = require("fs");
   const path = require("path");
   const SEARCH_CACHE = path.join(process.env.WORK_DIR || "/work", "search-cache");
@@ -1288,6 +1288,9 @@ async function ccSearchIds(key, q, { order, publishedAfter, max }) {
   } catch {}
   let ids;
   try {
+    // The nightly library harvest searches hundreds of queries: it never
+    // spends API search quota, which the daytime slots need.
+    if (quotaFree) throw new Error("quota-free search requested (429)");
     const search = await youtube(
       `/search?${new URLSearchParams({
         key,
@@ -1341,6 +1344,7 @@ app.post("/genesis-reel/find", auth, async (req, res) => {
       order,
       publishedAfter: req.body?.publishedAfter ? String(req.body.publishedAfter) : "",
       max: Math.min(want * 5, 25),
+      quotaFree: req.body?.quotaFree === true,
     });
     if (!ids.length) return res.json({ jobId: null, clips: [] });
 

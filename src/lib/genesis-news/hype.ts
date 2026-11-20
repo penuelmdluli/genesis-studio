@@ -115,18 +115,25 @@ function workDir(): string {
 
 type BankClip = HypeClip & { lastUsed?: string };
 const bankFile = (page: string) => path.join(workDir(), "reels", `footage-bank-${page}.json`);
+/** The nightly harvest (scripts/genesis-harvest.ts): licence- and overlay-checked, not yet aired. */
+export const libraryFile = (page: string) => path.join(workDir(), "reels", `footage-library-${page}.json`);
 
-function readBank(page: string): Record<string, BankClip> {
+function readJson<T>(file: string, fallback: T): T {
   try {
-    return JSON.parse(fs.readFileSync(bankFile(page), "utf8"));
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
-    return {};
+    return fallback;
   }
+}
+
+/** Aired clips (bank) first, then the harvested library; usage dates come from the bank. */
+function readBank(page: string): Record<string, BankClip> {
+  return { ...readJson<Record<string, BankClip>>(libraryFile(page), {}), ...readJson<Record<string, BankClip>>(bankFile(page), {}) };
 }
 
 /** Remember the clips a posted reel used (call after publishing). */
 export function addToBank(page: string, clips: HypeClip[]) {
-  const bank = readBank(page);
+  const bank = readJson<Record<string, BankClip>>(bankFile(page), {});
   const now = new Date().toISOString();
   for (const c of clips) bank[c.id] = { ...c, sheets: undefined, lastUsed: now };
   fs.mkdirSync(path.dirname(bankFile(page)), { recursive: true });
@@ -252,13 +259,13 @@ Reply with ONLY JSON: {"format": "preview"|"news"|"countdown"|"throwback", "topi
 export async function findClips(
   queries: string[],
   want: number,
-  opts: { avoid?: string[]; newest?: boolean; publishedAfter?: string } = {}
+  opts: { avoid?: string[]; newest?: boolean; publishedAfter?: string; quotaFree?: boolean } = {}
 ): Promise<HypeClip[]> {
   const avoid = new Set(opts.avoid || []);
   const seen = new Map<string, HypeClip>();
   for (const q of queries) {
     const r = await service<{ clips: HypeClip[] }>("/genesis-reel/find", {
-      story: q, clips: 6, order: opts.newest ? "date" : "relevance", publishedAfter: opts.publishedAfter,
+      story: q, clips: 6, order: opts.newest ? "date" : "relevance", publishedAfter: opts.publishedAfter, quotaFree: opts.quotaFree,
     });
     // Footage used in a recent reel is skipped so the page never looks like
     // the same clip on loop.
@@ -399,7 +406,7 @@ export function addToBlocklist(ids: string[], why: string) {
   fs.writeFileSync(BLOCKLIST(), JSON.stringify(list, null, 1));
 }
 
-async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<HypeClip[]> {
+export async function smartCrop(clips: HypeClip[], log: (s: string) => void): Promise<HypeClip[]> {
   const { execFile } = await import("node:child_process");
   const script = path.join(process.cwd(), "scripts", "genesis_overlay.py");
   const kept: HypeClip[] = [];

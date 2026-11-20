@@ -86,7 +86,14 @@ def main() -> None:
 
     cut = {"l": 0.0, "r": 0.0, "t": 0.0, "b": 0.0}
     centre = []
-    for x0, y0, x1, y1, _ in found:
+    for x0, y0, x1, y1, n in found:
+        # A huge "persistent" blob is not a graphic: it is a still camera's
+        # static scenery (news briefings, tripod vlogs, studio walls). On
+        # 2026-11-20 these got whole clips rejected. Real overlays — logos,
+        # buttons, face-cam frames, tickers — are small or hug an edge.
+        area = (x1 - x0 + 1) * (y1 - y0 + 1) / (W * H)
+        if area > 0.2:
+            continue
         need = {
             "l": (x1 + 1) / W + MARGIN,
             "r": (W - x0) / W + MARGIN,

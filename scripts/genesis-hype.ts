@@ -96,6 +96,7 @@ function readLedger(): LedgerRow[] {
       if (attempt > 1 && Date.now() - slotStart > 60 * 60_000) break;
       let format = arg("format") as HypeFormat | undefined;
       let queries = arg("queries")?.split("|").filter(Boolean);
+      let heldClipIds: string[] | undefined;
       try {
         if (auto) {
           // Auto-fix: with no spare to fall back on, the last attempt goes for
@@ -103,13 +104,15 @@ function readLedger(): LedgerRow[] {
           const evergreen = spare || (publish && attempt === 3 && !fs.existsSync(sparePath(page)));
           const pick = await pickTopic(readLedger().filter((r) => r.page === page), pageProfile(page), { failed, evergreen });
           ({ format, topic, why } = pick);
+          heldClipIds = pick.clipIds?.length ? pick.clipIds : undefined;
+          if (heldClipIds) console.log(`[genesis-hype]   footage first: built from held clips ${heldClipIds.join(", ")}`);
           queries = queries || (pick.format === "countdown" || pick.format === "throwback" ? pick.queries : undefined);
           console.log(`[genesis-hype] ${attempt > 1 ? `attempt ${attempt} â€” ` : ""}picked ${format}: ${topic} â€” ${why}`);
         }
         if (!topic) throw new Error("--topic or --auto required");
         const t0 = Date.now();
         reel = await makeHypeReel({
-          format: format || "countdown", topic, queries, clipIds: arg("clips")?.split(",").filter(Boolean),
+          format: format || "countdown", topic, queries, clipIds: heldClipIds ?? arg("clips")?.split(",").filter(Boolean),
           page, avoidClipIds: recentClips, newest: process.argv.includes("--newest") ? true : undefined,
         });
         console.log(`\nREEL ${reel.videoUrl}  (${reel.durationSec.toFixed(1)}s, ${Math.round((Date.now() - t0) / 1000)}s to make)`);

@@ -226,7 +226,14 @@ Reply with ONLY this JSON:
 
 // ─── 0. decide what to make ─────────────────────────────────
 
-export interface TopicPick { format: HypeFormat; topic: string; why: string; queries?: string[] }
+export interface TopicPick {
+  format: HypeFormat;
+  topic: string;
+  why: string;
+  queries?: string[];
+  /** Footage-first picks: the held clips (bank/library ids) the reel is built from. */
+  clipIds?: string[];
+}
 
 /**
  * The editor's morning call: what is the ONE reel worth making right now?
@@ -250,11 +257,15 @@ export async function pickTopic(
     ? `\nAlready tried in this slot and FAILED (not enough clean, matching footage) — pick something clearly different, with plenty of footage on YouTube:\n${opts.failed.map((f) => `- ${f.topic} (${f.why})`).join("\n")}\n`
     : "";
   // Footage first: what this page already holds, checked and ready.
-  const held = Object.values(readBank(page.key)).map((c) => `- ${c.title}`).slice(0, 40).join("\n");
-  const steer = opts.evergreen
-    ? `This reel must be EVERGREEN and SURE TO WORK: format "countdown" or "throwback", a timeless topic, nothing tied to this week's news.
-FOOTAGE FIRST: these clips are already downloaded and checked for this page — build the topic around what they show (and give "queries" that would find more of the same):
-${held || "- (none yet)"}`
+  const heldClips = Object.values(readBank(page.key)).filter((c) => !readBlocklist().includes(c.id)).slice(0, 40);
+  const held = heldClips.map((c) => `- [${c.id}] ${c.title} (${Math.round(c.durationSec)}s, by ${c.creator})`).join("\n");
+  const footageFirst = !!opts.evergreen && heldClips.length >= 2;
+  const steer = footageFirst
+    ? `This reel must be SURE TO WORK. It will be built ONLY from footage this page already holds — downloaded, licence-checked, overlay-checked:
+${held}
+Choose 2-3 of these clips that belong together and a timeless topic ("countdown" or "throwback") that they can FULLY carry — promise nothing the clips do not show. Return their ids in "clipIds".`
+    : opts.evergreen
+    ? `This reel must be EVERGREEN and SURE TO WORK: format "countdown" or "throwback", a timeless topic with lots of clean footage on YouTube, nothing tied to this week's news.`
     : `When a radar item fits this page's audience and has real footage behind it, prefer it over an evergreen topic — that is what gets shared today.`;
   const prompt = `${page.picker}
 Today is ${today()}.
@@ -266,11 +277,14 @@ ${failed}
 Recently made (do NOT repeat the same topic within 3 days; vary the format):
 ${recent.slice(-10).map((r) => `- ${r.at.slice(0, 10)} ${r.format}: ${r.topic}`).join("\n") || "- nothing yet"}
 
-Reply with ONLY JSON: {"format": "preview"|"news"|"countdown"|"throwback", "topic": "one line a researcher can act on", "why": "one sentence", "queries": ["optional YouTube searches for footage"]}`;
+Reply with ONLY JSON: {"format": "preview"|"news"|"countdown"|"throwback", "topic": "one line a researcher can act on", "why": "one sentence", "queries": ["optional YouTube searches for footage"]${footageFirst ? `, "clipIds": ["2-3 ids from the list above"]` : ""}}`;
   const p = await claudeJson<TopicPick>(prompt, { tools: ["WebSearch", "WebFetch"], timeoutMs: 6 * 60_000 });
   const allowed = opts.evergreen ? (["countdown", "throwback"] as const) : (["preview", "news", "countdown", "throwback"] as const);
   const format = (allowed as readonly string[]).includes(p.format) ? p.format : "countdown";
-  return { format, topic: String(p.topic || page.fallbackTopic), why: String(p.why || ""), queries: p.queries?.filter(Boolean) };
+  const heldIds = new Set(heldClips.map((c) => c.id));
+  let clipIds = footageFirst ? (p.clipIds || []).filter((id) => heldIds.has(id)).slice(0, 3) : undefined;
+  if (footageFirst && (!clipIds || clipIds.length < 2)) clipIds = heldClips.slice(0, 3).map((c) => c.id);
+  return { format, topic: String(p.topic || page.fallbackTopic), why: String(p.why || ""), queries: p.queries?.filter(Boolean), clipIds };
 }
 
 // ─── 2. find + 3. watch ─────────────────────────────────────

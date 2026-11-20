@@ -107,6 +107,49 @@ function workDir(): string {
   return dir;
 }
 
+// ─── footage bank ───────────────────────────────────────────
+// reels/footage-bank-<page>.json: every clip used in a POSTED reel (it passed
+// smart crop, the frame check and the licence check). Reused as archive
+// footage for stories whose own search comes back thin, at most once every
+// 2 days per clip so the page does not loop the same goal.
+
+type BankClip = HypeClip & { lastUsed?: string };
+const bankFile = (page: string) => path.join(workDir(), "reels", `footage-bank-${page}.json`);
+
+function readBank(page: string): Record<string, BankClip> {
+  try {
+    return JSON.parse(fs.readFileSync(bankFile(page), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+/** Remember the clips a posted reel used (call after publishing). */
+export function addToBank(page: string, clips: HypeClip[]) {
+  const bank = readBank(page);
+  const now = new Date().toISOString();
+  for (const c of clips) bank[c.id] = { ...c, sheets: undefined, lastUsed: now };
+  fs.mkdirSync(path.dirname(bankFile(page)), { recursive: true });
+  fs.writeFileSync(bankFile(page), JSON.stringify(bank, null, 1));
+}
+
+const STOP = new Set("the and for with from that this into over after before their about week weeks today frame story news vs v".split(" "));
+function bankClipsFor(page: string, about: string, exclude: string[], max: number): HypeClip[] {
+  const words = [...new Set(about.toLowerCase().match(/[a-z][a-z'-]{3,}/g) || [])].filter((w) => !STOP.has(w));
+  const blocked = new Set([...exclude, ...readBlocklist()]);
+  const fresh = Date.now() - 2 * 86_400_000;
+  return Object.values(readBank(page))
+    .filter((c) => !blocked.has(c.id) && (!c.lastUsed || Date.parse(c.lastUsed) < fresh))
+    .map((c) => ({ c, score: words.filter((w) => c.title.toLowerCase().includes(w)).length }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max)
+    .map(({ c }) => {
+      const { lastUsed: _l, ...clip } = c;
+      return clip;
+    });
+}
+
 async function service<T>(route: string, body?: unknown): Promise<T> {
   const url = process.env.SCRAPER_SERVICE_URL;
   const secret = process.env.SCRAPER_SERVICE_SECRET;
@@ -684,6 +727,15 @@ export async function makeHypeReel(opts: {
   if (!found.length && newest) found = await findClips(queries, opts.maxClips ?? 3, { avoid });
   if (opts.clipIds?.length) {
     found = await namedClips(opts.clipIds);
+  } else {
+    // Footage bank: clips that already passed every check in a posted reel.
+    // Specific Chiefs news (a player's fitness, a coach's quote) rarely has
+    // Creative Commons footage of its own — 2026-11-20's 11:15-equivalent run
+    // lost 3 stories to Sundowns payroll graphics and reserve-team clips —
+    // but the page's own verified Chiefs footage can illustrate it as archive.
+    const extra = bankClipsFor(page.key, `${opts.topic} ${queries.join(" ")}`, found.map((c) => c.id), Math.max(2, 4 - found.length));
+    if (extra.length) log(`  + footage bank: ${extra.map((c) => c.title || c.id).join(" | ")}`);
+    found = [...found, ...extra];
   }
   if (!found.length) throw new Error(`no Creative Commons footage found for "${opts.topic}"`);
   log(`  ${found.map((c) => c.title || c.id).join(" | ")}`);

@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { makeHypeReel, publishHypeReel, pickTopic, type HypeFormat, type HypeReel } from "../src/lib/genesis-news/hype";
+import { makeHypeReel, publishHypeReel, pickTopic, addToBank, type HypeFormat, type HypeReel } from "../src/lib/genesis-news/hype";
 import { pageProfile } from "../src/lib/genesis-news/pages";
 import { notifyPhone } from "../src/lib/genesis-news/notify";
 
@@ -156,6 +156,8 @@ function readLedger(): LedgerRow[] {
         [fbUrl && `Facebook: ${fbUrl}`, post.youtubeId && `YouTube: https://youtube.com/shorts/${post.youtubeId}`,
           failed.length ? `(${failed.length} stor${failed.length > 1 ? "ies" : "y"} fell through first)` : ""].filter(Boolean).join("\n"),
         { priority: 2, tags: "white_check_mark", click: fbUrl });
+      // Clips that made it into a posted reel join the page's footage bank.
+      addToBank(page, reel.clips.filter((c) => row.clipIds?.includes(c.id)));
       // A spare is used once; the night run makes the next one.
       if (fs.existsSync(sparePath(page)) && JSON.parse(fs.readFileSync(sparePath(page), "utf8")).r2Key === reel.r2Key) {
         fs.rmSync(sparePath(page));

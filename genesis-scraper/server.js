@@ -1270,6 +1270,61 @@ async function youtube(path) {
   return json;
 }
 
+// Creative Commons search, cheap on quota. A YouTube API search costs 100 of
+// the 10,000 daily units, and a slot with retries plus the overnight spares
+// ran the key dry by morning (2026-11-20: every retry died on 429). So:
+//   1. results are cached on disk for 24h — the same query never pays twice;
+//   2. when the API search is out of quota, yt-dlp reads YouTube's own search
+//      page with its Creative Commons filter (sp=EgIwAQ==), which costs no
+//      quota. The licence is still verified per video by /videos (1 unit).
+async function ccSearchIds(key, q, { order, publishedAfter, max }) {
+  const fs = require("fs");
+  const path = require("path");
+  const SEARCH_CACHE = path.join(process.env.WORK_DIR || "/work", "search-cache");
+  const cacheKey = require("crypto").createHash("sha1").update(JSON.stringify([q, order, publishedAfter ? publishedAfter.slice(0, 10) : "", max])).digest("hex");
+  const cacheFile = path.join(SEARCH_CACHE, `${cacheKey}.json`);
+  try {
+    if (Date.now() - fs.statSync(cacheFile).mtimeMs < 24 * 3600e3) return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+  } catch {}
+  let ids;
+  try {
+    const search = await youtube(
+      `/search?${new URLSearchParams({
+        key,
+        part: "snippet",
+        q,
+        type: "video",
+        videoLicense: "creativeCommon",
+        videoEmbeddable: "true",
+        // "date" for news/highlights so the newest uploads come first;
+        // publishedAfter keeps a highlights reel to this season's footage.
+        order,
+        ...(publishedAfter ? { publishedAfter } : {}),
+        safeSearch: "moderate",
+        relevanceLanguage: "en",
+        maxResults: String(max),
+      })}`
+    );
+    ids = (search.items || []).map((i) => i?.id?.videoId).filter(Boolean);
+  } catch (err) {
+    if (!/429|quota|rateLimit/i.test(String(err.message))) throw err;
+    console.log(`[genesis-reel/find] API search out of quota — yt-dlp CC search for "${q}"`);
+    // CAISAjAB = upload date + Creative Commons; EgIwAQ== = relevance + Creative Commons.
+    const sp = order === "date" ? "CAISAjAB" : "EgIwAQ%3D%3D";
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=${sp}`;
+    const out = await new Promise((resolve, reject) =>
+      execFile("yt-dlp", ["--flat-playlist", "--playlist-end", String(max), "--print", "id", "--no-warnings", url],
+        { timeout: 90_000, maxBuffer: 8 * 1024 * 1024 }, (e, stdout) => (e ? reject(e) : resolve(String(stdout))))
+    );
+    ids = out.split(/\s+/).filter((s) => /^[\w-]{11}$/.test(s));
+  }
+  try {
+    fs.mkdirSync(SEARCH_CACHE, { recursive: true });
+    fs.writeFileSync(cacheFile, JSON.stringify(ids));
+  } catch {}
+  return ids;
+}
+
 // ─── POST /genesis-reel/find ───
 // Creative Commons clips for one story, most relevant first.
 app.post("/genesis-reel/find", auth, async (req, res) => {
@@ -1281,25 +1336,12 @@ app.post("/genesis-reel/find", auth, async (req, res) => {
     if (!story) return res.status(400).json({ error: "story required" });
     const want = Math.min(Math.max(Number(req.body?.clips) || 4, 1), 6);
 
-    const search = await youtube(
-      `/search?${new URLSearchParams({
-        key,
-        part: "snippet",
-        q: story,
-        type: "video",
-        videoLicense: "creativeCommon",
-        videoEmbeddable: "true",
-        // "date" for news/highlights so the newest uploads come first;
-        // publishedAfter keeps a highlights reel to this season's footage.
-        order: req.body?.order === "date" ? "date" : "relevance",
-        ...(req.body?.publishedAfter ? { publishedAfter: String(req.body.publishedAfter) } : {}),
-        safeSearch: "moderate",
-        relevanceLanguage: "en",
-        maxResults: String(Math.min(want * 5, 25)),
-      })}`
-    );
-
-    const ids = (search.items || []).map((i) => i?.id?.videoId).filter(Boolean);
+    const order = req.body?.order === "date" ? "date" : "relevance";
+    const ids = await ccSearchIds(key, story, {
+      order,
+      publishedAfter: req.body?.publishedAfter ? String(req.body.publishedAfter) : "",
+      max: Math.min(want * 5, 25),
+    });
     if (!ids.length) return res.json({ jobId: null, clips: [] });
 
     // The licence is read back per video rather than trusted from the search

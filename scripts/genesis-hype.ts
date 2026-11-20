@@ -56,13 +56,13 @@ function readLedger(): LedgerRow[] {
 (async () => {
   fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
   // One reel at a time: two runs would fight over the container and the CPU.
-  // A lock older than 90 minutes is from a run that died.
-  // Wait (up to 45 min) for a reel already in progress rather than losing
+  // A lock older than 150 minutes is from a run that died.
+  // Wait (up to 80 min — a slot with retries can run an hour) for a reel already in progress rather than losing
   // this slot; give up only if it is still busy after that.
-  const waitUntil = Date.now() + 45 * 60_000;
-  while (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 90 * 60_000) {
+  const waitUntil = Date.now() + 80 * 60_000;
+  while (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 150 * 60_000) {
     if (Date.now() > waitUntil) {
-      console.log("another hype reel has been running for 45+ minutes — skipping this slot");
+      console.log("another hype reel has been running for 80+ minutes â€” skipping this slot");
       return;
     }
     await new Promise((r) => setTimeout(r, 30_000));
@@ -80,7 +80,7 @@ function readLedger(): LedgerRow[] {
     // The overnight spare: one finished, checked evergreen reel per page,
     // waiting in reels/spare-<page>.json for a slot whose story falls through.
     if (spare && fs.existsSync(sparePath(page)) && Date.now() - fs.statSync(sparePath(page)).mtimeMs < 5 * 86_400_000) {
-      console.log(`[genesis-hype] a spare for ${page} is already waiting — nothing to do`);
+      console.log(`[genesis-hype] a spare for ${page} is already waiting â€” nothing to do`);
       return;
     }
 
@@ -100,7 +100,7 @@ function readLedger(): LedgerRow[] {
           const pick = await pickTopic(readLedger().filter((r) => r.page === page), pageProfile(page), { failed, evergreen: spare });
           ({ format, topic, why } = pick);
           queries = queries || (pick.format === "countdown" || pick.format === "throwback" ? pick.queries : undefined);
-          console.log(`[genesis-hype] ${attempt > 1 ? `attempt ${attempt} — ` : ""}picked ${format}: ${topic} — ${why}`);
+          console.log(`[genesis-hype] ${attempt > 1 ? `attempt ${attempt} â€” ` : ""}picked ${format}: ${topic} â€” ${why}`);
         }
         if (!topic) throw new Error("--topic or --auto required");
         const t0 = Date.now();
@@ -130,7 +130,7 @@ function readLedger(): LedgerRow[] {
       const s = JSON.parse(fs.readFileSync(sparePath(page), "utf8"));
       ({ topic, why } = s);
       reel = s as HypeReel;
-      console.log(`[genesis-hype] every story fell through — posting the spare: ${reel.plan.title}`);
+      console.log(`[genesis-hype] every story fell through â€” posting the spare: ${reel.plan.title}`);
     }
     if (!reel) throw new Error(`no reel this slot (${failed.length} stories tried, no spare waiting)`);
 

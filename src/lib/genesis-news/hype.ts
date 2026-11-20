@@ -307,8 +307,14 @@ Rules for text:
 ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${redo}\nFix every point.\n\n` : ""}Reply with ONLY this JSON (no prose):
 {"title": "", "notes": "one line per clip: what you saw and where",
  "beats": [{"mode": "hook"|"beat"|"end", "label": "", "voice": "", "shots": [{"clip": "<id>", "start": 0, "dur": 0, "cap1": "", "cap2": ""}]}],
- "postCaption": "", "hashtags": ["#..."]}`;
-  const plan = await claudeJson<HypePlan>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 });
+ "postCaption": "", "hashtags": ["#..."]}
+
+If the footage cannot honestly carry this topic (wrong players, wrong sport, nothing that shows what the topic promises), do NOT invent a reel and do NOT explain in prose — reply with ONLY:
+{"unusable": "one line: what the clips actually show and why it does not fit"}`;
+  const plan = await claudeJson<HypePlan & { unusable?: string }>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 });
+  // An honest "this footage does not fit" ends the attempt with a reason the
+  // slot can act on (pick a different story) instead of a JSON parse crash.
+  if (plan.unusable) throw new Error(`footage does not fit the story: ${String(plan.unusable).slice(0, 200)}`);
   return validatePlan(plan, clips);
 }
 
@@ -571,11 +577,26 @@ export async function voiceBeats(plan: HypePlan, jobKey: string, page: PageProfi
     });
   const jobFile = path.join(workDir(), rel, "tts.json");
   fs.writeFileSync(jobFile, JSON.stringify({ engine, voice, speed, lines }));
-  await new Promise<void>((resolve, reject) =>
-    execFile(process.env.GENESIS_PYTHON || "python", [script, "--batch", jobFile], { timeout: 10 * 60_000 }, (err, _out, stderr) =>
-      err ? reject(new Error(`TTS: ${String(stderr).trim().split("\n").pop()}`)) : resolve()
-    )
-  );
+  // The last stderr line used to be the whole error — on 2026-11-20 that was
+  // a harmless torch WeightNorm warning, hiding the real failure. Report a
+  // timeout as a timeout, else the last line that looks like an error; and
+  // give the batch one more go before the attempt is lost.
+  const once = () =>
+    new Promise<void>((resolve, reject) =>
+      execFile(process.env.GENESIS_PYTHON || "python", [script, "--batch", jobFile], { timeout: 20 * 60_000 }, (err, _out, stderr) => {
+        if (!err) return resolve();
+        if ((err as { killed?: boolean }).killed) return reject(new Error("TTS: timed out after 20 min"));
+        const lines = String(stderr).trim().split("\n").map((l) => l.trim()).filter(Boolean);
+        const real = [...lines].reverse().find((l) => /error|exception|traceback|failed|not found|denied/i.test(l) && !/warn/i.test(l));
+        reject(new Error(`TTS: ${(real || lines.pop() || String(err.message)).slice(0, 200)}`));
+      })
+    );
+  try {
+    await once();
+  } catch (e) {
+    console.log(`[genesis-hype]   ${(e as Error).message} — retrying the voices once`);
+    await once();
+  }
 }
 
 // ─── 7. package ─────────────────────────────────────────────

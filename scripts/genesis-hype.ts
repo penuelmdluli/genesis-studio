@@ -30,6 +30,35 @@ const LEDGER = path.join(WORK, "reels", "ledger.jsonl");
 const LOCK = path.join(WORK, "reels", ".lock");
 const sparePath = (page: string) => path.join(WORK, "reels", `spare-${page}.json`);
 
+/** Only ever remove OUR lock — after a build-ahead wait another run may hold it. */
+function releaseLock() {
+  try {
+    if (fs.readFileSync(LOCK, "utf8").trim() === String(process.pid)) fs.rmSync(LOCK, { force: true });
+  } catch {}
+}
+
+/**
+ * Each page's posting times (local). The scheduled tasks start 75 min
+ * earlier; a run posts at the first of these that is still ahead of it and
+ * no more than 100 min away. Anything else (a manual run, a late build)
+ * posts immediately.
+ */
+const POST_TIMES: Record<string, string[]> = {
+  genesis_news: ["11:15", "15:15", "19:15"],
+  mzansi_daily_news: ["08:15", "13:15", "17:15"],
+  pawsome_daily: ["09:30", "14:15", "20:30"],
+};
+function slotTime(page: string): number | null {
+  const now = Date.now();
+  for (const hm of POST_TIMES[page] || []) {
+    const [h, m] = hm.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    if (d.getTime() > now && d.getTime() - now <= 100 * 60_000) return d.getTime();
+  }
+  return null;
+}
+
 export interface LedgerRow {
   at: string;
   page: string;
@@ -151,6 +180,15 @@ function readLedger(): LedgerRow[] {
       clipIds: [...new Set(reel.plan.beats.flatMap((b) => b.shots.map((s) => s.clip)))],
     };
     if (publish) {
+      // Build ahead: slots start 75 min before their posting time. A reel that
+      // is ready early waits for its time — WITHOUT the build lock, so the
+      // next page can start building meanwhile. A late reel posts at once.
+      const at = slotTime(page);
+      if (at && at > Date.now()) {
+        console.log(`[genesis-hype] ready early — posting at ${new Date(at).toTimeString().slice(0, 5)}`);
+        releaseLock();
+        await new Promise((r) => setTimeout(r, at - Date.now()));
+      }
       const post = await publishHypeReel(reel, page);
       Object.assign(row, { published: true, videoId: post.videoId, postId: post.postId, youtubeId: post.youtubeId });
       console.log(`\nPOSTED ${JSON.stringify(post)}`);
@@ -168,7 +206,7 @@ function readLedger(): LedgerRow[] {
     }
     fs.appendFileSync(LEDGER, JSON.stringify(row) + "\n");
   } finally {
-    fs.rmSync(LOCK, { force: true });
+    releaseLock();
   }
 })().catch(async (e) => {
   console.error("FAILED:", (e as Error).message);

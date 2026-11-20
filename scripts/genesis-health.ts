@@ -13,6 +13,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { runClaude } from "../src/lib/genesis-news/claude-cli";
 import { pageToken, whoIs } from "../src/lib/facebook-reels";
+import { notifyPhone } from "../src/lib/genesis-news/notify";
+import { execSync, spawn } from "node:child_process";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** What the check repaired by itself this morning. */
+const fixed: string[] = [];
 
 const WORK = process.env.GENESIS_WORK_DIR || ".";
 const FACTORY = process.env.AI_VIDEO_FACTORY_DIR || "C:/Users/PenuelM/Documents/ai-video-factory";
@@ -37,9 +43,20 @@ async function check(name: string, fix: string, fn: () => Promise<string>): Prom
 
   checks.push(await check("Video service (Docker)", "Start Docker Desktop; then `docker start genesis-scraper`.", async () => {
     const base = process.env.SCRAPER_SERVICE_URL || "http://localhost:3001";
-    const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(15_000) });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return "answering";
+    const up = () => fetch(`${base}/health`, { signal: AbortSignal.timeout(15_000) }).then((r) => r.ok).catch(() => false);
+    if (await up()) return "answering";
+    // Auto-fix: start Docker Desktop if needed, then (re)start the container.
+    try { execSync("docker info", { stdio: "ignore", timeout: 30_000 }); } catch {
+      spawn("C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe", [], { detached: true, stdio: "ignore" }).unref();
+      await sleep(120_000);
+    }
+    try { execSync("docker start genesis-scraper", { stdio: "ignore", timeout: 60_000 }); } catch {}
+    await sleep(10_000);
+    if (await up()) { fixed.push("video service was down — restarted it"); return "answering (restarted)"; }
+    try { execSync("docker restart genesis-scraper", { stdio: "ignore", timeout: 90_000 }); } catch {}
+    await sleep(15_000);
+    if (await up()) { fixed.push("video service was stuck — restarted the container"); return "answering (restarted)"; }
+    throw new Error("down, and a restart did not bring it back");
   }));
 
   checks.push(await check("Claude CLI (subscription login)", "Run `claude` once in a terminal and sign in.", async () => {
@@ -96,6 +113,17 @@ async function check(name: string, fix: string, fn: () => Promise<string>): Prom
     }));
   }
 
+  // Auto-fix: missing spares are built now (the spares task skips pages that
+  // already have one). Only when no reel is being made — it would wait anyway.
+  const noSpare = checks.filter((c) => c.name.startsWith("Spare reel") && !c.ok);
+  if (noSpare.length && !fs.existsSync(path.join(WORK, "reels", ".lock"))) {
+    try {
+      execSync('schtasks /Run /TN "Genesis Hype Spares"', { stdio: "ignore" });
+      fixed.push(`started building ${noSpare.length} missing spare reel(s)`);
+      for (const c of noSpare) c.fix = "Being built now (auto-fix).";
+    } catch {}
+  }
+
   const bad = checks.filter((c) => !c.ok);
   const date = new Date().toISOString().slice(0, 10);
   const md = [
@@ -103,6 +131,7 @@ async function check(name: string, fix: string, fn: () => Promise<string>): Prom
     "",
     bad.length ? `**${bad.length} problem(s)** — slots today may fail until fixed.` : "**All clear.**",
     "",
+    ...(fixed.length ? ["Fixed automatically:", ...fixed.map((f) => `- ${f}`), ""] : []),
     "| Check | | Detail | Fix |",
     "|---|---|---|---|",
     ...checks.map((c) => `| ${c.name} | ${c.ok ? "✅" : "❌"} | ${c.detail.replace(/\|/g, "/")} | ${c.ok ? "" : c.fix} |`),
@@ -114,6 +143,13 @@ async function check(name: string, fix: string, fn: () => Promise<string>): Prom
   fs.appendFileSync(path.join(WORK, "logs", "health.log"),
     `${new Date().toISOString()} ${bad.length ? `PROBLEMS: ${bad.map((c) => `${c.name}: ${c.detail}`).join(" / ")}` : "all clear"}\n`);
   console.log(md);
+  // Phone: problems loud, fixes and all-clear quiet.
+  const hard = bad.filter((c) => !c.name.startsWith("Spare reel") || !fixed.length);
+  await notifyPhone(
+    hard.length ? `Reels health: ${hard.length} problem(s) need you` : fixed.length ? "Reels health: fixed automatically" : "Reels health: all clear",
+    [...hard.map((c) => `X ${c.name}: ${c.detail}\n  -> ${c.fix}`), ...fixed.map((f) => `Fixed: ${f}`)].join("\n") || "Service, Claude login, tokens, YouTube and spares all OK.",
+    { priority: hard.length ? 4 : 1, tags: hard.length ? "rotating_light" : "white_check_mark" }
+  );
   process.exit(bad.length ? 2 : 0);
 })().catch((e) => {
   console.error("FAILED:", (e as Error).message);

@@ -12,6 +12,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { notifyPhone } from "../src/lib/genesis-news/notify";
 import { runClaude } from "../src/lib/genesis-news/claude-cli";
 
 const WORK = process.env.GENESIS_WORK_DIR || ".";
@@ -51,6 +52,11 @@ Never invent numbers. If a file is missing, say so.`;
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, `# Hype reel review — ${day}\n\n${report.trim()}\n`);
   console.log(`saved ${out}\n\n${report}`);
+  // Phone: the day in a few lines + the suggested fixes, so they get acted on.
+  const section = (name: string) => (report.split(/^## /m).find((s) => s.startsWith(name)) || "").replace(name, "").trim();
+  await notifyPhone(`Reels review ${day}`,
+    `${section("Today").slice(0, 900)}\n\nSUGGESTED FIXES (reply "fix them" to Claude):\n${section("Suggested fixes").replace(/^\(.*?\)\s*/, "").slice(0, 1800)}`,
+    { priority: 3, tags: "bar_chart" });
 })().catch((e) => {
   console.error("FAILED:", (e as Error).message);
   process.exit(1);

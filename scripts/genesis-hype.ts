@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { makeHypeReel, publishHypeReel, pickTopic, type HypeFormat, type HypeReel } from "../src/lib/genesis-news/hype";
 import { pageProfile } from "../src/lib/genesis-news/pages";
+import { notifyPhone } from "../src/lib/genesis-news/notify";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -97,7 +98,10 @@ function readLedger(): LedgerRow[] {
       let queries = arg("queries")?.split("|").filter(Boolean);
       try {
         if (auto) {
-          const pick = await pickTopic(readLedger().filter((r) => r.page === page), pageProfile(page), { failed, evergreen: spare });
+          // Auto-fix: with no spare to fall back on, the last attempt goes for
+          // a timeless countdown/throwback — the topics with the most footage.
+          const evergreen = spare || (publish && attempt === 3 && !fs.existsSync(sparePath(page)));
+          const pick = await pickTopic(readLedger().filter((r) => r.page === page), pageProfile(page), { failed, evergreen });
           ({ format, topic, why } = pick);
           queries = queries || (pick.format === "countdown" || pick.format === "throwback" ? pick.queries : undefined);
           console.log(`[genesis-hype] ${attempt > 1 ? `attempt ${attempt} â€” ` : ""}picked ${format}: ${topic} â€” ${why}`);
@@ -147,6 +151,11 @@ function readLedger(): LedgerRow[] {
       const post = await publishHypeReel(reel, page);
       Object.assign(row, { published: true, videoId: post.videoId, postId: post.postId, youtubeId: post.youtubeId });
       console.log(`\nPOSTED ${JSON.stringify(post)}`);
+      const fbUrl = post.videoId ? `https://www.facebook.com/reel/${post.videoId}` : undefined;
+      await notifyPhone(`${pageProfile(page).name} posted: ${reel.plan.title}`,
+        [fbUrl && `Facebook: ${fbUrl}`, post.youtubeId && `YouTube: https://youtube.com/shorts/${post.youtubeId}`,
+          failed.length ? `(${failed.length} stor${failed.length > 1 ? "ies" : "y"} fell through first)` : ""].filter(Boolean).join("\n"),
+        { priority: 2, tags: "white_check_mark", click: fbUrl });
       // A spare is used once; the night run makes the next one.
       if (fs.existsSync(sparePath(page)) && JSON.parse(fs.readFileSync(sparePath(page), "utf8")).r2Key === reel.r2Key) {
         fs.rmSync(sparePath(page));
@@ -156,7 +165,10 @@ function readLedger(): LedgerRow[] {
   } finally {
     fs.rmSync(LOCK, { force: true });
   }
-})().catch((e) => {
+})().catch(async (e) => {
   console.error("FAILED:", (e as Error).message);
+  const page = arg("page") || "genesis_news";
+  await notifyPhone(`${process.argv.includes("--spare") ? "Spare" : "Slot"} FAILED: ${pageProfile(page).name}`,
+    `${(e as Error).message.slice(0, 500)}\n\nLog: genesis-work\\logs\\hype-${page}.log`, { priority: 4, tags: "warning" });
   process.exit(1);
 });

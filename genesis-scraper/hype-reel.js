@@ -350,6 +350,57 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
     })().catch((err) => { job.status = "error"; job.error = err.message; });
   });
 
+  // Cover image for a reel (Facebook reel cover + YouTube Short thumbnail).
+  // Without one the platforms pick a random frame — often a blur or a
+  // transition. The edit planner names the single most striking frame and
+  // 2-4 words; this draws it in the reel's own style, readable at feed size:
+  // big Anton words inside the centre 4:5 area every feed crop keeps.
+  //   body: { clip: {id, crop}, t, text, tag, outputR2Key }  →  { r2Key, file }
+  app.post("/hype/thumb", auth, async (req, res) => {
+    try {
+      const { clip, text, tag, outputR2Key } = req.body || {};
+      if (!clip?.id || !fs.existsSync(srcPath(clip.id))) return res.status(400).json({ error: "clip not prepared" });
+      if (!outputR2Key) return res.status(400).json({ error: "outputR2Key required" });
+      const dur = await durationOf(srcPath(clip.id));
+      const t = Math.min(Math.max(Number(req.body.t) || 0, 0), Math.max(0, dur - 0.2));
+      const dir = path.join(WORK, "thumbs");
+      fs.mkdirSync(dir, { recursive: true });
+      const name = path.basename(outputR2Key);
+      const out = path.join(dir, name);
+      const tf = (k, body) => {
+        const p = path.join(dir, `${name}.${k}.txt`);
+        fs.writeFileSync(p, String(body || ""), "utf8");
+        return p;
+      };
+      // Two lines at most: the first white, the punchline gold.
+      const words = String(text || "").toUpperCase().trim().split(/\s+/).filter(Boolean).slice(0, 6);
+      const cut = words.length > 2 ? Math.ceil(words.length / 2) : words.length;
+      const l1 = words.slice(0, cut).join(" ");
+      const l2 = words.slice(cut).join(" ");
+      const hype = FONT_HYPE ? `fontfile='${FONT_HYPE}'` : "font='DejaVu Sans'";
+      const small = FONT_SMALL ? `fontfile='${FONT_SMALL}'` : "font='DejaVu Sans'";
+      const big = (s) => fit(s, 190, HYPE_EM);
+      const f = framing(clip.crop);
+      const draw = [
+        `drawtext=${small}:textfile='${tf("tag", tag)}':fontsize=40:fontcolor=0xFFC83D:borderw=3:bordercolor=black:x=(w-tw)/2:y=300`,
+        l1 && `drawtext=${hype}:textfile='${tf("l1", l1)}':fontsize=${big(l1)}:fontcolor=white:borderw=9:bordercolor=black:x=(w-tw)/2:y=500-th`,
+        l2 && `drawtext=${hype}:textfile='${tf("l2", l2)}':fontsize=${big(l2)}:fontcolor=0xFFC83D:borderw=9:bordercolor=black:x=(w-tw)/2:y=1400`,
+      ].filter(Boolean).join(",");
+      await run("ffmpeg", ["-v", "error", "-y", "-ss", t.toFixed(2), "-i", srcPath(clip.id), "-frames:v", "1", "-filter_complex",
+        `[0:v]crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
+        `[b]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},scale=108:192,gblur=sigma=2,scale=${W}:${H},eq=brightness=-0.25:saturation=1.3[bg];` +
+        `[a]scale=${W}:820:force_original_aspect_ratio=decrease,eq=contrast=1.12:saturation=1.3,unsharp=5:5:0.8[fg];` +
+        `[bg][fg]overlay=(W-w)/2:540+(820-h)/2,${draw},format=yuvj420p[v]`,
+        "-map", "[v]", "-q:v", "3", out], "thumb", 60_000);
+      await r2.send(new PutObjectCommand({
+        Bucket: BUCKET, Key: outputR2Key, Body: fs.readFileSync(out), ContentType: "image/jpeg",
+      }));
+      res.json({ r2Key: outputR2Key, file: `thumbs/${name}`, t });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message).slice(0, 300) });
+    }
+  });
+
   app.post("/hype/render", auth, (req, res) => {
     const { plan, clips, outputR2Key } = req.body || {};
     if (!outputR2Key) return res.status(400).json({ error: "outputR2Key required" });

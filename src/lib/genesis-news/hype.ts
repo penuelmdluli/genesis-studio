@@ -70,6 +70,8 @@ export interface HypePlan {
   hashtags: string[];
   /** What Claude saw, per clip — kept for review. */
   notes?: string;
+  /** Up to 3 cover candidates: the most striking frames + 2-4 words each. */
+  thumbs?: { clip: string; t: number; text: string }[];
 }
 
 export interface Research {
@@ -91,6 +93,10 @@ export interface HypeReel {
   research: Research | null;
   clips: HypeClip[];
   durationSec: number;
+  /** The chosen cover (Facebook reel cover + YouTube thumbnail). */
+  thumbUrl?: string;
+  /** Same cover on this PC, relative to the work dir. */
+  thumbFile?: string;
 }
 
 // ─── plumbing ───────────────────────────────────────────────
@@ -303,11 +309,13 @@ Rules for text:
 - Names: only if on a shirt, an on-screen graphic, or in the facts. Otherwise "the No.45", "the Chiefs skipper" etc. Never invent scores, dates or quotes.
 - voice: what the narrator — ${page.narrator} — says over the WHOLE beat. Plain words (no [tags], no emojis, no ALL CAPS), short punchy phrases with "!" and "…". About 2.5 words per second of the beat.
 - postCaption: 2-4 short lines for Facebook, 1-3 emojis, ends with a question that gets comments. hashtags: 4-6.
+- thumbs: 3 cover candidates, each a DIFFERENT moment — the frames that would stop a thumb mid-scroll: peak action (the ball hitting the net, the leap, the face), sharp and well lit, the subject big in frame; never a blur, a transition, a crowd wide shot or a graphic. "t" is the exact second (from the sheet stamps). "text": 2-4 punchy words that make people NEED to watch ("WAIT FOR #1", "ROCKET FROM 35M", "HE DID WHAT?!") — curiosity, not a summary; true to the footage.
 
 ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${redo}\nFix every point.\n\n` : ""}Reply with ONLY this JSON (no prose):
 {"title": "", "notes": "one line per clip: what you saw and where",
  "beats": [{"mode": "hook"|"beat"|"end", "label": "", "voice": "", "shots": [{"clip": "<id>", "start": 0, "dur": 0, "cap1": "", "cap2": ""}]}],
- "postCaption": "", "hashtags": ["#..."]}
+ "postCaption": "", "hashtags": ["#..."],
+ "thumbs": [{"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}]}
 
 If the footage cannot honestly carry this topic (wrong players, wrong sport, nothing that shows what the topic promises), do NOT invent a reel and do NOT explain in prose — reply with ONLY:
 {"unusable": "one line: what the clips actually show and why it does not fit"}`;
@@ -742,8 +750,12 @@ export async function makeHypeReel(opts: {
   const done = await waitJob<{ r2Key: string; duration: number }>(jobId, 30 * 60_000, log);
   fs.rmSync(path.join(workDir(), "voices", jobKey), { recursive: true, force: true });
 
+  log("cover: 3 candidates, Claude picks the best…");
+  const cover = await makeCover(plan, clips, done.r2Key, page, log);
+
   const { caption, firstComment } = packageCaption(plan, usable, opts.format);
   return {
+    ...cover,
     format: opts.format,
     topic: opts.topic,
     videoUrl: r2PublicUrl(done.r2Key),
@@ -758,15 +770,89 @@ export async function makeHypeReel(opts: {
   };
 }
 
+// ─── 6b. cover ──────────────────────────────────────────────
+//
+// The cover decides whether anyone taps. The planner (who watched every
+// frame) names 3 striking moments with 2-4 words each; all 3 are drawn,
+// and Claude looks at the finished images side by side and keeps the one
+// most likely to stop a scroll. A cover failure never loses the reel.
+
+export async function makeCover(
+  plan: HypePlan,
+  clips: HypeClip[],
+  videoR2Key: string,
+  page: PageProfile,
+  log: (s: string) => void = console.log
+): Promise<{ thumbUrl?: string; thumbFile?: string }> {
+  try {
+    const byId = new Map(clips.map((c) => [c.id, c]));
+    const cands = (plan.thumbs || []).filter((c) => byId.has(c.clip) && c.text).slice(0, 3);
+    // Older plans (and a planner that skipped it): the middle of the first
+    // shots of the strongest beats, under the reel's title.
+    for (const b of plan.beats.filter((x) => x.mode !== "end" && x.label !== "MADE WITH AI")) {
+      if (cands.length >= 3) break;
+      const s = b.shots[0];
+      if (s && byId.has(s.clip)) cands.push({ clip: s.clip, t: s.start + s.dur / 2, text: b.mode === "hook" ? plan.title : `${b.label}` });
+    }
+    const made: { file: string; r2Key: string; text: string }[] = [];
+    for (const [i, c] of cands.entries()) {
+      try {
+        const r = await service<{ r2Key: string; file: string }>("/hype/thumb", {
+          clip: { id: c.clip, crop: byId.get(c.clip)!.crop }, t: c.t, text: c.text, tag: page.tag,
+          outputR2Key: videoR2Key.replace(/\.mp4$/, `-cover${i + 1}.jpg`),
+        });
+        made.push({ ...r, text: c.text });
+      } catch (e) {
+        log(`  cover ${i + 1} not drawn: ${(e as Error).message.slice(0, 80)}`);
+      }
+    }
+    if (!made.length) return {};
+    let best = 0;
+    if (made.length > 1) {
+      const pick = await claudeJson<{ best: number; why: string }>(
+        `You are choosing the cover image for a ${page.name} reel ("${plan.title}") on Facebook and YouTube Shorts. Read each image:
+${made.map((m, i) => `${i + 1}. ${m.file}`).join("\n")}
+
+Pick the ONE that would stop the most thumbs mid-scroll at phone-feed size: a sharp, well-lit frame with a clear subject and peak action or emotion, words that are readable and make people need to watch. Reject blur, transitions, tiny subjects, clutter, text that covers the action.
+Reply with ONLY JSON: {"best": <number 1-${made.length}>, "why": "one line"}`,
+        { tools: ["Read"], cwd: workDir(), model: "sonnet", timeoutMs: 5 * 60_000 }
+      );
+      best = Math.min(Math.max(Math.round(Number(pick.best)) - 1, 0), made.length - 1);
+      log(`  cover: #${best + 1} "${made[best].text}" — ${String(pick.why).slice(0, 140)}`);
+    }
+    return { thumbUrl: r2PublicUrl(made[best].r2Key), thumbFile: made[best].file };
+  } catch (e) {
+    log(`  cover skipped: ${(e as Error).message.slice(0, 120)}`);
+    return {};
+  }
+}
+
+/** Set an image as a Facebook reel's cover (the video's preferred thumbnail). */
+export async function setReelCover(videoId: string, imagePath: string, token: string): Promise<boolean> {
+  const form = new FormData();
+  form.append("is_preferred", "true");
+  form.append("access_token", token);
+  form.append("source", new Blob([fs.readFileSync(imagePath)], { type: "image/jpeg" }), path.basename(imagePath));
+  const r = await fetch(`https://graph.facebook.com/v25.0/${videoId}/thumbnails`, { method: "POST", body: form });
+  if (!r.ok) console.warn(`[genesis-hype] reel cover not set (${r.status}): ${(await r.text()).slice(0, 160)}`);
+  return r.ok;
+}
+
 const PAGES_YT: Record<string, string> = { genesis_news: "sa_pulse", mzansi_daily_news: "", pawsome_daily: "" };
 
 /** Post a finished reel and drop the marketing comment under it. */
 export async function publishHypeReel(
-  reel: Pick<HypeReel, "videoUrl" | "caption" | "firstComment"> & { plan?: HypePlan },
+  reel: Pick<HypeReel, "videoUrl" | "caption" | "firstComment" | "thumbFile"> & { plan?: HypePlan },
   pageKey = "genesis_news",
   scheduledAt?: number
 ) {
   const post = await publishReel({ pageKey, videoUrl: reel.videoUrl, caption: reel.caption, scheduledAt });
+  // Our chosen cover instead of whatever frame Facebook grabs.
+  const cover = reel.thumbFile ? path.join(workDir(), reel.thumbFile) : "";
+  let coverSet = false;
+  if (post.videoId && cover && fs.existsSync(cover)) {
+    coverSet = await setReelCover(post.videoId, cover, pageToken(pageKey) || "").catch(() => false);
+  }
   let commentId: string | null = null;
   // Comments go on the reel's VIDEO id: its post id is a "singular status",
   // which the Graph API refuses comments on (error #12).
@@ -784,10 +870,10 @@ export async function publishHypeReel(
       console.warn(`[genesis-hype] YouTube skipped: ${(e as Error).message}`);
     }
   }
-  return { ...post, commentId, youtubeId };
+  return { ...post, commentId, youtubeId, coverSet };
 }
 
-async function uploadShort(reel: Pick<HypeReel, "videoUrl" | "caption" | "firstComment"> & { plan?: HypePlan }, niche: string): Promise<string> {
+async function uploadShort(reel: Pick<HypeReel, "videoUrl" | "caption" | "firstComment" | "thumbFile"> & { plan?: HypePlan }, niche: string): Promise<string> {
   const { execFile } = await import("node:child_process");
   const desc = path.join(workDir(), "reels", `yt-desc-${Date.now()}.txt`);
   fs.mkdirSync(path.dirname(desc), { recursive: true });
@@ -796,7 +882,8 @@ async function uploadShort(reel: Pick<HypeReel, "videoUrl" | "caption" | "firstC
   const title = reel.plan?.title ? `${reel.plan.title} — ${firstLine}` : firstLine;
   try {
     return await new Promise<string>((resolve, reject) =>
-      execFile(process.env.GENESIS_PYTHON || "python", [path.join(process.cwd(), "scripts", "genesis_youtube.py"), reel.videoUrl, title, desc, niche],
+      execFile(process.env.GENESIS_PYTHON || "python", [path.join(process.cwd(), "scripts", "genesis_youtube.py"), reel.videoUrl, title, desc, niche,
+        ...(reel.thumbFile ? [path.join(workDir(), reel.thumbFile)] : [])],
         { timeout: 10 * 60_000 }, (err, out, stderr) => (err ? reject(new Error(String(stderr).trim().split("\n").pop())) : resolve(String(out).trim().split("\n").pop() || "")))
     );
   } finally {

@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { makeHypeReel, publishHypeReel, pickTopic, addToBank, type HypeFormat, type HypeReel } from "../src/lib/genesis-news/hype";
+import { makeHypeReel, makeAnalysisReel, publishHypeReel, pickTopic, addToBank, type HypeFormat, type HypeReel } from "../src/lib/genesis-news/hype";
 import { pageProfile } from "../src/lib/genesis-news/pages";
 import { notifyPhone } from "../src/lib/genesis-news/notify";
 
@@ -121,11 +121,33 @@ function readLedger(): LedgerRow[] {
     let reel: HypeReel | null = null;
     let topic = arg("topic");
     let why: string | undefined;
+    let breakdownTopic: string | undefined;
+    let triedBreakdown = false;
     for (let attempt = 1; attempt <= (auto ? 3 : 1); attempt++) {
       if (attempt > 1 && Date.now() - slotStart > 60 * 60_000) break;
       let format = arg("format") as HypeFormat | undefined;
       let queries = arg("queries")?.split("|").filter(Boolean);
       let heldClipIds: string[] | undefined;
+      // Genesis News: a story that failed for FOOTAGE comes back as a
+      // breakdown reel — the search pool there is all of YouTube.
+      if (breakdownTopic) {
+        const story = breakdownTopic;
+        breakdownTopic = undefined;
+        triedBreakdown = true;
+        try {
+          console.log(`[genesis-hype] attempt ${attempt} — breakdown reel from YouTube: ${story}`);
+          const t0 = Date.now();
+          topic = story;
+          reel = await makeAnalysisReel({ topic: story, page, avoidClipIds: recentClips });
+          console.log(`\nREEL ${reel.videoUrl}  (${reel.durationSec.toFixed(1)}s, ${Math.round((Date.now() - t0) / 1000)}s to make)`);
+          break;
+        } catch (e) {
+          const msg = (e as Error).message;
+          console.log(`[genesis-hype] attempt ${attempt} FAILED: ${msg.slice(0, 300)}`);
+          failed.push({ topic: story, why: msg.slice(0, 120) });
+          continue;
+        }
+      }
       try {
         if (auto) {
           // Auto-fix: with no spare to fall back on, the last attempt goes for
@@ -151,6 +173,7 @@ function readLedger(): LedgerRow[] {
         console.log(`[genesis-hype] attempt ${attempt} FAILED: ${msg.slice(0, 300)}`);
         if (topic) failed.push({ topic, why: msg.slice(0, 120) });
         if (!auto) throw e;
+        if (page === "genesis_news" && !spare && !triedBreakdown && !heldClipIds && topic && /footage|quality gate/i.test(msg)) breakdownTopic = topic;
       }
     }
 

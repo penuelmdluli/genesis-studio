@@ -389,6 +389,25 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
     }
   });
 
+  // Footage for breakdown reels: ALL of YouTube (not only Creative Commons),
+  // via yt-dlp's search — no API quota.
+  //   body: { q, max } → { results: [{ id, title, creator, url, durationSec }] }
+  app.post("/media/search", auth, async (req, res) => {
+    try {
+      const q = String(req.body?.q || "").trim().slice(0, 160);
+      if (!q) return res.status(400).json({ error: "q required" });
+      const max = Math.min(Math.max(Number(req.body?.max) || 8, 1), 20);
+      const out = await run("yt-dlp", ["--flat-playlist", "--no-warnings", "--print", "%(id)s\t%(duration)s\t%(channel)s\t%(title)s", `ytsearch${max}:${q}`], "search", 90_000);
+      const results = out.split("\n").map((l) => l.split("\t")).filter((p) => /^[\w-]{11}$/.test(p[0])).map(([id, dur, ch, ...t]) => ({
+        id, title: t.join(" ").slice(0, 140), creator: String(ch || "").replace(/^NA$/, "").slice(0, 80),
+        url: `https://www.youtube.com/watch?v=${id}`, durationSec: Number(dur) || 0,
+      }));
+      res.json({ results });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message).slice(0, 300) });
+    }
+  });
+
   // One full-resolution frame with a labelled 10x10 grid, so the analyst can
   // place markers on exact players (fractions of the frame).
   //   body: { clipId, t } → { file }

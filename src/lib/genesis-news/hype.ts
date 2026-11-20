@@ -61,7 +61,11 @@ const cropExpr = (c?: HypeClip["crop"]) => {
   return `crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)}`;
 };
 
-export interface HypeShot { clip: string; start: number; dur: number; cap1?: string; cap2?: string }
+export interface HypeShot {
+  clip: string; start: number; dur: number; cap1?: string; cap2?: string;
+  /** Breakdown reels: slow-motion factor (1-2), seconds to freeze on the last frame, marker overlay (overlays/x.png). */
+  slow?: number; freeze?: number; overlay?: string;
+}
 export interface HypeBeat { mode?: "hook" | "beat" | "end"; label: string; voice: string; shots: HypeShot[]; voiceFile?: string }
 export interface HypePlan {
   title: string;
@@ -719,6 +723,153 @@ export function packageCaption(plan: HypePlan, clips: HypeClip[], _format: HypeF
     .join("\n\n");
   const firstComment = FIRST_COMMENTS[Math.floor(Date.now() / 86_400_000) % FIRST_COMMENTS.length];
   return { caption, firstComment };
+}
+
+// ─── breakdown reels (analysis) ─────────────────────────────
+//
+// The search pool for Genesis News is all of YouTube, through this format:
+// short excerpts of the moment, freeze frames with TV-style markers (rings,
+// runs, passes, space), a slow-motion replay, and the commentator breaking
+// it down. The analysis is the content; the footage is the evidence, and the
+// source is credited on screen and in the caption.
+
+interface Moment { clip: string; start: number; key: number; label: string; cap1?: string; cap2?: string; voice: string }
+interface Mark { type: "ring" | "arrow" | "pass" | "zone"; x?: number; y?: number; w?: number; h?: number; x1?: number; y1?: number; x2?: number; y2?: number; label?: string; color?: string }
+
+export async function makeAnalysisReel(opts: { topic: string; queries?: string[]; page?: string; avoidClipIds?: string[]; log?: (s: string) => void }): Promise<HypeReel> {
+  const t0 = Date.now();
+  const stamp = () => { const s = Math.round((Date.now() - t0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  const baseLog = opts.log ?? ((s: string) => console.log(`[genesis-hype] ${s}`));
+  const log = (s: string) => baseLog(`[${stamp()}] ${s}`);
+  const page = pageProfile(opts.page || "genesis_news");
+  const jobKey = `ga-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  log("breakdown: finding the moment on YouTube…");
+  const avoid = new Set([...(opts.avoidClipIds || []), ...readBlocklist()]);
+  const seen = new Map<string, HypeClip>();
+  for (const q of (opts.queries?.length ? opts.queries : searchQueries(opts.topic)).slice(0, 4)) {
+    try {
+      const r = await service<{ results: HypeClip[] }>("/media/search", { q, max: 8 });
+      for (const c of r.results) {
+        if (avoid.has(c.id) || seen.has(c.id) || c.durationSec < 30 || c.durationSec > 15 * 60) continue;
+        if (/\b(reaction|react|podcast|interview|press conference|live stream|is live|prediction|fifa ?\d|efootball|pes ?\d|gameplay)\b/i.test(c.title)) continue;
+        seen.set(c.id, { ...c, license: "used for analysis" });
+      }
+    } catch (e) {
+      log(`  search "${q}": ${(e as Error).message.slice(0, 80)}`);
+    }
+    if (seen.size >= 6) break;
+  }
+  // Highlights and goal clips first: they hold the moments worth breaking down.
+  const found = [...seen.values()]
+    .sort((a, b) => Number(/highlight|goal|skill|all goals/i.test(b.title)) - Number(/highlight|goal|skill|all goals/i.test(a.title)))
+    .slice(0, 2);
+  if (!found.length) throw new Error(`breakdown: no footage on YouTube for "${opts.topic}"`);
+  log(`  ${found.map((c) => `${c.title} (${c.creator})`).join(" | ")}`);
+
+  log("downloading + drawing frame sheets…");
+  let clips = (await prepareClips(found, log)).map((c) => ({ ...c, license: "used for analysis" }));
+  clips = await smartCrop(clips, log);
+  if (!clips.length) throw new Error("breakdown: no usable footage (overlays over the picture)");
+
+  log("analyst: picking the moments (claude)…");
+  const sheetList = clips.map((c) => `- clip ${c.id}: "${c.title}" by ${c.creator}, ${Math.round(c.durationSec)}s. Sheets: ${(c.sheets || []).join(", ")}`).join("\n");
+  const plan0 = await claudeJson<{ unusable?: string; title: string; hook: Moment & { dur: number }; moments: Moment[]; endQuestion: string; postCaption: string; hashtags: string[]; thumbs?: HypePlan["thumbs"] }>(
+    `You are the football analyst for ${page.name} (${page.desk}). Story: "${opts.topic}". Today is ${today()}.
+Read every frame sheet (one frame every 2s, each stamped with its second) of these clips:
+${sheetList}
+
+Make a BREAKDOWN reel — like a TV analyst: find the 2-3 most analysable moments (a goal's build-up, a killer pass, a run in behind, a defensive mistake, a piece of skill) that fit the story.
+For each moment: "start" = second the move begins (3-5s before the key moment), "key" = the exact second of the decisive frame to FREEZE and draw on, "label" ≤ 18 chars upper case ("THE RUN", "WHERE IT WENT WRONG"),
+cap1/cap2 ≤ 26 chars, and "voice": what the commentator says (${page.narrator}) — 2-3 short sentences that EXPLAIN it: the space, the run, the pass, the positioning, why it worked or failed. Plain words, "!" and "…", ~2.5 words per second.
+Also: a hook (a 2-3.5s shot + one punchy line), an endQuestion that splits opinion, title ≤ 22 chars upper case, postCaption (2-4 lines, 1-3 emojis, ends with a question), hashtags (4-6), and thumbs (3 cover candidates {clip, t, text 2-4 words}).
+Names only if visible (shirt, graphic) or in the story. Never invent scores or quotes. Use only what the frames show.
+If nothing in these clips can honestly carry this story, reply ONLY {"unusable": "why"}.
+Reply with ONLY JSON:
+{"title":"","hook":{"clip":"","start":0,"dur":3,"label":"","cap1":"","cap2":"","voice":""},"moments":[{"clip":"","start":0,"key":0,"label":"","cap1":"","cap2":"","voice":""}],"endQuestion":"","postCaption":"","hashtags":[],"thumbs":[{"clip":"","t":0,"text":""}]}`,
+    { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 }
+  );
+  if (plan0.unusable) throw new Error(`breakdown: footage does not fit: ${String(plan0.unusable).slice(0, 200)}`);
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  const moments = (plan0.moments || []).filter((m) => byId.has(m.clip) && m.key > 0 && m.key < (byId.get(m.clip)!.durationSec || 1e9)).slice(0, 3);
+  if (!moments.length) throw new Error("breakdown: the analyst found no usable moment");
+
+  // Markers: a full-resolution gridded frame per moment; Claude places them.
+  log("analyst: drawing on the frozen frames (claude)…");
+  const frames = await Promise.all(moments.map((m) => service<{ file: string }>("/hype/frame", { clipId: m.clip, t: m.key })));
+  const placed = await claudeJson<{ marks: Mark[][] }>(
+    `You are drawing TV-analysis markers on frozen football frames. Read each image (a 10x10 grid: yellow numbers = tenths across, cyan numbers = tenths down):
+${frames.map((f, i) => `${i + 1}. ${f.file} — moment "${moments[i].label}": ${moments[i].voice}`).join("\n")}
+
+For EACH image give 1-4 marks that show exactly what the commentator explains:
+- {"type":"ring","x":..,"y":..,"label":"No.10"} under a key player's FEET (x,y = his feet)
+- {"type":"arrow","x1":..,"y1":..,"x2":..,"y2":..,"label":"THE RUN"} a run / where he goes
+- {"type":"pass","x1":..,"y1":..,"x2":..,"y2":..} the ball's path
+- {"type":"zone","x":..,"y":..,"w":..,"h":..,"label":"SPACE"} open space or a gap
+Coordinates are fractions 0-1 of the image (from the grid). Be precise: rings on real players, arrows along the real direction. Labels ≤ 12 chars.
+Reply with ONLY JSON: {"marks": [[...marks for image 1], [...image 2], ...]}`,
+    { tools: ["Read"], cwd: workDir(), timeoutMs: 8 * 60_000 }
+  ).catch(() => ({ marks: [] as Mark[][] }));
+
+  // Source-frame fractions → reel pixels: the same framing the renderer uses
+  // (clean crop, ≤72% wide, fitted into the 1080x780 box at y=560).
+  fs.mkdirSync(path.join(workDir(), "overlays"), { recursive: true });
+  const overlays = await Promise.all(moments.map(async (m, i) => {
+    const marks = (placed.marks?.[i] || []).slice(0, 4);
+    if (!marks.length) return undefined;
+    const c = byId.get(m.clip)! as HypeClip & { width?: number; height?: number };
+    const f = framing(c.crop);
+    const cw = f.w * (c.width || 1920), ch = f.h * (c.height || 1080);
+    const s = Math.min(1080 / cw, 780 / ch);
+    const box = [(1080 - cw * s) / 2, 560 + (780 - ch * s) / 2, cw * s, ch * s];
+    const fx = (v = 0) => (v - f.x) / f.w, fy = (v = 0) => (v - f.y) / f.h;
+    const conv = marks.map((k) => k.type === "ring" ? { ...k, x: fx(k.x), y: fy(k.y) }
+      : k.type === "zone" ? { ...k, x: fx(k.x), y: fy(k.y), w: (k.w || 0) / f.w, h: (k.h || 0) / f.h }
+      : { ...k, x1: fx(k.x1), y1: fy(k.y1), x2: fx(k.x2), y2: fy(k.y2) });
+    const name = `overlays/${jobKey}-${i}.png`;
+    const job = path.join(workDir(), "overlays", `${jobKey}-${i}.json`);
+    fs.writeFileSync(job, JSON.stringify({ box, marks: conv }));
+    const { execFile } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => execFile(process.env.GENESIS_PYTHON || "python",
+      [path.join(process.cwd(), "scripts", "genesis_annotate.py"), job, path.join(workDir(), name)], { timeout: 60_000 }, (e) => (e ? reject(e) : resolve())));
+    return name;
+  }));
+
+  // The edit: hook → per moment (play it, FREEZE + markers, slow-mo replay) → verdict.
+  const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
+  const hookClip = byId.has(plan0.hook?.clip) ? plan0.hook.clip : moments[0].clip;
+  const beats: HypeBeat[] = [
+    { mode: "hook", label: plan0.hook?.label || plan0.title, voice: plan0.hook?.voice || "", shots: [{ clip: hookClip, start: Math.max(0, plan0.hook?.start ?? moments[0].start), dur: clamp(plan0.hook?.dur || 3, 2, 3.5), cap1: plan0.hook?.cap1, cap2: plan0.hook?.cap2 }] },
+    ...moments.map((m, i) => ({
+      mode: "beat" as const, label: m.label, voice: m.voice,
+      shots: [
+        { clip: m.clip, start: Math.max(0, m.start), dur: clamp(m.key - m.start + 0.4, 1.5, 6), cap1: m.cap1, cap2: m.cap2 },
+        { clip: m.clip, start: Math.max(0, m.key - 0.8), dur: 0.8, freeze: 3.2, overlay: overlays[i] } as HypeShot,
+        { clip: m.clip, start: Math.max(0, m.key - 1.6), dur: 2.4, slow: 2, cap1: "REPLAY" } as HypeShot,
+      ],
+    })),
+    { mode: "end", label: "YOUR VERDICT?", voice: plan0.endQuestion || "", shots: [{ clip: moments[moments.length - 1].clip, start: moments[moments.length - 1].key + 1, dur: 2.5 }] },
+  ];
+  const plan = withOutro({ title: plan0.title || "THE BREAKDOWN", beats, postCaption: plan0.postCaption || "", hashtags: plan0.hashtags || [], thumbs: plan0.thumbs });
+
+  log("voicing (local TTS)…");
+  await voiceBeats(plan, jobKey, page);
+  log("rendering…");
+  const r2Key = `${page.key === "genesis_news" ? "genesis-news" : page.key.replace(/_/g, "-")}/${today()}/${jobKey}.mp4`;
+  const { jobId } = await service<{ jobId: string }>("/hype/render", { plan: { ...plan, tag: page.tag, crowdGain: page.crowdGain }, clips, outputR2Key: r2Key });
+  const done = await waitJob<{ r2Key: string; duration: number }>(jobId, 30 * 60_000, log);
+  fs.rmSync(path.join(workDir(), "voices", jobKey), { recursive: true, force: true });
+  log("cover: 3 candidates, Claude picks the best…");
+  const cover = await makeCover(plan, clips, done.r2Key, page, log);
+
+  const creators = [...new Set(clips.filter((c) => beats.some((b) => b.shots.some((s) => s.clip === c.id))).map((c) => c.creator).filter(Boolean))];
+  const caption = [plan.postCaption.trim(), IVIDEO_CTA, plan.hashtags.join(" "),
+    creators.length ? `🎥 Footage: ${creators.join(", ")} — short excerpts used for analysis and review` : ""].filter(Boolean).join("\n\n");
+  return {
+    ...cover, format: "news", topic: opts.topic, videoUrl: r2PublicUrl(done.r2Key), r2Key: done.r2Key, caption,
+    firstComment: FIRST_COMMENTS[Math.floor(Date.now() / 86_400_000) % FIRST_COMMENTS.length],
+    plan, page: page.key, research: null, clips, durationSec: done.duration,
+  };
 }
 
 // ─── the whole thing ────────────────────────────────────────

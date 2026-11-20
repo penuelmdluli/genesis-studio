@@ -107,6 +107,21 @@ function workDir(): string {
   return dir;
 }
 
+/**
+ * Short YouTube searches from a long editorial topic. A whole sentence ("5
+ * proud South African moments trending this week — Relebohile Mofokeng's
+ * AFCON-qualifying brace…") matches nothing (2026-11-20, an attempt lost).
+ * Uses the headline part plus the named people/teams/places in it.
+ */
+export function searchQueries(topic: string): string[] {
+  const head = topic.split(/\s[—–-]\s|:|\(/)[0].replace(/[^\p{L}\p{N}\s'&]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 7).join(" ");
+  const names = [...topic.matchAll(/\b(?:[A-Z][\p{L}'’]+|[A-Z]{2,})(?:\s+(?:[A-Z][\p{L}'’]+|[A-Z]{2,}|vs|v|of|the)){0,3}/gu)]
+    .map((m) => m[0].replace(/['’]s\b/g, "").replace(/['’]/g, "").replace(/\s+(vs|v|of|the)$/i, "").trim())
+    .filter((n) => !/^(throwback|top|best|the|funniest|wait|watch|why|how|when|what|this|today)$/i.test(n))
+    .filter((n) => n.split(/\s+/).length >= 2 || n.length >= 6);
+  return [...new Set([head, ...names.map((n) => `${n} highlights`)])].filter((q) => q.length >= 4).slice(0, 4);
+}
+
 // ─── footage bank ───────────────────────────────────────────
 // reels/footage-bank-<page>.json: every clip used in a POSTED reel (it passed
 // smart crop, the frame check and the licence check). Reused as archive
@@ -721,7 +736,7 @@ export async function makeHypeReel(opts: {
   }
 
   log("finding footage…");
-  const queries = opts.clipIds?.length ? [] : opts.queries?.length ? opts.queries : facts?.youtubeQueries.length ? facts.youtubeQueries : [opts.topic];
+  const queries = opts.clipIds?.length ? [] : opts.queries?.length ? opts.queries : facts?.youtubeQueries.length ? facts.youtubeQueries : searchQueries(opts.topic);
   const newest = opts.newest ?? (opts.format === "news" || opts.format === "preview");
   const avoid = [...(opts.avoidClipIds || []), ...readBlocklist()];
   let found = await findClips(queries, opts.maxClips ?? (opts.format === "throwback" ? 2 : 3), {

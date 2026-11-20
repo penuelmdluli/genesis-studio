@@ -161,7 +161,7 @@ function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit
   // blurred copy of itself.
   const f = framing(crop);
   return (
-    `[0:v]${slow > 1 ? `setpts=${slow}*PTS,` : ""}crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
+    `[0:v]${slow !== 1 ? `setpts=${slow}*PTS,` : ""}crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
     `[b]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},scale=108:192,gblur=sigma=2,scale=${W}:${H},eq=brightness=-0.18:saturation=1.3[bg];` +
     `[a]scale=${W}:780:force_original_aspect_ratio=decrease,eq=contrast=1.08:saturation=1.18,unsharp=5:5:0.6[fg];` +
     `[bg][fg]overlay=(W-w)/2:560+(780-h)/2,fps=${FPS},setsar=1` +
@@ -218,7 +218,8 @@ async function renderHype(job, { plan, clips }) {
     // the last frame, with its markers) lengthen a shot beyond its source span.
     const shots = beat.shots.map((x) => ({
       ...x,
-      slow: Math.min(Math.max(Number(x.slow) || 1, 1), 2),
+      // slow < 1 plays FAST (0.6 = 1.67x, for build-ups), > 1 slow motion.
+      slow: Math.min(Math.max(Number(x.slow) || 1, 0.5), 2),
       freeze: Math.min(Math.max(Number(x.freeze) || 0, 0), 6),
     }));
     const eff = (x) => x.dur * x.slow + x.freeze;
@@ -272,7 +273,7 @@ async function renderHype(job, { plan, clips }) {
         await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", len.toFixed(3), "-c:a", "pcm_s16le", wav], `bed ${id}`);
       } else {
         await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", shot.dur.toFixed(3), "-i", srcPath(clip.id), "-vn",
-          "-af", `aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.01,afade=out:st=${Math.max(0, shot.dur - 0.01).toFixed(3)}:d=0.01,${shot.slow > 1 ? `atempo=${(1 / shot.slow).toFixed(3)},` : ""}apad`,
+          "-af", `aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.01,afade=out:st=${Math.max(0, shot.dur - 0.01).toFixed(3)}:d=0.01,${shot.slow !== 1 ? `atempo=${(1 / shot.slow).toFixed(3)},` : ""}apad`,
           "-t", len.toFixed(3), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", wav], `bed ${id}`);
       }
       beds.push(wav);

@@ -389,6 +389,7 @@ Rules for shots:
 - A shot is 1.5–5 seconds; start at a stamped second (the moment can be up to 2s either side). Never run past the clip's length.
 - The key moment (the goal, the jump, the reveal) must be INSIDE a shot. Use different angles/replays when the sheet shows them.
 - Total 30–60 seconds. Hook ≤ 3.5s. End card: one shot ≤ 3s of fans/celebration.
+- Pace like a pro edit with SPEED RAMPS, per shot "slow": 0.6-0.8 plays a build-up FAST (dribble, counter-attack, crowd), 1 is normal, 1.5-2 is SLOW MOTION for the money moment (the strike, the save, the celebration) — use slow-mo once or twice per reel, not everywhere. (A shot's screen time = dur × slow.)
 
 Rules for text:
 - title: ≤ 22 chars, upper case, the reel's name ("SOWETO DERBY SCREAMERS").
@@ -400,7 +401,7 @@ Rules for text:
 
 ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${redo}\nFix every point.\n\n` : ""}Reply with ONLY this JSON (no prose):
 {"title": "", "notes": "one line per clip: what you saw and where",
- "beats": [{"mode": "hook"|"beat"|"end", "label": "", "voice": "", "shots": [{"clip": "<id>", "start": 0, "dur": 0, "cap1": "", "cap2": ""}]}],
+ "beats": [{"mode": "hook"|"beat"|"end", "label": "", "voice": "", "shots": [{"clip": "<id>", "start": 0, "dur": 0, "slow": 1, "cap1": "", "cap2": ""}]}],
  "postCaption": "", "hashtags": ["#..."],
  "thumbs": [{"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}]}
 
@@ -642,7 +643,8 @@ export function validatePlan(plan: HypePlan, clips: HypeClip[]): HypePlan {
       if (used.some((u) => u.clip === c.id && Math.abs(u.start - start) < 2.5)) continue;
       used.push({ clip: c.id, start });
       budget -= dur;
-      shots.push({ clip: c.id, start, dur, cap1: String(s.cap1 || "").slice(0, 32), cap2: String(s.cap2 || "").slice(0, 32) });
+      const slow = Math.min(Math.max(Number(s.slow) || 1, 0.5), 2);
+      shots.push({ clip: c.id, start, dur, ...(slow !== 1 ? { slow } : {}), cap1: String(s.cap1 || "").slice(0, 32), cap2: String(s.cap2 || "").slice(0, 32) });
     }
     if (shots.length) beats.push({ mode: b.mode, label: String(b.label || "").slice(0, 24), voice: String(b.voice || ""), shots });
   }
@@ -843,7 +845,8 @@ Reply with ONLY JSON: {"marks": [[...marks for image 1], [...image 2], ...]}`,
     ...moments.map((m, i) => ({
       mode: "beat" as const, label: m.label, voice: m.voice,
       shots: [
-        { clip: m.clip, start: Math.max(0, m.start), dur: clamp(m.key - m.start + 0.4, 1.5, 6), cap1: m.cap1, cap2: m.cap2 },
+        // Speed ramp: a long build-up plays fast (1.4x), the freeze holds, the replay goes slow.
+        { clip: m.clip, start: Math.max(0, m.start), dur: clamp(m.key - m.start + 0.4, 1.5, 6), cap1: m.cap1, cap2: m.cap2, slow: m.key - m.start > 3 ? 0.7 : 1 },
         { clip: m.clip, start: Math.max(0, m.key - 0.8), dur: 0.8, freeze: 3.2, overlay: overlays[i] } as HypeShot,
         { clip: m.clip, start: Math.max(0, m.key - 1.6), dur: 2.4, slow: 2, cap1: "REPLAY" } as HypeShot,
       ],

@@ -138,7 +138,7 @@ function framing(c) {
   return { x: b.x + (b.w - w) / 2, y: b.y, w, h: b.h };
 }
 
-function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit, crop }) {
+function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit, crop, slow = 1, overlay = false }) {
   const tf = (name, body) => {
     const p = path.join(dir, `t_${id}_${name}.txt`);
     fs.writeFileSync(p, String(body || ""), "utf8");
@@ -161,7 +161,7 @@ function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit
   // blurred copy of itself.
   const f = framing(crop);
   return (
-    `[0:v]crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
+    `[0:v]${slow > 1 ? `setpts=${slow}*PTS,` : ""}crop=iw*${f.w.toFixed(3)}:ih*${f.h.toFixed(3)}:iw*${f.x.toFixed(3)}:ih*${f.y.toFixed(3)},split[a][b];` +
     `[b]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},scale=108:192,gblur=sigma=2,scale=${W}:${H},eq=brightness=-0.18:saturation=1.3[bg];` +
     `[a]scale=${W}:780:force_original_aspect_ratio=decrease,eq=contrast=1.08:saturation=1.18,unsharp=5:5:0.6[fg];` +
     `[bg][fg]overlay=(W-w)/2:560+(780-h)/2,fps=${FPS},setsar=1` +
@@ -169,6 +169,10 @@ function shotFilter({ id, dir, beat, shot, flash, hold, mode, title, tag, credit
     (mode === "end" ? `,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill` : "") +
     `,${lines.join(",")}` +
     (flash ? `,fade=in:st=0:d=0.18:color=white` : "") +
+    // Analysis markers (rings, run arrows, zones): a 1080x1920 transparent
+    // PNG drawn on the host by scripts/genesis_annotate.py, laid over the
+    // frozen frame.
+    (overlay ? `[pre];[pre][1:v]overlay=0:0:format=auto` : "") +
     `,format=yuv420p[v]`
   );
 }
@@ -210,8 +214,15 @@ async function renderHype(job, { plan, clips }) {
   for (let b = 0; b < plan.beats.length; b++) {
     const beat = plan.beats[b];
     beatStarts.push(t);
-    const shots = beat.shots.map((x) => ({ ...x }));
-    const footage = shots.reduce((s, x) => s + x.dur, 0);
+    // Analysis shots: slow (replay factor, 1-2) and freeze (seconds to hold
+    // the last frame, with its markers) lengthen a shot beyond its source span.
+    const shots = beat.shots.map((x) => ({
+      ...x,
+      slow: Math.min(Math.max(Number(x.slow) || 1, 1), 2),
+      freeze: Math.min(Math.max(Number(x.freeze) || 0, 0), 6),
+    }));
+    const eff = (x) => x.dur * x.slow + x.freeze;
+    const footage = shots.reduce((s, x) => s + eff(x), 0);
     const need = voiceFiles[b] ? voiceFiles[b].dur + 0.4 : footage;
     // Tighten: trim from the last shot backwards, never below 1.2s a shot.
     let excess = footage - need;
@@ -223,7 +234,7 @@ async function renderHype(job, { plan, clips }) {
       }
     }
     // Run on: extend the last shot from the source before ever freezing.
-    let extra = Math.max(0, need - shots.reduce((s, x) => s + x.dur, 0));
+    let extra = Math.max(0, need - shots.reduce((s, x) => s + eff(x), 0));
     const last = shots[shots.length - 1];
     const lastClip = byId.get(last.clip);
     const room = Math.max(0, (Number(lastClip.durationSec) || 0) - (last.start + last.dur) - 0.2);
@@ -234,11 +245,13 @@ async function renderHype(job, { plan, clips }) {
     for (let s = 0; s < shots.length; s++) {
       const shot = shots[s];
       const clip = byId.get(shot.clip);
-      const hold = s === shots.length - 1 ? extra : 0;
+      const hold = (s === shots.length - 1 ? extra : 0) + shot.freeze;
       const id = `${String(b).padStart(2, "0")}_${s}`;
       const out = path.join(dir, `p_${id}.mp4`);
+      const overlayFile = shot.overlay ? path.join(WORK, String(shot.overlay)) : null;
+      const hasOverlay = !!overlayFile && fs.existsSync(overlayFile);
       const fc = shotFilter({
-        id, dir, beat, shot, hold, crop: clip.crop,
+        id, dir, beat, shot, hold, crop: clip.crop, slow: shot.slow, overlay: hasOverlay,
         flash: s === 0 && beat.mode !== "hook",
         mode: beat.mode,
         title: plan.title,
@@ -248,7 +261,8 @@ async function renderHype(job, { plan, clips }) {
       const fcFile = path.join(dir, `f_${id}.txt`);
       fs.writeFileSync(fcFile, fc);
       await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", shot.dur.toFixed(3), "-i", srcPath(clip.id),
-        "-filter_complex_script", fcFile, "-map", "[v]", "-an", "-t", (shot.dur + hold).toFixed(3),
+        ...(hasOverlay ? ["-i", overlayFile] : []),
+        "-filter_complex_script", fcFile, "-map", "[v]", "-an", "-t", (shot.dur * shot.slow + hold).toFixed(3),
         "-threads", "0", "-c:v", "libx264", "-preset", "medium", "-crf", "18", out], `cut ${id}`, 5 * 60 * 1000);
       pieces.push(out);
       // The sound for exactly this piece's length, as PCM.
@@ -258,7 +272,7 @@ async function renderHype(job, { plan, clips }) {
         await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", len.toFixed(3), "-c:a", "pcm_s16le", wav], `bed ${id}`);
       } else {
         await run("ffmpeg", ["-v", "error", "-y", "-ss", String(shot.start), "-t", shot.dur.toFixed(3), "-i", srcPath(clip.id), "-vn",
-          "-af", `aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.01,afade=out:st=${Math.max(0, shot.dur - 0.01).toFixed(3)}:d=0.01,apad`,
+          "-af", `aformat=sample_rates=48000:channel_layouts=stereo,afade=in:d=0.01,afade=out:st=${Math.max(0, shot.dur - 0.01).toFixed(3)}:d=0.01,${shot.slow > 1 ? `atempo=${(1 / shot.slow).toFixed(3)},` : ""}apad`,
           "-t", len.toFixed(3), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", wav], `bed ${id}`);
       }
       beds.push(wav);
@@ -350,6 +364,56 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
     })().catch((err) => { job.status = "error"; job.error = err.message; });
   });
 
+  // ─── analysis reels ──────────────────────────────────────
+  // Any public video page yt-dlp can read (YouTube, Facebook…): what it is,
+  // who posted it, how long. The analysis credits the uploader by name.
+  //   body: { url } → { id, title, creator, url, durationSec, width, height, site }
+  app.post("/media/info", auth, async (req, res) => {
+    try {
+      const url = String(req.body?.url || "");
+      if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: "url required" });
+      const j = JSON.parse(await run("yt-dlp", ["-J", "--no-playlist", "--no-warnings", url], "info", 90_000));
+      const site = String(j.extractor_key || j.extractor || "web").toLowerCase().replace(/[^a-z]/g, "").slice(0, 8);
+      res.json({
+        id: `${site === "youtube" ? "" : `${site}_`}${String(j.id).replace(/[^\w-]/g, "")}`.slice(0, 60),
+        title: String(j.title || "").slice(0, 140),
+        creator: String(j.uploader || j.channel || j.uploader_id || site).slice(0, 80),
+        url: j.webpage_url || url,
+        durationSec: Number(j.duration) || 0,
+        width: j.width || 0,
+        height: j.height || 0,
+        site,
+      });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message).slice(0, 300) });
+    }
+  });
+
+  // One full-resolution frame with a labelled 10x10 grid, so the analyst can
+  // place markers on exact players (fractions of the frame).
+  //   body: { clipId, t } → { file }
+  app.post("/hype/frame", auth, async (req, res) => {
+    try {
+      const { clipId } = req.body || {};
+      if (!clipId || !fs.existsSync(srcPath(clipId))) return res.status(400).json({ error: "clip not prepared" });
+      const t = Math.max(0, Number(req.body.t) || 0);
+      const dir = path.join(WORK, "frames");
+      fs.mkdirSync(dir, { recursive: true });
+      const out = path.join(dir, `${clipId}-${t.toFixed(1)}.jpg`);
+      const font = FONT_SMALL ? `fontfile='${FONT_SMALL}':` : "";
+      const labels = [];
+      for (let i = 1; i < 10; i++) {
+        labels.push(`drawtext=${font}text='${i}':x=w*${i / 10}-tw/2:y=4:fontsize=26:fontcolor=yellow:box=1:boxcolor=black@0.6`);
+        labels.push(`drawtext=${font}text='${i}':x=4:y=h*${i / 10}-th/2:fontsize=26:fontcolor=cyan:box=1:boxcolor=black@0.6`);
+      }
+      await run("ffmpeg", ["-v", "error", "-y", "-ss", t.toFixed(2), "-i", srcPath(clipId), "-frames:v", "1",
+        "-vf", `scale=1600:-2,drawgrid=w=iw/10:h=ih/10:t=1:c=white@0.35,${labels.join(",")}`, "-q:v", "3", out], "frame", 60_000);
+      res.json({ file: `frames/${path.basename(out)}` });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message).slice(0, 300) });
+    }
+  });
+
   // Cover image for a reel (Facebook reel cover + YouTube Short thumbnail).
   // Without one the platforms pick a random frame — often a blur or a
   // transition. The edit planner names the single most striking frame and
@@ -414,6 +478,7 @@ module.exports = function registerHype(app, auth, r2, BUCKET) {
         if (!fs.existsSync(srcPath(s.clip))) return res.status(400).json({ error: `clip ${s.clip} not prepared` });
         s.start = Math.max(0, Number(s.start) || 0);
         s.dur = Math.min(Math.max(Number(s.dur) || 2, 0.8), 8);
+        if (s.overlay && !/^overlays\/[\w.-]+\.png$/.test(String(s.overlay))) return res.status(400).json({ error: `bad overlay path ${s.overlay}` });
       }
     }
     const job = newJob("render");

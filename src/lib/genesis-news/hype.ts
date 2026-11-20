@@ -249,8 +249,12 @@ export async function pickTopic(
   const failed = opts.failed?.length
     ? `\nAlready tried in this slot and FAILED (not enough clean, matching footage) — pick something clearly different, with plenty of footage on YouTube:\n${opts.failed.map((f) => `- ${f.topic} (${f.why})`).join("\n")}\n`
     : "";
+  // Footage first: what this page already holds, checked and ready.
+  const held = Object.values(readBank(page.key)).map((c) => `- ${c.title}`).slice(0, 40).join("\n");
   const steer = opts.evergreen
-    ? `This is the SPARE reel, kept in reserve for a slot whose story falls through. It must be EVERGREEN: format "countdown" or "throwback", a timeless topic with lots of clean footage on YouTube, nothing dated or tied to this week's news.`
+    ? `This reel must be EVERGREEN and SURE TO WORK: format "countdown" or "throwback", a timeless topic, nothing tied to this week's news.
+FOOTAGE FIRST: these clips are already downloaded and checked for this page — build the topic around what they show (and give "queries" that would find more of the same):
+${held || "- (none yet)"}`
     : `When a radar item fits this page's audience and has real footage behind it, prefer it over an evergreen topic — that is what gets shared today.`;
   const prompt = `${page.picker}
 Today is ${today()}.
@@ -382,7 +386,8 @@ ${redo ? `THIS IS A REDO. A frame-by-frame check of your last edit found:\n${red
  "postCaption": "", "hashtags": ["#..."],
  "thumbs": [{"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}, {"clip": "<id>", "t": 0, "text": ""}]}
 
-If the footage cannot honestly carry this topic (wrong players, wrong sport, nothing that shows what the topic promises), do NOT invent a reel and do NOT explain in prose — reply with ONLY:
+If the footage carries only PART of the topic, ADAPT the reel to what it truly shows instead of giving up: fewer countdown items ("5 street foods" → "2 street foods Mzansi can't live without"), a narrower angle, a new title and voice that promise only what is on screen. A true, smaller reel beats no reel. Never fake the missing part.
+Only if NOTHING in the footage can honestly carry a reel close to this topic (wrong players, wrong sport, wrong subject entirely), do NOT invent one and do NOT explain in prose — reply with ONLY:
 {"unusable": "one line: what the clips actually show and why it does not fit"}`;
   const plan = await claudeJson<HypePlan & { unusable?: string }>(prompt, { tools: ["Read"], cwd: workDir(), timeoutMs: 15 * 60_000 });
   // An honest "this footage does not fit" ends the attempt with a reason the
